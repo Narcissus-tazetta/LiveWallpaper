@@ -9,7 +9,7 @@ enum AppConfig {
     static let defaultVersion = "0.0.3"
     static let sparkleAppcastURL =
         "https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml"
-    static let sparklePublicEDKey = "MCowBQYDK2VwAyEAuoATy8ItPd3DQDHahg8JEWgXUNS4//A29+JLUy2zxhY="
+    static let sparklePublicEDKey = "uoATy8ItPd3DQDHahg8JEWgXUNS4//A29+JLUy2zxhY="
 }
 
 final class PlayerView: NSView {
@@ -189,20 +189,24 @@ final class WallpaperController {
         guard !trimmed.isEmpty else {
             return
         }
-        guard currentVideoPath != trimmed else {
+        let sourceURL = URL(fileURLWithPath: trimmed)
+        guard FileManager.default.fileExists(atPath: sourceURL.path) else {
             return
         }
 
-        let url = URL(fileURLWithPath: trimmed)
-        guard FileManager.default.fileExists(atPath: url.path) else {
+        guard let localURL = importVideoToAppSupport(from: sourceURL) else {
             return
         }
 
-        currentVideoPath = trimmed
-        UserDefaults.standard.set(trimmed, forKey: "videoPath")
+        guard currentVideoPath != localURL.path else {
+            return
+        }
+
+        currentVideoPath = localURL.path
+        UserDefaults.standard.set(localURL.path, forKey: "videoPath")
 
         let asset = AVURLAsset(
-            url: url,
+            url: localURL,
             options: [AVURLAssetPreferPreciseDurationAndTimingKey: false]
         )
         let item = AVPlayerItem(asset: asset)
@@ -212,6 +216,49 @@ final class WallpaperController {
         playerLooper = nil
         playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: item)
         queuePlayer.play()
+    }
+
+    private func importVideoToAppSupport(from sourceURL: URL) -> URL? {
+        let fileManager = FileManager.default
+        guard
+            let appSupportURL = fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+        else {
+            return nil
+        }
+
+        let targetDirectory =
+            appSupportURL
+            .appendingPathComponent("LiveWallpaper", isDirectory: true)
+            .appendingPathComponent("Videos", isDirectory: true)
+
+        do {
+            try fileManager.createDirectory(
+                at: targetDirectory,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            return nil
+        }
+
+        let ext = sourceURL.pathExtension.isEmpty ? "mp4" : sourceURL.pathExtension
+        let targetURL = targetDirectory.appendingPathComponent("wallpaper.\(ext)")
+
+        if sourceURL.path == targetURL.path {
+            return targetURL
+        }
+
+        do {
+            if fileManager.fileExists(atPath: targetURL.path) {
+                try fileManager.removeItem(at: targetURL)
+            }
+            try fileManager.copyItem(at: sourceURL, to: targetURL)
+            return targetURL
+        } catch {
+            return nil
+        }
     }
 
     private func restoreState() {
@@ -233,6 +280,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let wallpaperController = WallpaperController()
     #if canImport(Sparkle)
         private var updaterController: SPUStandardUpdaterController?
+        private var sparkleStarted = false
+        private var manualUpdateCheckPending = false
     #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -246,12 +295,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func verifyUpdatePrerequisites() {
         let bundlePath = Bundle.main.bundlePath
+        NSLog("[Sparkle] Bundle path: \(bundlePath)")
         if bundlePath.contains("/AppTranslocation/") {
             let alert = NSAlert()
             alert.messageText = "アップデートを有効化するにはアプリをApplicationsに移動してください"
             alert.informativeText = "現在は一時実行領域から起動しているため、自動アップデートが失敗する場合があります。"
             alert.alertStyle = .warning
             alert.runModal()
+            NSLog("[Sparkle] AppTranslocation detected")
         }
         if !FileManager.default.isWritableFile(atPath: bundlePath) {
             NSLog("[Sparkle] App path is not writable: \(bundlePath)")
@@ -261,11 +312,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupSparkleUpdater() {
         #if canImport(Sparkle)
             guard let publicEDKey = Self.sparklePublicEDKeyValue(), !publicEDKey.isEmpty else {
+                NSLog("[Sparkle] publicEDKey is empty")
                 return
             }
             guard let feedURL = Self.sparkleFeedURLValue(), !feedURL.isEmpty else {
+                NSLog("[Sparkle] feedURL is empty")
                 return
             }
+            NSLog("[Sparkle] feedURL=\(feedURL)")
 
             let updaterController = SPUStandardUpdaterController(
                 startingUpdater: false,
@@ -280,10 +334,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             do {
                 try updater.start()
+                sparkleStarted = true
+                NSLog("[Sparkle] updater.start() succeeded")
                 updater.checkForUpdatesInBackground()
+                NSLog("[Sparkle] checkForUpdatesInBackground() requested")
             } catch {
                 Self.reportSparkleError(error)
-                return
+                let alert = NSAlert()
+                alert.messageText = "アップデータ初期化に失敗しました"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .warning
+                alert.runModal()
             }
         #endif
     }
@@ -331,10 +392,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(toggleItem)
 
         #if canImport(Sparkle)
-            menu.addItem(
-                NSMenuItem(
-                    title: "アップデートを確認", action: #selector(checkForUpdates), keyEquivalent: "u")
+            let updateItem = NSMenuItem(
+                title: "アップデートを確認",
+                action: #selector(checkForUpdates),
+                keyEquivalent: "u"
             )
+            updateItem.image = updateMenuIcon()
+            menu.addItem(updateItem)
         #endif
 
         menu.addItem(NSMenuItem.separator())
@@ -451,6 +515,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return configured
     }
 
+    private func updateMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: "arrow.triangle.2.circlepath",
+            accessibilityDescription: "アップデート"
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
     @objc private func openSettings() {
         settingsWindowController.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -466,6 +541,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func checkForUpdates() {
         #if canImport(Sparkle)
+            NSLog("[Sparkle] manual checkForUpdates() requested")
+            manualUpdateCheckPending = true
+            guard let updater = updaterController?.updater else {
+                NSLog("[Sparkle] updaterController is nil")
+                manualUpdateCheckPending = false
+                return
+            }
+
+            if !sparkleStarted {
+                do {
+                    try updater.start()
+                    sparkleStarted = true
+                    NSLog("[Sparkle] updater.start() succeeded from manual check")
+                } catch {
+                    Self.reportSparkleError(error)
+                    manualUpdateCheckPending = false
+                    let alert = NSAlert()
+                    alert.messageText = "アップデータ初期化に失敗しました"
+                    alert.informativeText = error.localizedDescription
+                    alert.alertStyle = .warning
+                    alert.runModal()
+                    return
+                }
+            }
+
             updaterController?.checkForUpdates(nil)
         #endif
     }
@@ -482,7 +582,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         nonisolated func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
+            Task { @MainActor in
+                self.manualUpdateCheckPending = false
+            }
             Self.reportSparkleError(error)
+        }
+
+        nonisolated func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+            Task { @MainActor in
+                if self.manualUpdateCheckPending {
+                    self.manualUpdateCheckPending = false
+                    let alert = NSAlert()
+                    alert.messageText = "最新の状態です！"
+                    alert.informativeText = "現在利用できるアップデートはありません。"
+                    alert.alertStyle = .informational
+                    alert.runModal()
+                }
+            }
         }
     }
 #endif

@@ -30,6 +30,29 @@ normalize_public_key() {
   fi
 }
 
+validate_sparkle_public_key() {
+  local key="$1"
+  python3 - "$key" <<'PY'
+import base64
+import sys
+
+key = sys.argv[1].strip()
+try:
+    raw = base64.b64decode(key, validate=True)
+except Exception:
+    print("Sparkle public key must be base64", file=sys.stderr)
+    raise SystemExit(1)
+
+if len(raw) != 32:
+    print(
+        f"Sparkle public key must be 32-byte raw Ed25519 key (got {len(raw)} bytes). "
+        "Do not use PEM/DER; use Sparkle raw key base64.",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PY
+}
+
 mkdir -p "$DIST_DIR"
 
 cd "$ROOT_DIR"
@@ -81,6 +104,8 @@ if [[ -z "$SPARKLE_PUBLIC_ED_KEY" ]]; then
   exit 1
 fi
 
+validate_sparkle_public_key "$SPARKLE_PUBLIC_ED_KEY"
+
 echo "[2/5] Creating .app bundle..."
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
@@ -110,6 +135,12 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <string>${APP_NAME}</string>
   <key>CFBundleIconFile</key>
   <string>AppIcon.icns</string>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>ja</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>ja</string>
+  </array>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
   <key>LSUIElement</key>
