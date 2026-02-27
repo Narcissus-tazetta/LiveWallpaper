@@ -3,7 +3,7 @@ import AppKit
 import Sparkle
 
 enum AppConfig {
-    static let defaultVersion = "0.0.1"
+    static let defaultVersion = "0.0.3"
     static let sparkleAppcastURL =
         "https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml"
     static let sparklePublicEDKey = ""
