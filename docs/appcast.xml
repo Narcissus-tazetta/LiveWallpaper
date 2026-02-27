@@ -8,23 +8,18 @@
     <description>LiveWallpaper updates</description>
     <language>ja</language>
     <item>
-      <title>Version 0.0.4</title>
-      <sparkle:version>4</sparkle:version>
-      <sparkle:shortVersionString>0.0.4</sparkle:shortVersionString>
-      <pubDate>Fri, 27 Feb 2026 06:30:23 +0000</pubDate>
+      <title>Version 0.0.5</title>
+      <sparkle:version>5</sparkle:version>
+      <sparkle:shortVersionString>0.0.5</sparkle:shortVersionString>
+      <pubDate>Fri, 27 Feb 2026 06:45:16 +0000</pubDate>
       <enclosure
-        url="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v0.0.4/LiveWallpaper-macos-v0.0.4.zip"
-<<<<<<< HEAD
-        sparkle:edSignature="vXjvqOUZwFH7SLciViDNUZxiWbSBsHpR8N5lsBMABRRdT9Es2giFtFthEw+EA4jLtulLAAMwMFqfqSFayD/tAg=="
-        sparkle:version="0.0.4"
-=======
-        sparkle:edSignature="QcxBUA9LGFugf2ZIf3i+8ahGlyMeXPYbO13AKtK80IU+q8WVB74wmr5z3a9u3kldS88FxqlYFdThf7BheNPMAQ=="
-        sparkle:version="4"
->>>>>>> 325d443 (fix: 🐛 バージョンミス)
-        sparkle:shortVersionString="0.0.4"
-        length="1070547"
+        url="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v0.0.5/LiveWallpaper-macos-v0.0.5.zip"
+        sparkle:edSignature="/3RgNfXAksufJdS5BSNQR6wyGUpkEkb0j5d0ekn8ILmrIc00WIe3kbJ5rWljxOGZOxcxF/WtY2tSeCTiUqO1CA=="
+        sparkle:version="5"
+        sparkle:shortVersionString="0.0.5"
+        length="1070555"
         type="application/octet-stream"/>
-      <sparkle:releaseNotesLink>https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v0.0.4</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v0.0.5</sparkle:releaseNotesLink>
     </item>
   </channel>
 </rss>
