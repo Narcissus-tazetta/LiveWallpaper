@@ -1,6 +1,9 @@
 import AVFoundation
 import AppKit
-import Sparkle
+
+#if canImport(Sparkle)
+    import Sparkle
+#endif
 
 enum AppConfig {
     static let defaultVersion = "0.0.3"
@@ -223,12 +226,14 @@ final class WallpaperController {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
     private var settingsWindowController: SettingsWindowController!
     private let wallpaperController = WallpaperController()
-    private var updaterController: SPUStandardUpdaterController?
+    #if canImport(Sparkle)
+        private var updaterController: SPUStandardUpdaterController?
+    #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -239,41 +244,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
     }
 
     private func setupSparkleUpdater() {
-        guard let publicEDKey = Self.sparklePublicEDKeyValue(), !publicEDKey.isEmpty else {
-            return
-        }
-        guard let feedURL = Self.sparkleFeedURLValue(), !feedURL.isEmpty else {
-            return
-        }
+        #if canImport(Sparkle)
+            guard let publicEDKey = Self.sparklePublicEDKeyValue(), !publicEDKey.isEmpty else {
+                return
+            }
+            guard let feedURL = Self.sparkleFeedURLValue(), !feedURL.isEmpty else {
+                return
+            }
 
-        let updaterController = SPUStandardUpdaterController(
-            startingUpdater: false,
-            updaterDelegate: self,
-            userDriverDelegate: nil
-        )
-        self.updaterController = updaterController
+            let updaterController = SPUStandardUpdaterController(
+                startingUpdater: false,
+                updaterDelegate: self,
+                userDriverDelegate: nil
+            )
+            self.updaterController = updaterController
 
-        let updater = updaterController.updater
-        updater.automaticallyChecksForUpdates = true
-        updater.automaticallyDownloadsUpdates = true
+            let updater = updaterController.updater
+            updater.automaticallyChecksForUpdates = true
+            updater.automaticallyDownloadsUpdates = true
 
-        do {
-            try updater.start()
-            updater.checkForUpdatesInBackground()
-        } catch {
-            return
-        }
-    }
-
-    nonisolated func feedURLString(for updater: SPUUpdater) -> String? {
-        Self.sparkleFeedURLValue()
-    }
-
-    nonisolated func publicEDKey(for updater: SPUUpdater) -> String? {
-        Self.sparklePublicEDKeyValue()
-    }
-
-    nonisolated func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
+            do {
+                try updater.start()
+                updater.checkForUpdatesInBackground()
+            } catch {
+                return
+            }
+        #endif
     }
 
     nonisolated private static func sparkleFeedURLValue() -> String? {
@@ -441,6 +437,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
         NSApp.terminate(nil)
     }
 }
+
+#if canImport(Sparkle)
+    extension AppDelegate: SPUUpdaterDelegate {
+        nonisolated func feedURLString(for updater: SPUUpdater) -> String? {
+            Self.sparkleFeedURLValue()
+        }
+
+        nonisolated func publicEDKey(for updater: SPUUpdater) -> String? {
+            Self.sparklePublicEDKeyValue()
+        }
+
+        nonisolated func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
+        }
+    }
+#endif
 
 @main
 struct LiveWallpaperApp {

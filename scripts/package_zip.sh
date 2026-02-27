@@ -18,6 +18,17 @@ X64_EXEC_PATH="$ROOT_DIR/.build/x86_64-apple-macosx/release/${APP_NAME}"
 UNIVERSAL_EXEC_PATH="$DIST_DIR/${APP_NAME}-universal"
 EXEC_PATH="$ARM_EXEC_PATH"
 ICON_PATH="$ROOT_DIR/Sources/LiveWallpaper/Resources/AppIcon.icns"
+SPARKLE_FRAMEWORK_PATH="$ROOT_DIR/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+PUBLIC_KEY_FILE="$ROOT_DIR/sparkle-public.pem"
+
+normalize_public_key() {
+  local raw="$1"
+  if [[ "$raw" == *"BEGIN PUBLIC KEY"* ]]; then
+    printf '%s' "$raw" | sed $'s/\\\\n/\\\n/g' | sed '/-----BEGIN PUBLIC KEY-----/d;/-----END PUBLIC KEY-----/d' | tr -d '[:space:]'
+  else
+    printf '%s' "$raw" | tr -d '[:space:]'
+  fi
+}
 
 mkdir -p "$DIST_DIR"
 
@@ -54,12 +65,29 @@ if [[ ! -f "$ICON_PATH" ]]; then
   exit 1
 fi
 
+if [[ ! -d "$SPARKLE_FRAMEWORK_PATH" ]]; then
+  echo "Sparkle framework not found: $SPARKLE_FRAMEWORK_PATH" >&2
+  exit 1
+fi
+
+if [[ -z "$SPARKLE_PUBLIC_ED_KEY" ]] && [[ -f "$PUBLIC_KEY_FILE" ]]; then
+  SPARKLE_PUBLIC_ED_KEY="$(cat "$PUBLIC_KEY_FILE")"
+fi
+
+SPARKLE_PUBLIC_ED_KEY="$(normalize_public_key "$SPARKLE_PUBLIC_ED_KEY")"
+
+if [[ -z "$SPARKLE_PUBLIC_ED_KEY" ]]; then
+  echo "Sparkle public key is empty. Set SPARKLE_PUBLIC_ED_KEY or provide sparkle-public.pem" >&2
+  exit 1
+fi
+
 echo "[2/5] Creating .app bundle..."
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp -f "$EXEC_PATH" "$APP_DIR/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
 cp -f "$ICON_PATH" "$APP_DIR/Contents/Resources/AppIcon.icns"
+cp -R "$SPARKLE_FRAMEWORK_PATH" "$APP_DIR/Contents/MacOS/Sparkle.framework"
 
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
