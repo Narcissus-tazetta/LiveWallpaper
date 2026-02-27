@@ -9,7 +9,7 @@ enum AppConfig {
     static let defaultVersion = "0.0.3"
     static let sparkleAppcastURL =
         "https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml"
-    static let sparklePublicEDKey = ""
+    static let sparklePublicEDKey = "MCowBQYDK2VwAyEAuoATy8ItPd3DQDHahg8JEWgXUNS4//A29+JLUy2zxhY="
 }
 
 final class PlayerView: NSView {
@@ -240,7 +240,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.applicationIconImage = appIconImage()
         setupStatusBar()
         setupSettingsWindow()
+        verifyUpdatePrerequisites()
         setupSparkleUpdater()
+    }
+
+    private func verifyUpdatePrerequisites() {
+        let bundlePath = Bundle.main.bundlePath
+        if bundlePath.contains("/AppTranslocation/") {
+            let alert = NSAlert()
+            alert.messageText = "アップデートを有効化するにはアプリをApplicationsに移動してください"
+            alert.informativeText = "現在は一時実行領域から起動しているため、自動アップデートが失敗する場合があります。"
+            alert.alertStyle = .warning
+            alert.runModal()
+        }
+        if !FileManager.default.isWritableFile(atPath: bundlePath) {
+            NSLog("[Sparkle] App path is not writable: \(bundlePath)")
+        }
     }
 
     private func setupSparkleUpdater() {
@@ -267,9 +282,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try updater.start()
                 updater.checkForUpdatesInBackground()
             } catch {
+                Self.reportSparkleError(error)
                 return
             }
         #endif
+    }
+
+    nonisolated private static func reportSparkleError(_ error: Error) {
+        NSLog("[Sparkle] \(error.localizedDescription)")
     }
 
     nonisolated private static func sparkleFeedURLValue() -> String? {
@@ -309,6 +329,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toggleItem.image = clickThroughMenuIcon(wallpaperController.clickThrough)
         toggleItem.tag = 1001
         menu.addItem(toggleItem)
+
+        #if canImport(Sparkle)
+            menu.addItem(
+                NSMenuItem(
+                    title: "アップデートを確認", action: #selector(checkForUpdates), keyEquivalent: "u")
+            )
+        #endif
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "終了", action: #selector(quitApp), keyEquivalent: "q"))
@@ -436,6 +463,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func quitApp() {
         NSApp.terminate(nil)
     }
+
+    @objc private func checkForUpdates() {
+        #if canImport(Sparkle)
+            updaterController?.checkForUpdates(nil)
+        #endif
+    }
 }
 
 #if canImport(Sparkle)
@@ -449,6 +482,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         nonisolated func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
+            Self.reportSparkleError(error)
         }
     }
 #endif
