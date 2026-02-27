@@ -14,4 +14,8 @@ if [[ ! -f "$ZIP_PATH" ]]; then
   exit 1
 fi
 
-openssl pkeyutl -sign -inkey "$PRIVATE_KEY_PATH" -rawin -in "$ZIP_PATH" | openssl base64 -A
+if openssl pkeyutl -help 2>&1 | grep -q -- "-rawin"; then
+  openssl pkeyutl -sign -inkey "$PRIVATE_KEY_PATH" -rawin -in "$ZIP_PATH" | openssl base64 -A
+else
+  openssl pkeyutl -sign -inkey "$PRIVATE_KEY_PATH" -in "$ZIP_PATH" | openssl base64 -A
+fi
