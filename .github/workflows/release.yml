@@ -39,8 +39,23 @@ jobs:
                   fi
 
                   KEY_FILE="$RUNNER_TEMP/sparkle-private.pem"
-                  printf '%s' "$SPARKLE_PRIVATE_ED_KEY" > "$KEY_FILE"
+                  if [[ "$SPARKLE_PRIVATE_ED_KEY" == *"BEGIN PRIVATE KEY"* ]]; then
+                      printf '%s' "$SPARKLE_PRIVATE_ED_KEY" | sed $'s/\\\\n/\\\n/g' > "$KEY_FILE"
+                  else
+                      KEY_BODY="$(printf '%s' "$SPARKLE_PRIVATE_ED_KEY" | tr -d '[:space:]')"
+                      {
+                          echo "-----BEGIN PRIVATE KEY-----"
+                          echo "$KEY_BODY" | fold -w 64
+                          echo "-----END PRIVATE KEY-----"
+                      } > "$KEY_FILE"
+                  fi
+
                   chmod 600 "$KEY_FILE"
+
+                  if ! openssl pkey -in "$KEY_FILE" -noout >/dev/null 2>&1; then
+                      echo "Invalid SPARKLE_PRIVATE_ED_KEY format" >&2
+                      exit 1
+                  fi
 
                   chmod +x scripts/sign_zip.sh
                   chmod +x scripts/generate_appcast.sh
