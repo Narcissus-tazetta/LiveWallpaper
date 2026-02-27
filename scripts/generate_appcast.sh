@@ -18,6 +18,16 @@ if [[ -z "$ED_SIGNATURE" ]]; then
   exit 1
 fi
 
+if [[ "$ED_SIGNATURE" == *"BEGIN PUBLIC KEY"* ]] || [[ "$ED_SIGNATURE" == *"END PUBLIC KEY"* ]]; then
+  echo "edSignature looks like a public key PEM. Provide ZIP signature, not public key." >&2
+  exit 1
+fi
+
+if [[ ${#ED_SIGNATURE} -lt 80 ]]; then
+  echo "edSignature is too short. It may be a public key or invalid value." >&2
+  exit 1
+fi
+
 LENGTH=$(stat -f%z "$ZIP_PATH")
 PUB_DATE=$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S %z")
 

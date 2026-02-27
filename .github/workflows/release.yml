@@ -10,9 +10,6 @@ on:
                 required: false
                 default: "1"
                 type: string
-            sparkle_signature:
-                required: true
-                type: string
 
 permissions:
     contents: write
@@ -34,12 +31,23 @@ jobs:
 
             - name: Generate appcast
               env:
-                  SPARKLE_ED_SIGNATURE: ${{ inputs.sparkle_signature }}
+                                    SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
               run: |
+                                    if [[ -z "$SPARKLE_PRIVATE_ED_KEY" ]]; then
+                                        echo "Missing secret: SPARKLE_PRIVATE_ED_KEY" >&2
+                                        exit 1
+                                    fi
+
+                                    KEY_FILE="$RUNNER_TEMP/sparkle-private.pem"
+                                    printf '%s' "$SPARKLE_PRIVATE_ED_KEY" > "$KEY_FILE"
+                                    chmod 600 "$KEY_FILE"
+
+                                    chmod +x scripts/sign_zip.sh
                   chmod +x scripts/generate_appcast.sh
                   ZIP_PATH="dist/LiveWallpaper-macos-v${{ inputs.version }}.zip"
                   DOWNLOAD_URL="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v${{ inputs.version }}/LiveWallpaper-macos-v${{ inputs.version }}.zip"
-                  ./scripts/generate_appcast.sh "${{ inputs.version }}" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${{ inputs.version }}"
+                                    SPARKLE_ED_SIGNATURE="$(./scripts/sign_zip.sh "$KEY_FILE" "$ZIP_PATH")"
+                                    ./scripts/generate_appcast.sh "${{ inputs.version }}" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${{ inputs.version }}"
 
             - name: Commit appcast
               run: |
