@@ -11,13 +11,13 @@
       <title>Version 0.0.3</title>
       <sparkle:version>0.0.3</sparkle:version>
       <sparkle:shortVersionString>0.0.3</sparkle:shortVersionString>
-      <pubDate>Fri, 27 Feb 2026 05:22:44 +0000</pubDate>
+      <pubDate>Fri, 27 Feb 2026 05:43:29 +0000</pubDate>
       <enclosure
         url="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v0.0.3/LiveWallpaper-macos-v0.0.3.zip"
-        sparkle:edSignature="plb8Nyol+HZ505smY4/PV2ipQ+hqMJQNimBPZfwy5mKlntuMIRbu8C/sHiYMbQKPMUpVhRda5LvZxbK87ArVBw=="
+        sparkle:edSignature="Uka6hUJUKdqXSfgZCScUyoElApXMdap4LF+/N+TmQd0DO+tHaHS/JfNaw+zqbODW7tLEi9VuI3f0C2BWIMBiDA=="
         sparkle:version="0.0.3"
         sparkle:shortVersionString="0.0.3"
-        length="32281"
+        length="53635"
         type="application/octet-stream"/>
       <sparkle:releaseNotesLink>https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v0.0.3</sparkle:releaseNotesLink>
     </item>
