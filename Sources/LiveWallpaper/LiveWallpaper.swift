@@ -4,7 +4,8 @@ import Sparkle
 
 enum AppConfig {
     static let defaultVersion = "0.0.1"
-    static let sparkleAppcastURL = "https://narcissus-tazetta.github.io/LiveWallpaper/appcast.xml"
+    static let sparkleAppcastURL =
+        "https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml"
     static let sparklePublicEDKey = ""
 }
 

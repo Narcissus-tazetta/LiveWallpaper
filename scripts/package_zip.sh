@@ -5,7 +5,7 @@ APP_NAME="LiveWallpaper"
 BUNDLE_ID="com.sakana.livewallpaper"
 VERSION="${1:-0.0.1}"
 BUILD_NUMBER="${2:-1}"
-SPARKLE_APPCAST_URL="${SPARKLE_APPCAST_URL:-https://narcissus-tazetta.github.io/LiveWallpaper/appcast.xml}"
+SPARKLE_APPCAST_URL="${SPARKLE_APPCAST_URL:-https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml}"
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-}"
 ARCH_MODE="${ARCH_MODE:-universal}"
 

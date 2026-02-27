@@ -26,7 +26,7 @@ jobs:
             - name: Build zip
               env:
                   SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
-                  SPARKLE_APPCAST_URL: https://narcissus-tazetta.github.io/LiveWallpaper/appcast.xml
+                  SPARKLE_APPCAST_URL: https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml
                   ARCH_MODE: universal
               run: |
                   chmod +x scripts/package_zip.sh
