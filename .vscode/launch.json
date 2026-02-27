@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:wallpaper}",
+      "name": "Debug LiveWallpaper",
+      "target": "LiveWallpaper",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug LiveWallpaper"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:wallpaper}",
+      "name": "Release LiveWallpaper",
+      "target": "LiveWallpaper",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release LiveWallpaper"
+    }
+  ]
+}

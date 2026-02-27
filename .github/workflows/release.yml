@@ -1,0 +1,56 @@
+name: release
+
+on:
+    workflow_dispatch:
+        inputs:
+            version:
+                required: true
+                type: string
+            build_number:
+                required: false
+                default: "1"
+                type: string
+            sparkle_signature:
+                required: true
+                type: string
+
+permissions:
+    contents: write
+
+jobs:
+    build-and-publish:
+        runs-on: macos-14
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Build zip
+              env:
+                  SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
+                  SPARKLE_APPCAST_URL: https://narcissus-tazetta.github.io/LiveWallpaper/appcast.xml
+                  ARCH_MODE: universal
+              run: |
+                  chmod +x scripts/package_zip.sh
+                  ./scripts/package_zip.sh "${{ inputs.version }}" "${{ inputs.build_number }}"
+
+            - name: Generate appcast
+              env:
+                  SPARKLE_ED_SIGNATURE: ${{ inputs.sparkle_signature }}
+              run: |
+                  chmod +x scripts/generate_appcast.sh
+                  ZIP_PATH="dist/LiveWallpaper-macos-v${{ inputs.version }}.zip"
+                  DOWNLOAD_URL="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v${{ inputs.version }}/LiveWallpaper-macos-v${{ inputs.version }}.zip"
+                  ./scripts/generate_appcast.sh "${{ inputs.version }}" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${{ inputs.version }}"
+
+            - name: Commit appcast
+              run: |
+                  git config user.name github-actions
+                  git config user.email github-actions@github.com
+                  git add docs/appcast.xml
+                  git commit -m "chore: update appcast v${{ inputs.version }}" || true
+                  git push
+
+            - name: Create release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  gh release create "v${{ inputs.version }}" "dist/LiveWallpaper-macos-v${{ inputs.version }}.zip" --title "v${{ inputs.version }}" --notes "LiveWallpaper v${{ inputs.version }}"

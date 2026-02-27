@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+  xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+  xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>LiveWallpaper Updates</title>
+    <link>https://github.com/Narcissus-tazetta/LiveWallpaper/releases</link>
+    <description>LiveWallpaper updates</description>
+    <language>ja</language>
+    <item>
+      <title>Version 0.0.1</title>
+      <sparkle:version>0.0.1</sparkle:version>
+      <sparkle:shortVersionString>0.0.1</sparkle:shortVersionString>
+      <pubDate>Fri, 27 Feb 2026 04:50:28 +0000</pubDate>
+      <enclosure
+        url="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v0.0.1/LiveWallpaper-macos-v0.0.1.zip"
+        sparkle:edSignature="TEST_SIGNATURE"
+        sparkle:version="0.0.1"
+        sparkle:shortVersionString="0.0.1"
+        length="33060"
+        type="application/octet-stream"/>
+      <sparkle:releaseNotesLink>https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v0.0.1</sparkle:releaseNotesLink>
+    </item>
+  </channel>
+</rss>
