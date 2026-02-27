@@ -30,7 +30,7 @@ normalize_public_key() {
   fi
 }
 
-validate_sparkle_public_key() {
+normalize_and_validate_sparkle_public_key() {
   local key="$1"
   python3 - "$key" <<'PY'
 import base64
@@ -43,13 +43,21 @@ except Exception:
     print("Sparkle public key must be base64", file=sys.stderr)
     raise SystemExit(1)
 
-if len(raw) != 32:
-    print(
-        f"Sparkle public key must be 32-byte raw Ed25519 key (got {len(raw)} bytes). "
-        "Do not use PEM/DER; use Sparkle raw key base64.",
-        file=sys.stderr,
-    )
-    raise SystemExit(1)
+if len(raw) == 32:
+  print(base64.b64encode(raw).decode("ascii"), end="")
+  raise SystemExit(0)
+
+der_prefix = bytes.fromhex("302a300506032b6570032100")
+if len(raw) == 44 and raw.startswith(der_prefix):
+  normalized = raw[len(der_prefix):]
+  print(base64.b64encode(normalized).decode("ascii"), end="")
+  raise SystemExit(0)
+
+print(
+  f"Sparkle public key must be raw Ed25519 base64 (32 bytes) or compatible DER/SPKI key (got {len(raw)} bytes).",
+  file=sys.stderr,
+)
+raise SystemExit(1)
 PY
 }
 
@@ -104,7 +112,7 @@ if [[ -z "$SPARKLE_PUBLIC_ED_KEY" ]]; then
   exit 1
 fi
 
-validate_sparkle_public_key "$SPARKLE_PUBLIC_ED_KEY"
+SPARKLE_PUBLIC_ED_KEY="$(normalize_and_validate_sparkle_public_key "$SPARKLE_PUBLIC_ED_KEY")"
 
 echo "[2/5] Creating .app bundle..."
 rm -rf "$APP_DIR"
