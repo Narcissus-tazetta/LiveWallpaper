@@ -2,11 +2,12 @@
 set -euo pipefail
 
 VERSION="${1:?version required}"
-ZIP_PATH="${2:?zip path required}"
-DOWNLOAD_URL="${3:?download url required}"
-ED_SIGNATURE="${4:-${SPARKLE_ED_SIGNATURE:-}}"
-OUTPUT_PATH="${5:-docs/appcast.xml}"
-RELEASE_NOTES_URL="${6:-https://github.com/Narcissus-tazetta/LiveWallpaper/releases}"
+BUILD_NUMBER="${2:?build number required}"
+ZIP_PATH="${3:?zip path required}"
+DOWNLOAD_URL="${4:?download url required}"
+ED_SIGNATURE="${5:-${SPARKLE_ED_SIGNATURE:-}}"
+OUTPUT_PATH="${6:-docs/appcast.xml}"
+RELEASE_NOTES_URL="${7:-https://github.com/Narcissus-tazetta/LiveWallpaper/releases}"
 
 if [[ ! -f "$ZIP_PATH" ]]; then
   echo "zip not found: $ZIP_PATH" >&2
@@ -14,7 +15,12 @@ if [[ ! -f "$ZIP_PATH" ]]; then
 fi
 
 if [[ -z "$ED_SIGNATURE" ]]; then
-  echo "Sparkle edSignature is required as arg4 or SPARKLE_ED_SIGNATURE env" >&2
+  echo "Sparkle edSignature is required as arg5 or SPARKLE_ED_SIGNATURE env" >&2
+  exit 1
+fi
+
+if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+  echo "build number must be numeric (e.g. 4): $BUILD_NUMBER" >&2
   exit 1
 fi
 
@@ -45,13 +51,13 @@ cat > "$OUTPUT_PATH" <<XML
     <language>ja</language>
     <item>
       <title>Version ${VERSION}</title>
-      <sparkle:version>${VERSION}</sparkle:version>
+      <sparkle:version>${BUILD_NUMBER}</sparkle:version>
       <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
       <pubDate>${PUB_DATE}</pubDate>
       <enclosure
         url="${DOWNLOAD_URL}"
         sparkle:edSignature="${ED_SIGNATURE}"
-        sparkle:version="${VERSION}"
+        sparkle:version="${BUILD_NUMBER}"
         sparkle:shortVersionString="${VERSION}"
         length="${LENGTH}"
         type="application/octet-stream"/>

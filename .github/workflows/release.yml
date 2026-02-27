@@ -66,7 +66,7 @@ jobs:
                   ZIP_PATH="dist/LiveWallpaper-macos-v${{ inputs.version }}.zip"
                   DOWNLOAD_URL="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v${{ inputs.version }}/LiveWallpaper-macos-v${{ inputs.version }}.zip"
                   SPARKLE_ED_SIGNATURE="$(python scripts/sign_zip.py "$KEY_FILE" "$ZIP_PATH")"
-                  ./scripts/generate_appcast.sh "${{ inputs.version }}" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${{ inputs.version }}"
+                  ./scripts/generate_appcast.sh "${{ inputs.version }}" "${{ inputs.build_number }}" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${{ inputs.version }}"
 
             - name: Commit appcast
               run: |
