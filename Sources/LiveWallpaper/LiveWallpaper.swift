@@ -25,6 +25,24 @@ enum VideoFitMode: String {
     case fit
 }
 
+enum FrameRateLimit: String {
+    case off
+    case fps30
+    case fps60
+}
+
+enum DecodeMode: String {
+    case automatic
+    case balanced
+    case efficiency
+}
+
+enum DesktopLevelOffset: Int {
+    case minusOne = -1
+    case zero = 0
+    case plusOne = 1
+}
+
 final class PlayerView: NSView {
     override func makeBackingLayer() -> CALayer {
         AVPlayerLayer()
@@ -37,16 +55,27 @@ final class PlayerView: NSView {
 
 @MainActor
 final class WallpaperModel: ObservableObject {
+    private struct ScreenSignature: Equatable {
+        let displayID: UInt32
+        let frame: CGRect
+    }
+
     private var windows: [NSWindow] = []
     private var playerViews: [PlayerView] = []
     private let queuePlayer = AVQueuePlayer()
     private var playerLooper: AVPlayerLooper?
     private var screenChangeObserver: NSObjectProtocol?
+    private var screenChangeWorkItem: DispatchWorkItem?
+    private var lastScreenSignatures: [ScreenSignature] = []
 
     @Published private(set) var clickThrough = true
     @Published private(set) var displayMode: DisplayMode = .mainOnly
     @Published private(set) var fitMode: VideoFitMode = .fill
     @Published private(set) var lightweightMode = false
+    @Published private(set) var frameRateLimit: FrameRateLimit = .off
+    @Published private(set) var decodeMode: DecodeMode = .automatic
+    @Published private(set) var desktopLevelOffset: DesktopLevelOffset = .zero
+    @Published private(set) var useFullScreenAuxiliary = false
 
     @Published private(set) var currentVideoPath: String?
 
@@ -63,12 +92,13 @@ final class WallpaperModel: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.rebuildWindows()
+                self?.scheduleScreenSync()
             }
         }
     }
 
     deinit {
+        screenChangeWorkItem?.cancel()
         if let observer = screenChangeObserver {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -115,8 +145,7 @@ final class WallpaperModel: ObservableObject {
                 defer: false
             )
 
-            window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
-            window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+            applyWindowOptions(window)
             window.backgroundColor = .clear
             window.isOpaque = false
             window.hasShadow = false
@@ -134,6 +163,62 @@ final class WallpaperModel: ObservableObject {
 
             windows.append(window)
             playerViews.append(playerView)
+        }
+
+        lastScreenSignatures = screenSignatures(for: screens)
+    }
+
+    private func applyWindowOptions(_ window: NSWindow) {
+        let baseLevel = Int(CGWindowLevelForKey(.desktopWindow))
+        let levelValue = baseLevel + desktopLevelOffset.rawValue
+        window.level = NSWindow.Level(rawValue: levelValue)
+
+        var behavior: NSWindow.CollectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        if useFullScreenAuxiliary {
+            behavior.insert(.fullScreenAuxiliary)
+        }
+        window.collectionBehavior = behavior
+    }
+
+    private func scheduleScreenSync() {
+        screenChangeWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else {
+                return
+            }
+            self.syncWindowsToCurrentScreens()
+        }
+
+        screenChangeWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: workItem)
+    }
+
+    private func syncWindowsToCurrentScreens() {
+        let screens = targetScreens()
+        let signatures = screenSignatures(for: screens)
+
+        guard signatures != lastScreenSignatures else {
+            return
+        }
+
+        if screens.count == windows.count {
+            for (index, screen) in screens.enumerated() {
+                windows[index].setFrame(screen.frame, display: true)
+            }
+            lastScreenSignatures = signatures
+            return
+        }
+
+        rebuildWindows()
+    }
+
+    private func screenSignatures(for screens: [NSScreen]) -> [ScreenSignature] {
+        screens.map { screen in
+            let displayID =
+                (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?
+                .uint32Value ?? 0
+            return ScreenSignature(displayID: displayID, frame: screen.frame)
         }
     }
 
@@ -178,6 +263,46 @@ final class WallpaperModel: ObservableObject {
         applyLightweightSettings()
         if let currentPath = currentVideoPath {
             playVideo(url: URL(fileURLWithPath: currentPath))
+        }
+    }
+
+    func setFrameRateLimit(_ limit: FrameRateLimit) {
+        guard frameRateLimit != limit else {
+            return
+        }
+        frameRateLimit = limit
+        if let currentPath = currentVideoPath {
+            playVideo(url: URL(fileURLWithPath: currentPath))
+        }
+    }
+
+    func setDecodeMode(_ mode: DecodeMode) {
+        guard decodeMode != mode else {
+            return
+        }
+        decodeMode = mode
+        if let currentPath = currentVideoPath {
+            playVideo(url: URL(fileURLWithPath: currentPath))
+        }
+    }
+
+    func setDesktopLevelOffset(_ offset: DesktopLevelOffset) {
+        guard desktopLevelOffset != offset else {
+            return
+        }
+        desktopLevelOffset = offset
+        for window in windows {
+            applyWindowOptions(window)
+        }
+    }
+
+    func setFullScreenAuxiliary(_ enabled: Bool) {
+        guard useFullScreenAuxiliary != enabled else {
+            return
+        }
+        useFullScreenAuxiliary = enabled
+        for window in windows {
+            applyWindowOptions(window)
         }
     }
 
@@ -249,11 +374,31 @@ final class WallpaperModel: ObservableObject {
     private func playVideo(url: URL) {
         let asset = AVURLAsset(
             url: url,
-            options: [AVURLAssetPreferPreciseDurationAndTimingKey: false]
+            options: [
+                AVURLAssetPreferPreciseDurationAndTimingKey: decodeMode == .balanced
+            ]
         )
         let item = AVPlayerItem(asset: asset)
-        item.preferredForwardBufferDuration = lightweightMode ? 0 : 1
-        item.preferredPeakBitRate = lightweightMode ? 1_500_000 : 0
+        switch frameRateLimit {
+        case .off:
+            item.preferredPeakBitRate = lightweightMode ? 1_500_000 : 0
+        case .fps30:
+            item.preferredPeakBitRate = 3_000_000
+        case .fps60:
+            item.preferredPeakBitRate = 6_000_000
+        }
+
+        switch decodeMode {
+        case .automatic:
+            item.preferredForwardBufferDuration = lightweightMode ? 0 : 1
+        case .balanced:
+            item.preferredForwardBufferDuration = 1
+        case .efficiency:
+            item.preferredForwardBufferDuration = 0
+            if item.preferredPeakBitRate == 0 {
+                item.preferredPeakBitRate = 1_500_000
+            }
+        }
         queuePlayer.pause()
         queuePlayer.removeAllItems()
         playerLooper = nil
@@ -524,6 +669,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return nil
     }
 
+    private var settingsKeyMonitor: Any?
+
     private func setupSettingsWindow() {
         let hosting = NSHostingController(rootView: SettingsView(model: wallpaperModel))
         let window = NSWindow(contentViewController: hosting)
@@ -532,6 +679,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.setContentSize(NSSize(width: 760, height: 460))
         window.isReleasedWhenClosed = false
         settingsWindowController = NSWindowController(window: window)
+        settingsKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            [weak self] event in
+            guard let characters = event.charactersIgnoringModifiers?.lowercased() else {
+                return event
+            }
+            if event.modifierFlags.contains(.command) && characters == "q" {
+                if let win = self?.settingsWindowController.window, win.isKeyWindow {
+                    win.close()
+                } else {
+                    NSApp.terminate(nil)
+                }
+                return nil
+            }
+            return event
+        }
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(showOpenPanel), name: .chooseVideo, object: nil)
@@ -716,6 +878,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             updaterController?.checkForUpdates(nil)
         #endif
+    }
+
+    @MainActor
+    deinit {
+        if let monitor = settingsKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
     }
 }
 

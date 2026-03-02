@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
   @ObservedObject var model: WallpaperModel
+  @State private var isAdvancedExpanded = false
 
   var body: some View {
     Form {
@@ -74,6 +75,107 @@ struct SettingsView: View {
             get: { model.lightweightMode },
             set: { model.setLightweightMode($0) }
           ))
+
+        VStack(alignment: .leading, spacing: 0) {
+          Button(action: { isAdvancedExpanded.toggle() }) {
+            HStack(spacing: 8) {
+              Image(systemName: isAdvancedExpanded ? "chevron.down" : "chevron.right")
+                .font(.caption.weight(.semibold))
+              Text("詳細設定")
+              Spacer()
+            }
+            .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+
+          if isAdvancedExpanded {
+            VStack(alignment: .leading, spacing: 12) {
+              HStack(spacing: 16) {
+                HStack(spacing: 6) {
+                  Text("フレームレート")
+                  Image(systemName: "questionmark.circle")
+                    .help("動画再生のフレームレート制限。オフは制限なし。")
+                }
+                .frame(width: 130, alignment: .leading)
+                Picker(
+                  "",
+                  selection: Binding(
+                    get: { model.frameRateLimit },
+                    set: { model.setFrameRateLimit($0) }
+                  )
+                ) {
+                  Text("制限なし").tag(FrameRateLimit.off)
+                  Text("30").tag(FrameRateLimit.fps30)
+                  Text("60").tag(FrameRateLimit.fps60)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 240, alignment: .leading)
+              }
+
+              HStack(spacing: 16) {
+                HStack(spacing: 6) {
+                  Text("デコード")
+                  Image(systemName: "questionmark.circle")
+                    .help("デコード優先モード。省電力はソフトウェア中心。")
+                }
+                .frame(width: 130, alignment: .leading)
+                Picker(
+                  "",
+                  selection: Binding(
+                    get: { model.decodeMode },
+                    set: { model.setDecodeMode($0) }
+                  )
+                ) {
+                  Text("自動").tag(DecodeMode.automatic)
+                  Text("標準").tag(DecodeMode.balanced)
+                  Text("省電力").tag(DecodeMode.efficiency)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 240, alignment: .leading)
+              }
+
+              HStack(spacing: 16) {
+                HStack(spacing: 6) {
+                  Text("デスクトップレベル")
+                  Image(systemName: "questionmark.circle")
+                    .help("デスクトップ基準のレベルを選択します。-1 は背面、0 は標準、+1 は前面です。")
+                }
+                .frame(width: 130, alignment: .leading)
+                Picker(
+                  "",
+                  selection: Binding(
+                    get: { model.desktopLevelOffset },
+                    set: { model.setDesktopLevelOffset($0) }
+                  )
+                ) {
+                  Text("-1").tag(DesktopLevelOffset.minusOne)
+                  Text("0").tag(DesktopLevelOffset.zero)
+                  Text("+1").tag(DesktopLevelOffset.plusOne)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 240, alignment: .leading)
+              }
+
+              Toggle(
+                isOn: Binding(
+                  get: { model.useFullScreenAuxiliary },
+                  set: { model.setFullScreenAuxiliary($0) }
+                )
+              ) {
+                HStack(spacing: 6) {
+                  Text("fullScreenAuxiliary を有効化")
+                  Image(systemName: "questionmark.circle")
+                    .help("フルスクリーン空間でもウィンドウを維持。動作が不安定になる可能性があります。")
+                }
+              }
+            }
+            .padding(.top, 6)
+            .padding(.leading, 20)
+          }
+        }
       }
       Section(header: Text("キャッシュ")) {
         HStack(spacing: 10) {
