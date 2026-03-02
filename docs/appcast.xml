@@ -8,18 +8,18 @@
     <description>LiveWallpaper updates</description>
     <language>ja</language>
     <item>
-      <title>Version 0.0.8</title>
-      <sparkle:version>8</sparkle:version>
-      <sparkle:shortVersionString>0.0.8</sparkle:shortVersionString>
-      <pubDate>Fri, 27 Feb 2026 08:45:15 +0000</pubDate>
+      <title>Version 0.0.9</title>
+      <sparkle:version>9</sparkle:version>
+      <sparkle:shortVersionString>0.0.9</sparkle:shortVersionString>
+      <pubDate>Mon, 02 Mar 2026 01:57:33 +0000</pubDate>
       <enclosure
-        url="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v0.0.8/LiveWallpaper-macos-v0.0.8.zip"
-        sparkle:edSignature="KGVc5oAKgMQIlH7JcAFyWp3Pm3KyAIgAHopCmvejai/VE5xDg9soiZWdTl/rgenM8/Q/zAd6/I+MtLKiKWdSDw=="
-        sparkle:version="8"
-        sparkle:shortVersionString="0.0.8"
-        length="1115765"
+        url="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v0.0.9/LiveWallpaper-macos-v0.0.9.zip"
+        sparkle:edSignature="rDBBIxtTLxLHlg5efEOpH4Jdx+C5bIOZoNzSd+pr88t8BYhaOD6E9W3u4Ph+PVnuXGOz/HEACHiaVLCX8tLUCQ=="
+        sparkle:version="9"
+        sparkle:shortVersionString="0.0.9"
+        length="1162608"
         type="application/octet-stream"/>
-      <sparkle:releaseNotesLink>https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v0.0.8</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v0.0.9</sparkle:releaseNotesLink>
     </item>
   </channel>
 </rss>
