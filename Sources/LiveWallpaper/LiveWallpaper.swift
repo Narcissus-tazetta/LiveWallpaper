@@ -880,7 +880,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
     }
 
-    @MainActor
     deinit {
         if let monitor = settingsKeyMonitor {
             NSEvent.removeMonitor(monitor)
