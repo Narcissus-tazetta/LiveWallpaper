@@ -1,6 +1,8 @@
 import AVFoundation
 import AppKit
+import Combine
 import ServiceManagement
+import SwiftUI
 
 #if canImport(Sparkle)
     import Sparkle
@@ -34,266 +36,19 @@ final class PlayerView: NSView {
 }
 
 @MainActor
-final class SettingsWindowController: NSWindowController {
-    private let pathField = NSTextField(string: "")
-    private let clickThroughCheckbox = NSButton(
-        checkboxWithTitle: "クリック貫通を有効にする", target: nil, action: nil)
-    private let launchAtLoginCheckbox = NSButton(
-        checkboxWithTitle: "ログイン時に自動起動する", target: nil, action: nil)
-    private let displayModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let fitModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let lightweightModeCheckbox = NSButton(
-        checkboxWithTitle: "再生の軽量モード（省電力）", target: nil, action: nil)
-    private let autoUpdateCheckbox = NSButton(
-        checkboxWithTitle: "アップデートを自動で確認する", target: nil, action: nil)
-    private let versionLabel = NSTextField(labelWithString: "")
-
-    var onChooseVideo: (() -> Void)?
-    var onApplyPath: ((String) -> Void)?
-    var onToggleClickThrough: ((Bool) -> Void)?
-    var onToggleLaunchAtLogin: ((Bool) -> Void)?
-    var onChangeDisplayMode: ((DisplayMode) -> Void)?
-    var onChangeFitMode: ((VideoFitMode) -> Void)?
-    var onToggleLightweightMode: ((Bool) -> Void)?
-    var onOpenCacheFolder: (() -> Void)?
-    var onClearCache: (() -> Void)?
-    var onToggleAutoUpdate: ((Bool) -> Void)?
-    var onCheckUpdatesNow: (() -> Void)?
-
-    convenience init() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 420),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        self.init(window: window)
-        setupUI()
-    }
-
-    private func setupUI() {
-        guard let contentView = window?.contentView else {
-            return
-        }
-
-        window?.title = "Live Wallpaper 設定"
-        window?.center()
-        window?.isReleasedWhenClosed = false
-
-        let titleLabel = NSTextField(labelWithString: "動画ファイル")
-        let chooseButton = NSButton(title: "参照", target: self, action: #selector(chooseVideo))
-        let applyButton = NSButton(title: "適用", target: self, action: #selector(applyVideo))
-        let displayModeLabel = NSTextField(labelWithString: "壁紙の表示先")
-        let fitModeLabel = NSTextField(labelWithString: "動画のフィット")
-        let openCacheButton = NSButton(
-            title: "保存先を開く", target: self, action: #selector(openCacheFolder))
-        let clearCacheButton = NSButton(
-            title: "キャッシュ削除", target: self, action: #selector(clearCache))
-        let checkUpdatesButton = NSButton(
-            title: "今すぐ確認", target: self, action: #selector(checkUpdatesNow)
-        )
-
-        pathField.placeholderString = "/Users/.../wallpaper.mp4"
-
-        clickThroughCheckbox.target = self
-        clickThroughCheckbox.action = #selector(toggleClickThrough)
-
-        launchAtLoginCheckbox.target = self
-        launchAtLoginCheckbox.action = #selector(toggleLaunchAtLogin)
-
-        displayModePopup.addItems(withTitles: ["メインディスプレイのみ", "全ディスプレイ"])
-        displayModePopup.target = self
-        displayModePopup.action = #selector(changeDisplayMode)
-
-        fitModePopup.addItems(withTitles: ["拡大表示（全画面）", "全体表示（余白あり）"])
-        fitModePopup.target = self
-        fitModePopup.action = #selector(changeFitMode)
-
-        lightweightModeCheckbox.target = self
-        lightweightModeCheckbox.action = #selector(toggleLightweightMode)
-
-        autoUpdateCheckbox.target = self
-        autoUpdateCheckbox.action = #selector(toggleAutoUpdate)
-
-        versionLabel.textColor = .secondaryLabelColor
-        versionLabel.font = NSFont.systemFont(ofSize: 11)
-        versionLabel.alignment = .right
-
-        [
-            titleLabel, pathField, chooseButton, applyButton,
-            clickThroughCheckbox, launchAtLoginCheckbox,
-            displayModeLabel, displayModePopup,
-            fitModeLabel, fitModePopup,
-            lightweightModeCheckbox,
-            openCacheButton, clearCacheButton,
-            autoUpdateCheckbox, checkUpdatesButton,
-            versionLabel,
-        ]
-        .forEach {
-            $0.translatesAutoresizingMaskIntoConstraints = false
-            contentView.addSubview($0)
-        }
-
-        NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-
-            pathField.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
-            pathField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            pathField.trailingAnchor.constraint(equalTo: chooseButton.leadingAnchor, constant: -8),
-
-            chooseButton.centerYAnchor.constraint(equalTo: pathField.centerYAnchor),
-            chooseButton.trailingAnchor.constraint(
-                equalTo: contentView.trailingAnchor, constant: -20),
-            chooseButton.widthAnchor.constraint(equalToConstant: 72),
-
-            applyButton.topAnchor.constraint(equalTo: pathField.bottomAnchor, constant: 12),
-            applyButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            applyButton.widthAnchor.constraint(equalToConstant: 72),
-
-            clickThroughCheckbox.leadingAnchor.constraint(
-                equalTo: contentView.leadingAnchor, constant: 20),
-            clickThroughCheckbox.topAnchor.constraint(
-                equalTo: applyButton.bottomAnchor, constant: 14),
-
-            launchAtLoginCheckbox.leadingAnchor.constraint(
-                equalTo: contentView.leadingAnchor, constant: 20),
-            launchAtLoginCheckbox.topAnchor.constraint(
-                equalTo: clickThroughCheckbox.bottomAnchor, constant: 10),
-
-            displayModeLabel.leadingAnchor.constraint(
-                equalTo: contentView.leadingAnchor, constant: 20),
-            displayModeLabel.topAnchor.constraint(
-                equalTo: launchAtLoginCheckbox.bottomAnchor, constant: 16),
-
-            displayModePopup.leadingAnchor.constraint(
-                equalTo: displayModeLabel.trailingAnchor, constant: 12),
-            displayModePopup.centerYAnchor.constraint(equalTo: displayModeLabel.centerYAnchor),
-            displayModePopup.widthAnchor.constraint(equalToConstant: 220),
-
-            fitModeLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            fitModeLabel.topAnchor.constraint(equalTo: displayModeLabel.bottomAnchor, constant: 14),
-
-            fitModePopup.leadingAnchor.constraint(
-                equalTo: fitModeLabel.trailingAnchor, constant: 12),
-            fitModePopup.centerYAnchor.constraint(equalTo: fitModeLabel.centerYAnchor),
-            fitModePopup.widthAnchor.constraint(equalToConstant: 220),
-
-            lightweightModeCheckbox.leadingAnchor.constraint(
-                equalTo: contentView.leadingAnchor, constant: 20),
-            lightweightModeCheckbox.topAnchor.constraint(
-                equalTo: fitModeLabel.bottomAnchor, constant: 14),
-
-            openCacheButton.leadingAnchor.constraint(
-                equalTo: contentView.leadingAnchor, constant: 20),
-            openCacheButton.topAnchor.constraint(
-                equalTo: lightweightModeCheckbox.bottomAnchor, constant: 14),
-            openCacheButton.widthAnchor.constraint(equalToConstant: 120),
-
-            clearCacheButton.leadingAnchor.constraint(
-                equalTo: openCacheButton.trailingAnchor, constant: 10),
-            clearCacheButton.centerYAnchor.constraint(equalTo: openCacheButton.centerYAnchor),
-            clearCacheButton.widthAnchor.constraint(equalToConstant: 120),
-
-            autoUpdateCheckbox.leadingAnchor.constraint(
-                equalTo: contentView.leadingAnchor, constant: 20),
-            autoUpdateCheckbox.topAnchor.constraint(
-                equalTo: openCacheButton.bottomAnchor, constant: 14),
-
-            checkUpdatesButton.leadingAnchor.constraint(
-                equalTo: autoUpdateCheckbox.trailingAnchor, constant: 10),
-            checkUpdatesButton.centerYAnchor.constraint(equalTo: autoUpdateCheckbox.centerYAnchor),
-            checkUpdatesButton.widthAnchor.constraint(equalToConstant: 100),
-
-            versionLabel.trailingAnchor.constraint(
-                equalTo: contentView.trailingAnchor, constant: -12),
-            versionLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
-        ])
-    }
-
-    func update(
-        path: String?,
-        clickThrough: Bool,
-        launchAtLogin: Bool,
-        displayMode: DisplayMode,
-        fitMode: VideoFitMode,
-        lightweightMode: Bool,
-        autoUpdateEnabled: Bool
-    ) {
-        pathField.stringValue = path ?? ""
-        clickThroughCheckbox.state = clickThrough ? .on : .off
-        launchAtLoginCheckbox.state = launchAtLogin ? .on : .off
-        displayModePopup.selectItem(at: displayMode == .allScreens ? 1 : 0)
-        fitModePopup.selectItem(at: fitMode == .fit ? 1 : 0)
-        lightweightModeCheckbox.state = lightweightMode ? .on : .off
-        autoUpdateCheckbox.state = autoUpdateEnabled ? .on : .off
-    }
-
-    func updateVersion(_ version: String) {
-        versionLabel.stringValue = "v\(version)"
-    }
-
-    @objc private func chooseVideo() {
-        onChooseVideo?()
-    }
-
-    @objc private func applyVideo() {
-        onApplyPath?(pathField.stringValue)
-    }
-
-    @objc private func toggleClickThrough() {
-        onToggleClickThrough?(clickThroughCheckbox.state == .on)
-    }
-
-    @objc private func toggleLaunchAtLogin() {
-        onToggleLaunchAtLogin?(launchAtLoginCheckbox.state == .on)
-    }
-
-    @objc private func changeDisplayMode() {
-        let mode: DisplayMode = displayModePopup.indexOfSelectedItem == 1 ? .allScreens : .mainOnly
-        onChangeDisplayMode?(mode)
-    }
-
-    @objc private func changeFitMode() {
-        let mode: VideoFitMode = fitModePopup.indexOfSelectedItem == 1 ? .fit : .fill
-        onChangeFitMode?(mode)
-    }
-
-    @objc private func toggleLightweightMode() {
-        onToggleLightweightMode?(lightweightModeCheckbox.state == .on)
-    }
-
-    @objc private func openCacheFolder() {
-        onOpenCacheFolder?()
-    }
-
-    @objc private func clearCache() {
-        onClearCache?()
-    }
-
-    @objc private func toggleAutoUpdate() {
-        onToggleAutoUpdate?(autoUpdateCheckbox.state == .on)
-    }
-
-    @objc private func checkUpdatesNow() {
-        onCheckUpdatesNow?()
-    }
-}
-
-@MainActor
-final class WallpaperController {
+final class WallpaperModel: ObservableObject {
     private var windows: [NSWindow] = []
     private var playerViews: [PlayerView] = []
     private let queuePlayer = AVQueuePlayer()
     private var playerLooper: AVPlayerLooper?
     private var screenChangeObserver: NSObjectProtocol?
 
-    private(set) var clickThrough = true
-    private(set) var displayMode: DisplayMode = .mainOnly
-    private(set) var fitMode: VideoFitMode = .fill
-    private(set) var lightweightMode = false
+    @Published private(set) var clickThrough = true
+    @Published private(set) var displayMode: DisplayMode = .mainOnly
+    @Published private(set) var fitMode: VideoFitMode = .fill
+    @Published private(set) var lightweightMode = false
 
-    private(set) var currentVideoPath: String?
+    @Published private(set) var currentVideoPath: String?
 
     init() {
         configurePlayer()
@@ -573,14 +328,24 @@ final class WallpaperController {
             currentVideoPath = savedPath
         }
     }
+
+    func currentAppVersion() -> String {
+        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+            as? String,
+            !version.isEmpty
+        {
+            return version
+        }
+        return AppConfig.defaultVersion
+    }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
-    private var settingsWindowController: SettingsWindowController!
-    private let wallpaperController = WallpaperController()
+    private var settingsWindowController: NSWindowController!
+    private let wallpaperModel = WallpaperModel()
     private var launchAtLoginEnabled = false
     private var autoUpdateEnabled = true
     #if canImport(Sparkle)
@@ -682,6 +447,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return nil
     }
 
+    private var cancellables = Set<AnyCancellable>()
+
     private func setupStatusBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         configureStatusIcon()
@@ -691,13 +458,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "設定を開く", action: #selector(openSettings), keyEquivalent: ""))
 
         let toggleItem = NSMenuItem(
-            title: clickThroughMenuTitle(wallpaperController.clickThrough),
+            title: clickThroughMenuTitle(wallpaperModel.clickThrough),
             action: #selector(toggleClickThrough),
             keyEquivalent: ""
         )
-        toggleItem.image = clickThroughMenuIcon(wallpaperController.clickThrough)
+        toggleItem.image = clickThroughMenuIcon(wallpaperModel.clickThrough)
         toggleItem.tag = 1001
         menu.addItem(toggleItem)
+
+        wallpaperModel.$clickThrough
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let item = self?.statusItem.menu?.item(withTag: 1001) else { return }
+                item.title = self?.clickThroughMenuTitle(enabled) ?? ""
+                item.image = self?.clickThroughMenuIcon(enabled)
+            }
+            .store(in: &cancellables)
 
         #if canImport(Sparkle)
             let updateItem = NSMenuItem(
@@ -749,79 +525,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupSettingsWindow() {
-        settingsWindowController = SettingsWindowController()
-        updateSettingsWindowState()
-        settingsWindowController.updateVersion(currentAppVersion())
+        let hosting = NSHostingController(rootView: SettingsView(model: wallpaperModel))
+        let window = NSWindow(contentViewController: hosting)
+        window.title = "Live Wallpaper 設定"
+        window.center()
+        window.setContentSize(NSSize(width: 760, height: 460))
+        window.isReleasedWhenClosed = false
+        settingsWindowController = NSWindowController(window: window)
 
-        settingsWindowController.onChooseVideo = { [weak self] in
-            self?.showOpenPanel()
-        }
-
-        settingsWindowController.onApplyPath = { [weak self] path in
-            self?.wallpaperController.setVideo(path: path)
-            self?.updateSettingsWindowState()
-        }
-
-        settingsWindowController.onToggleClickThrough = { [weak self] enabled in
-            self?.setClickThrough(enabled)
-        }
-
-        settingsWindowController.onToggleLaunchAtLogin = { [weak self] enabled in
-            self?.setLaunchAtLogin(enabled)
-        }
-
-        settingsWindowController.onChangeDisplayMode = { [weak self] mode in
-            self?.wallpaperController.setDisplayMode(mode)
-            self?.updateSettingsWindowState()
-        }
-
-        settingsWindowController.onChangeFitMode = { [weak self] mode in
-            self?.wallpaperController.setFitMode(mode)
-            self?.updateSettingsWindowState()
-        }
-
-        settingsWindowController.onToggleLightweightMode = { [weak self] enabled in
-            self?.wallpaperController.setLightweightMode(enabled)
-            self?.updateSettingsWindowState()
-        }
-
-        settingsWindowController.onOpenCacheFolder = { [weak self] in
-            self?.wallpaperController.openCacheFolder()
-        }
-
-        settingsWindowController.onClearCache = { [weak self] in
-            guard let self else {
-                return
-            }
-            if !self.wallpaperController.clearCache() {
-                let alert = NSAlert()
-                alert.messageText = "キャッシュ削除に失敗しました"
-                alert.informativeText = "もう一度お試しください。"
-                alert.alertStyle = .warning
-                alert.runModal()
-            }
-            self.updateSettingsWindowState()
-        }
-
-        settingsWindowController.onToggleAutoUpdate = { [weak self] enabled in
-            self?.setAutoUpdateEnabled(enabled)
-        }
-
-        settingsWindowController.onCheckUpdatesNow = { [weak self] in
-            self?.checkForUpdates()
-        }
-    }
-
-    private func updateSettingsWindowState() {
-        settingsWindowController.update(
-            path: wallpaperController.currentVideoPath,
-            clickThrough: wallpaperController.clickThrough,
-            launchAtLogin: launchAtLoginEnabled,
-            displayMode: wallpaperController.displayMode,
-            fitMode: wallpaperController.fitMode,
-            lightweightMode: wallpaperController.lightweightMode,
-            autoUpdateEnabled: autoUpdateEnabled
-        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(showOpenPanel), name: .chooseVideo, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleLaunchToggle(_:)), name: .toggleLaunchAtLogin,
+            object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleOpenCache), name: .openCacheFolder, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleClearCache), name: .clearCache, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleAutoUpdateToggle(_:)), name: .toggleAutoUpdate,
+            object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(checkForUpdates), name: .checkUpdatesNow, object: nil)
     }
 
     private func currentAppVersion() -> String {
@@ -834,7 +559,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return AppConfig.defaultVersion
     }
 
-    private func showOpenPanel() {
+    @objc private func showOpenPanel() {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -845,14 +570,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if panel.runModal() == .OK, let url = panel.url {
-            wallpaperController.setVideo(path: url.path)
-            updateSettingsWindowState()
+            wallpaperModel.setVideo(path: url.path)
+        }
+    }
+    @objc private func handleLaunchToggle(_ note: Notification) {
+        if let enabled = note.object as? Bool {
+            setLaunchAtLogin(enabled)
         }
     }
 
+    @objc private func handleAutoUpdateToggle(_ note: Notification) {
+        if let enabled = note.object as? Bool {
+            setAutoUpdateEnabled(enabled)
+        }
+    }
+
+    @objc private func handleOpenCache() {
+        wallpaperModel.openCacheFolder()
+    }
+
+    @objc private func handleClearCache() {
+        _ = wallpaperModel.clearCache()
+    }
+
     private func setClickThrough(_ enabled: Bool) {
-        wallpaperController.setClickThrough(enabled)
-        updateSettingsWindowState()
+        wallpaperModel.setClickThrough(enabled)
         if let toggleItem = statusItem.menu?.item(withTag: 1001) {
             toggleItem.title = clickThroughMenuTitle(enabled)
             toggleItem.image = clickThroughMenuIcon(enabled)
@@ -895,7 +637,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             alert.runModal()
             launchAtLoginEnabled = false
         }
-        updateSettingsWindowState()
     }
 
     private func setAutoUpdateEnabled(_ enabled: Bool) {
@@ -907,7 +648,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 updater.automaticallyDownloadsUpdates = enabled
             }
         #endif
-        updateSettingsWindowState()
     }
 
     private func clickThroughMenuTitle(_ enabled: Bool) -> String {
@@ -940,7 +680,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func toggleClickThrough() {
-        setClickThrough(!wallpaperController.clickThrough)
+        setClickThrough(!wallpaperModel.clickThrough)
     }
 
     @objc private func quitApp() {
