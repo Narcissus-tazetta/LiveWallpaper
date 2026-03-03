@@ -1,8 +1,11 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
   @ObservedObject var model: WallpaperModel
   @State private var isAdvancedExpanded: Bool = false
+  @State private var volumeInput: String = ""
+  @FocusState private var isVolumeInputFocused: Bool
 
   var body: some View {
     Form {
@@ -34,6 +37,45 @@ struct SettingsView: View {
             get: { UserDefaults.standard.bool(forKey: "launchAtLogin") },
             set: { NotificationCenter.default.post(name: .toggleLaunchAtLogin, object: $0) }
           ))
+        Toggle(
+          "音声を再生する",
+          isOn: Binding(
+            get: { model.audioEnabled },
+            set: { value in withAnimation { model.setAudioEnabled(value) } }
+          ))
+        HStack(spacing: 12) {
+          Text("音量")
+            .frame(width: 150, alignment: .leading)
+          Slider(
+            value: Binding(
+              get: { Double(model.audioVolume) },
+              set: { model.setAudioVolume(Float($0)) }
+            ),
+            in: 0...1
+          )
+          .disabled(!model.audioEnabled)
+          .frame(minWidth: 240, maxWidth: .infinity)
+          Spacer()
+          HStack(spacing: 2) {
+            TextField("", text: $volumeInput)
+              .frame(width: 60)
+              .textFieldStyle(.roundedBorder)
+              .multilineTextAlignment(.trailing)
+              .disabled(!model.audioEnabled)
+              .focused($isVolumeInputFocused)
+              .onSubmit {
+                commitVolumeInput()
+              }
+              .onChange(of: volumeInput) { newValue in
+                let filtered = String(newValue.filter(\.isNumber).prefix(3))
+                if filtered != newValue {
+                  volumeInput = filtered
+                }
+              }
+            Text("%")
+              .foregroundColor(.secondary)
+          }
+        }
       }
       Section(header: Label("表示", systemImage: "display.2")) {
         HStack(spacing: 16) {
@@ -207,20 +249,46 @@ struct SettingsView: View {
         }
       }
       Section {
-        VStack(spacing: 2) {
-          Text("©︎Narcissus-tazetta 2026")
-            .foregroundColor(.secondary)
-            .frame(maxWidth: .infinity, alignment: .center)
-          Text("v\(model.currentAppVersion())")
-            .foregroundColor(.secondary)
-            .frame(maxWidth: .infinity, alignment: .trailing)
-        }
+        Text("©︎Narcissus-tazetta 2026  •  v\(model.currentAppVersion())")
+          .foregroundColor(.secondary)
+          .frame(maxWidth: .infinity, alignment: .center)
       }
+    }
+    .onTapGesture {
+      NSApp.keyWindow?.makeFirstResponder(nil)
     }
     .font(.system(size: 14, weight: .medium))
     .tint(.accentColor)
     .formStyle(.grouped)
     .frame(minWidth: 760, idealWidth: 760, minHeight: 460, idealHeight: 460)
+    .onAppear {
+      syncVolumeInputWithModel()
+    }
+    .onChange(of: model.audioVolume) { _ in
+      if !isVolumeInputFocused {
+        syncVolumeInputWithModel()
+      }
+    }
+    .onChange(of: isVolumeInputFocused) { focused in
+      if !focused {
+        commitVolumeInput()
+      }
+    }
+  }
+
+  private func syncVolumeInputWithModel() {
+    let percent = Int((model.audioVolume * 100).rounded())
+    volumeInput = String(percent)
+  }
+
+  private func commitVolumeInput() {
+    guard !volumeInput.isEmpty else {
+      syncVolumeInputWithModel()
+      return
+    }
+    let percent = min(max(Int(volumeInput) ?? 0, 0), 100)
+    model.setAudioVolume(Float(percent) / 100)
+    volumeInput = String(percent)
   }
 }
 

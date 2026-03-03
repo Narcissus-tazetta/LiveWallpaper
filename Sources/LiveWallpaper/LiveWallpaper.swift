@@ -76,6 +76,8 @@ final class WallpaperModel: ObservableObject {
     @Published private(set) var displayMode: DisplayMode = .mainOnly
     @Published private(set) var fitMode: VideoFitMode = .fill
     @Published private(set) var lightweightMode: Bool = false
+    @Published private(set) var audioEnabled: Bool = false
+    @Published private(set) var audioVolume: Float = 1.0
     @Published private(set) var frameRateLimit: FrameRateLimit = .off
     @Published private(set) var decodeMode: DecodeMode = .automatic
     @Published private(set) var desktopLevelOffset: DesktopLevelOffset = .zero
@@ -113,7 +115,7 @@ final class WallpaperModel: ObservableObject {
     }
 
     private func configurePlayer() {
-        queuePlayer.isMuted = true
+        applyAudioSettings()
         queuePlayer.allowsExternalPlayback = false
         queuePlayer.preventsDisplaySleepDuringVideoPlayback = false
         queuePlayer.actionAtItemEnd = .none
@@ -361,6 +363,25 @@ final class WallpaperModel: ObservableObject {
         }
     }
 
+    func setAudioEnabled(_ enabled: Bool) {
+        guard audioEnabled != enabled else {
+            return
+        }
+        audioEnabled = enabled
+        applyAudioSettings()
+        UserDefaults.standard.set(enabled, forKey: "audioEnabled")
+    }
+
+    func setAudioVolume(_ volume: Float) {
+        let clampedVolume: Float = min(max(volume, 0), 1)
+        guard abs(audioVolume - clampedVolume) > 0.001 else {
+            return
+        }
+        audioVolume = clampedVolume
+        applyAudioSettings()
+        UserDefaults.standard.set(clampedVolume, forKey: "audioVolume")
+    }
+
     func setFrameRateLimit(_ limit: FrameRateLimit) {
         guard frameRateLimit != limit else {
             return
@@ -458,6 +479,11 @@ final class WallpaperModel: ObservableObject {
         queuePlayer.automaticallyWaitsToMinimizeStalling = lightweightMode
     }
 
+    private func applyAudioSettings() {
+        queuePlayer.isMuted = !audioEnabled
+        queuePlayer.volume = audioVolume
+    }
+
     private func playVideo(url: URL) {
         let asset = AVURLAsset(
             url: url,
@@ -490,6 +516,7 @@ final class WallpaperModel: ObservableObject {
         queuePlayer.removeAllItems()
         playerLooper = nil
         playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: item)
+        applyAudioSettings()
         queuePlayer.play()
     }
 
@@ -574,6 +601,13 @@ final class WallpaperModel: ObservableObject {
             fitMode = restoredFit
         }
         lightweightMode = UserDefaults.standard.object(forKey: "lightweightMode") as? Bool ?? false
+        audioEnabled = UserDefaults.standard.object(forKey: "audioEnabled") as? Bool ?? false
+        let savedAudioVolume: Float = UserDefaults.standard.float(forKey: "audioVolume")
+        audioVolume = savedAudioVolume == 0 ? 1.0 : min(max(savedAudioVolume, 0), 1)
+        if UserDefaults.standard.object(forKey: "audioVolume") as? NSNumber != nil {
+            audioVolume = min(max(savedAudioVolume, 0), 1)
+        }
+        applyAudioSettings()
         applyLightweightSettings()
         if let savedPath: String = UserDefaults.standard.string(forKey: "videoPath") {
             currentVideoPath = savedPath
