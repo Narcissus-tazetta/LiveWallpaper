@@ -2,9 +2,18 @@ import AppKit
 import SwiftUI
 
 struct SettingsView: View {
+  private enum HelpTopic: Hashable {
+    case frameRate
+    case decode
+    case desktopLevel
+    case fullScreenAuxiliary
+  }
+
   @ObservedObject var model: WallpaperModel
   @State private var isAdvancedExpanded: Bool = false
   @State private var volumeInput: String = ""
+  @State private var expandedHelpTopics: Set<HelpTopic> = []
+  @State private var hoveredHelpTopic: HelpTopic?
   @FocusState private var isVolumeInputFocused: Bool
 
   var body: some View {
@@ -56,10 +65,11 @@ struct SettingsView: View {
           .disabled(!model.audioEnabled)
           .frame(minWidth: 240, maxWidth: .infinity)
           Spacer()
-          HStack(spacing: 2) {
+          HStack(alignment: .firstTextBaseline, spacing: 6) {
             TextField("", text: $volumeInput)
               .frame(width: 60)
-              .textFieldStyle(.roundedBorder)
+              .textFieldStyle(.plain)
+              .font(.system(size: 13, weight: .medium))
               .multilineTextAlignment(.trailing)
               .disabled(!model.audioEnabled)
               .focused($isVolumeInputFocused)
@@ -74,6 +84,7 @@ struct SettingsView: View {
               }
             Text("%")
               .foregroundColor(.secondary)
+              .font(.system(size: 13))
           }
         }
       }
@@ -136,8 +147,16 @@ struct SettingsView: View {
               HStack(spacing: 16) {
                 HStack(spacing: 6) {
                   Text("フレームレート")
-                  Image(systemName: "questionmark.circle")
-                    .help("動画再生のフレームレート制限。オフは制限なし。")
+                  Button(action: { toggleHelp(.frameRate) }) {
+                    Image(
+                      systemName: expandedHelpTopics.contains(.frameRate)
+                        || hoveredHelpTopic == .frameRate
+                        ? "questionmark.circle.fill" : "questionmark.circle")
+                  }
+                  .buttonStyle(.plain)
+                  .onHover { over in
+                    hoveredHelpTopic = over ? .frameRate : nil
+                  }
                 }
                 .frame(width: 130, alignment: .leading)
                 Picker(
@@ -155,12 +174,26 @@ struct SettingsView: View {
                 .labelsHidden()
                 .frame(width: 240, alignment: .leading)
               }
+              if expandedHelpTopics.contains(.frameRate) {
+                Text("動画の再生上限を選べます。制限なしは滑らかさ優先、30/60 はCPUと電力を抑えやすくなります。")
+                  .font(.caption)
+                  .foregroundColor(.secondary)
+                  .frame(maxWidth: .infinity, alignment: .leading)
+              }
 
               HStack(spacing: 16) {
                 HStack(spacing: 6) {
                   Text("デコード")
-                  Image(systemName: "questionmark.circle")
-                    .help("デコード優先モード。省電力はソフトウェア中心。")
+                  Button(action: { toggleHelp(.decode) }) {
+                    Image(
+                      systemName: expandedHelpTopics.contains(.decode)
+                        || hoveredHelpTopic == .decode
+                        ? "questionmark.circle.fill" : "questionmark.circle")
+                  }
+                  .buttonStyle(.plain)
+                  .onHover { over in
+                    hoveredHelpTopic = over ? .decode : nil
+                  }
                 }
                 .frame(width: 130, alignment: .leading)
                 Picker(
@@ -178,12 +211,28 @@ struct SettingsView: View {
                 .labelsHidden()
                 .frame(width: 240, alignment: .leading)
               }
+              if expandedHelpTopics.contains(.decode) {
+                Text(
+                  "動画データのデコード方法を切り替えます。自動はハードウェア/ソフトウェアを状況に応じて選び、標準はGPUハードウェア優先で滑らかさを保ちます。省電力はソフトウェア再生を多用し、CPU負荷と消費電力を低く抑えますが再生品質が落ちる場合があります。"
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+              }
 
               HStack(spacing: 16) {
                 HStack(spacing: 6) {
                   Text("デスクトップレベル")
-                  Image(systemName: "questionmark.circle")
-                    .help("デスクトップ基準のレベルを選択します。-1 は背面、0 は標準、+1 は前面です。")
+                  Button(action: { toggleHelp(.desktopLevel) }) {
+                    Image(
+                      systemName: expandedHelpTopics.contains(.desktopLevel)
+                        || hoveredHelpTopic == .desktopLevel
+                        ? "questionmark.circle.fill" : "questionmark.circle")
+                  }
+                  .buttonStyle(.plain)
+                  .onHover { over in
+                    hoveredHelpTopic = over ? .desktopLevel : nil
+                  }
                 }
                 .frame(width: 130, alignment: .leading)
                 Picker(
@@ -201,6 +250,14 @@ struct SettingsView: View {
                 .labelsHidden()
                 .frame(width: 240, alignment: .leading)
               }
+              if expandedHelpTopics.contains(.desktopLevel) {
+                Text(
+                  "壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。"
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+              }
 
               Toggle(
                 isOn: Binding(
@@ -210,9 +267,23 @@ struct SettingsView: View {
               ) {
                 HStack(spacing: 6) {
                   Text("fullScreenAuxiliary を有効化")
-                  Image(systemName: "questionmark.circle")
-                    .help("フルスクリーン空間でもウィンドウを維持。動作が不安定になる可能性があります。")
+                  Button(action: { toggleHelp(.fullScreenAuxiliary) }) {
+                    Image(
+                      systemName: expandedHelpTopics.contains(.fullScreenAuxiliary)
+                        || hoveredHelpTopic == .fullScreenAuxiliary
+                        ? "questionmark.circle.fill" : "questionmark.circle")
+                  }
+                  .buttonStyle(.plain)
+                  .onHover { over in
+                    hoveredHelpTopic = over ? .fullScreenAuxiliary : nil
+                  }
                 }
+              }
+              if expandedHelpTopics.contains(.fullScreenAuxiliary) {
+                Text("フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。")
+                  .font(.caption)
+                  .foregroundColor(.secondary)
+                  .frame(maxWidth: .infinity, alignment: .leading)
               }
             }
             .padding(.top, 6)
@@ -289,6 +360,14 @@ struct SettingsView: View {
     let percent = min(max(Int(volumeInput) ?? 0, 0), 100)
     model.setAudioVolume(Float(percent) / 100)
     volumeInput = String(percent)
+  }
+
+  private func toggleHelp(_ topic: HelpTopic) {
+    if expandedHelpTopics.contains(topic) {
+      expandedHelpTopics.remove(topic)
+    } else {
+      expandedHelpTopics.insert(topic)
+    }
   }
 }
 
