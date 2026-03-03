@@ -2,11 +2,11 @@ import SwiftUI
 
 struct SettingsView: View {
   @ObservedObject var model: WallpaperModel
-  @State private var isAdvancedExpanded = false
+  @State private var isAdvancedExpanded: Bool = false
 
   var body: some View {
     Form {
-      Section(header: Text("動画")) {
+      Section(header: Label("動画", systemImage: "film")) {
         VStack(alignment: .leading, spacing: 6) {
           Text("選択中の動画")
             .font(.caption)
@@ -19,6 +19,7 @@ struct SettingsView: View {
             Button("参照") {
               NotificationCenter.default.post(name: .chooseVideo, object: nil)
             }
+            .buttonStyle(.borderedProminent)
           }
         }
         Toggle(
@@ -34,7 +35,7 @@ struct SettingsView: View {
             set: { NotificationCenter.default.post(name: .toggleLaunchAtLogin, object: $0) }
           ))
       }
-      Section(header: Text("表示")) {
+      Section(header: Label("表示", systemImage: "display.2")) {
         HStack(spacing: 16) {
           Text("壁紙の表示先")
             .frame(width: 130, alignment: .leading)
@@ -177,18 +178,20 @@ struct SettingsView: View {
           }
         }
       }
-      Section(header: Text("キャッシュ")) {
+      Section(header: Label("キャッシュ", systemImage: "externaldrive")) {
         HStack(spacing: 10) {
           Button("保存先を開く") {
             NotificationCenter.default.post(name: .openCacheFolder, object: nil)
           }
+          .buttonStyle(.bordered)
           Button("キャッシュ削除") {
             NotificationCenter.default.post(name: .clearCache, object: nil)
           }
+          .buttonStyle(.bordered)
           Spacer()
         }
       }
-      Section(header: Text("アップデート")) {
+      Section(header: Label("アップデート", systemImage: "arrow.triangle.2.circlepath")) {
         Toggle(
           "アップデートを自動で確認する（起動時にも通知）",
           isOn: Binding(
@@ -199,15 +202,23 @@ struct SettingsView: View {
           Button("今すぐ確認") {
             NotificationCenter.default.post(name: .checkUpdatesNow, object: nil)
           }
+          .buttonStyle(.bordered)
           Spacer()
         }
       }
       Section {
-        Text("v\(model.currentAppVersion())")
-          .foregroundColor(.secondary)
-          .frame(maxWidth: .infinity, alignment: .trailing)
+        VStack(spacing: 2) {
+          Text("©︎Narcissus-tazetta 2026")
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+          Text("v\(model.currentAppVersion())")
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
       }
     }
+    .font(.system(size: 14, weight: .medium))
+    .tint(.accentColor)
     .formStyle(.grouped)
     .frame(minWidth: 760, idealWidth: 760, minHeight: 460, idealHeight: 460)
   }

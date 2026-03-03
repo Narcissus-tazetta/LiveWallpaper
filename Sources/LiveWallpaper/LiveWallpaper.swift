@@ -62,20 +62,24 @@ final class WallpaperModel: ObservableObject {
 
     private var windows: [NSWindow] = []
     private var playerViews: [PlayerView] = []
-    private let queuePlayer = AVQueuePlayer()
+    private let queuePlayer: AVQueuePlayer = AVQueuePlayer()
     private var playerLooper: AVPlayerLooper?
     private var screenChangeObserver: NSObjectProtocol?
     private var screenChangeWorkItem: DispatchWorkItem?
+    private var windowRebuildWorkItem: DispatchWorkItem?
+    private var windowOptionsWorkItem: DispatchWorkItem?
+    private var windowRetireWorkItem: DispatchWorkItem?
+    private var retiredWindows: [NSWindow] = []
     private var lastScreenSignatures: [ScreenSignature] = []
 
-    @Published private(set) var clickThrough = true
+    @Published private(set) var clickThrough: Bool = true
     @Published private(set) var displayMode: DisplayMode = .mainOnly
     @Published private(set) var fitMode: VideoFitMode = .fill
-    @Published private(set) var lightweightMode = false
+    @Published private(set) var lightweightMode: Bool = false
     @Published private(set) var frameRateLimit: FrameRateLimit = .off
     @Published private(set) var decodeMode: DecodeMode = .automatic
     @Published private(set) var desktopLevelOffset: DesktopLevelOffset = .zero
-    @Published private(set) var useFullScreenAuxiliary = false
+    @Published private(set) var useFullScreenAuxiliary: Bool = false
 
     @Published private(set) var currentVideoPath: String?
 
@@ -83,7 +87,7 @@ final class WallpaperModel: ObservableObject {
         configurePlayer()
         restoreState()
         rebuildWindows()
-        if let savedPath = currentVideoPath {
+        if let savedPath: String = currentVideoPath {
             playVideo(url: URL(fileURLWithPath: savedPath))
         }
         screenChangeObserver = NotificationCenter.default.addObserver(
@@ -99,7 +103,11 @@ final class WallpaperModel: ObservableObject {
 
     deinit {
         screenChangeWorkItem?.cancel()
-        if let observer = screenChangeObserver {
+        windowRebuildWorkItem?.cancel()
+        windowOptionsWorkItem?.cancel()
+        windowRetireWorkItem?.cancel()
+        retiredWindows.removeAll()
+        if let observer: any NSObjectProtocol = screenChangeObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
@@ -117,10 +125,10 @@ final class WallpaperModel: ObservableObject {
         case .allScreens:
             return NSScreen.screens
         case .mainOnly:
-            if let main = NSScreen.main {
+            if let main: NSScreen = NSScreen.main {
                 return [main]
             }
-            if let first = NSScreen.screens.first {
+            if let first: NSScreen = NSScreen.screens.first {
                 return [first]
             }
             return []
@@ -128,17 +136,42 @@ final class WallpaperModel: ObservableObject {
     }
 
     private func rebuildWindows() {
-        for window in windows {
-            window.orderOut(nil)
-            window.close()
-        }
-        windows.removeAll()
-        playerViews.removeAll()
+        let screens: [NSScreen] = targetScreens()
 
-        let screens = targetScreens()
-        for screen in screens {
-            let frame = screen.frame
-            let window = NSWindow(
+        if windows.count > screens.count {
+            let extras = Array(windows[screens.count...])
+            for window in extras {
+                prepareWindowForRetire(window)
+                window.orderOut(nil)
+            }
+            windows.removeLast(windows.count - screens.count)
+            playerViews.removeLast(playerViews.count - screens.count)
+            retireWindows(extras)
+        }
+
+        for (index, screen) in screens.enumerated() {
+            if index < windows.count {
+                let window = windows[index]
+                let playerView = playerViews[index]
+
+                applyWindowOptions(window)
+                window.ignoresMouseEvents = clickThrough
+                window.setFrame(screen.frame, display: true)
+                playerView.playerLayer.videoGravity =
+                    fitMode == .fit ? .resizeAspect : .resizeAspectFill
+                if playerView.playerLayer.player !== queuePlayer {
+                    playerView.playerLayer.player = queuePlayer
+                }
+                if window.contentView !== playerView {
+                    window.contentView = playerView
+                }
+                window.orderBack(nil)
+                window.orderFront(nil)
+                continue
+            }
+
+            let frame: NSRect = screen.frame
+            let window: NSWindow = NSWindow(
                 contentRect: frame,
                 styleMask: [.borderless],
                 backing: .buffered,
@@ -168,9 +201,41 @@ final class WallpaperModel: ObservableObject {
         lastScreenSignatures = screenSignatures(for: screens)
     }
 
+    private func prepareWindowForRetire(_ window: NSWindow) {
+        if let playerView = window.contentView as? PlayerView {
+            playerView.playerLayer.player = nil
+        }
+        window.contentView = nil
+    }
+
+    private func retireWindows(_ windowsToRetire: [NSWindow]) {
+        guard !windowsToRetire.isEmpty else {
+            return
+        }
+
+        retiredWindows.append(contentsOf: windowsToRetire)
+        windowRetireWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else {
+                return
+            }
+
+            let targets = self.retiredWindows
+            self.retiredWindows.removeAll()
+            for window in targets {
+                self.prepareWindowForRetire(window)
+                window.close()
+            }
+        }
+
+        windowRetireWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: workItem)
+    }
+
     private func applyWindowOptions(_ window: NSWindow) {
-        let baseLevel = Int(CGWindowLevelForKey(.desktopWindow))
-        let levelValue = baseLevel + desktopLevelOffset.rawValue
+        let baseLevel: Int = Int(CGWindowLevelForKey(.desktopWindow))
+        let levelValue: Int = baseLevel + desktopLevelOffset.rawValue
         window.level = NSWindow.Level(rawValue: levelValue)
 
         var behavior: NSWindow.CollectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
@@ -213,9 +278,39 @@ final class WallpaperModel: ObservableObject {
         rebuildWindows()
     }
 
+    private func scheduleWindowRebuild(delay: TimeInterval = 0.08) {
+        windowRebuildWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else {
+                return
+            }
+            self.rebuildWindows()
+        }
+
+        windowRebuildWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
+
+    private func scheduleWindowOptionsApply(delay: TimeInterval = 0.02) {
+        windowOptionsWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else {
+                return
+            }
+            for window in self.windows {
+                self.applyWindowOptions(window)
+            }
+        }
+
+        windowOptionsWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
+
     private func screenSignatures(for screens: [NSScreen]) -> [ScreenSignature] {
         screens.map { screen in
-            let displayID =
+            let displayID: UInt32 =
                 (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?
                 .uint32Value ?? 0
             return ScreenSignature(displayID: displayID, frame: screen.frame)
@@ -239,7 +334,7 @@ final class WallpaperModel: ObservableObject {
         }
         displayMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: "displayMode")
-        rebuildWindows()
+        scheduleWindowRebuild()
     }
 
     func setFitMode(_ mode: VideoFitMode) {
@@ -261,7 +356,7 @@ final class WallpaperModel: ObservableObject {
         lightweightMode = enabled
         UserDefaults.standard.set(enabled, forKey: "lightweightMode")
         applyLightweightSettings()
-        if let currentPath = currentVideoPath {
+        if let currentPath: String = currentVideoPath {
             playVideo(url: URL(fileURLWithPath: currentPath))
         }
     }
@@ -271,7 +366,7 @@ final class WallpaperModel: ObservableObject {
             return
         }
         frameRateLimit = limit
-        if let currentPath = currentVideoPath {
+        if let currentPath: String = currentVideoPath {
             playVideo(url: URL(fileURLWithPath: currentPath))
         }
     }
@@ -281,7 +376,7 @@ final class WallpaperModel: ObservableObject {
             return
         }
         decodeMode = mode
-        if let currentPath = currentVideoPath {
+        if let currentPath: String = currentVideoPath {
             playVideo(url: URL(fileURLWithPath: currentPath))
         }
     }
@@ -291,9 +386,7 @@ final class WallpaperModel: ObservableObject {
             return
         }
         desktopLevelOffset = offset
-        for window in windows {
-            applyWindowOptions(window)
-        }
+        scheduleWindowOptionsApply()
     }
 
     func setFullScreenAuxiliary(_ enabled: Bool) {
@@ -301,26 +394,20 @@ final class WallpaperModel: ObservableObject {
             return
         }
         useFullScreenAuxiliary = enabled
-        for window in windows {
-            applyWindowOptions(window)
-        }
+        scheduleWindowOptionsApply()
     }
 
     func setVideo(path: String) {
-        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed: String = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return
         }
-        let sourceURL = URL(fileURLWithPath: trimmed)
+        let sourceURL: URL = URL(fileURLWithPath: trimmed)
         guard FileManager.default.fileExists(atPath: sourceURL.path) else {
             return
         }
 
-        guard let localURL = importVideoToAppSupport(from: sourceURL) else {
-            return
-        }
-
-        guard currentVideoPath != localURL.path else {
+        guard let localURL: URL = importVideoToAppSupport(from: sourceURL) else {
             return
         }
 
@@ -331,7 +418,7 @@ final class WallpaperModel: ObservableObject {
     }
 
     func openCacheFolder() {
-        guard let directory = cacheDirectoryURL() else {
+        guard let directory: URL = cacheDirectoryURL() else {
             return
         }
         do {
@@ -354,7 +441,7 @@ final class WallpaperModel: ObservableObject {
             }
             try FileManager.default.createDirectory(
                 at: directory, withIntermediateDirectories: true)
-            if let currentPath = currentVideoPath, currentPath.hasPrefix(directory.path) {
+            if let currentPath: String = currentVideoPath, currentPath.hasPrefix(directory.path) {
                 queuePlayer.pause()
                 queuePlayer.removeAllItems()
                 playerLooper = nil
@@ -408,7 +495,7 @@ final class WallpaperModel: ObservableObject {
 
     private func cacheDirectoryURL() -> URL? {
         guard
-            let appSupportURL = FileManager.default.urls(
+            let appSupportURL: URL = FileManager.default.urls(
                 for: .applicationSupportDirectory,
                 in: .userDomainMask
             ).first
@@ -424,7 +511,7 @@ final class WallpaperModel: ObservableObject {
 
     private func importVideoToAppSupport(from sourceURL: URL) -> URL? {
         let fileManager = FileManager.default
-        guard let targetDirectory = cacheDirectoryURL() else {
+        guard let targetDirectory: URL = cacheDirectoryURL() else {
             return nil
         }
 
@@ -437,18 +524,37 @@ final class WallpaperModel: ObservableObject {
             return nil
         }
 
-        let ext = sourceURL.pathExtension.isEmpty ? "mp4" : sourceURL.pathExtension
-        let targetURL = targetDirectory.appendingPathComponent("wallpaper.\(ext)")
-
-        if sourceURL.path == targetURL.path {
-            return targetURL
-        }
+        let ext: String = sourceURL.pathExtension.isEmpty ? "mp4" : sourceURL.pathExtension
+        let targetURL: URL = targetDirectory.appendingPathComponent(
+            "wallpaper-\(UUID().uuidString).\(ext)")
 
         do {
-            if fileManager.fileExists(atPath: targetURL.path) {
-                try fileManager.removeItem(at: targetURL)
+            if let previousPath: String = currentVideoPath,
+                previousPath.hasPrefix(targetDirectory.path),
+                previousPath != targetURL.path,
+                fileManager.fileExists(atPath: previousPath)
+            {
+                try fileManager.removeItem(atPath: previousPath)
             }
             try fileManager.copyItem(at: sourceURL, to: targetURL)
+
+            if let files = try? fileManager.contentsOfDirectory(
+                at: targetDirectory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            ) {
+                for file in files {
+                    if file.path == targetURL.path {
+                        continue
+                    }
+                    if let previousPath = currentVideoPath, file.path == previousPath {
+                        continue
+                    }
+                    if file.lastPathComponent.hasPrefix("wallpaper-") {
+                        try? fileManager.removeItem(at: file)
+                    }
+                }
+            }
             return targetURL
         } catch {
             return nil
@@ -457,25 +563,26 @@ final class WallpaperModel: ObservableObject {
 
     private func restoreState() {
         clickThrough = UserDefaults.standard.object(forKey: "clickThrough") as? Bool ?? true
-        if let modeValue = UserDefaults.standard.string(forKey: "displayMode"),
+        if let modeValue: String = UserDefaults.standard.string(forKey: "displayMode"),
             let restoredMode = DisplayMode(rawValue: modeValue)
         {
             displayMode = restoredMode
         }
-        if let fitValue = UserDefaults.standard.string(forKey: "fitMode"),
+        if let fitValue: String = UserDefaults.standard.string(forKey: "fitMode"),
             let restoredFit = VideoFitMode(rawValue: fitValue)
         {
             fitMode = restoredFit
         }
         lightweightMode = UserDefaults.standard.object(forKey: "lightweightMode") as? Bool ?? false
         applyLightweightSettings()
-        if let savedPath = UserDefaults.standard.string(forKey: "videoPath") {
+        if let savedPath: String = UserDefaults.standard.string(forKey: "videoPath") {
             currentVideoPath = savedPath
         }
     }
 
     func currentAppVersion() -> String {
-        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+        if let version: String = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString")
             as? String,
             !version.isEmpty
         {
@@ -491,8 +598,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var settingsWindowController: NSWindowController!
     private let wallpaperModel = WallpaperModel()
-    private var launchAtLoginEnabled = false
-    private var autoUpdateEnabled = true
+    private var launchAtLoginEnabled: Bool = false
+    private var autoUpdateEnabled: Bool = true
     #if canImport(Sparkle)
         private var updaterController: SPUStandardUpdaterController?
         private var sparkleStarted = false
@@ -512,7 +619,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func verifyUpdatePrerequisites() {
-        let bundlePath = Bundle.main.bundlePath
+        let bundlePath: String = Bundle.main.bundlePath
         NSLog("[Sparkle] Bundle path: \(bundlePath)")
         if bundlePath.contains("/AppTranslocation/") {
             let alert = NSAlert()
@@ -572,7 +679,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     nonisolated private static func sparkleFeedURLValue() -> String? {
-        if let value = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String,
+        if let value: String = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String,
             !value.isEmpty
         {
             return value
@@ -581,7 +688,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     nonisolated private static func sparklePublicEDKeyValue() -> String? {
-        if let value = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String,
+        if let value: String = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String,
             !value.isEmpty
         {
             return value
@@ -712,7 +819,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func currentAppVersion() -> String {
-        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+        if let version: String = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString")
             as? String,
             !version.isEmpty
         {
@@ -731,18 +839,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie]
         }
 
-        if panel.runModal() == .OK, let url = panel.url {
+        if panel.runModal() == .OK, let url: URL = panel.url {
             wallpaperModel.setVideo(path: url.path)
         }
     }
     @objc private func handleLaunchToggle(_ note: Notification) {
-        if let enabled = note.object as? Bool {
+        if let enabled: Bool = note.object as? Bool {
             setLaunchAtLogin(enabled)
         }
     }
 
     @objc private func handleAutoUpdateToggle(_ note: Notification) {
-        if let enabled = note.object as? Bool {
+        if let enabled: Bool = note.object as? Bool {
             setAutoUpdateEnabled(enabled)
         }
     }
@@ -817,7 +925,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func clickThroughMenuIcon(_ enabled: Bool) -> NSImage? {
-        let symbolName = enabled ? "cursorarrow.click" : "cursorarrow"
+        let symbolName: String = enabled ? "cursorarrow.click" : "cursorarrow"
         let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "クリック貫通")
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)
@@ -881,7 +989,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     deinit {
-        if let monitor = settingsKeyMonitor {
+        if let monitor: Any = settingsKeyMonitor {
             NSEvent.removeMonitor(monitor)
         }
     }
