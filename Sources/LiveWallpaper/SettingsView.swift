@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
   private enum HelpTopic: Hashable {
@@ -52,9 +53,10 @@ struct SettingsView: View {
             get: { model.audioEnabled },
             set: { value in withAnimation { model.setAudioEnabled(value) } }
           ))
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
           Text("音量")
             .frame(width: 150, alignment: .leading)
+
           Slider(
             value: Binding(
               get: { Double(model.audioVolume) },
@@ -63,11 +65,11 @@ struct SettingsView: View {
             in: 0...1
           )
           .disabled(!model.audioEnabled)
-          .frame(minWidth: 240, maxWidth: .infinity)
-          Spacer()
+          .frame(minWidth: 180, maxWidth: .infinity)
+
           HStack(alignment: .firstTextBaseline, spacing: 6) {
             TextField("", text: $volumeInput)
-              .frame(width: 60)
+              .frame(width: 48)
               .textFieldStyle(.plain)
               .font(.system(size: 13, weight: .medium))
               .multilineTextAlignment(.trailing)
@@ -129,6 +131,55 @@ struct SettingsView: View {
             get: { model.lightweightMode },
             set: { model.setLightweightMode($0) }
           ))
+        Toggle(
+          "他のアプリが前面にあるとき再生を停止",
+          isOn: Binding(
+            get: { model.suspendWhenOtherAppFullScreen },
+            set: { value in
+              _ = model.setSuspendWhenOtherAppFullScreen(value)
+            }
+          ))
+        if model.suspendWhenOtherAppFullScreen {
+          VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+              Text("停止対象から除外するアプリ")
+                .font(.caption)
+                .foregroundColor(.secondary)
+              Spacer()
+              Button("アプリを選択して追加") {
+                selectAppForSuspendExclusion()
+              }
+              .buttonStyle(.bordered)
+              .controlSize(.small)
+            }
+            .padding(.vertical, 2)
+
+            if model.suspendExclusionBundleIDs.isEmpty {
+              Text("除外アプリは未設定です")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            } else {
+              VStack(alignment: .leading, spacing: 8) {
+                ForEach(model.suspendExclusionBundleIDs, id: \.self) { bundleID in
+                  HStack(spacing: 12) {
+                    Text(bundleID)
+                      .lineLimit(1)
+                      .truncationMode(.middle)
+                      .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("削除") {
+                      model.removeSuspendExclusionBundleID(bundleID)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                  }
+                  .padding(.vertical, 4)
+                }
+              }
+              .padding(.top, 4)
+            }
+          }
+          .padding(.vertical, 6)
+        }
 
         VStack(alignment: .leading, spacing: 0) {
           Button(action: { isAdvancedExpanded.toggle() }) {
@@ -141,12 +192,15 @@ struct SettingsView: View {
             .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
+          .padding(.leading, 10)
 
           if isAdvancedExpanded {
             VStack(alignment: .leading, spacing: 12) {
-              HStack(spacing: 16) {
-                HStack(spacing: 6) {
+              HStack(spacing: 24) {
+                HStack {
                   Text("フレームレート")
+                    .lineLimit(1)
+                  Spacer(minLength: 8)
                   Button(action: { toggleHelp(.frameRate) }) {
                     Image(
                       systemName: expandedHelpTopics.contains(.frameRate)
@@ -158,7 +212,7 @@ struct SettingsView: View {
                     hoveredHelpTopic = over ? .frameRate : nil
                   }
                 }
-                .frame(width: 130, alignment: .leading)
+                .frame(width: 150, alignment: .leading)
                 Picker(
                   "",
                   selection: Binding(
@@ -181,9 +235,11 @@ struct SettingsView: View {
                   .frame(maxWidth: .infinity, alignment: .leading)
               }
 
-              HStack(spacing: 16) {
-                HStack(spacing: 6) {
+              HStack(spacing: 24) {
+                HStack {
                   Text("デコード")
+                    .lineLimit(1)
+                  Spacer(minLength: 8)
                   Button(action: { toggleHelp(.decode) }) {
                     Image(
                       systemName: expandedHelpTopics.contains(.decode)
@@ -195,7 +251,7 @@ struct SettingsView: View {
                     hoveredHelpTopic = over ? .decode : nil
                   }
                 }
-                .frame(width: 130, alignment: .leading)
+                .frame(width: 150, alignment: .leading)
                 Picker(
                   "",
                   selection: Binding(
@@ -220,9 +276,11 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
               }
 
-              HStack(spacing: 16) {
-                HStack(spacing: 6) {
+              HStack(spacing: 24) {
+                HStack {
                   Text("デスクトップレベル")
+                    .lineLimit(1)
+                  Spacer(minLength: 8)
                   Button(action: { toggleHelp(.desktopLevel) }) {
                     Image(
                       systemName: expandedHelpTopics.contains(.desktopLevel)
@@ -234,7 +292,7 @@ struct SettingsView: View {
                     hoveredHelpTopic = over ? .desktopLevel : nil
                   }
                 }
-                .frame(width: 130, alignment: .leading)
+                .frame(width: 150, alignment: .leading)
                 Picker(
                   "",
                   selection: Binding(
@@ -367,6 +425,28 @@ struct SettingsView: View {
       expandedHelpTopics.remove(topic)
     } else {
       expandedHelpTopics.insert(topic)
+    }
+  }
+
+  private func selectAppForSuspendExclusion() {
+    let panel = NSOpenPanel()
+    panel.allowsMultipleSelection = false
+    panel.canChooseFiles = true
+    panel.canChooseDirectories = false
+    panel.canCreateDirectories = false
+    if #available(macOS 12.0, *) {
+      panel.allowedContentTypes = [.applicationBundle]
+    } else {
+      panel.allowedFileTypes = ["app"]
+    }
+    panel.allowsOtherFileTypes = false
+    panel.treatsFilePackagesAsDirectories = false
+    panel.prompt = "追加"
+
+    if panel.runModal() == .OK,
+      let url = panel.url
+    {
+      _ = model.addSuspendExclusionFromAppURL(url)
     }
   }
 }
