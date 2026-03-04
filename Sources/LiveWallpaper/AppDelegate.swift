@@ -115,6 +115,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private var cancellables = Set<AnyCancellable>()
+  private enum MenuTag {
+    static let audioToggle = 1001
+    static let playlistToggle = 1002
+    static let shuffleToggle = 1003
+    static let previousVideo = 1004
+    static let nextVideo = 1005
+  }
 
   private func setupStatusBar() {
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -137,15 +144,87 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       keyEquivalent: ""
     )
     toggleItem.image = audioMenuIcon(wallpaperModel.audioEnabled)
-    toggleItem.tag = 1001
+    toggleItem.tag = MenuTag.audioToggle
     menu.addItem(toggleItem)
+
+    menu.addItem(NSMenuItem.separator())
+
+    let playlistItem = NSMenuItem(
+      title: playlistMenuTitle(wallpaperModel.playlistPlaybackEnabled),
+      action: #selector(togglePlaylistPlayback),
+      keyEquivalent: ""
+    )
+    playlistItem.image = playlistMenuIcon()
+    playlistItem.tag = MenuTag.playlistToggle
+    menu.addItem(playlistItem)
+
+    let shuffleItem = NSMenuItem(
+      title: shuffleMenuTitle(wallpaperModel.shufflePlaybackEnabled),
+      action: #selector(toggleShufflePlayback),
+      keyEquivalent: ""
+    )
+    shuffleItem.image = shuffleMenuIcon()
+    shuffleItem.tag = MenuTag.shuffleToggle
+    menu.addItem(shuffleItem)
+
+    let previousItem = NSMenuItem(
+      title: "前の動画",
+      action: #selector(playPreviousVideo),
+      keyEquivalent: "["
+    )
+    previousItem.image = previousVideoMenuIcon()
+    previousItem.tag = MenuTag.previousVideo
+    menu.addItem(previousItem)
+
+    let nextItem = NSMenuItem(
+      title: "次の動画",
+      action: #selector(playNextVideo),
+      keyEquivalent: "]"
+    )
+    nextItem.image = nextVideoMenuIcon()
+    nextItem.tag = MenuTag.nextVideo
+    menu.addItem(nextItem)
 
     wallpaperModel.$audioEnabled
       .receive(on: DispatchQueue.main)
       .sink { [weak self] enabled in
-        guard let item = self?.statusItem.menu?.item(withTag: 1001) else { return }
+        guard let item = self?.statusItem.menu?.item(withTag: MenuTag.audioToggle) else { return }
         item.title = self?.audioMenuTitle(enabled) ?? ""
         item.image = self?.audioMenuIcon(enabled)
+      }
+      .store(in: &cancellables)
+
+    wallpaperModel.$playlistPlaybackEnabled
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] enabled in
+        guard let self else {
+          return
+        }
+        if let item = self.statusItem.menu?.item(withTag: MenuTag.playlistToggle) {
+          item.title = self.playlistMenuTitle(enabled)
+          item.image = self.playlistMenuIcon()
+        }
+        self.refreshPlaylistMenuState()
+      }
+      .store(in: &cancellables)
+
+    wallpaperModel.$shufflePlaybackEnabled
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] enabled in
+        guard let self else {
+          return
+        }
+        if let item = self.statusItem.menu?.item(withTag: MenuTag.shuffleToggle) {
+          item.title = self.shuffleMenuTitle(enabled)
+          item.image = self.shuffleMenuIcon()
+        }
+      }
+      .store(in: &cancellables)
+
+    wallpaperModel.$registeredVideoPaths
+      .receive(on: DispatchQueue.main)
+      .sink { [weak self] _ in
+        self?.refreshPlaylistMenuState()
       }
       .store(in: &cancellables)
 
@@ -163,6 +242,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     menu.addItem(NSMenuItem(title: "終了", action: #selector(quitApp), keyEquivalent: "q"))
 
     statusItem.menu = menu
+    refreshPlaylistMenuState()
   }
 
   private func configureStatusIcon() {
@@ -170,25 +250,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       return
     }
 
-    if let customIcon = appIconImage() {
-      button.image = customIcon
+    if let image = selectWindowStatusIcon() {
+      button.image = image
       button.image?.size = NSSize(width: 18, height: 18)
-      button.image?.isTemplate = false
+      button.image?.isTemplate = true
       button.title = ""
       return
     }
 
-    if let image = NSImage(
-      systemSymbolName: "square.3.layers.3d",
+    if let fallback = NSImage(
+      systemSymbolName: "macwindow.on.rectangle",
       accessibilityDescription: "Live Wallpaper"
     ) {
       let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
-      button.image = image.withSymbolConfiguration(config)
+      button.image = fallback.withSymbolConfiguration(config)
       button.image?.isTemplate = true
       button.title = ""
     } else {
       button.title = "LW"
     }
+  }
+
+  private func selectWindowStatusIcon() -> NSImage? {
+    let size = NSSize(width: 18, height: 18)
+    let image = NSImage(size: size)
+    image.lockFocus()
+    defer { image.unlockFocus() }
+
+    guard let context = NSGraphicsContext.current?.cgContext else {
+      return nil
+    }
+
+    context.setStrokeColor(NSColor.labelColor.cgColor)
+    context.setLineWidth(1.6)
+    context.setLineCap(.round)
+    context.setLineJoin(.round)
+
+    let backRect = CGRect(x: 3.1, y: 4.2, width: 9.4, height: 8.0)
+    let frontRect = CGRect(x: 5.5, y: 6.4, width: 9.4, height: 8.0)
+    context.stroke(backRect.insetBy(dx: 0.35, dy: 0.35))
+    context.stroke(frontRect.insetBy(dx: 0.35, dy: 0.35))
+
+    image.isTemplate = true
+    return image
   }
 
   private func appIconImage() -> NSImage? {
@@ -227,6 +331,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     NotificationCenter.default.addObserver(
       self, selector: #selector(showOpenPanel), name: .chooseVideo, object: nil)
     NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleCreatePlaylistAndChooseVideo),
+      name: .createPlaylistAndChooseVideo,
+      object: nil)
+    NotificationCenter.default.addObserver(
       self, selector: #selector(handleLaunchToggle(_:)), name: .toggleLaunchAtLogin,
       object: nil)
     NotificationCenter.default.addObserver(
@@ -255,6 +364,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
+  @objc private func handleCreatePlaylistAndChooseVideo() {
+    let panel = NSOpenPanel()
+    panel.allowsMultipleSelection = false
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+
+    if #available(macOS 11.0, *) {
+      panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie]
+    }
+
+    if panel.runModal() == .OK, let url: URL = panel.url {
+      _ = wallpaperModel.createPlaylistAndSetVideo(path: url.path)
+    }
+  }
+
   @objc private func handleLaunchToggle(_ note: Notification) {
     if let enabled: Bool = note.object as? Bool {
       setLaunchAtLogin(enabled)
@@ -277,9 +401,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func setAudioEnabled(_ enabled: Bool) {
     wallpaperModel.setAudioEnabled(enabled)
-    if let toggleItem = statusItem.menu?.item(withTag: 1001) {
+    if let toggleItem = statusItem.menu?.item(withTag: MenuTag.audioToggle) {
       toggleItem.title = audioMenuTitle(enabled)
       toggleItem.image = audioMenuIcon(enabled)
+    }
+  }
+
+  private func refreshPlaylistMenuState() {
+    let hasMultipleVideos = wallpaperModel.registeredVideoPaths.count > 1
+    let playlistEnabled = wallpaperModel.playlistPlaybackEnabled
+
+    if let shuffleItem = statusItem.menu?.item(withTag: MenuTag.shuffleToggle) {
+      shuffleItem.isEnabled = playlistEnabled && hasMultipleVideos
+    }
+    if let previousItem = statusItem.menu?.item(withTag: MenuTag.previousVideo) {
+      previousItem.isEnabled = hasMultipleVideos
+    }
+    if let nextItem = statusItem.menu?.item(withTag: MenuTag.nextVideo) {
+      nextItem.isEnabled = hasMultipleVideos
     }
   }
 
@@ -336,6 +475,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     "音声を再生: " + (enabled ? "ON" : "OFF")
   }
 
+  private func playlistMenuTitle(_ enabled: Bool) -> String {
+    "プレイリスト連続再生: " + (enabled ? "ON" : "OFF")
+  }
+
+  private func shuffleMenuTitle(_ enabled: Bool) -> String {
+    "シャッフル: " + (enabled ? "ON" : "OFF")
+  }
+
   private func audioMenuIcon(_ enabled: Bool) -> NSImage? {
     let symbolName: String = enabled ? "speaker.wave.2" : "speaker.slash"
     let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "音声")
@@ -367,6 +514,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     return configured
   }
 
+  private func playlistMenuIcon() -> NSImage? {
+    let image = NSImage(
+      systemSymbolName: "rectangle.stack",
+      accessibilityDescription: "プレイリスト"
+    )
+    let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+    let configured = image?.withSymbolConfiguration(config)
+    configured?.isTemplate = true
+    return configured
+  }
+
+  private func shuffleMenuIcon() -> NSImage? {
+    let image = NSImage(
+      systemSymbolName: "shuffle",
+      accessibilityDescription: "シャッフル"
+    )
+    let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+    let configured = image?.withSymbolConfiguration(config)
+    configured?.isTemplate = true
+    return configured
+  }
+
+  private func previousVideoMenuIcon() -> NSImage? {
+    let image = NSImage(
+      systemSymbolName: "backward.fill",
+      accessibilityDescription: "前の動画"
+    )
+    let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+    let configured = image?.withSymbolConfiguration(config)
+    configured?.isTemplate = true
+    return configured
+  }
+
+  private func nextVideoMenuIcon() -> NSImage? {
+    let image = NSImage(
+      systemSymbolName: "forward.fill",
+      accessibilityDescription: "次の動画"
+    )
+    let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+    let configured = image?.withSymbolConfiguration(config)
+    configured?.isTemplate = true
+    return configured
+  }
+
   @objc private func openSettings() {
     settingsWindowController.showWindow(nil)
     NSApp.activate(ignoringOtherApps: true)
@@ -381,6 +572,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   @objc private func toggleAudioEnabled() {
     setAudioEnabled(!wallpaperModel.audioEnabled)
+  }
+
+  @objc private func togglePlaylistPlayback() {
+    wallpaperModel.setPlaylistPlaybackEnabled(!wallpaperModel.playlistPlaybackEnabled)
+  }
+
+  @objc private func toggleShufflePlayback() {
+    wallpaperModel.setShufflePlaybackEnabled(!wallpaperModel.shufflePlaybackEnabled)
+  }
+
+  @objc private func playPreviousVideo() {
+    wallpaperModel.playPreviousVideo()
+  }
+
+  @objc private func playNextVideo() {
+    wallpaperModel.playNextVideo()
   }
 
   @objc private func quitApp() {

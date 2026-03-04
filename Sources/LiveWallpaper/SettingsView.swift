@@ -25,9 +25,12 @@ struct SettingsView: View {
   @State private var hoveredHelpTopic: HelpTopic?
   @State private var wallpaperThumbnails: [String: NSImage] = [:]
   @State private var thumbnailGenerationInFlight: Set<String> = []
+  @State private var editingPlaylistID: UUID?
+  @State private var editingPlaylistNameInput: String = ""
   @State private var editingWallpaperPath: String?
   @State private var editingWallpaperNameInput: String = ""
   @FocusState private var isVolumeInputFocused: Bool
+  @FocusState private var focusedPlaylistID: UUID?
   @FocusState private var focusedWallpaperPath: String?
   // even more compact grid for wallpapers
   private let wallpaperColumns: [GridItem] = [
@@ -51,6 +54,31 @@ struct SettingsView: View {
 
       if selectedTab == .wallpaper {
         Section(header: Label("壁紙を変更", systemImage: "photo.on.rectangle")) {
+          HStack(alignment: .center, spacing: 10) {
+            Text("プレイリスト")
+              .font(.caption)
+              .foregroundColor(.secondary)
+
+            if model.visiblePlaylists.isEmpty {
+              Text("表示中のプレイリストはありません")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            } else {
+              ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                  ForEach(model.visiblePlaylists) { playlist in
+                    playlistChip(playlist)
+                  }
+                }
+              }
+              .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Text(model.playlistCapacityText)
+              .font(.caption)
+              .foregroundColor(.secondary)
+          }
+
           HStack(spacing: 12) {
             Text(
               model.currentVideoPath.map { model.registeredVideoDisplayName(for: $0) } ?? "(選択なし)"
@@ -58,14 +86,75 @@ struct SettingsView: View {
             .lineLimit(1)
             .truncationMode(.middle)
             .frame(maxWidth: .infinity, alignment: .leading)
+            Button("プレイリスト追加") {
+              NotificationCenter.default.post(name: .createPlaylistAndChooseVideo, object: nil)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!model.canAddPlaylist)
             Button("動画を追加") {
               NotificationCenter.default.post(name: .chooseVideo, object: nil)
             }
             .buttonStyle(.borderedProminent)
           }
 
+          if !model.registeredVideoPaths.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+              HStack(spacing: 14) {
+                compactToggle(
+                  "プレイリスト連続再生",
+                  isOn: Binding(
+                    get: { model.playlistPlaybackEnabled },
+                    set: { model.setPlaylistPlaybackEnabled($0) }
+                  )
+                )
+
+                compactToggle(
+                  "シャッフル",
+                  isOn: Binding(
+                    get: { model.shufflePlaybackEnabled },
+                    set: { model.setShufflePlaybackEnabled($0) }
+                  )
+                )
+                .disabled(!model.playlistPlaybackEnabled || model.registeredVideoPaths.count < 2)
+
+                Spacer(minLength: 12)
+
+                if let index = model.currentVideoIndex {
+                  Text("\(index + 1) / \(model.registeredVideoPaths.count)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                }
+              }
+
+              HStack(spacing: 8) {
+                Button {
+                  model.playPreviousVideo()
+                } label: {
+                  Label("前へ", systemImage: "backward.fill")
+                }
+                .buttonStyle(.bordered)
+                .disabled(model.registeredVideoPaths.count < 2)
+
+                Button {
+                  model.playNextVideo()
+                } label: {
+                  Label("次へ", systemImage: "forward.fill")
+                }
+                .buttonStyle(.bordered)
+                .disabled(model.registeredVideoPaths.count < 2)
+
+                Spacer(minLength: 0)
+              }
+            }
+            .padding(10)
+            .background(
+              RoundedRectangle(cornerRadius: 10)
+                .fill(Color.secondary.opacity(0.08))
+            )
+          }
+
           if model.registeredVideoPaths.isEmpty {
-            Text("登録済みの壁紙はありません")
+            Text("このプレイリストに登録済みの壁紙はありません")
               .font(.caption)
               .foregroundColor(.secondary)
           } else {
@@ -84,6 +173,21 @@ struct SettingsView: View {
 
       if selectedTab == .settings {
         Section(header: Label("動画", systemImage: "film")) {
+          VStack(alignment: .leading, spacing: 6) {
+            Text("選択中の動画")
+              .font(.caption)
+              .foregroundColor(.secondary)
+            HStack(spacing: 12) {
+              Text(model.currentVideoPath ?? "(選択なし)")
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+              Button("参照") {
+                NotificationCenter.default.post(name: .chooseVideo, object: nil)
+              }
+              .buttonStyle(.borderedProminent)
+            }
+          }
           Toggle(
             "クリック貫通を有効にする",
             isOn: Binding(
@@ -452,6 +556,14 @@ struct SettingsView: View {
     .onChange(of: model.registeredVideoPaths) { _ in
       pruneMissingWallpaperThumbnails()
     }
+    .onChange(of: model.playlists) { _ in
+      guard let editingID = editingPlaylistID else {
+        return
+      }
+      if !model.playlists.contains(where: { $0.id == editingID }) {
+        cancelPlaylistNameEdit()
+      }
+    }
     .onChange(of: isVolumeInputFocused) { focused in
       if !focused {
         commitVolumeInput()
@@ -471,25 +583,24 @@ struct SettingsView: View {
         model.selectRegisteredVideo(path: path)
         selectedTab = .wallpaper
       } label: {
-        Group {
+        ZStack {
           if let image = wallpaperThumbnails[path] {
             Image(nsImage: image)
               .resizable()
               .scaledToFill()
           } else {
-            ZStack {
-              Rectangle().fill(Color.secondary.opacity(0.15))
-              Image(systemName: "film")
-                .font(.system(size: 18))
-                .foregroundColor(.secondary)
-            }
-            .task {
-              requestWallpaperThumbnail(path: path)
-            }
+            Rectangle().fill(Color.secondary.opacity(0.15))
+            Image(systemName: "film")
+              .font(.system(size: 18))
+              .foregroundColor(.secondary)
           }
         }
-        .frame(height: 60)
+        .frame(maxWidth: .infinity, minHeight: 60, maxHeight: 60)
+        .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .task {
+          requestWallpaperThumbnail(path: path)
+        }
       }
       .buttonStyle(.plain)
 
@@ -546,6 +657,7 @@ struct SettingsView: View {
     }
     .padding(4)
     .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(RoundedRectangle(cornerRadius: 10))
     .background(
       RoundedRectangle(cornerRadius: 10)
         .fill(Color.secondary.opacity(0.08))
@@ -566,6 +678,78 @@ struct SettingsView: View {
       }
       Button("登録から削除") {
         model.removeRegisteredVideo(path: path)
+      }
+    }
+  }
+
+  private func playlistChip(_ playlist: WallpaperPlaylist) -> some View {
+    Group {
+      if editingPlaylistID == playlist.id {
+        HStack(spacing: 4) {
+          TextField("プレイリスト名", text: $editingPlaylistNameInput)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+            .font(.system(size: 11, weight: .medium))
+            .frame(minWidth: 120, idealWidth: 150, maxWidth: 180)
+            .focused($focusedPlaylistID, equals: playlist.id)
+            .onSubmit {
+              commitPlaylistNameEdit(playlistID: playlist.id)
+            }
+
+          Button {
+            commitPlaylistNameEdit(playlistID: playlist.id)
+          } label: {
+            Image(systemName: "checkmark")
+              .font(.system(size: 10, weight: .semibold))
+          }
+          .controlSize(.mini)
+          .buttonStyle(.borderless)
+
+          Button {
+            cancelPlaylistNameEdit()
+          } label: {
+            Image(systemName: "xmark")
+              .font(.system(size: 10, weight: .semibold))
+          }
+          .controlSize(.mini)
+          .buttonStyle(.borderless)
+        }
+      } else {
+        Button {
+          model.selectPlaylist(playlist.id)
+        } label: {
+          HStack(spacing: 4) {
+            Text(playlist.name)
+              .lineLimit(1)
+            Image(systemName: "pencil")
+              .font(.system(size: 10, weight: .semibold))
+              .opacity(0.75)
+          }
+          .font(.system(size: 12, weight: .semibold))
+          .padding(.horizontal, 10)
+          .padding(.vertical, 6)
+          .frame(minWidth: 72, maxWidth: 180)
+          .background(
+            Capsule()
+              .fill(
+                model.isSelectedPlaylist(playlist.id)
+                  ? Color.accentColor : Color.secondary.opacity(0.16)
+              )
+          )
+          .foregroundColor(model.isSelectedPlaylist(playlist.id) ? .white : .primary)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+          Button("このプレイリストに切り替え") {
+            model.selectPlaylist(playlist.id)
+          }
+          Button("名前を編集") {
+            startPlaylistNameEdit(playlistID: playlist.id)
+          }
+          Button("プレイリストを削除") {
+            model.removePlaylist(playlist.id)
+          }
+        }
       }
     }
   }
@@ -642,9 +826,28 @@ struct SettingsView: View {
   }
 
   private func startWallpaperNameEdit(path: String) {
+    cancelPlaylistNameEdit()
     editingWallpaperPath = path
     editingWallpaperNameInput = model.registeredVideoDisplayName(for: path)
     focusedWallpaperPath = path
+  }
+
+  private func startPlaylistNameEdit(playlistID: UUID) {
+    cancelWallpaperNameEdit()
+    editingPlaylistID = playlistID
+    editingPlaylistNameInput = model.playlistName(for: playlistID)
+    focusedPlaylistID = playlistID
+  }
+
+  private func commitPlaylistNameEdit(playlistID: UUID) {
+    model.setPlaylistName(editingPlaylistNameInput, for: playlistID)
+    cancelPlaylistNameEdit()
+  }
+
+  private func cancelPlaylistNameEdit() {
+    editingPlaylistID = nil
+    editingPlaylistNameInput = ""
+    focusedPlaylistID = nil
   }
 
   private func commitWallpaperNameEdit(path: String) {
@@ -664,16 +867,28 @@ struct SettingsView: View {
     } label: {
       Label(title, systemImage: systemImage)
         .font(.system(size: 14, weight: .semibold))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
         .frame(minWidth: 130)
         .background(
           RoundedRectangle(cornerRadius: 8)
             .fill(selectedTab == tab ? Color.accentColor : Color.clear)
         )
         .foregroundColor(selectedTab == tab ? Color.white : Color.primary)
+        .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+  }
+
+  private func compactToggle(_ title: String, isOn: Binding<Bool>) -> some View {
+    HStack(spacing: 6) {
+      Text(title)
+      Toggle("", isOn: isOn)
+        .labelsHidden()
+        .toggleStyle(.switch)
+        .fixedSize()
+    }
+    .fixedSize(horizontal: true, vertical: false)
   }
 
   private func syncVolumeInputWithModel() {
@@ -724,6 +939,7 @@ struct SettingsView: View {
 
 extension Notification.Name {
   static let chooseVideo = Notification.Name("ChooseVideo")
+  static let createPlaylistAndChooseVideo = Notification.Name("CreatePlaylistAndChooseVideo")
   static let openWallpaperTab = Notification.Name("OpenWallpaperTab")
   static let openSettingsTab = Notification.Name("OpenSettingsTab")
   static let toggleLaunchAtLogin = Notification.Name("ToggleLaunchAtLogin")

@@ -3,8 +3,16 @@ import AppKit
 import ApplicationServices
 import Combine
 
+struct WallpaperPlaylist: Codable, Identifiable, Equatable {
+  var id: UUID
+  var name: String
+  var videoPaths: [String]
+}
+
 @MainActor
 final class WallpaperModel: ObservableObject {
+  private let maxPlaylistCount: Int = 10
+
   private struct ScreenSignature: Equatable {
     let displayID: UInt32
     let frame: CGRect
@@ -23,6 +31,7 @@ final class WallpaperModel: ObservableObject {
   private var lastScreenSignatures: [ScreenSignature] = []
   private var frontmostAppObserver: NSObjectProtocol?
   private var activeSpaceObserver: NSObjectProtocol?
+  private var playerItemEndObserver: NSObjectProtocol?
   private var axObserver: AXObserver?
   private var observedAppElement: AXUIElement?
   private var observedAppPID: pid_t?
@@ -36,14 +45,40 @@ final class WallpaperModel: ObservableObject {
   @Published private(set) var audioVolume: Float = 1.0
   @Published private(set) var frameRateLimit: FrameRateLimit = .off
   @Published private(set) var decodeMode: DecodeMode = .automatic
+  @Published private(set) var playlistPlaybackEnabled: Bool = false
+  @Published private(set) var shufflePlaybackEnabled: Bool = false
+  @Published private(set) var currentVideoIndex: Int?
   @Published private(set) var desktopLevelOffset: DesktopLevelOffset = .zero
   @Published private(set) var useFullScreenAuxiliary: Bool = false
   @Published private(set) var suspendWhenOtherAppFullScreen: Bool = false
   @Published private(set) var suspendExclusionBundleIDs: [String] = []
 
+  @Published private(set) var playlists: [WallpaperPlaylist] = []
+  @Published private(set) var selectedPlaylistID: UUID?
   @Published private(set) var currentVideoPath: String?
   @Published private(set) var registeredVideoPaths: [String] = []
   @Published private(set) var registeredVideoDisplayNames: [String: String] = [:]
+
+  var visiblePlaylists: [WallpaperPlaylist] {
+    playlists.filter { !$0.videoPaths.isEmpty }
+  }
+
+  var canAddPlaylist: Bool {
+    playlists.count < maxPlaylistCount
+  }
+
+  var playlistCapacityText: String {
+    "\(playlists.count)/\(maxPlaylistCount)"
+  }
+
+  var selectedPlaylistName: String {
+    guard let selectedID = selectedPlaylistID,
+      let playlist = playlists.first(where: { $0.id == selectedID })
+    else {
+      return "プレイリスト"
+    }
+    return playlist.name
+  }
 
   init() {
     configurePlayer()
@@ -80,6 +115,9 @@ final class WallpaperModel: ObservableObject {
     if let observer = activeSpaceObserver {
       NSWorkspace.shared.notificationCenter.removeObserver(observer)
     }
+    if let observer: any NSObjectProtocol = playerItemEndObserver {
+      NotificationCenter.default.removeObserver(observer)
+    }
     MainActor.assumeIsolated {
       removeAXObserver()
     }
@@ -91,6 +129,38 @@ final class WallpaperModel: ObservableObject {
     queuePlayer.preventsDisplaySleepDuringVideoPlayback = false
     queuePlayer.actionAtItemEnd = .none
     applyLightweightSettings()
+    configurePlaybackEndObserver()
+  }
+
+  private func configurePlaybackEndObserver() {
+    if let observer = playerItemEndObserver {
+      NotificationCenter.default.removeObserver(observer)
+    }
+    playerItemEndObserver = NotificationCenter.default.addObserver(
+      forName: .AVPlayerItemDidPlayToEndTime,
+      object: nil,
+      queue: .main
+    ) { [weak self] note in
+      MainActor.assumeIsolated {
+        guard let self else {
+          return
+        }
+        guard self.playlistPlaybackEnabled else {
+          return
+        }
+        guard let finishedItem = note.object as? AVPlayerItem,
+          finishedItem === self.queuePlayer.currentItem
+        else {
+          return
+        }
+        guard self.registeredVideoPaths.count > 1 else {
+          self.queuePlayer.seek(to: .zero)
+          self.queuePlayer.play()
+          return
+        }
+        self.playNextVideo()
+      }
+    }
   }
 
   private func targetScreens() -> [NSScreen] {
@@ -373,6 +443,196 @@ final class WallpaperModel: ObservableObject {
     }
   }
 
+  func setPlaylistPlaybackEnabled(_ enabled: Bool) {
+    guard playlistPlaybackEnabled != enabled else {
+      return
+    }
+    playlistPlaybackEnabled = enabled
+    UserDefaults.standard.set(enabled, forKey: "playlistPlaybackEnabled")
+    if !enabled {
+      setShufflePlaybackEnabled(false)
+    }
+    if let currentPath: String = currentVideoPath {
+      playVideo(url: URL(fileURLWithPath: currentPath))
+    }
+  }
+
+  func setShufflePlaybackEnabled(_ enabled: Bool) {
+    let normalized = playlistPlaybackEnabled ? enabled : false
+    guard shufflePlaybackEnabled != normalized else {
+      return
+    }
+    shufflePlaybackEnabled = normalized
+    UserDefaults.standard.set(normalized, forKey: "shufflePlaybackEnabled")
+  }
+
+  func isSelectedPlaylist(_ playlistID: UUID) -> Bool {
+    selectedPlaylistID == playlistID
+  }
+
+  func playlistName(for playlistID: UUID) -> String {
+    playlists.first(where: { $0.id == playlistID })?.name ?? "プレイリスト"
+  }
+
+  func setPlaylistName(_ name: String, for playlistID: UUID) {
+    guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else {
+      return
+    }
+    let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !cleaned.isEmpty else {
+      return
+    }
+    guard playlists[index].name != cleaned else {
+      return
+    }
+    playlists[index].name = cleaned
+    persistPlaylistState()
+  }
+
+  func removePlaylist(_ playlistID: UUID) {
+    guard let removeIndex = playlists.firstIndex(where: { $0.id == playlistID }) else {
+      return
+    }
+    let removedPaths = Set(playlists[removeIndex].videoPaths)
+    let removedCurrent = removedPaths.contains(currentVideoPath ?? "")
+
+    playlists.remove(at: removeIndex)
+    ensureSelectedPlaylist()
+    syncActivePlaylistPaths()
+
+    if removedCurrent {
+      if let firstPath = registeredVideoPaths.first {
+        selectRegisteredVideo(path: firstPath)
+      } else {
+        queuePlayer.pause()
+        queuePlayer.removeAllItems()
+        playerLooper = nil
+        currentVideoPath = nil
+        currentVideoIndex = nil
+        UserDefaults.standard.removeObject(forKey: "videoPath")
+      }
+    } else if let currentPath = currentVideoPath,
+      let existingIndex = registeredVideoPaths.firstIndex(of: currentPath)
+    {
+      currentVideoIndex = existingIndex
+    } else {
+      currentVideoPath = registeredVideoPaths.first
+      currentVideoIndex = currentVideoPath.flatMap { registeredVideoPaths.firstIndex(of: $0) }
+    }
+
+    pruneDisplayNamesForExistingPaths()
+    persistPlaylistState()
+  }
+
+  func selectPlaylist(_ playlistID: UUID) {
+    guard playlists.contains(where: { $0.id == playlistID }) else {
+      return
+    }
+    selectedPlaylistID = playlistID
+    syncActivePlaylistPaths()
+
+    if let currentPath = currentVideoPath,
+      registeredVideoPaths.contains(currentPath)
+    {
+      currentVideoIndex = registeredVideoPaths.firstIndex(of: currentPath)
+      persistPlaylistState()
+      return
+    }
+
+    if let firstPath = registeredVideoPaths.first {
+      selectRegisteredVideo(path: firstPath)
+    } else {
+      queuePlayer.pause()
+      queuePlayer.removeAllItems()
+      playerLooper = nil
+      currentVideoPath = nil
+      currentVideoIndex = nil
+      UserDefaults.standard.removeObject(forKey: "videoPath")
+      persistPlaylistState()
+    }
+  }
+
+  @discardableResult
+  func createPlaylistAndSetVideo(path: String) -> Bool {
+    guard canAddPlaylist else {
+      return false
+    }
+
+    let originalSelectedID = selectedPlaylistID
+    let newPlaylist = WallpaperPlaylist(
+      id: UUID(),
+      name: "プレイリスト\(playlists.count + 1)",
+      videoPaths: []
+    )
+    playlists.append(newPlaylist)
+    selectedPlaylistID = newPlaylist.id
+    syncActivePlaylistPaths()
+    persistPlaylistState()
+
+    let beforeCount = registeredVideoPaths.count
+    setVideo(path: path)
+    let didAdd = registeredVideoPaths.count > beforeCount
+    if didAdd {
+      return true
+    }
+
+    if let index = playlists.firstIndex(where: { $0.id == newPlaylist.id }) {
+      playlists.remove(at: index)
+    }
+    selectedPlaylistID = originalSelectedID
+    ensureSelectedPlaylist()
+    syncActivePlaylistPaths()
+    persistPlaylistState()
+    return false
+  }
+
+  func playNextVideo() {
+    guard !registeredVideoPaths.isEmpty else {
+      return
+    }
+    guard registeredVideoPaths.count > 1 else {
+      if let currentPath = currentVideoPath {
+        playVideo(url: URL(fileURLWithPath: currentPath))
+      }
+      return
+    }
+    let nextIndex = resolvedNextIndex(forward: true)
+    selectRegisteredVideo(path: registeredVideoPaths[nextIndex])
+  }
+
+  func playPreviousVideo() {
+    guard !registeredVideoPaths.isEmpty else {
+      return
+    }
+    guard registeredVideoPaths.count > 1 else {
+      if let currentPath = currentVideoPath {
+        playVideo(url: URL(fileURLWithPath: currentPath))
+      }
+      return
+    }
+    let previousIndex = resolvedNextIndex(forward: false)
+    selectRegisteredVideo(path: registeredVideoPaths[previousIndex])
+  }
+
+  private func resolvedNextIndex(forward: Bool) -> Int {
+    guard !registeredVideoPaths.isEmpty else {
+      return 0
+    }
+    let baseIndex = currentVideoIndex ?? 0
+    let maxIndex = registeredVideoPaths.count - 1
+    if shufflePlaybackEnabled && registeredVideoPaths.count > 2 {
+      var candidate = Int.random(in: 0...maxIndex)
+      while candidate == baseIndex {
+        candidate = Int.random(in: 0...maxIndex)
+      }
+      return candidate
+    }
+    if forward {
+      return (baseIndex + 1) % registeredVideoPaths.count
+    }
+    return (baseIndex - 1 + registeredVideoPaths.count) % registeredVideoPaths.count
+  }
+
   func setDesktopLevelOffset(_ offset: DesktopLevelOffset) {
     guard desktopLevelOffset != offset else {
       return
@@ -468,13 +728,15 @@ final class WallpaperModel: ObservableObject {
       return
     }
 
+    ensureSelectedPlaylist()
+
     if registeredVideoPaths.contains(sourceURL.path) {
       selectRegisteredVideo(path: sourceURL.path)
       return
     }
 
     if let cacheDirectory = cacheDirectoryURL(), sourceURL.path.hasPrefix(cacheDirectory.path) {
-      registerVideoPath(sourceURL.path)
+      addVideoPathToSelectedPlaylist(sourceURL.path)
       selectRegisteredVideo(path: sourceURL.path)
       return
     }
@@ -483,7 +745,7 @@ final class WallpaperModel: ObservableObject {
       return
     }
 
-    registerVideoPath(localURL.path, preferredDisplayName: sourceURL.lastPathComponent)
+    addVideoPathToSelectedPlaylist(localURL.path, preferredDisplayName: sourceURL.lastPathComponent)
     selectRegisteredVideo(path: localURL.path)
   }
 
@@ -524,33 +786,59 @@ final class WallpaperModel: ObservableObject {
       removeRegisteredVideo(path: trimmed)
       return
     }
-    registerVideoPath(trimmed)
+    addVideoPathToSelectedPlaylist(trimmed)
+    syncActivePlaylistPaths()
     currentVideoPath = trimmed
+    currentVideoIndex = registeredVideoPaths.firstIndex(of: trimmed)
     UserDefaults.standard.set(trimmed, forKey: "videoPath")
     playVideo(url: URL(fileURLWithPath: trimmed))
+    persistPlaylistState()
   }
 
   func removeRegisteredVideo(path: String) {
     let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let index = registeredVideoPaths.firstIndex(of: trimmed) else {
+    guard let selectedIndex = selectedPlaylistIndex() else {
       return
     }
-    registeredVideoPaths.remove(at: index)
-    UserDefaults.standard.set(registeredVideoPaths, forKey: "registeredVideoPaths")
+    guard let index = playlists[selectedIndex].videoPaths.firstIndex(of: trimmed) else {
+      return
+    }
+    let wasCurrent = currentVideoPath == trimmed
+    playlists[selectedIndex].videoPaths.remove(at: index)
+    syncActivePlaylistPaths()
     registeredVideoDisplayNames.removeValue(forKey: trimmed)
     UserDefaults.standard.set(registeredVideoDisplayNames, forKey: "registeredVideoDisplayNames")
 
-    if currentVideoPath == trimmed {
-      if let nextPath = registeredVideoPaths.first {
-        selectRegisteredVideo(path: nextPath)
+    if playlists[selectedIndex].videoPaths.isEmpty {
+      playlists.remove(at: selectedIndex)
+      ensureSelectedPlaylist()
+      syncActivePlaylistPaths()
+    }
+
+    if wasCurrent {
+      if !registeredVideoPaths.isEmpty {
+        let nextIndex = min(index, registeredVideoPaths.count - 1)
+        selectRegisteredVideo(path: registeredVideoPaths[nextIndex])
       } else {
         queuePlayer.pause()
         queuePlayer.removeAllItems()
         playerLooper = nil
         currentVideoPath = nil
+        currentVideoIndex = nil
         UserDefaults.standard.removeObject(forKey: "videoPath")
+        persistPlaylistState()
       }
+      return
     }
+
+    if let currentPath = currentVideoPath,
+      let existingIndex = registeredVideoPaths.firstIndex(of: currentPath)
+    {
+      currentVideoIndex = existingIndex
+    } else {
+      currentVideoIndex = nil
+    }
+    persistPlaylistState()
   }
 
   func openCacheFolder() {
@@ -577,8 +865,10 @@ final class WallpaperModel: ObservableObject {
       }
       try FileManager.default.createDirectory(
         at: directory, withIntermediateDirectories: true)
+      playlists.removeAll()
+      selectedPlaylistID = nil
       registeredVideoPaths.removeAll()
-      UserDefaults.standard.set(registeredVideoPaths, forKey: "registeredVideoPaths")
+      UserDefaults.standard.removeObject(forKey: "registeredVideoPaths")
       registeredVideoDisplayNames.removeAll()
       UserDefaults.standard.set(registeredVideoDisplayNames, forKey: "registeredVideoDisplayNames")
       if let currentPath: String = currentVideoPath, currentPath.hasPrefix(directory.path) {
@@ -586,8 +876,10 @@ final class WallpaperModel: ObservableObject {
         queuePlayer.removeAllItems()
         playerLooper = nil
         currentVideoPath = nil
+        currentVideoIndex = nil
         UserDefaults.standard.removeObject(forKey: "videoPath")
       }
+      persistPlaylistState()
       return true
     } catch {
       return false
@@ -634,7 +926,11 @@ final class WallpaperModel: ObservableObject {
     queuePlayer.pause()
     queuePlayer.removeAllItems()
     playerLooper = nil
-    playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: item)
+    if playlistPlaybackEnabled {
+      queuePlayer.insert(item, after: nil)
+    } else {
+      playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: item)
+    }
     applyAudioSettings()
     queuePlayer.play()
     evaluateForegroundCoverageState()
@@ -695,6 +991,13 @@ final class WallpaperModel: ObservableObject {
     {
       fitMode = restoredFit
     }
+    playlistPlaybackEnabled =
+      UserDefaults.standard.object(forKey: "playlistPlaybackEnabled") as? Bool ?? false
+    shufflePlaybackEnabled =
+      UserDefaults.standard.object(forKey: "shufflePlaybackEnabled") as? Bool ?? false
+    if !playlistPlaybackEnabled {
+      shufflePlaybackEnabled = false
+    }
     lightweightMode = UserDefaults.standard.object(forKey: "lightweightMode") as? Bool ?? false
     audioEnabled = UserDefaults.standard.object(forKey: "audioEnabled") as? Bool ?? false
     let savedAudioVolume: Float = UserDefaults.standard.float(forKey: "audioVolume")
@@ -714,36 +1017,87 @@ final class WallpaperModel: ObservableObject {
       )
       .sorted()
     }
-    let savedPaths = UserDefaults.standard.stringArray(forKey: "registeredVideoPaths") ?? []
-    registeredVideoPaths = savedPaths.filter { FileManager.default.fileExists(atPath: $0) }
+
+    if let playlistData = UserDefaults.standard.data(forKey: "playlistsData"),
+      let decoded = try? JSONDecoder().decode([WallpaperPlaylist].self, from: playlistData)
+    {
+      playlists = decoded.map { playlist in
+        var cleaned = playlist
+        cleaned.videoPaths = cleaned.videoPaths.filter {
+          FileManager.default.fileExists(atPath: $0)
+        }
+        return cleaned
+      }
+      .filter { !$0.videoPaths.isEmpty }
+    } else {
+      let savedPaths = UserDefaults.standard.stringArray(forKey: "registeredVideoPaths") ?? []
+      let cleaned = savedPaths.filter { FileManager.default.fileExists(atPath: $0) }
+      if !cleaned.isEmpty {
+        playlists = [
+          WallpaperPlaylist(id: UUID(), name: "プレイリスト1", videoPaths: cleaned)
+        ]
+      }
+    }
+
+    if let savedPlaylistID = UserDefaults.standard.string(forKey: "selectedPlaylistID"),
+      let uuid = UUID(uuidString: savedPlaylistID),
+      playlists.contains(where: { $0.id == uuid })
+    {
+      selectedPlaylistID = uuid
+    } else {
+      selectedPlaylistID = playlists.first?.id
+    }
+
+    syncActivePlaylistPaths()
+
+    let allPaths = Set(playlists.flatMap { $0.videoPaths })
     if let savedDisplayNames = UserDefaults.standard.dictionary(
       forKey: "registeredVideoDisplayNames")
       as? [String: String]
     {
       registeredVideoDisplayNames = savedDisplayNames.filter {
-        registeredVideoPaths.contains($0.key)
+        allPaths.contains($0.key)
       }
     }
     if let savedPath: String = UserDefaults.standard.string(forKey: "videoPath"),
-      FileManager.default.fileExists(atPath: savedPath)
+      FileManager.default.fileExists(atPath: savedPath),
+      let playlistContainingPath = playlists.first(where: { $0.videoPaths.contains(savedPath) })
     {
+      selectedPlaylistID = playlistContainingPath.id
+      syncActivePlaylistPaths()
       currentVideoPath = savedPath
-      registerVideoPath(savedPath)
     } else {
       currentVideoPath = registeredVideoPaths.first
     }
+    if let currentPath = currentVideoPath,
+      let restoredIndex = registeredVideoPaths.firstIndex(of: currentPath)
+    {
+      currentVideoIndex = restoredIndex
+    } else {
+      currentVideoIndex = nil
+    }
+    persistPlaylistState()
   }
 
-  private func registerVideoPath(_ path: String, preferredDisplayName: String? = nil) {
+  private func addVideoPathToSelectedPlaylist(_ path: String, preferredDisplayName: String? = nil) {
     guard !path.isEmpty else {
       return
     }
     guard FileManager.default.fileExists(atPath: path) else {
       return
     }
-    if !registeredVideoPaths.contains(path) {
-      registeredVideoPaths.append(path)
-      UserDefaults.standard.set(registeredVideoPaths, forKey: "registeredVideoPaths")
+
+    if playlists.isEmpty {
+      playlists = [WallpaperPlaylist(id: UUID(), name: "プレイリスト1", videoPaths: [])]
+      selectedPlaylistID = playlists.first?.id
+    }
+    ensureSelectedPlaylist()
+    guard let index = selectedPlaylistIndex() else {
+      return
+    }
+
+    if !playlists[index].videoPaths.contains(path) {
+      playlists[index].videoPaths.append(path)
     }
 
     if let preferredDisplayName,
@@ -753,6 +1107,48 @@ final class WallpaperModel: ObservableObject {
       registeredVideoDisplayNames[path] = preferredDisplayName
       UserDefaults.standard.set(registeredVideoDisplayNames, forKey: "registeredVideoDisplayNames")
     }
+
+    syncActivePlaylistPaths()
+    persistPlaylistState()
+  }
+
+  private func selectedPlaylistIndex() -> Int? {
+    guard let selectedPlaylistID else {
+      return nil
+    }
+    return playlists.firstIndex(where: { $0.id == selectedPlaylistID })
+  }
+
+  private func ensureSelectedPlaylist() {
+    if let selectedPlaylistID,
+      playlists.contains(where: { $0.id == selectedPlaylistID })
+    {
+      return
+    }
+    selectedPlaylistID = playlists.first?.id
+  }
+
+  private func syncActivePlaylistPaths() {
+    ensureSelectedPlaylist()
+    if let index = selectedPlaylistIndex() {
+      registeredVideoPaths = playlists[index].videoPaths
+    } else {
+      registeredVideoPaths = []
+    }
+  }
+
+  private func pruneDisplayNamesForExistingPaths() {
+    let validPaths = Set(playlists.flatMap { $0.videoPaths })
+    registeredVideoDisplayNames = registeredVideoDisplayNames.filter { validPaths.contains($0.key) }
+    UserDefaults.standard.set(registeredVideoDisplayNames, forKey: "registeredVideoDisplayNames")
+  }
+
+  private func persistPlaylistState() {
+    if let data = try? JSONEncoder().encode(playlists) {
+      UserDefaults.standard.set(data, forKey: "playlistsData")
+    }
+    UserDefaults.standard.set(registeredVideoPaths, forKey: "registeredVideoPaths")
+    UserDefaults.standard.set(selectedPlaylistID?.uuidString, forKey: "selectedPlaylistID")
   }
 
   private func configureForegroundCoverageMonitoring() {
