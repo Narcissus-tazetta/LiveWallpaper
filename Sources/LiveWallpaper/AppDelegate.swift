@@ -122,23 +122,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     let menu = NSMenu()
     menu.showsStateColumn = false
+    let openWallpaperItem = NSMenuItem(
+      title: "壁紙を開く",
+      action: #selector(openWallpaperTab),
+      keyEquivalent: ""
+    )
+    openWallpaperItem.image = wallpaperMenuIcon()
+    menu.addItem(openWallpaperItem)
     menu.addItem(NSMenuItem(title: "設定を開く", action: #selector(openSettings), keyEquivalent: ""))
 
     let toggleItem = NSMenuItem(
-      title: clickThroughMenuTitle(wallpaperModel.clickThrough),
-      action: #selector(toggleClickThrough),
+      title: audioMenuTitle(wallpaperModel.audioEnabled),
+      action: #selector(toggleAudioEnabled),
       keyEquivalent: ""
     )
-    toggleItem.image = clickThroughMenuIcon(wallpaperModel.clickThrough)
+    toggleItem.image = audioMenuIcon(wallpaperModel.audioEnabled)
     toggleItem.tag = 1001
     menu.addItem(toggleItem)
 
-    wallpaperModel.$clickThrough
+    wallpaperModel.$audioEnabled
       .receive(on: DispatchQueue.main)
       .sink { [weak self] enabled in
         guard let item = self?.statusItem.menu?.item(withTag: 1001) else { return }
-        item.title = self?.clickThroughMenuTitle(enabled) ?? ""
-        item.image = self?.clickThroughMenuIcon(enabled)
+        item.title = self?.audioMenuTitle(enabled) ?? ""
+        item.image = self?.audioMenuIcon(enabled)
       }
       .store(in: &cancellables)
 
@@ -268,11 +275,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     _ = wallpaperModel.clearCache()
   }
 
-  private func setClickThrough(_ enabled: Bool) {
-    wallpaperModel.setClickThrough(enabled)
+  private func setAudioEnabled(_ enabled: Bool) {
+    wallpaperModel.setAudioEnabled(enabled)
     if let toggleItem = statusItem.menu?.item(withTag: 1001) {
-      toggleItem.title = clickThroughMenuTitle(enabled)
-      toggleItem.image = clickThroughMenuIcon(enabled)
+      toggleItem.title = audioMenuTitle(enabled)
+      toggleItem.image = audioMenuIcon(enabled)
     }
   }
 
@@ -325,13 +332,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #endif
   }
 
-  private func clickThroughMenuTitle(_ enabled: Bool) -> String {
-    "クリック貫通: " + (enabled ? "ON" : "OFF")
+  private func audioMenuTitle(_ enabled: Bool) -> String {
+    "音声を再生: " + (enabled ? "ON" : "OFF")
   }
 
-  private func clickThroughMenuIcon(_ enabled: Bool) -> NSImage? {
-    let symbolName: String = enabled ? "cursorarrow.click" : "cursorarrow"
-    let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "クリック貫通")
+  private func audioMenuIcon(_ enabled: Bool) -> NSImage? {
+    let symbolName: String = enabled ? "speaker.wave.2" : "speaker.slash"
+    let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "音声")
     let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
     let configured = image?.withSymbolConfiguration(config)
     configured?.isTemplate = true
@@ -349,13 +356,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     return configured
   }
 
+  private func wallpaperMenuIcon() -> NSImage? {
+    let image = NSImage(
+      systemSymbolName: "photo.on.rectangle",
+      accessibilityDescription: "壁紙"
+    )
+    let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+    let configured = image?.withSymbolConfiguration(config)
+    configured?.isTemplate = true
+    return configured
+  }
+
   @objc private func openSettings() {
     settingsWindowController.showWindow(nil)
     NSApp.activate(ignoringOtherApps: true)
+    NotificationCenter.default.post(name: .openSettingsTab, object: nil)
   }
 
-  @objc private func toggleClickThrough() {
-    setClickThrough(!wallpaperModel.clickThrough)
+  @objc private func openWallpaperTab() {
+    settingsWindowController.showWindow(nil)
+    NSApp.activate(ignoringOtherApps: true)
+    NotificationCenter.default.post(name: .openWallpaperTab, object: nil)
+  }
+
+  @objc private func toggleAudioEnabled() {
+    setAudioEnabled(!wallpaperModel.audioEnabled)
   }
 
   @objc private func quitApp() {

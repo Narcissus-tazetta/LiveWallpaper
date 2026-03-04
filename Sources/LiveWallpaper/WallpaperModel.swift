@@ -3,51 +3,6 @@ import AppKit
 import ApplicationServices
 import Combine
 
-enum AppConfig {
-  static let defaultVersion = "0.0.3"
-  static let sparkleAppcastURL =
-    "https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml"
-  static let sparklePublicEDKey = "uoATy8ItPd3DQDHahg8JEWgXUNS4//A29+JLUy2zxhY="
-}
-
-enum DisplayMode: String {
-  case mainOnly
-  case allScreens
-}
-
-enum VideoFitMode: String {
-  case fill
-  case fit
-}
-
-enum FrameRateLimit: String {
-  case off
-  case fps30
-  case fps60
-}
-
-enum DecodeMode: String {
-  case automatic
-  case balanced
-  case efficiency
-}
-
-enum DesktopLevelOffset: Int {
-  case minusOne = -1
-  case zero = 0
-  case plusOne = 1
-}
-
-final class PlayerView: NSView {
-  override func makeBackingLayer() -> CALayer {
-    AVPlayerLayer()
-  }
-
-  var playerLayer: AVPlayerLayer {
-    layer as! AVPlayerLayer
-  }
-}
-
 @MainActor
 final class WallpaperModel: ObservableObject {
   private struct ScreenSignature: Equatable {
@@ -87,6 +42,8 @@ final class WallpaperModel: ObservableObject {
   @Published private(set) var suspendExclusionBundleIDs: [String] = []
 
   @Published private(set) var currentVideoPath: String?
+  @Published private(set) var registeredVideoPaths: [String] = []
+  @Published private(set) var registeredVideoDisplayNames: [String: String] = [:]
 
   init() {
     configurePlayer()
@@ -511,14 +468,89 @@ final class WallpaperModel: ObservableObject {
       return
     }
 
+    if registeredVideoPaths.contains(sourceURL.path) {
+      selectRegisteredVideo(path: sourceURL.path)
+      return
+    }
+
+    if let cacheDirectory = cacheDirectoryURL(), sourceURL.path.hasPrefix(cacheDirectory.path) {
+      registerVideoPath(sourceURL.path)
+      selectRegisteredVideo(path: sourceURL.path)
+      return
+    }
+
     guard let localURL: URL = importVideoToAppSupport(from: sourceURL) else {
       return
     }
 
-    currentVideoPath = localURL.path
-    UserDefaults.standard.set(localURL.path, forKey: "videoPath")
+    registerVideoPath(localURL.path, preferredDisplayName: sourceURL.lastPathComponent)
+    selectRegisteredVideo(path: localURL.path)
+  }
 
-    playVideo(url: localURL)
+  func registeredVideoDisplayName(for path: String) -> String {
+    let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let stored = registeredVideoDisplayNames[trimmed], !stored.isEmpty {
+      return stored
+    }
+    return URL(fileURLWithPath: trimmed).lastPathComponent
+  }
+
+  func setRegisteredVideoDisplayName(_ displayName: String, for path: String) {
+    let trimmedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard registeredVideoPaths.contains(trimmedPath) else {
+      return
+    }
+
+    let cleaned = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let finalName =
+      cleaned.isEmpty
+      ? URL(fileURLWithPath: trimmedPath).lastPathComponent
+      : cleaned
+
+    guard registeredVideoDisplayNames[trimmedPath] != finalName else {
+      return
+    }
+
+    registeredVideoDisplayNames[trimmedPath] = finalName
+    UserDefaults.standard.set(registeredVideoDisplayNames, forKey: "registeredVideoDisplayNames")
+  }
+
+  func selectRegisteredVideo(path: String) {
+    let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      return
+    }
+    guard FileManager.default.fileExists(atPath: trimmed) else {
+      removeRegisteredVideo(path: trimmed)
+      return
+    }
+    registerVideoPath(trimmed)
+    currentVideoPath = trimmed
+    UserDefaults.standard.set(trimmed, forKey: "videoPath")
+    playVideo(url: URL(fileURLWithPath: trimmed))
+  }
+
+  func removeRegisteredVideo(path: String) {
+    let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let index = registeredVideoPaths.firstIndex(of: trimmed) else {
+      return
+    }
+    registeredVideoPaths.remove(at: index)
+    UserDefaults.standard.set(registeredVideoPaths, forKey: "registeredVideoPaths")
+    registeredVideoDisplayNames.removeValue(forKey: trimmed)
+    UserDefaults.standard.set(registeredVideoDisplayNames, forKey: "registeredVideoDisplayNames")
+
+    if currentVideoPath == trimmed {
+      if let nextPath = registeredVideoPaths.first {
+        selectRegisteredVideo(path: nextPath)
+      } else {
+        queuePlayer.pause()
+        queuePlayer.removeAllItems()
+        playerLooper = nil
+        currentVideoPath = nil
+        UserDefaults.standard.removeObject(forKey: "videoPath")
+      }
+    }
   }
 
   func openCacheFolder() {
@@ -545,6 +577,10 @@ final class WallpaperModel: ObservableObject {
       }
       try FileManager.default.createDirectory(
         at: directory, withIntermediateDirectories: true)
+      registeredVideoPaths.removeAll()
+      UserDefaults.standard.set(registeredVideoPaths, forKey: "registeredVideoPaths")
+      registeredVideoDisplayNames.removeAll()
+      UserDefaults.standard.set(registeredVideoDisplayNames, forKey: "registeredVideoDisplayNames")
       if let currentPath: String = currentVideoPath, currentPath.hasPrefix(directory.path) {
         queuePlayer.pause()
         queuePlayer.removeAllItems()
@@ -640,32 +676,7 @@ final class WallpaperModel: ObservableObject {
       "wallpaper-\(UUID().uuidString).\(ext)")
 
     do {
-      if let previousPath: String = currentVideoPath,
-        previousPath.hasPrefix(targetDirectory.path),
-        previousPath != targetURL.path,
-        fileManager.fileExists(atPath: previousPath)
-      {
-        try fileManager.removeItem(atPath: previousPath)
-      }
       try fileManager.copyItem(at: sourceURL, to: targetURL)
-
-      if let files = try? fileManager.contentsOfDirectory(
-        at: targetDirectory,
-        includingPropertiesForKeys: nil,
-        options: [.skipsHiddenFiles]
-      ) {
-        for file in files {
-          if file.path == targetURL.path {
-            continue
-          }
-          if let previousPath = currentVideoPath, file.path == previousPath {
-            continue
-          }
-          if file.lastPathComponent.hasPrefix("wallpaper-") {
-            try? fileManager.removeItem(at: file)
-          }
-        }
-      }
       return targetURL
     } catch {
       return nil
@@ -703,8 +714,44 @@ final class WallpaperModel: ObservableObject {
       )
       .sorted()
     }
-    if let savedPath: String = UserDefaults.standard.string(forKey: "videoPath") {
+    let savedPaths = UserDefaults.standard.stringArray(forKey: "registeredVideoPaths") ?? []
+    registeredVideoPaths = savedPaths.filter { FileManager.default.fileExists(atPath: $0) }
+    if let savedDisplayNames = UserDefaults.standard.dictionary(
+      forKey: "registeredVideoDisplayNames")
+      as? [String: String]
+    {
+      registeredVideoDisplayNames = savedDisplayNames.filter {
+        registeredVideoPaths.contains($0.key)
+      }
+    }
+    if let savedPath: String = UserDefaults.standard.string(forKey: "videoPath"),
+      FileManager.default.fileExists(atPath: savedPath)
+    {
       currentVideoPath = savedPath
+      registerVideoPath(savedPath)
+    } else {
+      currentVideoPath = registeredVideoPaths.first
+    }
+  }
+
+  private func registerVideoPath(_ path: String, preferredDisplayName: String? = nil) {
+    guard !path.isEmpty else {
+      return
+    }
+    guard FileManager.default.fileExists(atPath: path) else {
+      return
+    }
+    if !registeredVideoPaths.contains(path) {
+      registeredVideoPaths.append(path)
+      UserDefaults.standard.set(registeredVideoPaths, forKey: "registeredVideoPaths")
+    }
+
+    if let preferredDisplayName,
+      !preferredDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      registeredVideoDisplayNames[path] == nil
+    {
+      registeredVideoDisplayNames[path] = preferredDisplayName
+      UserDefaults.standard.set(registeredVideoDisplayNames, forKey: "registeredVideoDisplayNames")
     }
   }
 
