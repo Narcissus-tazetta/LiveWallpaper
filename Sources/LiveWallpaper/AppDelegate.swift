@@ -653,11 +653,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       Task { @MainActor in
         if self.manualUpdateCheckPending {
           self.manualUpdateCheckPending = false
-          let alert = NSAlert()
-          alert.messageText = "最新の状態です！"
-          alert.informativeText = "現在利用できるアップデートはありません。"
-          alert.alertStyle = .informational
-          alert.runModal()
         }
       }
     }

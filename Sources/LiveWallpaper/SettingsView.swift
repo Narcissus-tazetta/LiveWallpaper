@@ -32,7 +32,6 @@ struct SettingsView: View {
   @FocusState private var isVolumeInputFocused: Bool
   @FocusState private var focusedPlaylistID: UUID?
   @FocusState private var focusedWallpaperPath: String?
-  // even more compact grid for wallpapers
   private let wallpaperColumns: [GridItem] = [
     GridItem(.adaptive(minimum: 110, maximum: 140), spacing: 6)
   ]
