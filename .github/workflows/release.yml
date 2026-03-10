@@ -19,6 +19,8 @@ jobs:
         runs-on: macos-14
         steps:
             - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
             - name: Cache SwiftPM
               uses: actions/cache@v4
@@ -44,27 +46,27 @@ jobs:
                   SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
               run: |
                   if [[ -z "$SPARKLE_PRIVATE_ED_KEY" ]]; then
-                      echo "Missing secret: SPARKLE_PRIVATE_ED_KEY" >&2
-                      exit 1
+                    echo "Missing secret: SPARKLE_PRIVATE_ED_KEY" >&2
+                    exit 1
                   fi
 
                   KEY_FILE="$RUNNER_TEMP/sparkle-private.pem"
                   if [[ "$SPARKLE_PRIVATE_ED_KEY" == *"BEGIN PRIVATE KEY"* ]]; then
-                      printf '%s' "$SPARKLE_PRIVATE_ED_KEY" | sed $'s/\\\\n/\\\n/g' > "$KEY_FILE"
+                    printf '%s' "$SPARKLE_PRIVATE_ED_KEY" | python3 -c 'import sys; print(sys.stdin.read().replace("\\\\n", "\n"), end="")' > "$KEY_FILE"
                   else
-                      KEY_BODY="$(printf '%s' "$SPARKLE_PRIVATE_ED_KEY" | tr -d '[:space:]')"
-                      {
-                          echo "-----BEGIN PRIVATE KEY-----"
-                          echo "$KEY_BODY" | fold -w 64
-                          echo "-----END PRIVATE KEY-----"
-                      } > "$KEY_FILE"
+                    KEY_BODY="$(printf '%s' "$SPARKLE_PRIVATE_ED_KEY" | tr -d '[:space:]')"
+                    {
+                      echo "-----BEGIN PRIVATE KEY-----"
+                      echo "$KEY_BODY" | fold -w 64
+                      echo "-----END PRIVATE KEY-----"
+                    } > "$KEY_FILE"
                   fi
 
                   chmod 600 "$KEY_FILE"
 
                   if ! openssl pkey -in "$KEY_FILE" -noout >/dev/null 2>&1; then
-                      echo "Invalid SPARKLE_PRIVATE_ED_KEY format" >&2
-                      exit 1
+                    echo "Invalid SPARKLE_PRIVATE_ED_KEY format" >&2
+                    exit 1
                   fi
 
                   python3 -m venv "$RUNNER_TEMP/pyenv"
@@ -78,6 +80,21 @@ jobs:
                   SPARKLE_ED_SIGNATURE="$(python scripts/sign_zip.py "$KEY_FILE" "$ZIP_PATH")"
                   ./scripts/generate_appcast.sh "${{ inputs.version }}" "${{ inputs.build_number }}" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${{ inputs.version }}"
 
+            - name: Generate release notes from commits
+              run: |
+                  chmod +x scripts/generate_release_notes.sh
+                  ./scripts/generate_release_notes.sh "${{ inputs.version }}" "dist/release-notes.md"
+
+            - name: Create release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  gh release create \
+                    "v${{ inputs.version }}" \
+                    "dist/LiveWallpaper-macos-v${{ inputs.version }}.zip" \
+                    --title "v${{ inputs.version }}" \
+                    --notes-file "dist/release-notes.md"
+
             - name: Commit appcast
               run: |
                   git config user.name github-actions
@@ -85,9 +102,3 @@ jobs:
                   git add docs/appcast.xml
                   git commit -m "chore: update appcast v${{ inputs.version }}" || true
                   git push
-
-            - name: Create release
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  gh release create "v${{ inputs.version }}" "dist/LiveWallpaper-macos-v${{ inputs.version }}.zip" --title "v${{ inputs.version }}" --notes "LiveWallpaper v${{ inputs.version }}"

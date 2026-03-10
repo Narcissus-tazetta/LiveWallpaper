@@ -1,0 +1,728 @@
+import AppKit
+import Combine
+import ServiceManagement
+import SwiftUI
+
+#if canImport(Sparkle)
+    import Sparkle
+#endif
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var statusItem: NSStatusItem!
+    private var settingsWindowController: NSWindowController!
+    private let wallpaperModel = WallpaperModel()
+    private var launchAtLoginEnabled: Bool = false
+    private var autoUpdateEnabled: Bool = true
+    #if canImport(Sparkle)
+        private var updaterController: SPUStandardUpdaterController?
+        private var sparkleStarted = false
+        private var manualUpdateCheckPending = false
+    #endif
+
+    func applicationDidFinishLaunching(_: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+        launchAtLoginEnabled = currentLaunchAtLoginEnabled()
+        autoUpdateEnabled =
+            UserDefaults.standard.object(forKey: "autoUpdateEnabled") as? Bool ?? true
+        NSApp.applicationIconImage = appIconImage()
+        setupStatusBar()
+        setupSettingsWindow()
+        verifyUpdatePrerequisites()
+        setupSparkleUpdater()
+    }
+
+    private func verifyUpdatePrerequisites() {
+        let bundlePath: String = Bundle.main.bundlePath
+        NSLog("[Sparkle] Bundle path: \(bundlePath)")
+        if bundlePath.contains("/AppTranslocation/") {
+            let alert = NSAlert()
+            alert.messageText = "アップデートを有効化するにはアプリをApplicationsに移動してください"
+            alert.informativeText = "現在は一時実行領域から起動しているため、自動アップデートが失敗する場合があります。"
+            alert.alertStyle = .warning
+            alert.runModal()
+            NSLog("[Sparkle] AppTranslocation detected")
+        }
+        if !FileManager.default.isWritableFile(atPath: bundlePath) {
+            NSLog("[Sparkle] App path is not writable: \(bundlePath)")
+        }
+    }
+
+    private func setupSparkleUpdater() {
+        #if canImport(Sparkle)
+            guard let publicEDKey = Self.sparklePublicEDKeyValue(), !publicEDKey.isEmpty else {
+                NSLog("[Sparkle] publicEDKey is empty")
+                return
+            }
+            guard let feedURL = Self.sparkleFeedURLValue(), !feedURL.isEmpty else {
+                NSLog("[Sparkle] feedURL is empty")
+                return
+            }
+            NSLog("[Sparkle] feedURL=\(feedURL)")
+
+            let updaterController = SPUStandardUpdaterController(
+                startingUpdater: false,
+                updaterDelegate: self,
+                userDriverDelegate: nil
+            )
+            self.updaterController = updaterController
+
+            let updater = updaterController.updater
+            updater.automaticallyChecksForUpdates = autoUpdateEnabled
+            updater.automaticallyDownloadsUpdates = autoUpdateEnabled
+
+            do {
+                try updater.start()
+                sparkleStarted = true
+                NSLog("[Sparkle] updater.start() succeeded")
+                updater.checkForUpdatesInBackground()
+                NSLog("[Sparkle] checkForUpdatesInBackground() requested")
+            } catch {
+                Self.reportSparkleError(error)
+                let alert = NSAlert()
+                alert.messageText = "アップデータ初期化に失敗しました"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .warning
+                alert.runModal()
+            }
+        #endif
+    }
+
+    private nonisolated static func reportSparkleError(_ error: Error) {
+        NSLog("[Sparkle] \(error.localizedDescription)")
+    }
+
+    private nonisolated static func sparkleFeedURLValue() -> String? {
+        if let value: String = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String,
+           !value.isEmpty
+        {
+            return value
+        }
+        return AppConfig.sparkleAppcastURL
+    }
+
+    private nonisolated static func sparklePublicEDKeyValue() -> String? {
+        if let value: String = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String,
+           !value.isEmpty
+        {
+            return value
+        }
+        if !AppConfig.sparklePublicEDKey.isEmpty {
+            return AppConfig.sparklePublicEDKey
+        }
+        return nil
+    }
+
+    private var cancellables = Set<AnyCancellable>()
+    private enum MenuTag {
+        static let audioToggle = 1001
+        static let playlistToggle = 1002
+        static let shuffleToggle = 1003
+        static let previousVideo = 1004
+        static let nextVideo = 1005
+    }
+
+    private func setupStatusBar() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        configureStatusIcon()
+
+        let menu = NSMenu()
+        menu.showsStateColumn = false
+        let openWallpaperItem = NSMenuItem(
+            title: "壁紙を開く",
+            action: #selector(openWallpaperTab),
+            keyEquivalent: ""
+        )
+        openWallpaperItem.image = wallpaperMenuIcon()
+        menu.addItem(openWallpaperItem)
+        let openWallpaperFitItem = NSMenuItem(
+            title: "壁紙設定を開く",
+            action: #selector(openWallpaperFitTab),
+            keyEquivalent: ""
+        )
+        openWallpaperFitItem.image = wallpaperFitMenuIcon()
+        menu.addItem(openWallpaperFitItem)
+        menu.addItem(NSMenuItem(title: "設定を開く", action: #selector(openSettings), keyEquivalent: ""))
+
+        let toggleItem = NSMenuItem(
+            title: audioMenuTitle(wallpaperModel.audioEnabled),
+            action: #selector(toggleAudioEnabled),
+            keyEquivalent: ""
+        )
+        toggleItem.image = audioMenuIcon(wallpaperModel.audioEnabled)
+        toggleItem.tag = MenuTag.audioToggle
+        menu.addItem(toggleItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let playlistItem = NSMenuItem(
+            title: playlistMenuTitle(wallpaperModel.playlistPlaybackEnabled),
+            action: #selector(togglePlaylistPlayback),
+            keyEquivalent: ""
+        )
+        playlistItem.image = playlistMenuIcon()
+        playlistItem.tag = MenuTag.playlistToggle
+        menu.addItem(playlistItem)
+
+        let shuffleItem = NSMenuItem(
+            title: shuffleMenuTitle(wallpaperModel.shufflePlaybackEnabled),
+            action: #selector(toggleShufflePlayback),
+            keyEquivalent: ""
+        )
+        shuffleItem.image = shuffleMenuIcon()
+        shuffleItem.tag = MenuTag.shuffleToggle
+        menu.addItem(shuffleItem)
+
+        let previousItem = NSMenuItem(
+            title: "前の動画",
+            action: #selector(playPreviousVideo),
+            keyEquivalent: "["
+        )
+        previousItem.image = previousVideoMenuIcon()
+        previousItem.tag = MenuTag.previousVideo
+        menu.addItem(previousItem)
+
+        let nextItem = NSMenuItem(
+            title: "次の動画",
+            action: #selector(playNextVideo),
+            keyEquivalent: "]"
+        )
+        nextItem.image = nextVideoMenuIcon()
+        nextItem.tag = MenuTag.nextVideo
+        menu.addItem(nextItem)
+
+        let refreshItem = NSMenuItem(
+            title: "再生をリフレッシュ",
+            action: #selector(refreshPlaybackState),
+            keyEquivalent: "r"
+        )
+        refreshItem.image = refreshMenuIcon()
+        menu.addItem(refreshItem)
+
+        wallpaperModel.$audioEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let item = self?.statusItem.menu?.item(withTag: MenuTag.audioToggle)
+                else { return }
+                item.title = self?.audioMenuTitle(enabled) ?? ""
+                item.image = self?.audioMenuIcon(enabled)
+            }
+            .store(in: &cancellables)
+
+        wallpaperModel.$playlistPlaybackEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self else {
+                    return
+                }
+                if let item = statusItem.menu?.item(withTag: MenuTag.playlistToggle) {
+                    item.title = playlistMenuTitle(enabled)
+                    item.image = playlistMenuIcon()
+                }
+                refreshPlaylistMenuState()
+            }
+            .store(in: &cancellables)
+
+        wallpaperModel.$shufflePlaybackEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self else {
+                    return
+                }
+                if let item = statusItem.menu?.item(withTag: MenuTag.shuffleToggle) {
+                    item.title = shuffleMenuTitle(enabled)
+                    item.image = shuffleMenuIcon()
+                }
+            }
+            .store(in: &cancellables)
+
+        wallpaperModel.$registeredVideoPaths
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshPlaylistMenuState()
+            }
+            .store(in: &cancellables)
+
+        #if canImport(Sparkle)
+            let updateItem = NSMenuItem(
+                title: "アップデートを確認",
+                action: #selector(checkForUpdates),
+                keyEquivalent: "u"
+            )
+            updateItem.image = updateMenuIcon()
+            menu.addItem(updateItem)
+        #endif
+
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "終了", action: #selector(quitApp), keyEquivalent: "q"))
+
+        statusItem.menu = menu
+        refreshPlaylistMenuState()
+    }
+
+    private func configureStatusIcon() {
+        guard let button = statusItem.button else {
+            return
+        }
+
+        if let image = selectWindowStatusIcon() {
+            button.image = image
+            button.image?.size = NSSize(width: 18, height: 18)
+            button.image?.isTemplate = true
+            button.title = ""
+            return
+        }
+
+        if let fallback = NSImage(
+            systemSymbolName: "macwindow.on.rectangle",
+            accessibilityDescription: "Live Wallpaper"
+        ) {
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+            button.image = fallback.withSymbolConfiguration(config)
+            button.image?.isTemplate = true
+            button.title = ""
+        } else {
+            button.title = "LW"
+        }
+    }
+
+    private func selectWindowStatusIcon() -> NSImage? {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        defer { image.unlockFocus() }
+
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            return nil
+        }
+
+        context.setStrokeColor(NSColor.labelColor.cgColor)
+        context.setLineWidth(1.6)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+
+        let backRect = CGRect(x: 3.1, y: 4.2, width: 9.4, height: 8.0)
+        let frontRect = CGRect(x: 5.5, y: 6.4, width: 9.4, height: 8.0)
+        context.stroke(backRect.insetBy(dx: 0.35, dy: 0.35))
+        context.stroke(frontRect.insetBy(dx: 0.35, dy: 0.35))
+
+        image.isTemplate = true
+        return image
+    }
+
+    private func appIconImage() -> NSImage? {
+        if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns") {
+            return NSImage(contentsOf: iconURL)
+        }
+        return nil
+    }
+
+    private var settingsKeyMonitor: Any?
+
+    private func setupSettingsWindow() {
+        let hosting = NSHostingController(rootView: SettingsView(model: wallpaperModel))
+        let window = NSWindow(contentViewController: hosting)
+        window.title = "Live Wallpaper 設定"
+        window.center()
+        window.setContentSize(NSSize(width: 760, height: 460))
+        window.isReleasedWhenClosed = false
+        settingsWindowController = NSWindowController(window: window)
+        settingsKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            [weak self] event in
+            guard let characters = event.charactersIgnoringModifiers?.lowercased() else {
+                return event
+            }
+            if event.modifierFlags.contains(.command) {
+                if characters == "w" {
+                    if let win = self?.settingsWindowController.window, win.isKeyWindow {
+                        win.close()
+                        return nil
+                    }
+                }
+                if characters == "q" {
+                    if let win = self?.settingsWindowController.window, win.isKeyWindow {
+                        return nil
+                    } else {
+                        NSApp.terminate(nil)
+                        return nil
+                    }
+                }
+            }
+            return event
+        }
+
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(showOpenPanel), name: .chooseVideo, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleCreatePlaylistAndChooseVideo),
+            name: .createPlaylistAndChooseVideo,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleLaunchToggle(_:)), name: .toggleLaunchAtLogin,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleOpenCache), name: .openCacheFolder, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleClearCache), name: .clearCache, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleAutoUpdateToggle(_:)), name: .toggleAutoUpdate,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(checkForUpdates), name: .checkUpdatesNow, object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(refreshPlaybackState), name: .refreshPlayback, object: nil
+        )
+    }
+
+    @objc private func showOpenPanel() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        if #available(macOS 11.0, *) {
+            panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie]
+        }
+
+        if panel.runModal() == .OK, let url: URL = panel.url {
+            wallpaperModel.setVideo(path: url.path)
+        }
+    }
+
+    @objc private func handleCreatePlaylistAndChooseVideo() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        if #available(macOS 11.0, *) {
+            panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie]
+        }
+
+        if panel.runModal() == .OK, let url: URL = panel.url {
+            _ = wallpaperModel.createPlaylistAndSetVideo(path: url.path)
+        }
+    }
+
+    @objc private func handleLaunchToggle(_ note: Notification) {
+        if let enabled: Bool = note.object as? Bool {
+            setLaunchAtLogin(enabled)
+        }
+    }
+
+    @objc private func handleAutoUpdateToggle(_ note: Notification) {
+        if let enabled: Bool = note.object as? Bool {
+            setAutoUpdateEnabled(enabled)
+        }
+    }
+
+    @objc private func handleOpenCache() {
+        wallpaperModel.openCacheFolder()
+    }
+
+    @objc private func handleClearCache() {
+        _ = wallpaperModel.clearCache()
+    }
+
+    private func setAudioEnabled(_ enabled: Bool) {
+        wallpaperModel.setAudioEnabled(enabled)
+        if let toggleItem = statusItem.menu?.item(withTag: MenuTag.audioToggle) {
+            toggleItem.title = audioMenuTitle(enabled)
+            toggleItem.image = audioMenuIcon(enabled)
+        }
+    }
+
+    private func refreshPlaylistMenuState() {
+        let hasMultipleVideos = wallpaperModel.registeredVideoPaths.count > 1
+        let playlistEnabled = wallpaperModel.playlistPlaybackEnabled
+
+        if let shuffleItem = statusItem.menu?.item(withTag: MenuTag.shuffleToggle) {
+            shuffleItem.isEnabled = playlistEnabled && hasMultipleVideos
+        }
+        if let previousItem = statusItem.menu?.item(withTag: MenuTag.previousVideo) {
+            previousItem.isEnabled = hasMultipleVideos
+        }
+        if let nextItem = statusItem.menu?.item(withTag: MenuTag.nextVideo) {
+            nextItem.isEnabled = hasMultipleVideos
+        }
+    }
+
+    private func currentLaunchAtLoginEnabled() -> Bool {
+        if #available(macOS 13.0, *) {
+            return SMAppService.mainApp.status == .enabled
+        }
+        return UserDefaults.standard.object(forKey: "launchAtLogin") as? Bool ?? false
+    }
+
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        if #available(macOS 13.0, *) {
+            do {
+                if enabled {
+                    if SMAppService.mainApp.status != .enabled {
+                        try SMAppService.mainApp.register()
+                    }
+                } else {
+                    if SMAppService.mainApp.status == .enabled {
+                        try SMAppService.mainApp.unregister()
+                    }
+                }
+                launchAtLoginEnabled = currentLaunchAtLoginEnabled()
+                UserDefaults.standard.set(launchAtLoginEnabled, forKey: "launchAtLogin")
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = "ログイン時起動の設定に失敗しました"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .warning
+                alert.runModal()
+                launchAtLoginEnabled = currentLaunchAtLoginEnabled()
+            }
+        } else {
+            let alert = NSAlert()
+            alert.messageText = "このmacOSではログイン時起動設定に対応していません"
+            alert.alertStyle = .informational
+            alert.runModal()
+            launchAtLoginEnabled = false
+        }
+    }
+
+    private func setAutoUpdateEnabled(_ enabled: Bool) {
+        autoUpdateEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "autoUpdateEnabled")
+        #if canImport(Sparkle)
+            if let updater = updaterController?.updater {
+                updater.automaticallyChecksForUpdates = enabled
+                updater.automaticallyDownloadsUpdates = enabled
+            }
+        #endif
+    }
+
+    private func audioMenuTitle(_ enabled: Bool) -> String {
+        "音声を再生: " + (enabled ? "ON" : "OFF")
+    }
+
+    private func playlistMenuTitle(_ enabled: Bool) -> String {
+        "プレイリスト連続再生: " + (enabled ? "ON" : "OFF")
+    }
+
+    private func shuffleMenuTitle(_ enabled: Bool) -> String {
+        "シャッフル: " + (enabled ? "ON" : "OFF")
+    }
+
+    private func audioMenuIcon(_ enabled: Bool) -> NSImage? {
+        let symbolName: String = enabled ? "speaker.wave.2" : "speaker.slash"
+        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "音声")
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    private func updateMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: "arrow.triangle.2.circlepath",
+            accessibilityDescription: "アップデート"
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    private func wallpaperMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: "photo.on.rectangle",
+            accessibilityDescription: "壁紙"
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    private func playlistMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: "rectangle.stack",
+            accessibilityDescription: "プレイリスト"
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    private func shuffleMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: "shuffle",
+            accessibilityDescription: "シャッフル"
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    private func previousVideoMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: "backward.fill",
+            accessibilityDescription: "前の動画"
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    private func nextVideoMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: "forward.fill",
+            accessibilityDescription: "次の動画"
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    private func wallpaperFitMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: "viewfinder",
+            accessibilityDescription: "壁紙設定"
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    private func refreshMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: "arrow.clockwise",
+            accessibilityDescription: "再生リフレッシュ"
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    @objc private func openSettings() {
+        settingsWindowController.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        NotificationCenter.default.post(name: .openSettingsTab, object: nil)
+    }
+
+    @objc private func openWallpaperTab() {
+        settingsWindowController.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        NotificationCenter.default.post(name: .openWallpaperTab, object: nil)
+    }
+
+    @objc private func openWallpaperFitTab() {
+        settingsWindowController.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        NotificationCenter.default.post(name: .openWallpaperFitTab, object: nil)
+    }
+
+    @objc private func toggleAudioEnabled() {
+        setAudioEnabled(!wallpaperModel.audioEnabled)
+    }
+
+    @objc private func togglePlaylistPlayback() {
+        wallpaperModel.setPlaylistPlaybackEnabled(!wallpaperModel.playlistPlaybackEnabled)
+    }
+
+    @objc private func toggleShufflePlayback() {
+        wallpaperModel.setShufflePlaybackEnabled(!wallpaperModel.shufflePlaybackEnabled)
+    }
+
+    @objc private func playPreviousVideo() {
+        wallpaperModel.playPreviousVideo()
+    }
+
+    @objc private func playNextVideo() {
+        wallpaperModel.playNextVideo()
+    }
+
+    @objc private func refreshPlaybackState() {
+        wallpaperModel.refreshPlaybackState()
+    }
+
+    @objc private func quitApp() {
+        NSApp.terminate(nil)
+    }
+
+    @objc private func checkForUpdates() {
+        #if canImport(Sparkle)
+            settingsWindowController.showWindow(nil)
+            settingsWindowController.window?.orderFrontRegardless()
+            NSApp.activate(ignoringOtherApps: true)
+            NSLog("[Sparkle] manual checkForUpdates() requested")
+            manualUpdateCheckPending = true
+            guard let updater = updaterController?.updater else {
+                NSLog("[Sparkle] updaterController is nil")
+                manualUpdateCheckPending = false
+                return
+            }
+
+            if !sparkleStarted {
+                do {
+                    try updater.start()
+                    sparkleStarted = true
+                    NSLog("[Sparkle] updater.start() succeeded from manual check")
+                } catch {
+                    Self.reportSparkleError(error)
+                    manualUpdateCheckPending = false
+                    let alert = NSAlert()
+                    alert.messageText = "アップデータ初期化に失敗しました"
+                    alert.informativeText = error.localizedDescription
+                    alert.alertStyle = .warning
+                    alert.runModal()
+                    return
+                }
+            }
+
+            updaterController?.checkForUpdates(nil)
+        #endif
+    }
+
+    deinit {
+        if let monitor: Any = settingsKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+    }
+}
+
+#if canImport(Sparkle)
+    extension AppDelegate: SPUUpdaterDelegate {
+        nonisolated func feedURLString(for _: SPUUpdater) -> String? {
+            Self.sparkleFeedURLValue()
+        }
+
+        nonisolated func publicEDKey(for _: SPUUpdater) -> String? {
+            Self.sparklePublicEDKeyValue()
+        }
+
+        nonisolated func updater(_: SPUUpdater, didAbortWithError error: Error) {
+            Task { @MainActor in
+                self.manualUpdateCheckPending = false
+            }
+            Self.reportSparkleError(error)
+        }
+
+        nonisolated func updaterDidNotFindUpdate(_: SPUUpdater) {
+            Task { @MainActor in
+                if self.manualUpdateCheckPending {
+                    self.manualUpdateCheckPending = false
+                }
+            }
+        }
+    }
+#endif

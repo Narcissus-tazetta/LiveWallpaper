@@ -22,7 +22,7 @@ def main() -> int:
         return 1
 
     private_key = serialization.load_pem_private_key(private_key_path.read_bytes(), password=None)
-    signature = private_key.sign(zip_path.read_bytes())
+    signature = private_key.sign(zip_path.read_bytes()) # type: ignore
     print(base64.b64encode(signature).decode("ascii"), end="")
     return 0
 

@@ -1,0 +1,12 @@
+# SwiftFormat configuration for LiveWallpaper
+# run with `swiftformat . --config .swiftformat`
+
+--indent 4
+--maxwidth 100
+--allman false
+--wraparguments beforefirst
+--wrapelements beforefirst
+--commas inline
+--header ignore
+--disable redundantReturn
+--disable trailingClosures

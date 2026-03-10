@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "lint: SwiftLint",
+      "type": "shell",
+      "command": "swiftlint lint --strict",
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": [
+        "$swiftlint"
+      ]
+    },
+    {
+      "label": "format: SwiftFormat",
+      "type": "shell",
+      "command": "swiftformat . --config .swiftformat",
+      "group": "build",
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "setup dev tools",
+      "type": "shell",
+      "command": "bun scripts/setup-linters.ts",
+      "presentation": {
+        "reveal": "always"
+      }
+    }
+  ]
+}

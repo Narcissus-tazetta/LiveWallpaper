@@ -178,3 +178,5 @@ ls -lh "$ZIP_PATH"
 if [[ -f "$UNIVERSAL_EXEC_PATH" ]]; then
   rm -f "$UNIVERSAL_EXEC_PATH"
 fi
+
+open "$APP_DIR"
