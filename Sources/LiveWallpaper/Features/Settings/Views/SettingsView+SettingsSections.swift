@@ -173,6 +173,12 @@ extension SettingsView {
             Toggle("再生の軽量モード（省電力）", isOn: lightweightModeBinding)
             Toggle("他のアプリが前面にあるとき再生を停止", isOn: suspendWhenFullScreenBinding)
 
+            if let statusMessage = model.suspendWhenOtherAppStatusMessage {
+                Text(statusMessage)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
             if model.suspendWhenOtherAppFullScreen {
                 suspendExclusionSection
             }
@@ -201,26 +207,53 @@ extension SettingsView {
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(model.suspendExclusionBundleIDs, id: \.self) { bundleID in
-                        HStack(spacing: 12) {
-                            Text(bundleID)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            Button("削除") {
-                                model.removeSuspendExclusionBundleID(bundleID)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(model.suspendExclusionBundleIDs, id: \.self) { bundleID in
+                            suspendExclusionRow(for: bundleID)
                         }
-                        .padding(.vertical, 4)
                     }
                 }
+                .frame(maxHeight: 140)
                 .padding(.top, 4)
             }
         }
         .padding(.vertical, 6)
+    }
+
+    private func suspendExclusionRow(for bundleID: String) -> some View {
+        let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+        let appName = appURL.map { $0.deletingPathExtension().lastPathComponent } ?? bundleID
+        let appIcon = appURL.map { NSWorkspace.shared.icon(forFile: $0.path) }
+
+        return HStack(spacing: 10) {
+            if let icon = appIcon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: 24, height: 24)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(appName)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if appURL != nil {
+                    Text(bundleID)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button("削除", role: .destructive) {
+                model.removeSuspendExclusionBundleID(bundleID)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .tint(.red)
+        }
+        .padding(.vertical, 2)
     }
 
     private var advancedSettingsSection: some View {

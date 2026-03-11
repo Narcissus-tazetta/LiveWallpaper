@@ -76,6 +76,7 @@ final class WallpaperModel: ObservableObject {
     private var autoFrameRateBitRateFactor: Double = 1.0
     private var autoFrameRateBufferAdjustment: TimeInterval = 0
     private var coverageEvaluationWorkItem: DispatchWorkItem?
+    private var coverageEvaluationGeneration: UInt64 = 0
     private var playbackStartupValidationWorkItem: DispatchWorkItem?
     private var lastPlaybackFallbackPath: String?
     private var lastCoverageEvaluationAt: CFAbsoluteTime = 0
@@ -102,6 +103,7 @@ final class WallpaperModel: ObservableObject {
     @Published private(set) var useFullScreenAuxiliary: Bool = false
     @Published private(set) var suspendWhenOtherAppFullScreen: Bool = false
     @Published private(set) var suspendExclusionBundleIDs: [String] = []
+    @Published private(set) var suspendWhenOtherAppStatusMessage: String?
 
     @Published private(set) var playlists: [WallpaperPlaylist] = []
     @Published private(set) var selectedPlaylistID: UUID?
@@ -1404,13 +1406,16 @@ final class WallpaperModel: ObservableObject {
     func setSuspendWhenOtherAppFullScreen(_ enabled: Bool) -> Bool {
         guard suspendWhenOtherAppFullScreen != enabled else {
             if enabled {
+                suspendWhenOtherAppStatusMessage = nil
                 evaluateForegroundCoverageState()
             } else {
+                suspendWhenOtherAppStatusMessage = nil
                 applyCoveringAppSuspension(false)
             }
             return true
         }
 
+        suspendWhenOtherAppStatusMessage = nil
         suspendWhenOtherAppFullScreen = enabled
         UserDefaults.standard.set(enabled, forKey: "suspendWhenOtherAppFullScreen")
         configureForegroundCoverageMonitoring()
@@ -2011,6 +2016,7 @@ final class WallpaperModel: ObservableObject {
             )
             .sorted()
         }
+        suspendWhenOtherAppStatusMessage = nil
 
         if let playlistData = UserDefaults.standard.data(forKey: "playlistsData"),
            let decoded = try? JSONDecoder().decode([WallpaperPlaylist].self, from: playlistData)
@@ -2212,6 +2218,7 @@ final class WallpaperModel: ObservableObject {
 
         guard suspendWhenOtherAppFullScreen else {
             coverageEvaluationWorkItem?.cancel()
+            coverageEvaluationWorkItem = nil
             removeAXObserver()
             applyCoveringAppSuspension(false)
             return
@@ -2247,7 +2254,11 @@ final class WallpaperModel: ObservableObject {
     }
 
     private func updateAXObserverForFrontmostApplication() {
-        guard suspendWhenOtherAppFullScreen, isAccessibilityTrusted() else {
+        guard suspendWhenOtherAppFullScreen else {
+            removeAXObserver()
+            return
+        }
+        guard isAccessibilityTrusted() else {
             removeAXObserver()
             return
         }
@@ -2372,14 +2383,20 @@ final class WallpaperModel: ObservableObject {
             return
         }
 
+        coverageEvaluationGeneration &+= 1
+        let generation = coverageEvaluationGeneration
         coverageEvaluationWorkItem?.cancel()
         let delay = max(0.2 - elapsed, 0.05)
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else {
                 return
             }
+            guard generation == coverageEvaluationGeneration else {
+                return
+            }
             lastCoverageEvaluationAt = CFAbsoluteTimeGetCurrent()
             evaluateForegroundCoverageState()
+            coverageEvaluationWorkItem = nil
         }
         coverageEvaluationWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
@@ -2394,9 +2411,42 @@ final class WallpaperModel: ObservableObject {
             applyCoveringAppSuspension(false)
             return
         }
+
+        let frontmostAppDisplayIDs = displayIDsForFrontmostAppPresence()
+        if !frontmostAppDisplayIDs.isEmpty {
+            applyCoveringAppSuspension(frontmostAppDisplayIDs)
+            return
+        }
+
         updateAXObserverForFrontmostApplication()
-        let coveredDisplayIDs = coveredDisplayIDsByFrontmostApp()
+        let fullScreenDisplayIDs = fullScreenDisplayIDsByFrontmostApp()
+        let coveredDisplayIDs =
+            fullScreenDisplayIDs.isEmpty ? coveredDisplayIDsByFrontmostApp() : fullScreenDisplayIDs
         applyCoveringAppSuspension(coveredDisplayIDs)
+    }
+
+    private func displayIDsForFrontmostAppPresence() -> Set<String> {
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
+            return []
+        }
+
+        if let bundleID = frontmostApp.bundleIdentifier,
+           suspendExclusionBundleIDs.contains(normalizeBundleID(bundleID))
+        {
+            return []
+        }
+
+        if frontmostApp.bundleIdentifier == "com.apple.finder" {
+            return []
+        }
+
+        let frontmostPID = frontmostApp.processIdentifier
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        guard frontmostPID != ownPID else {
+            return []
+        }
+
+        return Set(targetScreens().map { displayIDString(for: $0) })
     }
 
     private func applyCoveringAppSuspension(_ shouldSuspend: Bool) {
@@ -2584,6 +2634,140 @@ final class WallpaperModel: ObservableObject {
         }
 
         return covered
+    }
+
+    private func fullScreenDisplayIDsByFrontmostApp() -> Set<String> {
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
+            return []
+        }
+
+        if let bundleID = frontmostApp.bundleIdentifier,
+           suspendExclusionBundleIDs.contains(normalizeBundleID(bundleID))
+        {
+            return []
+        }
+
+        if frontmostApp.bundleIdentifier == "com.apple.finder" {
+            return []
+        }
+
+        let frontmostPID = frontmostApp.processIdentifier
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        guard frontmostPID != ownPID else {
+            return []
+        }
+
+        let appElement = AXUIElementCreateApplication(frontmostPID)
+        var focusedWindow: CFTypeRef?
+        let focusedResult = AXUIElementCopyAttributeValue(
+            appElement,
+            kAXFocusedWindowAttribute as CFString,
+            &focusedWindow
+        )
+        if focusedResult != .success {
+            var mainWindow: CFTypeRef?
+            let mainResult = AXUIElementCopyAttributeValue(
+                appElement,
+                kAXMainWindowAttribute as CFString,
+                &mainWindow
+            )
+            if mainResult == .success {
+                focusedWindow = mainWindow
+            }
+        }
+
+        guard let windowRef = focusedWindow else {
+            return []
+        }
+        let windowElement = unsafeBitCast(windowRef, to: AXUIElement.self)
+
+        var fullScreenValue: CFTypeRef?
+        let fullScreenAttribute: CFString = "AXFullScreen" as CFString
+        let fullScreenResult = AXUIElementCopyAttributeValue(
+            windowElement,
+            fullScreenAttribute,
+            &fullScreenValue
+        )
+        guard fullScreenResult == .success,
+              let number = fullScreenValue as? NSNumber,
+              number.boolValue
+        else {
+            return []
+        }
+
+        guard let bounds = boundsForAXWindow(windowElement) else {
+            return coveredDisplayIDsByFrontmostApp()
+        }
+
+        let screenInfos = targetScreens().map { screen in
+            (
+                id: displayIDString(for: screen),
+                frame: screen.frame,
+                area: max(screen.frame.width * screen.frame.height, 1)
+            )
+        }
+        guard !screenInfos.isEmpty else {
+            return []
+        }
+
+        var covered: Set<String> = []
+        for screen in screenInfos {
+            let intersection = bounds.intersection(screen.frame)
+            guard !intersection.isNull, !intersection.isEmpty else {
+                continue
+            }
+            let coveredRatio = (intersection.width * intersection.height) / screen.area
+            if coveredRatio >= 0.95 {
+                covered.insert(screen.id)
+            }
+        }
+
+        if !covered.isEmpty {
+            return covered
+        }
+
+        return coveredDisplayIDsByFrontmostApp()
+    }
+
+    private func boundsForAXWindow(_ windowElement: AXUIElement) -> CGRect? {
+        var positionValue: CFTypeRef?
+        let positionResult = AXUIElementCopyAttributeValue(
+            windowElement,
+            kAXPositionAttribute as CFString,
+            &positionValue
+        )
+
+        var sizeValue: CFTypeRef?
+        let sizeResult = AXUIElementCopyAttributeValue(
+            windowElement,
+            kAXSizeAttribute as CFString,
+            &sizeValue
+        )
+
+        guard positionResult == .success,
+              sizeResult == .success,
+              let positionValue,
+              let sizeValue,
+              CFGetTypeID(positionValue) == AXValueGetTypeID(),
+              CFGetTypeID(sizeValue) == AXValueGetTypeID()
+        else {
+            return nil
+        }
+
+          let axPosition = unsafeBitCast(positionValue, to: AXValue.self)
+          let axSize = unsafeBitCast(sizeValue, to: AXValue.self)
+
+        var point = CGPoint.zero
+        var size = CGSize.zero
+        guard AXValueGetType(axPosition) == .cgPoint,
+              AXValueGetType(axSize) == .cgSize,
+              AXValueGetValue(axPosition, .cgPoint, &point),
+              AXValueGetValue(axSize, .cgSize, &size)
+        else {
+            return nil
+        }
+
+        return CGRect(origin: point, size: size)
     }
 
     private func normalizeBundleID(_ bundleID: String) -> String {
