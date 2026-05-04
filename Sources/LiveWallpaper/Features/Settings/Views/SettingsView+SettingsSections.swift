@@ -263,6 +263,9 @@ extension SettingsView {
                     Image(systemName: isAdvancedExpanded ? "chevron.down" : "chevron.right")
                         .font(.caption.weight(.semibold))
                     Text("詳細設定")
+                    Text(advancedSettingsSummaryText())
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     Spacer()
                 }
                 .contentShape(Rectangle())
@@ -274,6 +277,40 @@ extension SettingsView {
                 advancedSettingsContent
             }
         }
+    }
+
+    private func advancedSettingsSummaryText() -> String {
+        let qualityText: String
+        switch model.qualityPreset {
+        case .auto:
+            qualityText = "自動"
+        case .efficiency:
+            qualityText = "省電力"
+        case .quality:
+            qualityText = "高画質"
+        }
+
+        let workProfileText: String
+        switch model.workProfile {
+        case .normal:
+            workProfileText = "通常"
+        case .lowPower:
+            workProfileText = "低負荷"
+        case .ultraLight:
+            workProfileText = "最小"
+        }
+
+        let frameRateText: String
+        switch model.frameRateLimit {
+        case .off:
+            frameRateText = "制限なし"
+        case .fps30:
+            frameRateText = "30fps"
+        case .fps60:
+            frameRateText = "60fps"
+        }
+
+        return "\(qualityText)・\(workProfileText)・\(frameRateText)"
     }
 
     private var advancedSettingsContent: some View {

@@ -47,6 +47,75 @@ extension SettingsView {
         volumeInput = String(percent)
     }
 
+    func currentWallpaperSummaryText() -> String {
+        guard let currentPath = model.currentVideoPath else {
+            return model.allRegisteredVideoPaths.isEmpty ? "未登録" : "未再生"
+        }
+        return model.registeredVideoDisplayName(for: currentPath)
+    }
+
+    func currentPlaylistSummaryText() -> String {
+        guard !model.playlists.isEmpty else {
+            return "未作成"
+        }
+        return model.selectedPlaylistName
+    }
+
+    func currentDisplayModeSummaryText() -> String {
+        switch model.displayMode {
+        case .mainOnly:
+            return "メインのみ"
+        case .allScreens:
+            return "全ディスプレイ"
+        }
+    }
+
+    func currentWallpaperPreviewImage() -> NSImage? {
+        guard let currentPath = model.currentVideoPath else {
+            return nil
+        }
+        return thumbnailCache.image(for: currentPath)
+    }
+
+    func requestCurrentWallpaperThumbnailIfNeeded() {
+        guard let currentPath = model.currentVideoPath else {
+            return
+        }
+        requestWallpaperThumbnail(path: currentPath)
+    }
+
+    @ViewBuilder
+    var currentWallpaperPreview: some View {
+        let image = currentWallpaperPreviewImage()
+
+        ZStack {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.secondary.opacity(0.08))
+
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 122, height: 70)
+                    .clipped()
+            } else {
+                VStack(spacing: 4) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 18, weight: .medium))
+                    Text("No Preview")
+                        .font(.caption2)
+                }
+                .foregroundColor(.secondary)
+            }
+        }
+        .frame(width: 122, height: 70)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
+        )
+        .accessibilityLabel("現在の壁紙プレビュー")
+    }
+
     func toggleHelp(_ topic: HelpTopic) {
         if expandedHelpTopics.contains(topic) {
             expandedHelpTopics.remove(topic)

@@ -40,7 +40,7 @@ extension SettingsView {
             }
 
             if model.allRegisteredVideoPaths.isEmpty {
-                Text("登録済みの壁紙はまだありません。動画を追加するか、ここへドラッグ&ドロップしてください。")
+                Text("1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます")
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
@@ -97,7 +97,7 @@ extension SettingsView {
 
             HStack(alignment: .center, spacing: 10) {
                 if model.playlists.isEmpty {
-                    Text("プレイリストはありません")
+                    Text("プレイリストはありません。「新規プレイリスト」で作成できます")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
@@ -223,7 +223,7 @@ extension SettingsView {
             }
 
             if model.allRegisteredVideoPaths.isEmpty {
-                Text("登録済みの壁紙がありません")
+                Text("まず壁紙を追加すると、ここで配置を調整できます")
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
@@ -383,7 +383,7 @@ extension SettingsView {
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
-                Text("上の壁紙一覧から動画を選択すると、画面ごとにフィット設定を編集できます")
+                Text("下の壁紙一覧から動画を選択すると、画面ごとにフィット設定を編集できます")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

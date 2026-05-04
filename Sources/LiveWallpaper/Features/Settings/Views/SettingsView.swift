@@ -24,7 +24,7 @@ struct SettingsView: View {
     }
 
     @ObservedObject var model: WallpaperModel
-    @State var selectedTab: SettingsTab = .settings
+    @State var selectedTab: SettingsTab = .wallpaper
     @State var isAdvancedExpanded: Bool = false
     @State var volumeInput: String = ""
     @State var expandedHelpTopics: Set<HelpTopic> = []
@@ -98,13 +98,45 @@ struct SettingsView: View {
         }
     }
 
+    var currentStatusSection: some View {
+        Section {
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("現在の壁紙: \(currentWallpaperSummaryText())")
+                    Text("プレイリスト: \(currentPlaylistSummaryText())")
+                    Text("表示: \(currentDisplayModeSummaryText())")
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+                Spacer(minLength: 0)
+
+                currentWallpaperPreview
+            }
+        }
+    }
+
+    var wallpaperTabSection: some View {
+        Section(header: Label("壁紙", systemImage: "photo.on.rectangle")) {
+            wallpaperLibraryPanel
+            playlistSettingsPanel
+        }
+    }
+
+    var wallpaperFitTabSection: some View {
+        Section(header: Label("配置", systemImage: "viewfinder")) {
+            wallpaperFitEditorPanel
+            wallpaperFitLibraryPanel
+        }
+    }
+
     var body: some View {
         Form {
             Section {
                 HStack(spacing: 10) {
+                    tabButton(.wallpaper, title: "壁紙", systemImage: "photo.on.rectangle")
+                    tabButton(.wallpaperFit, title: "配置", systemImage: "viewfinder")
                     tabButton(.settings, title: "設定", systemImage: "gearshape")
-                    tabButton(.wallpaper, title: "壁紙を変更", systemImage: "photo.on.rectangle")
-                    tabButton(.wallpaperFit, title: "壁紙設定", systemImage: "viewfinder")
                     Spacer(minLength: 0)
                 }
                 .padding(8)
@@ -115,18 +147,14 @@ struct SettingsView: View {
                 )
             }
 
+            currentStatusSection
+
             if selectedTab == .wallpaper {
-                Section(header: Label("壁紙を変更", systemImage: "photo.on.rectangle")) {
-                    wallpaperLibraryPanel
-                    playlistSettingsPanel
-                }
+                wallpaperTabSection
             }
 
             if selectedTab == .wallpaperFit {
-                Section(header: Label("壁紙設定", systemImage: "viewfinder")) {
-                    wallpaperFitLibraryPanel
-                    wallpaperFitEditorPanel
-                }
+                wallpaperFitTabSection
             }
 
             settingsTabSections
@@ -146,6 +174,7 @@ struct SettingsView: View {
         .onAppear {
             syncVolumeInputWithModel()
             pruneMissingWallpaperThumbnails()
+            requestCurrentWallpaperThumbnailIfNeeded()
             thumbnailCache.prewarm(paths: Array(model.allRegisteredVideoPaths.prefix(10)))
             processThumbnailQueue()
             ensureFitEditorScreenSelection()
@@ -201,6 +230,7 @@ struct SettingsView: View {
             }
         }
         .onChange(of: model.currentVideoPath) { _ in
+            requestCurrentWallpaperThumbnailIfNeeded()
             if fitEditorSelectedVideoPath == nil {
                 syncFitEditorSelectionWithCurrentVideoIfNeeded()
             }
