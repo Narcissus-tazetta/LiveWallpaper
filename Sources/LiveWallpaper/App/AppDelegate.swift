@@ -120,6 +120,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let shuffleToggle = 1003
         static let previousVideo = 1004
         static let nextVideo = 1005
+        static let exportPackage = 1006
+        static let importPackage = 1007
     }
 
     private func setupStatusBar() {
@@ -198,6 +200,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         refreshItem.image = refreshMenuIcon()
         menu.addItem(refreshItem)
+
+        let exportItem = NSMenuItem(
+            title: "壁紙を共有",
+            action: #selector(exportPackage),
+            keyEquivalent: "e"
+        )
+        exportItem.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Share")
+        exportItem.tag = MenuTag.exportPackage
+        menu.addItem(exportItem)
+
+        let importItem = NSMenuItem(
+            title: "壁紙を読み込む",
+            action: #selector(importPackage),
+            keyEquivalent: "i"
+        )
+        importItem.image = NSImage(systemSymbolName: "square.and.arrow.down", accessibilityDescription: "Import")
+        importItem.tag = MenuTag.importPackage
+        menu.addItem(importItem)
 
         wallpaperModel.$audioEnabled
             .receive(on: DispatchQueue.main)
@@ -653,6 +673,102 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func refreshPlaybackState() {
         wallpaperModel.refreshPlaybackState()
+    }
+
+    @objc private func exportPackage() {
+        let panel = NSSavePanel()
+        panel.title = "壁紙を共有"
+        panel.nameFieldStringValue = "Wallpaper"
+        panel.allowedFileTypes = ["lwpkg"]
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let exporter = PackageExporter()
+        Task {
+            let hasScopedAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if hasScopedAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            do {
+                try await exporter.exportPackage(
+                    model: wallpaperModel,
+                    includeVideos: false,
+                    outputURL: url
+                )
+                let alert = NSAlert()
+                alert.messageText = "エクスポート完了"
+                alert.informativeText = "パッケージが \(url.lastPathComponent) に保存されました。"
+                alert.alertStyle = .informational
+                alert.runModal()
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = "エクスポートに失敗"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .critical
+                alert.runModal()
+            }
+        }
+    }
+
+    @objc private func importPackage() {
+        let panel = NSOpenPanel()
+        panel.title = "壁紙を読み込む"
+        panel.allowedFileTypes = ["lwpkg"]
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+
+        guard panel.runModal() == .OK, let url = panel.urls.first else { return }
+
+        let importer = PackageImporter()
+
+        func showImportSucceededAlert() {
+            let alert = NSAlert()
+            alert.messageText = "インポート完了"
+            alert.informativeText = "パッケージが正常にインポートされました。"
+            alert.alertStyle = .informational
+            alert.runModal()
+        }
+
+        func showImportFailedAlert(_ message: String) {
+            let alert = NSAlert()
+            alert.messageText = "インポートに失敗"
+            alert.informativeText = message
+            alert.alertStyle = .critical
+            alert.runModal()
+        }
+
+        func importWithResolution(_ resolution: PackageImporter.DuplicateResolution) {
+            Task {
+                do {
+                    try await importer.importPackage(
+                        from: url,
+                        into: wallpaperModel,
+                        duplicateResolution: resolution
+                    )
+                    showImportSucceededAlert()
+                } catch PackageImporter.ImportError.duplicateVideo(let name) {
+                    let duplicateAlert = NSAlert()
+                    duplicateAlert.messageText = "重複するビデオが見つかりました"
+                    duplicateAlert.informativeText = "\(name) は既に存在します。置き換えますか？"
+                    duplicateAlert.alertStyle = .warning
+                    duplicateAlert.addButton(withTitle: "中止")
+                    duplicateAlert.addButton(withTitle: "置き換える")
+
+                    if duplicateAlert.runModal() == .alertSecondButtonReturn {
+                        importWithResolution(.replace)
+                    }
+                } catch {
+                    showImportFailedAlert(error.localizedDescription)
+                }
+            }
+        }
+
+        importWithResolution(.abort)
     }
 
     @objc private func quitApp() {
