@@ -3,8 +3,9 @@
 /Packages
 xcuserdata/
 DerivedData/
-.swiftpm/configuration/registries.json
-.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+/.swiftpm
+/.swiftpm/configuration/registries.json
+/.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 
 # distribution and build artifacts
@@ -15,3 +16,23 @@ dist/
 
 # secrets
 *.pem
+
+# IDE/editor
+.vscode/
+.idea/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata
+
+# Editor swap/temp
+*~
+*.swp
+*.swo
+
+# Env files
+.env
+.env.*
+
+# macOS
+.AppleDouble
+.LSOverride
