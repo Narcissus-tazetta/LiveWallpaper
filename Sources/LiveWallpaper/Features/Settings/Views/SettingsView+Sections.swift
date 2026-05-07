@@ -33,10 +33,18 @@ extension SettingsView {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Button("動画を追加") {
-                    NotificationCenter.default.post(name: .chooseVideo, object: nil)
+                HStack(spacing: 8) {
+                    Button("壁紙を共有") {
+                        isWallpaperShareSheetPresented = true
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(model.allRegisteredVideoPaths.isEmpty)
+
+                    Button("動画を追加") {
+                        NotificationCenter.default.post(name: .chooseVideo, object: nil)
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
             }
 
             if model.allRegisteredVideoPaths.isEmpty {
@@ -835,6 +843,11 @@ extension SettingsView {
                     .disabled(!model.canAddPlaylist)
                 }
             }
+            Divider()
+            Button("共有…") {
+                beginShareWallpaperSelection(path: path)
+            }
+            Divider()
             Button("名前を編集") {
                 startWallpaperNameEdit(path: path)
             }

@@ -27,17 +27,17 @@ final class PackageImporter {
                 return "不正なパッケージ形式です"
             case .missingMetadata:
                 return "metadata.jsonが見つかりません"
-            case .invalidMetadataJSON(let details):
+            case let .invalidMetadataJSON(details):
                 return "metadata.jsonが破損しています: \(details)"
             case .unsupportedPackageVersion:
                 return "サポートされていないパッケージバージョンです"
-            case .duplicateVideo(let name):
+            case let .duplicateVideo(name):
                 return "重複するビデオが既に存在します: \(name)"
-            case .videoNotFound(let name):
+            case let .videoNotFound(name):
                 return "ビデオファイルが見つかりません: \(name)"
-            case .corruptedVideoFile(let name):
+            case let .corruptedVideoFile(name):
                 return "ビデオファイルが破損しています: \(name)"
-            case .invalidChecksum(let name):
+            case let .invalidChecksum(name):
                 return "ビデオファイルのチェックサムが一致しません: \(name)"
             case .extractionFailed:
                 return "パッケージの展開に失敗しました"
@@ -156,7 +156,7 @@ final class PackageImporter {
         let decoder = JSONDecoder()
 
         do {
-            return (try decoder.decode(PackageManifest.self, from: data), packageRootDir)
+            return try (decoder.decode(PackageManifest.self, from: data), packageRootDir)
         } catch {
             throw ImportError.invalidMetadataJSON(error.localizedDescription)
         }
@@ -239,7 +239,8 @@ final class PackageImporter {
 
     private func appSupportVideosDir() throws -> URL {
         let libraryDir = fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-        let appSupportDir = libraryDir.appendingPathComponent("Application Support/LiveWallpaper/Videos")
+        let appSupportDir = libraryDir
+            .appendingPathComponent("Application Support/LiveWallpaper/Videos")
         try fileManager.createDirectory(at: appSupportDir, withIntermediateDirectories: true)
         return appSupportDir
     }
@@ -284,7 +285,9 @@ final class PackageImporter {
             }
 
             let sameName = fileURL.lastPathComponent == video.source.fileName
-            if sameName, let expectedSize = video.source.size, expectedSize > 0, existingSize == expectedSize {
+            if sameName, let expectedSize = video.source.size, expectedSize > 0,
+               existingSize == expectedSize
+            {
                 return path
             }
         }

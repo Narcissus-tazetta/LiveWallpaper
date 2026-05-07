@@ -170,7 +170,10 @@ final class DiskThumbnailCache: ObservableObject {
             if fileManager.fileExists(atPath: base.path) {
                 try fileManager.removeItem(at: base)
             }
-            try fileManager.createDirectory(at: dataDirectoryURL(), withIntermediateDirectories: true)
+            try fileManager.createDirectory(
+                at: dataDirectoryURL(),
+                withIntermediateDirectories: true
+            )
         } catch {
             return
         }
@@ -193,7 +196,10 @@ final class DiskThumbnailCache: ObservableObject {
 
         let fileManager = FileManager.default
         do {
-            try fileManager.createDirectory(at: dataDirectoryURL(), withIntermediateDirectories: true)
+            try fileManager.createDirectory(
+                at: dataDirectoryURL(),
+                withIntermediateDirectories: true
+            )
         } catch {
             metadata = .init(version: 1, entries: [:])
             return
@@ -220,26 +226,30 @@ final class DiskThumbnailCache: ObservableObject {
             representationTypes: .all
         )
 
-        QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { [weak self] representation, _ in
-            guard let self else {
-                return
-            }
-
-            if let cgImage = representation?.cgImage {
-                let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                DispatchQueue.main.async {
-                    self.finishGeneration(path: path, image: image)
+        QLThumbnailGenerator.shared
+            .generateBestRepresentation(for: request) { [weak self] representation, _ in
+                guard let self else {
+                    return
                 }
-                return
-            }
 
-            DispatchQueue.global(qos: .userInitiated).async {
-                let fallback = Self.generateFallbackThumbnail(path: path)
-                DispatchQueue.main.async {
-                    self.finishGeneration(path: path, image: fallback)
+                if let cgImage = representation?.cgImage {
+                    let image = NSImage(
+                        cgImage: cgImage,
+                        size: NSSize(width: cgImage.width, height: cgImage.height)
+                    )
+                    DispatchQueue.main.async {
+                        self.finishGeneration(path: path, image: image)
+                    }
+                    return
+                }
+
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let fallback = Self.generateFallbackThumbnail(path: path)
+                    DispatchQueue.main.async {
+                        self.finishGeneration(path: path, image: fallback)
+                    }
                 }
             }
-        }
     }
 
     private func finishGeneration(path: String, image: NSImage?) {
@@ -265,7 +275,10 @@ final class DiskThumbnailCache: ObservableObject {
         for seconds in candidates {
             let time = CMTime(seconds: seconds, preferredTimescale: 600)
             if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
-                return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+                return NSImage(
+                    cgImage: cgImage,
+                    size: NSSize(width: cgImage.width, height: cgImage.height)
+                )
             }
         }
 
@@ -359,7 +372,10 @@ final class DiskThumbnailCache: ObservableObject {
         let removeCount = inMemoryImages.count - maxInMemoryCount
         let removable = inMemoryLastAccess.keys
             .filter { !visiblePaths.contains($0) }
-            .sorted { (inMemoryLastAccess[$0] ?? .leastNormalMagnitude) < (inMemoryLastAccess[$1] ?? .leastNormalMagnitude) }
+            .sorted {
+                (inMemoryLastAccess[$0] ?? .leastNormalMagnitude) <
+                    (inMemoryLastAccess[$1] ?? .leastNormalMagnitude)
+            }
 
         for key in removable.prefix(removeCount) {
             inMemoryImages.removeValue(forKey: key)
@@ -418,7 +434,10 @@ final class DiskThumbnailCache: ObservableObject {
     }
 
     private func rootDirectoryURL() -> URL {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let support = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first!
         return support
             .appendingPathComponent("LiveWallpaper", isDirectory: true)
             .appendingPathComponent("ThumbnailCache", isDirectory: true)

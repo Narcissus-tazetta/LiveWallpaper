@@ -53,6 +53,7 @@ struct SettingsView: View {
     @State var fitPreviewStillImageInFlight: Set<String> = []
     @State var fitEditorPreviewFrameSize: CGSize = .zero
     @State var isResetSettingsDialogPresented: Bool = false
+    @State var isWallpaperShareSheetPresented: Bool = false
     @State var keyEventMonitor: Any?
     @FocusState var isVolumeInputFocused: Bool
     @FocusState var focusedPlaylistID: UUID?
@@ -218,6 +219,10 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openWallpaperFitTab)) { _ in
             selectedTab = .wallpaperFit
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openWallpaperShareSheet)) { _ in
+            selectedTab = .wallpaper
+            isWallpaperShareSheetPresented = true
+        }
         .onChange(of: selectedTab) { tab in
             if tab == .wallpaperFit {
                 ensureFitEditorScreenSelection()
@@ -250,6 +255,9 @@ struct SettingsView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(isDropTargeted ? Color.accentColor : Color.clear, lineWidth: 2)
         )
+        .sheet(isPresented: $isWallpaperShareSheetPresented) {
+            shareWallpaperPickerSheet
+        }
         .confirmationDialog(
             "追加先プレイリスト",
             isPresented: $isDropPlaylistDialogPresented,
@@ -465,6 +473,7 @@ extension Notification.Name {
     static let createPlaylistAndChooseVideo = Notification.Name("CreatePlaylistAndChooseVideo")
     static let openWallpaperTab = Notification.Name("OpenWallpaperTab")
     static let openWallpaperFitTab = Notification.Name("OpenWallpaperFitTab")
+    static let openWallpaperShareSheet = Notification.Name("OpenWallpaperShareSheet")
     static let openSettingsTab = Notification.Name("OpenSettingsTab")
     static let toggleLaunchAtLogin = Notification.Name("ToggleLaunchAtLogin")
     static let openCacheFolder = Notification.Name("OpenCacheFolder")

@@ -206,7 +206,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(exportPackage),
             keyEquivalent: "e"
         )
-        exportItem.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Share")
+        exportItem.image = NSImage(
+            systemSymbolName: "square.and.arrow.up",
+            accessibilityDescription: "Share"
+        )
         exportItem.tag = MenuTag.exportPackage
         menu.addItem(exportItem)
 
@@ -215,7 +218,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(importPackage),
             keyEquivalent: "i"
         )
-        importItem.image = NSImage(systemSymbolName: "square.and.arrow.down", accessibilityDescription: "Import")
+        importItem.image = NSImage(
+            systemSymbolName: "square.and.arrow.down",
+            accessibilityDescription: "Import"
+        )
         importItem.tag = MenuTag.importPackage
         menu.addItem(importItem)
 
@@ -676,42 +682,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func exportPackage() {
-        let panel = NSSavePanel()
-        panel.title = "壁紙を共有"
-        panel.nameFieldStringValue = "Wallpaper"
-        panel.allowedFileTypes = ["lwpkg"]
-        panel.canCreateDirectories = true
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        let exporter = PackageExporter()
-        Task {
-            let hasScopedAccess = url.startAccessingSecurityScopedResource()
-            defer {
-                if hasScopedAccess {
-                    url.stopAccessingSecurityScopedResource()
-                }
-            }
-
-            do {
-                try await exporter.exportPackage(
-                    model: wallpaperModel,
-                    includeVideos: false,
-                    outputURL: url
-                )
-                let alert = NSAlert()
-                alert.messageText = "エクスポート完了"
-                alert.informativeText = "パッケージが \(url.lastPathComponent) に保存されました。"
-                alert.alertStyle = .informational
-                alert.runModal()
-            } catch {
-                let alert = NSAlert()
-                alert.messageText = "エクスポートに失敗"
-                alert.informativeText = error.localizedDescription
-                alert.alertStyle = .critical
-                alert.runModal()
-            }
-        }
+        openWallpaperTab()
+        NotificationCenter.default.post(name: .openWallpaperShareSheet, object: nil)
     }
 
     @objc private func importPackage() {
@@ -751,7 +723,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         duplicateResolution: resolution
                     )
                     showImportSucceededAlert()
-                } catch PackageImporter.ImportError.duplicateVideo(let name) {
+                } catch let PackageImporter.ImportError.duplicateVideo(name) {
                     let duplicateAlert = NSAlert()
                     duplicateAlert.messageText = "重複するビデオが見つかりました"
                     duplicateAlert.informativeText = "\(name) は既に存在します。置き換えますか？"

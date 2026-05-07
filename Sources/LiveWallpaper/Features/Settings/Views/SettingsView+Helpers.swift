@@ -145,4 +145,141 @@ extension SettingsView {
             _ = model.addSuspendExclusionFromAppURL(url)
         }
     }
+
+    func beginShareWallpaperSelection(path: String) {
+        isWallpaperShareSheetPresented = false
+        DispatchQueue.main.async {
+            shareWallpaper(path: path)
+        }
+    }
+
+    @ViewBuilder
+    var shareWallpaperPickerSheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("共有する壁紙を選択")
+                        .font(.system(size: 18, weight: .semibold))
+                    Text("選ぶと保存先フォルダを指定して、.lwpkg と .mov を出力します")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer(minLength: 0)
+
+                Button("閉じる") {
+                    isWallpaperShareSheetPresented = false
+                }
+                .buttonStyle(.bordered)
+            }
+
+            if model.allRegisteredVideoPaths.isEmpty {
+                Text("共有できる壁紙がありません")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else {
+                GeometryReader { proxy in
+                    let layout = wallpaperGridLayout(for: proxy.size.width)
+                    ScrollView {
+                        LazyVGrid(
+                            columns: layout.0,
+                            alignment: .leading,
+                            spacing: wallpaperGridRowSpacing
+                        ) {
+                            ForEach(model.allRegisteredVideoPaths, id: \.self) { path in
+                                shareWallpaperSelectionCard(path: path, cardWidth: layout.1)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                    }
+                }
+                .frame(minHeight: 280, maxHeight: 520)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 720, minHeight: 460)
+    }
+
+    func shareWallpaperSelectionCard(path: String, cardWidth: CGFloat) -> some View {
+        Button {
+            beginShareWallpaperSelection(path: path)
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack {
+                    if let image = thumbnailCache.image(for: path) {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Rectangle().fill(Color.secondary.opacity(0.15))
+                        Image(systemName: "film")
+                            .font(.system(size: 18))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .frame(width: max(cardWidth - 8, 1), height: 60)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                Text(model.registeredVideoDisplayName(for: path))
+                    .font(.system(size: 10))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("共有")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .foregroundColor(.secondary)
+            }
+            .padding(4)
+            .frame(width: cardWidth, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.secondary.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
+        )
+    }
+
+    func shareWallpaper(path: String) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "共有"
+        panel.message = "壁紙を保存するフォルダを選択してください"
+
+        if panel.runModal() == .OK,
+           let folderURL = panel.url
+        {
+            Task {
+                do {
+                    let exporter = PackageExporter()
+                    try await exporter.exportSingleWallpaper(
+                        model: model,
+                        videoPath: path,
+                        outputFolderURL: folderURL
+                    )
+                } catch {
+                    let alert = NSAlert()
+                    alert.messageText = "共有に失敗しました"
+                    alert.informativeText = error.localizedDescription
+                    alert.alertStyle = .warning
+                    alert.runModal()
+                }
+            }
+        }
+    }
 }

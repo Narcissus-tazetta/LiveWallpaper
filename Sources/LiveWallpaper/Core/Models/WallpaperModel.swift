@@ -360,7 +360,9 @@ final class WallpaperModel: ObservableObject {
 
             guard usedFrameRateComposition else {
                 if !isPlayingOrWaiting {
-                    NSLog("[Playback] startup stalled for \(url.lastPathComponent) even in fallback mode")
+                    NSLog(
+                        "[Playback] startup stalled for \(url.lastPathComponent) even in fallback mode"
+                    )
                 }
                 return
             }
@@ -525,10 +527,10 @@ final class WallpaperModel: ObservableObject {
         let isFitMode: Bool = presentation.fitMode == .fit
         let screenID = displayIDString(for: screen)
         let videoAspect = resolvedVideoAspectRatio(for: currentVideoPath, screenID: screenID)
-        let roundedZoom = (presentation.zoom * 10_000).rounded() / 10_000
-        let roundedOffsetX = (presentation.offsetX * 10_000).rounded() / 10_000
-        let roundedOffsetY = (presentation.offsetY * 10_000).rounded() / 10_000
-        let roundedAspect = (videoAspect * 10_000).rounded() / 10_000
+        let roundedZoom = (presentation.zoom * 10000).rounded() / 10000
+        let roundedOffsetX = (presentation.offsetX * 10000).rounded() / 10000
+        let roundedOffsetY = (presentation.offsetY * 10000).rounded() / 10000
+        let roundedAspect = (videoAspect * 10000).rounded() / 10000
         let key = PresentationCacheKey(
             screenID: screenID,
             boundsWidth: playerView.bounds.width,
@@ -624,7 +626,10 @@ final class WallpaperModel: ObservableObject {
         }
 
         windowRebuildWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + min(max(delay, 0.2), 0.5), execute: workItem)
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + min(max(delay, 0.2), 0.5),
+            execute: workItem
+        )
     }
 
     private func scheduleWindowOptionsApply(delay: TimeInterval = 0.02) {
@@ -1847,7 +1852,7 @@ final class WallpaperModel: ObservableObject {
         let baseRate = baseBitRate(for: width, preset: qualityPreset)
         var bitRate =
             baseRate * decodeBitRateFactor() * frameRateBitRateFactor()
-            * autoFrameRateBitRateFactor
+                * autoFrameRateBitRateFactor
         var buffer = qualityAdjustedBuffer(baseBufferDuration())
         buffer += autoFrameRateBufferAdjustment
 
@@ -2754,8 +2759,8 @@ final class WallpaperModel: ObservableObject {
             return nil
         }
 
-          let axPosition = unsafeBitCast(positionValue, to: AXValue.self)
-          let axSize = unsafeBitCast(sizeValue, to: AXValue.self)
+        let axPosition = unsafeBitCast(positionValue, to: AXValue.self)
+        let axSize = unsafeBitCast(sizeValue, to: AXValue.self)
 
         var point = CGPoint.zero
         var size = CGSize.zero

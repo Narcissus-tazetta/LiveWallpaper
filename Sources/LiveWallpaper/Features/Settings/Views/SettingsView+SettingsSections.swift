@@ -280,34 +280,31 @@ extension SettingsView {
     }
 
     private func advancedSettingsSummaryText() -> String {
-        let qualityText: String
-        switch model.qualityPreset {
+        let qualityText = switch model.qualityPreset {
         case .auto:
-            qualityText = "自動"
+            "自動"
         case .efficiency:
-            qualityText = "省電力"
+            "省電力"
         case .quality:
-            qualityText = "高画質"
+            "高画質"
         }
 
-        let workProfileText: String
-        switch model.workProfile {
+        let workProfileText = switch model.workProfile {
         case .normal:
-            workProfileText = "通常"
+            "通常"
         case .lowPower:
-            workProfileText = "低負荷"
+            "低負荷"
         case .ultraLight:
-            workProfileText = "最小"
+            "最小"
         }
 
-        let frameRateText: String
-        switch model.frameRateLimit {
+        let frameRateText = switch model.frameRateLimit {
         case .off:
-            frameRateText = "制限なし"
+            "制限なし"
         case .fps30:
-            frameRateText = "30fps"
+            "30fps"
         case .fps60:
-            frameRateText = "60fps"
+            "60fps"
         }
 
         return "\(qualityText)・\(workProfileText)・\(frameRateText)"
@@ -452,10 +449,12 @@ extension SettingsView {
             }
 
             if expandedHelpTopics.contains(.decode) {
-                Text("動画データのデコード方法を切り替えます。自動はハードウェア/ソフトウェアを状況に応じて選び、標準はGPUハードウェア優先で滑らかさを保ちます。省電力はソフトウェア再生を多用し、CPU負荷と消費電力を低く抑えますが再生品質が落ちる場合があります。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(
+                    "動画データのデコード方法を切り替えます。自動はハードウェア/ソフトウェアを状況に応じて選び、標準はGPUハードウェア優先で滑らかさを保ちます。省電力はソフトウェア再生を多用し、CPU負荷と消費電力を低く抑えますが再生品質が落ちる場合があります。"
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -482,10 +481,12 @@ extension SettingsView {
             }
 
             if expandedHelpTopics.contains(.desktopLevel) {
-                Text("壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(
+                    "壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。"
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
