@@ -265,11 +265,15 @@ struct SettingsView: View {
         ) {
             ForEach(model.playlists) { playlist in
                 Button(playlist.name) {
-                    applyDroppedVideo(to: playlist.id)
+                    Task {
+                        await applyDroppedVideo(to: playlist.id)
+                    }
                 }
             }
             Button("新規プレイリストを作成して追加") {
-                applyDroppedVideo(to: nil)
+                Task {
+                    await applyDroppedVideo(to: nil)
+                }
             }
             .disabled(!model.canAddPlaylist)
             Button("キャンセル", role: .cancel) {

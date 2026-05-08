@@ -50,8 +50,10 @@ final class PackageExporter {
             }
 
             let thumbPath = previewsDir.appendingPathComponent("\(videoId).png")
-            if let thumbnail = await generateThumbnail(for: path) {
-                try thumbnail.tiffRepresentation?.write(to: thumbPath)
+            if let thumbnail = await generateThumbnail(for: path),
+               let pngData = Self.pngData(from: thumbnail)
+            {
+                try pngData.write(to: thumbPath)
                 videoThumbnails[videoId] = "previews/\(videoId).png"
             }
         }
@@ -205,8 +207,10 @@ final class PackageExporter {
         let fileSize = attrs[.size] as? UInt64 ?? 0
 
         let thumbPath = previewsDir.appendingPathComponent("\(videoId).png")
-        if let thumbnail = await generateThumbnail(for: videoPath) {
-            try thumbnail.tiffRepresentation?.write(to: thumbPath)
+        if let thumbnail = await generateThumbnail(for: videoPath),
+           let pngData = Self.pngData(from: thumbnail)
+        {
+            try pngData.write(to: thumbPath)
             videoThumbnails[videoId] = "previews/\(videoId).png"
         }
 
@@ -298,6 +302,15 @@ final class PackageExporter {
             playlists: [],
             packaging: .init(videosIncluded: false, packageSizeBytes: 0)
         )
+    }
+
+    private static func pngData(from image: NSImage) -> Data? {
+        guard let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff)
+        else {
+            return nil
+        }
+        return bitmap.representation(using: .png, properties: [:])
     }
 
     private func sanitizedExportFileName(_ rawValue: String) -> String {

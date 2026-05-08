@@ -283,7 +283,7 @@ extension SettingsView {
         isDropPlaylistDialogPresented = true
     }
 
-    func applyDroppedVideo(to playlistID: UUID?) {
+    func applyDroppedVideo(to playlistID: UUID?) async {
         guard let droppedURL = pendingDroppedVideoURL else {
             return
         }
@@ -299,7 +299,7 @@ extension SettingsView {
             targetPlaylistID = created
         }
 
-        if model.addVideo(path: droppedURL.path, to: targetPlaylistID, activateAfterAdding: true) {
+        if await model.addVideo(path: droppedURL.path, to: targetPlaylistID, activateAfterAdding: true) {
             selectedTab = .wallpaper
         }
         pendingDroppedVideoURL = nil

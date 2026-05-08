@@ -38,6 +38,10 @@ final class DiskThumbnailCache: ObservableObject {
     private var inFlight: Set<String> = []
     private var metadata: Metadata = .init(version: 1, entries: [:])
     private var initialized: Bool = false
+    private var metadataDirty: Bool = false
+    private var metadataFlushWorkItem: DispatchWorkItem?
+    private let metadataFlushDelay: TimeInterval = 2.0
+    private var willTerminateObserver: NSObjectProtocol?
 
     func image(for path: String) -> NSImage? {
         ensureInitialized()
@@ -157,6 +161,7 @@ final class DiskThumbnailCache: ObservableObject {
 
         persistMetadata()
         trimDiskIfNeeded()
+        flushMetadataIfNeeded()
         bumpRevision()
     }
 
@@ -185,6 +190,7 @@ final class DiskThumbnailCache: ObservableObject {
         pendingQueue.removeAll()
         inFlight.removeAll()
         persistMetadata()
+        flushMetadataIfNeeded()
         bumpRevision()
     }
 
@@ -214,7 +220,19 @@ final class DiskThumbnailCache: ObservableObject {
         } else {
             metadata = .init(version: 1, entries: [:])
             persistMetadata()
+            flushMetadataIfNeeded()
         }
+
+        let observer = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.flushMetadataIfNeeded()
+            }
+        }
+        willTerminateObserver = observer
     }
 
     private func generate(path: String) {
@@ -427,6 +445,32 @@ final class DiskThumbnailCache: ObservableObject {
     }
 
     private func persistMetadata() {
+        metadataDirty = true
+        scheduleMetadataFlush()
+    }
+
+    private func scheduleMetadataFlush() {
+        metadataFlushWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            Task { @MainActor in
+                self?.flushMetadataIfNeeded()
+            }
+        }
+        metadataFlushWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + metadataFlushDelay,
+            execute: workItem
+        )
+    }
+
+    private func flushMetadataIfNeeded() {
+        guard metadataDirty else {
+            return
+        }
+        metadataDirty = false
+        metadataFlushWorkItem?.cancel()
+        metadataFlushWorkItem = nil
+
         guard let data = try? JSONEncoder().encode(metadata) else {
             return
         }
@@ -458,5 +502,11 @@ final class DiskThumbnailCache: ObservableObject {
 
     private func bumpRevision() {
         revision += 1
+    }
+
+    deinit {
+        if let observer = willTerminateObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 }

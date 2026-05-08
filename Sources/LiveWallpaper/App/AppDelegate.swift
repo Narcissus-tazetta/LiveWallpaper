@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import ServiceManagement
 import SwiftUI
+import UniformTypeIdentifiers
 
 #if canImport(Sparkle)
     import Sparkle
@@ -36,12 +37,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let bundlePath: String = Bundle.main.bundlePath
         NSLog("[Sparkle] Bundle path: \(bundlePath)")
         if bundlePath.contains("/AppTranslocation/") {
-            let alert = NSAlert()
-            alert.messageText = "アップデートを有効化するにはアプリをApplicationsに移動してください"
-            alert.informativeText = "現在は一時実行領域から起動しているため、自動アップデートが失敗する場合があります。"
-            alert.alertStyle = .warning
-            alert.runModal()
             NSLog("[Sparkle] AppTranslocation detected")
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "アップデートを有効化するにはアプリをApplicationsに移動してください"
+                alert.informativeText = "現在は一時実行領域から起動しているため、自動アップデートが失敗する場合があります。"
+                alert.alertStyle = .warning
+                alert.runModal()
+            }
         }
         if !FileManager.default.isWritableFile(atPath: bundlePath) {
             NSLog("[Sparkle] App path is not writable: \(bundlePath)")
@@ -79,11 +82,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("[Sparkle] checkForUpdatesInBackground() requested")
             } catch {
                 Self.reportSparkleError(error)
-                let alert = NSAlert()
-                alert.messageText = "アップデータ初期化に失敗しました"
-                alert.informativeText = error.localizedDescription
-                alert.alertStyle = .warning
-                alert.runModal()
+                let message = error.localizedDescription
+                DispatchQueue.main.async {
+                    let alert = NSAlert()
+                    alert.messageText = "アップデータ初期化に失敗しました"
+                    alert.informativeText = message
+                    alert.alertStyle = .warning
+                    alert.runModal()
+                }
             }
         #endif
     }
@@ -419,7 +425,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if panel.runModal() == .OK, let url: URL = panel.url {
-            wallpaperModel.setVideo(path: url.path)
+            Task {
+                await wallpaperModel.setVideo(path: url.path)
+            }
         }
     }
 
@@ -434,7 +442,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if panel.runModal() == .OK, let url: URL = panel.url {
-            _ = wallpaperModel.createPlaylistAndSetVideo(path: url.path)
+            Task {
+                _ = await wallpaperModel.createPlaylistAndSetVideo(path: url.path)
+            }
         }
     }
 
@@ -689,7 +699,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func importPackage() {
         let panel = NSOpenPanel()
         panel.title = "壁紙を読み込む"
-        panel.allowedFileTypes = ["lwpkg"]
+        if #available(macOS 11.0, *) {
+            panel.allowedContentTypes = [UTType(filenameExtension: "lwpkg") ?? .data]
+        } else {
+            panel.allowedFileTypes = ["lwpkg"]
+        }
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false

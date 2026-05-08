@@ -56,8 +56,9 @@ final class WallpaperModel: ObservableObject {
 
     private var windows: [NSWindow] = []
     private var playerViews: [PlayerView] = []
-    private var players: [AVQueuePlayer] = []
-    private var playerLoopers: [AVPlayerLooper?] = []
+    private var sharedPlayer: AVQueuePlayer?
+    private var sharedLooper: AVPlayerLooper?
+    private var pendingPlaybackReconfiguration: Bool = false
     private var screenChangeObserver: NSObjectProtocol?
     private var screenChangeWorkItem: DispatchWorkItem?
     private var windowRebuildWorkItem: DispatchWorkItem?
@@ -216,15 +217,14 @@ final class WallpaperModel: ObservableObject {
                     return
                 }
                 guard let finishedItem = note.object as? AVPlayerItem,
-                      self.players.contains(where: { $0.currentItem === finishedItem })
+                      let player = self.sharedPlayer,
+                      player.currentItem === finishedItem
                 else {
                     return
                 }
                 guard self.registeredVideoPaths.count > 1 else {
-                    for player in self.players {
-                        player.seek(to: .zero)
-                        player.play()
-                    }
+                    player.seek(to: .zero)
+                    player.play()
                     return
                 }
                 self.playNextVideo()
@@ -243,35 +243,32 @@ final class WallpaperModel: ObservableObject {
         return player
     }
 
-    private func ensurePlayerExists(at index: Int) {
-        while players.count <= index {
-            players.append(createConfiguredPlayer())
-            playerLoopers.append(nil)
+    private func ensureSharedPlayer() -> AVQueuePlayer {
+        if let existing = sharedPlayer {
+            return existing
         }
+        let player = createConfiguredPlayer()
+        sharedPlayer = player
+        return player
     }
 
-    private func trimPlaybackArrays(to count: Int) {
-        if players.count <= count {
-            return
+    private func attachSharedPlayerToAllViews() {
+        let player = sharedPlayer
+        for view in playerViews where view.playerLayer.player !== player {
+            view.playerLayer.player = player
         }
-        for index in count ..< players.count {
-            players[index].pause()
-            players[index].removeAllItems()
-        }
-        players.removeLast(players.count - count)
-        playerLoopers.removeLast(playerLoopers.count - count)
     }
 
     private func stopAllPlayers() {
-        for player in players {
+        if let player = sharedPlayer {
             player.pause()
             player.removeAllItems()
         }
-        playerLoopers = Array(repeating: nil, count: players.count)
+        sharedLooper = nil
         suspendedDisplayIDs.removeAll()
     }
 
-    private func displayIDForPlayer(at index: Int) -> String {
+    private func displayIDForWindow(at index: Int) -> String {
         if index < windows.count, let screen = windows[index].screen {
             return displayIDString(for: screen)
         }
@@ -283,14 +280,20 @@ final class WallpaperModel: ObservableObject {
     }
 
     private func applySuspensionStateToPlayers() {
-        for index in players.indices {
-            let player = players[index]
-            let displayID = displayIDForPlayer(at: index)
-            if suspendedDisplayIDs.contains(displayID) {
-                player.pause()
-            } else {
-                player.play()
-            }
+        guard let player = sharedPlayer else {
+            return
+        }
+        let displayCount = max(playerViews.count, windows.count)
+        guard displayCount > 0 else {
+            player.pause()
+            return
+        }
+        let displayIDs = (0 ..< displayCount).map { displayIDForWindow(at: $0) }
+        let allSuspended = displayIDs.allSatisfy { suspendedDisplayIDs.contains($0) }
+        if allSuspended {
+            player.pause()
+        } else {
+            player.play()
         }
     }
 
@@ -318,9 +321,7 @@ final class WallpaperModel: ObservableObject {
     }
 
     private func reapplyPlaybackForCurrentVideoIfNeeded() {
-        if let currentPath: String = currentVideoPath {
-            playVideo(url: URL(fileURLWithPath: currentPath))
-        }
+        requestPlaybackReconfiguration()
     }
 
     private func schedulePlaybackStartupValidation(
@@ -336,7 +337,7 @@ final class WallpaperModel: ObservableObject {
             guard currentVideoPath == url.path else {
                 return
             }
-            guard !players.isEmpty else {
+            guard let player = sharedPlayer else {
                 return
             }
 
@@ -347,16 +348,14 @@ final class WallpaperModel: ObservableObject {
                 return
             }
 
-            let hasFailedItem = players.contains { player in
-                player.currentItem?.status == .failed
-            }
-            let isPlayingOrWaiting = players.contains { player in
+            let hasFailedItem = player.currentItem?.status == .failed
+            let isPlayingOrWaiting: Bool = {
                 if player.rate > 0.01 {
                     return true
                 }
                 return player.timeControlStatus == .playing
                     || player.timeControlStatus == .waitingToPlayAtSpecifiedRate
-            }
+            }()
 
             guard usedFrameRateComposition else {
                 if !isPlayingOrWaiting {
@@ -405,6 +404,7 @@ final class WallpaperModel: ObservableObject {
 
     private func rebuildWindows() {
         let screens: [NSScreen] = targetScreens()
+        let player = ensureSharedPlayer()
 
         if windows.count > screens.count {
             let extras = Array(windows[screens.count...])
@@ -414,12 +414,10 @@ final class WallpaperModel: ObservableObject {
             }
             windows.removeLast(windows.count - screens.count)
             playerViews.removeLast(playerViews.count - screens.count)
-            trimPlaybackArrays(to: screens.count)
             retireWindows(extras)
         }
 
         for (index, screen) in screens.enumerated() {
-            ensurePlayerExists(at: index)
             if index < windows.count {
                 let window = windows[index]
                 let playerView = playerViews[index]
@@ -430,8 +428,8 @@ final class WallpaperModel: ObservableObject {
                     window.setFrame(screen.frame, display: true)
                 }
                 applyPlayerPresentation(to: playerView, screen: screen)
-                if playerView.playerLayer.player !== players[index] {
-                    playerView.playerLayer.player = players[index]
+                if playerView.playerLayer.player !== player {
+                    playerView.playerLayer.player = player
                 }
                 if window.contentView !== playerView {
                     window.contentView = playerView
@@ -459,7 +457,7 @@ final class WallpaperModel: ObservableObject {
             let playerView = PlayerView(frame: CGRect(origin: .zero, size: frame.size))
             playerView.autoresizingMask = [.width, .height]
             applyPlayerPresentation(to: playerView, screen: screen)
-            playerView.playerLayer.player = players[index]
+            playerView.playerLayer.player = player
             window.contentView = playerView
             window.orderBack(nil)
             window.orderFront(nil)
@@ -467,8 +465,6 @@ final class WallpaperModel: ObservableObject {
             windows.append(window)
             playerViews.append(playerView)
         }
-
-        trimPlaybackArrays(to: screens.count)
 
         let validDisplayIDs = Set(screens.map { displayIDString(for: $0) })
         suspendedDisplayIDs = suspendedDisplayIDs.intersection(validDisplayIDs)
@@ -997,9 +993,7 @@ final class WallpaperModel: ObservableObject {
         lightweightMode = enabled
         UserDefaults.standard.set(enabled, forKey: "lightweightMode")
         applyLightweightSettings()
-        if let currentPath: String = currentVideoPath {
-            playVideo(url: URL(fileURLWithPath: currentPath))
-        }
+        requestPlaybackReconfiguration()
     }
 
     func setAudioEnabled(_ enabled: Bool) {
@@ -1036,9 +1030,7 @@ final class WallpaperModel: ObservableObject {
         }
         decodeMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: "decodeMode")
-        if let currentPath: String = currentVideoPath {
-            playVideo(url: URL(fileURLWithPath: currentPath))
-        }
+        requestPlaybackReconfiguration()
     }
 
     func setWorkProfile(_ profile: WorkProfile) {
@@ -1056,9 +1048,7 @@ final class WallpaperModel: ObservableObject {
         }
         qualityPreset = preset
         UserDefaults.standard.set(preset.rawValue, forKey: "qualityPreset")
-        if let currentPath: String = currentVideoPath {
-            playVideo(url: URL(fileURLWithPath: currentPath))
-        }
+        requestPlaybackReconfiguration()
     }
 
     func setPlaylistPlaybackEnabled(_ enabled: Bool) {
@@ -1070,9 +1060,7 @@ final class WallpaperModel: ObservableObject {
         if !enabled {
             setShufflePlaybackEnabled(false)
         }
-        if let currentPath: String = currentVideoPath {
-            playVideo(url: URL(fileURLWithPath: currentPath))
-        }
+        requestPlaybackReconfiguration()
     }
 
     func setShufflePlaybackEnabled(_ enabled: Bool) {
@@ -1214,7 +1202,7 @@ final class WallpaperModel: ObservableObject {
     }
 
     @discardableResult
-    func addVideo(path: String, to playlistID: UUID, activateAfterAdding: Bool = true) -> Bool {
+    func addVideo(path: String, to playlistID: UUID, activateAfterAdding: Bool = true) async -> Bool {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return false
@@ -1231,7 +1219,7 @@ final class WallpaperModel: ObservableObject {
         if let cacheDirectory = cacheDirectoryURL(), sourceURL.path.hasPrefix(cacheDirectory.path) {
             destinationPath = sourceURL.path
         } else {
-            guard let localURL = importVideoToAppSupport(from: sourceURL) else {
+            guard let localURL = await importVideoToAppSupport(from: sourceURL) else {
                 return false
             }
             destinationPath = localURL.path
@@ -1314,7 +1302,7 @@ final class WallpaperModel: ObservableObject {
     }
 
     @discardableResult
-    func createPlaylistAndSetVideo(path: String) -> Bool {
+    func createPlaylistAndSetVideo(path: String) async -> Bool {
         guard canAddPlaylist else {
             return false
         }
@@ -1328,7 +1316,7 @@ final class WallpaperModel: ObservableObject {
         persistPlaylistState()
 
         let beforeCount = registeredVideoPaths.count
-        setVideo(path: path)
+        await setVideo(path: path)
         let didAdd = registeredVideoPaths.count > beforeCount
         if didAdd {
             return true
@@ -1479,7 +1467,7 @@ final class WallpaperModel: ObservableObject {
         return true
     }
 
-    func setVideo(path: String) {
+    func setVideo(path: String) async {
         let trimmed: String = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return
@@ -1502,7 +1490,7 @@ final class WallpaperModel: ObservableObject {
             return
         }
 
-        guard let localURL: URL = importVideoToAppSupport(from: sourceURL) else {
+        guard let localURL: URL = await importVideoToAppSupport(from: sourceURL) else {
             return
         }
 
@@ -1684,16 +1672,15 @@ final class WallpaperModel: ObservableObject {
     }
 
     private func applyLightweightSettings() {
-        for player in players {
-            player.automaticallyWaitsToMinimizeStalling = lightweightMode
-        }
+        sharedPlayer?.automaticallyWaitsToMinimizeStalling = lightweightMode
     }
 
     private func applyAudioSettings() {
-        for player in players {
-            player.isMuted = !audioEnabled
-            player.volume = audioVolume
+        guard let player = sharedPlayer else {
+            return
         }
+        player.isMuted = !audioEnabled
+        player.volume = audioVolume
     }
 
     private func targetMaxPixelWidth() -> Double {
@@ -1883,28 +1870,23 @@ final class WallpaperModel: ObservableObject {
             lastPlaybackFallbackPath = nil
         }
 
-        if players.isEmpty {
-            evaluateForegroundCoverageState()
-            return
-        }
+        let player = ensureSharedPlayer()
+        attachSharedPlayerToAllViews()
 
-        for index in players.indices {
-            let player = players[index]
-            let item = AVPlayerItem(asset: asset)
-            item.preferredPeakBitRate = bypassFrameRateComposition
-                ? max(profile.bitRate, 2_000_000)
-                : profile.bitRate
-            item.preferredForwardBufferDuration = bypassFrameRateComposition
-                ? max(profile.buffer, 0.3)
-                : profile.buffer
-            item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
-            configureFrameRateComposition(item: item, asset: asset, targetFPS: targetFPS)
-            if playlistPlaybackEnabled {
-                player.insert(item, after: nil)
-                playerLoopers[index] = nil
-            } else {
-                playerLoopers[index] = AVPlayerLooper(player: player, templateItem: item)
-            }
+        let item = AVPlayerItem(asset: asset)
+        item.preferredPeakBitRate = bypassFrameRateComposition
+            ? max(profile.bitRate, 2_000_000)
+            : profile.bitRate
+        item.preferredForwardBufferDuration = bypassFrameRateComposition
+            ? max(profile.buffer, 0.3)
+            : profile.buffer
+        item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
+        configureFrameRateComposition(item: item, asset: asset, targetFPS: targetFPS)
+        if playlistPlaybackEnabled {
+            player.insert(item, after: nil)
+            sharedLooper = nil
+        } else {
+            sharedLooper = AVPlayerLooper(player: player, templateItem: item)
         }
         applyAudioSettings()
         applySuspensionStateToPlayers()
@@ -1913,6 +1895,43 @@ final class WallpaperModel: ObservableObject {
             url: url,
             usedFrameRateComposition: !bypassFrameRateComposition && targetFPS != nil
         )
+    }
+
+    /// Updates only bitrate / buffer of the currently playing item, without
+    /// destroying and recreating the player item. Returns true if an update was
+    /// applied; false if there is no current item (caller may choose to fall
+    /// back to a full `playVideo` reload).
+    @discardableResult
+    private func applyDynamicPlaybackProfile() -> Bool {
+        guard let player = sharedPlayer,
+              let item = player.currentItem
+        else {
+            return false
+        }
+        let profile = resolvePlaybackProfile()
+        item.preferredPeakBitRate = profile.bitRate
+        item.preferredForwardBufferDuration = profile.buffer
+        return true
+    }
+
+    /// Coalesce multiple full reconfiguration requests into a single
+    /// `playVideo` call on the next runloop tick. Useful for settings that
+    /// require recreating the asset/item (decode mode, quality preset,
+    /// playlist mode toggle).
+    private func requestPlaybackReconfiguration() {
+        guard !pendingPlaybackReconfiguration else {
+            return
+        }
+        pendingPlaybackReconfiguration = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            self.pendingPlaybackReconfiguration = false
+            if let currentPath = self.currentVideoPath {
+                self.playVideo(url: URL(fileURLWithPath: currentPath))
+            }
+        }
     }
 
     private func cacheDirectoryURL() -> URL? {
@@ -1947,7 +1966,7 @@ final class WallpaperModel: ObservableObject {
                 .appendingPathComponent("ThumbnailCache", isDirectory: true)
     }
 
-    private func importVideoToAppSupport(from sourceURL: URL) -> URL? {
+    private func importVideoToAppSupport(from sourceURL: URL) async -> URL? {
         let fileManager = FileManager.default
         guard let targetDirectory: URL = cacheDirectoryURL() else {
             return nil
@@ -1967,12 +1986,19 @@ final class WallpaperModel: ObservableObject {
             "wallpaper-\(UUID().uuidString).\(ext)"
         )
 
-        do {
-            try fileManager.copyItem(at: sourceURL, to: targetURL)
-            return targetURL
-        } catch {
-            return nil
-        }
+        return await Task.detached(priority: .userInitiated) {
+            let fileManager = FileManager.default
+            do {
+                try fileManager.createDirectory(
+                    at: targetDirectory,
+                    withIntermediateDirectories: true
+                )
+                try fileManager.copyItem(at: sourceURL, to: targetURL)
+                return targetURL
+            } catch {
+                return nil
+            }
+        }.value
     }
 
     private func restoreState() {
@@ -2492,9 +2518,7 @@ final class WallpaperModel: ObservableObject {
             if autoFrameRateBitRateFactor != 1.0 || autoFrameRateBufferAdjustment != 0 {
                 autoFrameRateBitRateFactor = 1.0
                 autoFrameRateBufferAdjustment = 0
-                if let currentPath = currentVideoPath {
-                    playVideo(url: URL(fileURLWithPath: currentPath))
-                }
+                applyDynamicPlaybackProfile()
             }
             return
         }
@@ -2503,9 +2527,7 @@ final class WallpaperModel: ObservableObject {
             if autoFrameRateBitRateFactor != 1.0 || autoFrameRateBufferAdjustment != 0 {
                 autoFrameRateBitRateFactor = 1.0
                 autoFrameRateBufferAdjustment = 0
-                if let currentPath = currentVideoPath {
-                    playVideo(url: URL(fileURLWithPath: currentPath))
-                }
+                applyDynamicPlaybackProfile()
             }
             return
         }
@@ -2550,9 +2572,7 @@ final class WallpaperModel: ObservableObject {
 
         autoFrameRateBitRateFactor = nextBitRateFactor
         autoFrameRateBufferAdjustment = nextBufferAdjustment
-        if let currentPath = currentVideoPath {
-            playVideo(url: URL(fileURLWithPath: currentPath))
-        }
+        applyDynamicPlaybackProfile()
     }
 
     private func coveredDisplayIDsByFrontmostApp() -> Set<String> {

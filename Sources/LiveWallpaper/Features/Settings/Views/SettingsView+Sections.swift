@@ -676,79 +676,49 @@ extension SettingsView {
     ) -> some View {
         let thumbnailWidth = max(cardWidth - 8, 1)
 
+        let thumbnailButton = Button {
+            if let onSelect {
+                onSelect()
+            } else {
+                model.selectRegisteredVideo(path: path)
+                if switchToWallpaperTabOnSelect {
+                    selectedTab = .wallpaper
+                }
+            }
+        } label: {
+            ZStack {
+                if let image = thumbnailCache.image(for: path) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Rectangle().fill(Color.secondary.opacity(0.15))
+                    Image(systemName: "film")
+                        .font(.system(size: 18))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(width: thumbnailWidth, height: 60)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .onAppear {
+                setThumbnailVisibility(path: path, isVisible: true)
+            }
+            .onDisappear {
+                setThumbnailVisibility(path: path, isVisible: false)
+            }
+        }
+        .buttonStyle(.plain)
+
         return VStack(alignment: .leading, spacing: 8) {
             Group {
                 if canDragToPlaylist {
-                    Button {
-                        if let onSelect {
-                            onSelect()
-                        } else {
-                            model.selectRegisteredVideo(path: path)
-                            if switchToWallpaperTabOnSelect {
-                                selectedTab = .wallpaper
-                            }
+                    thumbnailButton
+                        .onDrag {
+                            NSItemProvider(object: path as NSString)
                         }
-                    } label: {
-                        ZStack {
-                            if let image = thumbnailCache.image(for: path) {
-                                Image(nsImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                            } else {
-                                Rectangle().fill(Color.secondary.opacity(0.15))
-                                Image(systemName: "film")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .frame(width: thumbnailWidth, height: 60)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .onAppear {
-                            setThumbnailVisibility(path: path, isVisible: true)
-                        }
-                        .onDisappear {
-                            setThumbnailVisibility(path: path, isVisible: false)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .onDrag {
-                        NSItemProvider(object: path as NSString)
-                    }
                 } else {
-                    Button {
-                        if let onSelect {
-                            onSelect()
-                        } else {
-                            model.selectRegisteredVideo(path: path)
-                            if switchToWallpaperTabOnSelect {
-                                selectedTab = .wallpaper
-                            }
-                        }
-                    } label: {
-                        ZStack {
-                            if let image = thumbnailCache.image(for: path) {
-                                Image(nsImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                            } else {
-                                Rectangle().fill(Color.secondary.opacity(0.15))
-                                Image(systemName: "film")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .frame(width: thumbnailWidth, height: 60)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .onAppear {
-                            setThumbnailVisibility(path: path, isVisible: true)
-                        }
-                        .onDisappear {
-                            setThumbnailVisibility(path: path, isVisible: false)
-                        }
-                    }
-                    .buttonStyle(.plain)
+                    thumbnailButton
                 }
             }
 
