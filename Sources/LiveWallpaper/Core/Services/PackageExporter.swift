@@ -197,7 +197,9 @@ final class PackageExporter {
         let contentDir = tempDir.appendingPathComponent("content")
         try fileManager.createDirectory(at: contentDir, withIntermediateDirectories: true)
 
+        let videosDir = contentDir.appendingPathComponent("videos")
         let previewsDir = contentDir.appendingPathComponent("previews")
+        try fileManager.createDirectory(at: videosDir, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: previewsDir, withIntermediateDirectories: true)
 
         let videoId = UUID().uuidString
@@ -205,6 +207,10 @@ final class PackageExporter {
 
         let attrs = try fileManager.attributesOfItem(atPath: videoPath)
         let fileSize = attrs[.size] as? UInt64 ?? 0
+
+        // Keep original bytes (no transcoding) to avoid any quality loss.
+        let packagedVideoURL = videosDir.appendingPathComponent("\(videoId).mp4")
+        try fileManager.copyItem(atPath: videoPath, toPath: packagedVideoURL.path)
 
         let thumbPath = previewsDir.appendingPathComponent("\(videoId).png")
         if let thumbnail = await generateThumbnail(for: videoPath),
@@ -300,7 +306,7 @@ final class PackageExporter {
             ),
             videos: [packageVideo],
             playlists: [],
-            packaging: .init(videosIncluded: false, packageSizeBytes: 0)
+            packaging: .init(videosIncluded: true, packageSizeBytes: fileSize)
         )
     }
 
