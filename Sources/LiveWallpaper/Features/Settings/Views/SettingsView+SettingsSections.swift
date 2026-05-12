@@ -553,8 +553,17 @@ extension SettingsView {
                     NotificationCenter.default.post(name: .checkUpdatesNow, object: nil)
                 }
                 .buttonStyle(.bordered)
+
+                Button("手動ダウンロード") {
+                    NotificationCenter.default.post(name: .openReleasePage, object: nil)
+                }
+                .buttonStyle(.bordered)
                 Spacer()
             }
+
+            Text("更新が失敗する場合は、Releasesから最新版を取得して /Applications の LiveWallpaper.app を置き換えてください")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
 }

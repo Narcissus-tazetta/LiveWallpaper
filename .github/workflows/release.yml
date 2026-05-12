@@ -37,8 +37,23 @@ jobs:
                   SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
                   SPARKLE_APPCAST_URL: https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml
                   ARCH_MODE: universal
+                  APP_SIGN_IDENTITY: ${{ secrets.APP_SIGN_IDENTITY }}
+                  DMG_SIGN_IDENTITY: ${{ secrets.DMG_SIGN_IDENTITY }}
+                  APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+                  APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+                  APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+                  CREATE_DMG: true
               run: |
                   chmod +x scripts/package_zip.sh
+                  if [[ -n "$APP_SIGN_IDENTITY" && -n "$APPLE_API_KEY_ID" && -n "$APPLE_API_ISSUER_ID" && -n "$APPLE_API_PRIVATE_KEY" ]]; then
+                    export SIGNING_MODE=developerid
+                    export NOTARIZE=true
+                    echo "Apple credentials detected: using Developer ID signing and notarization"
+                  else
+                    export SIGNING_MODE=adhoc
+                    export NOTARIZE=false
+                    echo "Apple credentials not provided: falling back to adhoc signing; notarization disabled"
+                  fi
                   ./scripts/package_zip.sh "${{ inputs.version }}" "${{ inputs.build_number }}"
 
             - name: Generate appcast
@@ -89,9 +104,14 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
+                  ZIP="dist/LiveWallpaper-macos-v${{ inputs.version }}.zip"
+                  DMG="dist/LiveWallpaper-macos-v${{ inputs.version }}.dmg"
+                  ASSETS="$ZIP"
+                  if [[ -f "$DMG" ]]; then
+                    ASSETS="$ASSETS $DMG"
+                  fi
                   gh release create \
-                    "v${{ inputs.version }}" \
-                    "dist/LiveWallpaper-macos-v${{ inputs.version }}.zip" \
+                    "v${{ inputs.version }}" $ASSETS \
                     --title "v${{ inputs.version }}" \
                     --notes-file "dist/release-notes.md"
 

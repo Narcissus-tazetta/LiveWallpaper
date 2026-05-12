@@ -485,4 +485,5 @@ extension Notification.Name {
     static let toggleAutoUpdate = Notification.Name("ToggleAutoUpdate")
     static let checkUpdatesNow = Notification.Name("CheckUpdatesNow")
     static let refreshPlayback = Notification.Name("RefreshPlayback")
+    static let openReleasePage = Notification.Name("OpenReleasePage")
 }

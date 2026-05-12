@@ -5,7 +5,7 @@
 
 Japanese README: [README.md](README.md)
 
-sry Im not good at english so this document is using AI
+Sry I'm not good at english so this document is using AI
 
 LiveWallpaper lets you set your favorite videos as your Mac desktop wallpaper.
 It is designed to reduce system load (battery and CPU usage) while you are working.
@@ -24,10 +24,13 @@ It is designed to reduce system load (battery and CPU usage) while you are worki
 
 ## Install And Launch
 
-1. Download the latest `LiveWallpaper.app.zip` from the [Releases](../../releases) page.
-2. Unzip and move `LiveWallpaper.app` to your **Applications** folder.
+1. Download the latest `LiveWallpaper-macos-vX.Y.Z.dmg` from the [Releases](../../releases) page.
+2. Open the DMG and move `LiveWallpaper.app` to your **Applications** folder.
+3. If it is already installed, replace the existing app with the new one.
 
 To ensure auto-update and related features work correctly, always launch from the Applications folder.
+
+If an update fails, use the "Manual Download" action in Settings to open Releases and reinstall the latest version.
 
 Important first-launch note:
 Since the app is currently not Apple-notarized, macOS may block it with a security warning.

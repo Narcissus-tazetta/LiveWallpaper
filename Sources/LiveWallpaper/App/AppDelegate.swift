@@ -21,6 +21,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         private var manualUpdateCheckPending = false
     #endif
 
+    private enum UpdateEnvironmentIssue {
+        case translocated
+        case outsideApplications
+        case notWritable
+    }
+
     func applicationDidFinishLaunching(_: Notification) {
         NSApp.setActivationPolicy(.accessory)
         launchAtLoginEnabled = currentLaunchAtLoginEnabled()
@@ -33,21 +39,102 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupSparkleUpdater()
     }
 
-    private func verifyUpdatePrerequisites() {
-        let bundlePath: String = Bundle.main.bundlePath
-        NSLog("[Sparkle] Bundle path: \(bundlePath)")
-        if bundlePath.contains("/AppTranslocation/") {
-            NSLog("[Sparkle] AppTranslocation detected")
-            DispatchQueue.main.async {
-                let alert = NSAlert()
-                alert.messageText = "アップデートを有効化するにはアプリをApplicationsに移動してください"
-                alert.informativeText = "現在は一時実行領域から起動しているため、自動アップデートが失敗する場合があります。"
-                alert.alertStyle = .warning
-                alert.runModal()
-            }
+    private func bundleURL() -> URL {
+        Bundle.main.bundleURL.resolvingSymlinksInPath()
+    }
+
+    private func applicationsDirectoryURL() -> URL? {
+        FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask).first?
+            .resolvingSymlinksInPath()
+    }
+
+    private func isRunningFromAppTranslocation(bundlePath: String) -> Bool {
+        bundlePath.contains("/AppTranslocation/")
+    }
+
+    private func isInstalledInApplications(bundleURL: URL) -> Bool {
+        guard let applicationsURL = applicationsDirectoryURL() else {
+            return false
         }
-        if !FileManager.default.isWritableFile(atPath: bundlePath) {
-            NSLog("[Sparkle] App path is not writable: \(bundlePath)")
+        let appPath = bundleURL.path
+        let applicationsPath = applicationsURL.path
+        return appPath == applicationsPath || appPath.hasPrefix(applicationsPath + "/")
+    }
+
+    private func canWriteBundleLocation(bundleURL: URL) -> Bool {
+        let bundlePath = bundleURL.path
+        let parentPath = bundleURL.deletingLastPathComponent().path
+        return FileManager.default.isWritableFile(atPath: bundlePath)
+            || FileManager.default.isWritableFile(atPath: parentPath)
+    }
+
+    private func currentUpdateEnvironmentIssues() -> [UpdateEnvironmentIssue] {
+        let bundle = bundleURL()
+        let path = bundle.path
+        var issues: [UpdateEnvironmentIssue] = []
+
+        if isRunningFromAppTranslocation(bundlePath: path) {
+            issues.append(.translocated)
+        }
+        if !isInstalledInApplications(bundleURL: bundle) {
+            issues.append(.outsideApplications)
+        }
+        if !canWriteBundleLocation(bundleURL: bundle) {
+            issues.append(.notWritable)
+        }
+        return issues
+    }
+
+    private func updateEnvironmentIssueDescription(_ issue: UpdateEnvironmentIssue) -> String {
+        switch issue {
+        case .translocated:
+            return "一時実行領域（AppTranslocation）から起動されています。"
+        case .outsideApplications:
+            return "アプリが /Applications 配下にありません。"
+        case .notWritable:
+            return "現在の配置先に書き込みできません。"
+        }
+    }
+
+    private func showUpdateEnvironmentAlert(issues: [UpdateEnvironmentIssue], title: String) {
+        guard !issues.isEmpty else {
+            return
+        }
+        let bulletText = issues
+            .map { "・\(updateEnvironmentIssueDescription($0))" }
+            .joined(separator: "\n")
+
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText =
+            "アップデートの前提条件を満たしていません。\n\n\(bulletText)\n\nLiveWallpaper.app を /Applications に移動して再起動してから、もう一度お試しください。"
+        alert.alertStyle = .warning
+        alert.runModal()
+    }
+
+    private func ensureUpdateEnvironmentOrNotify(title: String) -> Bool {
+        let issues = currentUpdateEnvironmentIssues()
+        if issues.isEmpty {
+            return true
+        }
+        showUpdateEnvironmentAlert(issues: issues, title: title)
+        return false
+    }
+
+    private func verifyUpdatePrerequisites() {
+        let bundlePath: String = bundleURL().path
+        NSLog("[Sparkle] Bundle path: \(bundlePath)")
+        let issues = currentUpdateEnvironmentIssues()
+        if !issues.isEmpty {
+            for issue in issues {
+                NSLog("[Sparkle] Update prerequisite issue: \(updateEnvironmentIssueDescription(issue))")
+            }
+            DispatchQueue.main.async {
+                self.showUpdateEnvironmentAlert(
+                    issues: issues,
+                    title: "アップデートを有効化するにはアプリをApplicationsに移動してください"
+                )
+            }
         }
     }
 
@@ -71,15 +158,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.updaterController = updaterController
 
             let updater = updaterController.updater
-            updater.automaticallyChecksForUpdates = autoUpdateEnabled
-            updater.automaticallyDownloadsUpdates = autoUpdateEnabled
+            let canUseAutomaticUpdates = autoUpdateEnabled
+                && currentUpdateEnvironmentIssues().isEmpty
+            updater.automaticallyChecksForUpdates = canUseAutomaticUpdates
+            updater.automaticallyDownloadsUpdates = canUseAutomaticUpdates
 
             do {
                 try updater.start()
                 sparkleStarted = true
                 NSLog("[Sparkle] updater.start() succeeded")
-                updater.checkForUpdatesInBackground()
-                NSLog("[Sparkle] checkForUpdatesInBackground() requested")
+                if canUseAutomaticUpdates {
+                    updater.checkForUpdatesInBackground()
+                    NSLog("[Sparkle] checkForUpdatesInBackground() requested")
+                } else {
+                    NSLog("[Sparkle] automatic updates are disabled due to update prerequisites")
+                }
             } catch {
                 Self.reportSparkleError(error)
                 let message = error.localizedDescription
@@ -412,6 +505,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             self, selector: #selector(refreshPlaybackState), name: .refreshPlayback, object: nil
         )
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(openReleasePage), name: .openReleasePage, object: nil
+        )
     }
 
     @objc private func showOpenPanel() {
@@ -534,10 +630,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(enabled, forKey: "autoUpdateEnabled")
         #if canImport(Sparkle)
             if let updater = updaterController?.updater {
-                updater.automaticallyChecksForUpdates = enabled
-                updater.automaticallyDownloadsUpdates = enabled
+                let shouldEnable = enabled && currentUpdateEnvironmentIssues().isEmpty
+                updater.automaticallyChecksForUpdates = shouldEnable
+                updater.automaticallyDownloadsUpdates = shouldEnable
             }
         #endif
+    }
+
+    @objc private func openReleasePage() {
+        guard let url = URL(string: "https://github.com/Narcissus-tazetta/LiveWallpaper/releases") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 
     private func audioMenuTitle(_ enabled: Bool) -> String {
@@ -763,6 +867,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func checkForUpdates() {
         #if canImport(Sparkle)
+            guard ensureUpdateEnvironmentOrNotify(
+                title: "アップデートを確認する前に移動が必要です"
+            ) else {
+                manualUpdateCheckPending = false
+                return
+            }
+
             settingsWindowController.showWindow(nil)
             settingsWindowController.window?.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
