@@ -32,6 +32,9 @@ jobs:
                   restore-keys: |
                       ${{ runner.os }}-swiftpm-
 
+            - name: Install create-dmg
+              run: brew install create-dmg
+
             - name: Build zip
               env:
                   SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
