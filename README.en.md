@@ -21,6 +21,20 @@ It is designed to reduce system load (battery and CPU usage) while you are worki
     - Supports exclusion rules for apps that should not trigger pause.
     - Supports frame rate and decode mode settings tuned for different Mac workloads.
 - Auto updates: Integrated with Sparkle for in-app updates.
+- Auto updates: Integrated with Sparkle for in-app updates.
+
+## Other Features (Detailed)
+
+- **Wallpaper export & sharing**: From Settings you can select any registered wallpaper to share. Exporting lets you choose an output folder and writes a `.lwpkg` (wallpaper package) alongside the original video (`.mov`/`.mp4`). Exports include thumbnails and metadata such as presentation/fit settings and playlist information.
+- **Package import**: `.lwpkg` files can be imported into the app. The importer restores presentation settings and playlists from the package metadata. Duplicate video handling (replace or abort) is supported during import.
+- **Playlists & shuffle**: Create playlists to play videos in sequence. Supports shuffle playback and controls for previous/next video and playlist selection.
+- **Fit editor (per-display layout)**: Edit how a video is presented on each display (fit mode, zoom, X/Y offset) and save per-screen presentation settings.
+- **Display / output options**: Choose to show wallpaper on the main display only or on all displays. Frame rate limits (30fps / 60fps / unlimited) and decode mode options help tune performance.
+- **Auto-pause & exclusion rules**: The app can automatically pause playback when other windows cover the screen, and you can exclude specific apps from triggering pause so playback continues.
+- **Thumbnail cache**: Video thumbnails are cached in memory and on disk to provide fast listing and previews. The app prewarms thumbnails and provides cache clearing functionality.
+- **Audio controls**: Mute or adjust wallpaper audio volume from the app.
+- **Drag & drop and file operations**: Add videos via drag & drop, drag videos into playlists, and edit registered video display names.
+- **Developer / distribution scripts**: Build and packaging scripts are included for generating DMGs, producing Sparkle appcast entries, signing, and (optionally) notarization.
 
 ## Install And Launch
 
