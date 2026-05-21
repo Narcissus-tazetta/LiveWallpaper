@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "LiveWallpaper",
+    defaultLocalization: "ja",
     platforms: [
         .macOS(.v13)
     ],

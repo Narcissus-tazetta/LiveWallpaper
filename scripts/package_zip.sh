@@ -213,6 +213,13 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp -f "$EXEC_PATH" "$APP_DIR/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
 cp -f "$ICON_PATH" "$APP_DIR/Contents/Resources/AppIcon.icns"
+if [[ -d "$ROOT_DIR/Sources/LiveWallpaper/Resources" ]]; then
+  for lproj in "$ROOT_DIR"/Sources/LiveWallpaper/Resources/*.lproj; do
+    if [[ -d "$lproj" ]]; then
+      cp -R "$lproj" "$APP_DIR/Contents/Resources/"
+    fi
+  done
+fi
 cp -R "$SPARKLE_FRAMEWORK_PATH" "$APP_DIR/Contents/MacOS/Sparkle.framework"
 
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
@@ -241,6 +248,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <key>CFBundleLocalizations</key>
   <array>
     <string>ja</string>
+    <string>en</string>
   </array>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>

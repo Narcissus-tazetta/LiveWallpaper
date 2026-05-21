@@ -111,6 +111,7 @@ final class WallpaperModel: ObservableObject {
     @Published private(set) var currentVideoPath: String?
     @Published private(set) var registeredVideoPaths: [String] = []
     @Published private(set) var registeredVideoDisplayNames: [String: String] = [:]
+    @Published private(set) var appLanguage: AppLanguage = .automatic
     @Published private(set) var wallpaperPresentationByPath:
         [String: [String: WallpaperPresentation]] = [:]
 
@@ -147,10 +148,33 @@ final class WallpaperModel: ObservableObject {
         return result
     }
 
+    var appLocale: Locale {
+        Locale(identifier: appLanguage.effectiveLanguageCode)
+    }
+
+    var effectiveAppLanguageCode: String {
+        appLanguage.effectiveLanguageCode
+    }
+
+    func localizedString(_ key: String) -> String {
+        AppLocalization.localizedString(key, languageCode: effectiveAppLanguageCode)
+    }
+
+    func setAppLanguage(_ language: AppLanguage) {
+        guard appLanguage != language else {
+            return
+        }
+        appLanguage = language
+        UserDefaults.standard.set(language.rawValue, forKey: "appLanguage")
+        LocalizationManager.setLanguage(language.effectiveLanguageCode)
+        NSLog("[Localization] setAppLanguage -> \(language) effective=\(language.effectiveLanguageCode)")
+    }
+
     init() {
         playbackEnvironment = Self.detectPlaybackEnvironment()
         configurePlayer()
         restoreState()
+        LocalizationManager.setLanguage(effectiveAppLanguageCode)
         rebuildWindows()
         if let savedPath: String = currentVideoPath {
             playVideo(url: URL(fileURLWithPath: savedPath))
@@ -686,7 +710,11 @@ final class WallpaperModel: ObservableObject {
         return screens.enumerated().map { index, screen in
             let screenID = displayIDString(for: screen)
             let isMain = (NSScreen.main == screen)
-            let name = isMain ? "画面\(index + 1) (メイン)" : "画面\(index + 1)"
+            let screenLabel = localizedString("画面")
+            let mainLabel = localizedString("メイン")
+            let name = isMain
+                ? "\(screenLabel)\(index + 1) (\(mainLabel))"
+                : "\(screenLabel)\(index + 1)"
             return DisplayScreenInfo(id: screenID, name: name, frame: screen.frame)
         }
     }
@@ -1133,7 +1161,7 @@ final class WallpaperModel: ObservableObject {
     }
 
     func playlistName(for playlistID: UUID) -> String {
-        playlists.first(where: { $0.id == playlistID })?.name ?? "プレイリスト"
+        playlists.first(where: { $0.id == playlistID })?.name ?? localizedString("プレイリスト")
     }
 
     func setPlaylistName(_ name: String, for playlistID: UUID) {
@@ -1157,7 +1185,9 @@ final class WallpaperModel: ObservableObject {
             return nil
         }
         let cleaned = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let playlistName = cleaned.isEmpty ? "プレイリスト\(playlists.count + 1)" : cleaned
+        let playlistName = cleaned.isEmpty
+            ? "\(localizedString("プレイリスト"))\(playlists.count + 1)"
+            : cleaned
         let playlist = WallpaperPlaylist(id: UUID(), name: playlistName, videoPaths: [])
         playlists.append(playlist)
         if selectedPlaylistID == nil {
@@ -2035,6 +2065,11 @@ final class WallpaperModel: ObservableObject {
         if UserDefaults.standard.object(forKey: "audioVolume") is NSNumber {
             audioVolume = min(max(savedAudioVolume, 0), 1)
         }
+        if let appLanguageValue = UserDefaults.standard.string(forKey: "appLanguage"),
+           let restoredAppLanguage = AppLanguage(rawValue: appLanguageValue)
+        {
+            appLanguage = restoredAppLanguage
+        }
         applyAudioSettings()
         applyLightweightSettings()
         suspendWhenOtherAppFullScreen =
@@ -2065,7 +2100,11 @@ final class WallpaperModel: ObservableObject {
             let cleaned = savedPaths.filter { FileManager.default.fileExists(atPath: $0) }
             if !cleaned.isEmpty {
                 playlists = [
-                    WallpaperPlaylist(id: UUID(), name: "プレイリスト1", videoPaths: cleaned)
+                    WallpaperPlaylist(
+                        id: UUID(),
+                        name: "\(localizedString("プレイリスト"))1",
+                        videoPaths: cleaned
+                    )
                 ]
             }
         }

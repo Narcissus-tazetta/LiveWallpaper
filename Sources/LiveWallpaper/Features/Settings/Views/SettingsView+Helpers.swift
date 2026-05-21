@@ -49,14 +49,16 @@ extension SettingsView {
 
     func currentWallpaperSummaryText() -> String {
         guard let currentPath = model.currentVideoPath else {
-            return model.allRegisteredVideoPaths.isEmpty ? "未登録" : "未再生"
+            return model.allRegisteredVideoPaths.isEmpty
+                ? model.localizedString("未登録")
+                : model.localizedString("未再生")
         }
         return model.registeredVideoDisplayName(for: currentPath)
     }
 
     func currentPlaylistSummaryText() -> String {
         guard !model.playlists.isEmpty else {
-            return "未作成"
+            return model.localizedString("未作成")
         }
         return model.selectedPlaylistName
     }
@@ -64,9 +66,9 @@ extension SettingsView {
     func currentDisplayModeSummaryText() -> String {
         switch model.displayMode {
         case .mainOnly:
-            return "メインのみ"
+            return model.localizedString("メインのみ")
         case .allScreens:
-            return "全ディスプレイ"
+            return model.localizedString("全ディスプレイ")
         }
     }
 
@@ -102,7 +104,7 @@ extension SettingsView {
                 VStack(spacing: 4) {
                     Image(systemName: "photo")
                         .font(.system(size: 18, weight: .medium))
-                    Text("No Preview")
+                    Text(model.localizedString("プレビューなし"))
                         .font(.caption2)
                 }
                 .foregroundColor(.secondary)
@@ -113,7 +115,7 @@ extension SettingsView {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
         )
-        .accessibilityLabel("現在の壁紙プレビュー")
+        .accessibilityLabel(model.localizedString("現在の壁紙プレビュー"))
     }
 
     func toggleHelp(_ topic: HelpTopic) {
@@ -137,7 +139,7 @@ extension SettingsView {
         }
         panel.allowsOtherFileTypes = false
         panel.treatsFilePackagesAsDirectories = false
-        panel.prompt = "追加"
+        panel.prompt = model.localizedString("追加")
 
         if panel.runModal() == .OK,
            let url = panel.url
@@ -158,23 +160,23 @@ extension SettingsView {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("共有する壁紙を選択")
+                    Text(model.localizedString("共有する壁紙を選択"))
                         .font(.system(size: 18, weight: .semibold))
-                    Text("選ぶと保存先フォルダを指定して、.lwpkg と .mov を出力します")
+                    Text(model.localizedString("選ぶと保存先フォルダを指定して、.lwpkg と .mov を出力します"))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
                 Spacer(minLength: 0)
 
-                Button("閉じる") {
+                Button(model.localizedString("閉じる")) {
                     isWallpaperShareSheetPresented = false
                 }
                 .buttonStyle(.bordered)
             }
 
             if model.allRegisteredVideoPaths.isEmpty {
-                Text("共有できる壁紙がありません")
+                Text(model.localizedString("共有できる壁紙がありません"))
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -229,10 +231,10 @@ extension SettingsView {
                     .truncationMode(.middle)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 4) {
+                    HStack(spacing: 4) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 10, weight: .semibold))
-                    Text("共有")
+                    Text(model.localizedString("共有"))
                         .font(.system(size: 10, weight: .semibold))
                 }
                 .foregroundColor(.secondary)
@@ -258,8 +260,8 @@ extension SettingsView {
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.prompt = "共有"
-        panel.message = "壁紙を保存するフォルダを選択してください"
+        panel.prompt = model.localizedString("共有")
+        panel.message = model.localizedString("壁紙を保存するフォルダを選択してください")
 
         if panel.runModal() == .OK,
            let folderURL = panel.url
@@ -274,7 +276,7 @@ extension SettingsView {
                     )
                 } catch {
                     let alert = NSAlert()
-                    alert.messageText = "共有に失敗しました"
+                    alert.messageText = model.localizedString("共有に失敗しました")
                     alert.informativeText = error.localizedDescription
                     alert.alertStyle = .warning
                     alert.runModal()

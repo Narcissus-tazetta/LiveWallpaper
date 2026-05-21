@@ -16,10 +16,10 @@ extension SettingsView {
     var wallpaperLibraryPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("壁紙一覧", systemImage: "square.grid.2x2")
+                Label(model.localizedString("壁紙一覧"), systemImage: "square.grid.2x2")
                     .font(.system(size: 13, weight: .semibold))
                 Spacer(minLength: 0)
-                Text("\(model.allRegisteredVideoPaths.count) 本")
+                Text("\(model.allRegisteredVideoPaths.count) \(model.localizedString("本"))")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -28,19 +28,19 @@ extension SettingsView {
                 Text(
                     model.currentVideoPath.map { model.registeredVideoDisplayName(
                         for: $0
-                    ) } ?? "(選択なし)"
+                    ) } ?? model.localizedString("(選択なし)")
                 )
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) {
-                    Button("壁紙を共有") {
+                    Button(model.localizedString("壁紙を共有")) {
                         isWallpaperShareSheetPresented = true
                     }
                     .buttonStyle(.bordered)
                     .disabled(model.allRegisteredVideoPaths.isEmpty)
 
-                    Button("動画を追加") {
+                    Button(model.localizedString("動画を追加")) {
                         NotificationCenter.default.post(name: .chooseVideo, object: nil)
                     }
                     .buttonStyle(.borderedProminent)
@@ -48,7 +48,7 @@ extension SettingsView {
             }
 
             if model.allRegisteredVideoPaths.isEmpty {
-                Text("1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます")
+                Text(model.localizedString("1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
@@ -85,7 +85,7 @@ extension SettingsView {
     var playlistSettingsPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("プレイリスト・設定", systemImage: "list.bullet.rectangle")
+                Label(model.localizedString("プレイリスト・設定"), systemImage: "list.bullet.rectangle")
                     .font(.system(size: 13, weight: .semibold))
                 Spacer(minLength: 0)
                 Text(model.playlistCapacityText)
@@ -94,18 +94,18 @@ extension SettingsView {
             }
 
             HStack(spacing: 10) {
-                Text("選択中: \(model.selectedPlaylistName)")
+                Text("\(model.localizedString("選択中")): \(model.selectedPlaylistName)")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Spacer(minLength: 0)
-                Text("\(model.registeredVideoPaths.count) 本")
+                Text("\(model.registeredVideoPaths.count) \(model.localizedString("本"))")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             HStack(alignment: .center, spacing: 10) {
                 if model.playlists.isEmpty {
-                    Text("プレイリストはありません。「新規プレイリスト」で作成できます")
+                    Text(model.localizedString("プレイリストはありません。「新規プレイリスト」で作成できます"))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
@@ -119,7 +119,7 @@ extension SettingsView {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                Button("新規プレイリスト") {
+                Button(model.localizedString("新規プレイリスト")) {
                     if let created = model.createPlaylist() {
                         model.selectPlaylist(created)
                     }
@@ -132,7 +132,7 @@ extension SettingsView {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 14) {
                         compactToggle(
-                            "プレイリスト連続再生",
+                            model.localizedString("プレイリスト連続再生"),
                             isOn: Binding<Bool>(
                                 get: { model.playlistPlaybackEnabled },
                                 set: { model.setPlaylistPlaybackEnabled($0) }
@@ -140,7 +140,7 @@ extension SettingsView {
                         )
 
                         compactToggle(
-                            "シャッフル",
+                            model.localizedString("シャッフル"),
                             isOn: Binding<Bool>(
                                 get: { model.shufflePlaybackEnabled },
                                 set: { model.setShufflePlaybackEnabled($0) }
@@ -162,7 +162,7 @@ extension SettingsView {
                         Button {
                             model.playPreviousVideo()
                         } label: {
-                            Label("前へ", systemImage: "backward.fill")
+                            Label(model.localizedString("前へ"), systemImage: "backward.fill")
                         }
                         .buttonStyle(.bordered)
                         .disabled(model.registeredVideoPaths.count < 2)
@@ -170,7 +170,7 @@ extension SettingsView {
                         Button {
                             model.playNextVideo()
                         } label: {
-                            Label("次へ", systemImage: "forward.fill")
+                            Label(model.localizedString("次へ"), systemImage: "forward.fill")
                         }
                         .buttonStyle(.bordered)
                         .disabled(model.registeredVideoPaths.count < 2)
@@ -197,7 +197,7 @@ extension SettingsView {
                     .frame(minHeight: wallpaperLibraryGridMinHeight, maxHeight: 260)
                 }
             } else {
-                Text("このプレイリストに動画がありません")
+                Text(model.localizedString("このプレイリストに動画がありません"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -222,16 +222,16 @@ extension SettingsView {
     var wallpaperFitLibraryPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("壁紙一覧", systemImage: "square.grid.2x2")
+                Label(model.localizedString("壁紙一覧"), systemImage: "square.grid.2x2")
                     .font(.system(size: 13, weight: .semibold))
                 Spacer(minLength: 0)
-                Text("\(model.allRegisteredVideoPaths.count) 本")
+                Text("\(model.allRegisteredVideoPaths.count) \(model.localizedString("本"))")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             if model.allRegisteredVideoPaths.isEmpty {
-                Text("まず壁紙を追加すると、ここで配置を調整できます")
+                Text(model.localizedString("まず壁紙を追加すると、ここで配置を調整できます"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
@@ -272,7 +272,7 @@ extension SettingsView {
     var wallpaperFitEditorPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("フィット編集", systemImage: "crop")
+                Label(model.localizedString("フィット編集"), systemImage: "crop")
                     .font(.system(size: 13, weight: .semibold))
                 Spacer(minLength: 0)
             }
@@ -308,11 +308,11 @@ extension SettingsView {
 
                 HStack(spacing: 8) {
                     Spacer(minLength: 0)
-                    Button("保存して再適用") {
+                    Button(model.localizedString("保存して再適用")) {
                         applyFitEditorDraft(path: path, screenID: screenID)
                     }
                     .buttonStyle(.borderedProminent)
-                    Button("リセット") {
+                    Button(model.localizedString("リセット")) {
                         resetFitEditorDraft(path: path, screenID: screenID)
                     }
                     .buttonStyle(.bordered)
@@ -320,30 +320,36 @@ extension SettingsView {
                 .frame(maxWidth: .infinity, alignment: .trailing)
 
                 HStack(spacing: 12) {
-                    Text("表示")
+                    Text(model.localizedString("表示"))
                         .frame(width: 72, alignment: .leading)
                     Spacer(minLength: 0)
                     EqualSegmentedControl(
-                        options: [("拡大", VideoFitMode.fill), ("全体", VideoFitMode.fit)],
+                        options: [
+                            (model.localizedString("拡大"), VideoFitMode.fill),
+                            (model.localizedString("全体"), VideoFitMode.fit)
+                        ],
                         selection: fitModeBinding(path: path, screenID: screenID)
                     )
                     .frame(width: fitEditorSegmentedPickerWidth, height: 24)
                 }
 
                 HStack(spacing: 12) {
-                    Text("プレビュー")
+                    Text(model.localizedString("プレビュー"))
                         .lineLimit(1)
                         .frame(width: 72, alignment: .leading)
                     Spacer(minLength: 0)
                     EqualSegmentedControl(
-                        options: [("動画", FitPreviewMode.video), ("静止画", FitPreviewMode.still)],
+                        options: [
+                            (model.localizedString("動画"), FitPreviewMode.video),
+                            (model.localizedString("静止画"), FitPreviewMode.still)
+                        ],
                         selection: $fitPreviewMode
                     )
                     .frame(width: fitEditorSegmentedPickerWidth, height: 24)
                 }
 
                 HStack(spacing: 12) {
-                    Text("ズーム")
+                    Text(model.localizedString("ズーム"))
                         .frame(width: 56, alignment: .leading)
                     Slider(value: zoomBinding(path: path, screenID: screenID), in: 1 ... 3)
                     Text(
@@ -357,7 +363,7 @@ extension SettingsView {
                 }
 
                 HStack(spacing: 12) {
-                    Text("X")
+                    Text(model.localizedString("X"))
                         .frame(width: 56, alignment: .leading)
                     Slider(value: offsetXBinding(path: path, screenID: screenID), in: -1 ... 1)
                     Text(
@@ -371,7 +377,7 @@ extension SettingsView {
                 }
 
                 HStack(spacing: 12) {
-                    Text("Y")
+                    Text(model.localizedString("Y"))
                         .frame(width: 56, alignment: .leading)
                     Slider(value: offsetYBinding(path: path, screenID: screenID), in: -1 ... 1)
                     Text(
@@ -384,14 +390,14 @@ extension SettingsView {
                     .frame(width: 50, alignment: .trailing)
                 }
 
-                Text("矢印キーで位置を調整できます（Shift 併用で速く移動）。左クリックを押したままドラッグでも調整できます")
+                Text(model.localizedString("矢印キーで位置を調整できます（Shift 併用で速く移動）。左クリックを押したままドラッグでも調整できます"))
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text("この画面ではプレビューのみ更新されます。『保存して再適用』で壁紙に反映されます")
+                Text(model.localizedString("この画面ではプレビューのみ更新されます。『保存して再適用』で壁紙に反映されます"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
-                Text("下の壁紙一覧から動画を選択すると、画面ごとにフィット設定を編集できます")
+                Text(model.localizedString("下の壁紙一覧から動画を選択すると、画面ごとにフィット設定を編集できます"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -725,7 +731,7 @@ extension SettingsView {
             if editingWallpaperPath == path {
                 HStack(spacing: 4) {
                     TextField(
-                        "名前",
+                        model.localizedString("名前"),
                         text: $editingWallpaperNameInput
                     )
                     .textFieldStyle(.roundedBorder)
@@ -790,12 +796,12 @@ extension SettingsView {
                 )
         )
         .contextMenu {
-            Button("この壁紙に切り替え") {
+            Button(model.localizedString("この壁紙に切り替え")) {
                 model.selectRegisteredVideo(path: path)
             }
-            Menu("プレイリストに追加…") {
+            Menu(model.localizedString("プレイリストに追加…")) {
                 if model.playlists.isEmpty {
-                    Button("新規プレイリストを作成して追加") {
+                    Button(model.localizedString("新規プレイリストを作成して追加")) {
                         addToNewPlaylist(path: path)
                     }
                     .disabled(!model.canAddPlaylist)
@@ -807,21 +813,21 @@ extension SettingsView {
                         .disabled(model.playlistContainsVideo(playlist.id, path: path))
                     }
                     Divider()
-                    Button("新規プレイリストを作成して追加") {
+                    Button(model.localizedString("新規プレイリストを作成して追加")) {
                         addToNewPlaylist(path: path)
                     }
                     .disabled(!model.canAddPlaylist)
                 }
             }
             Divider()
-            Button("共有…") {
+            Button(model.localizedString("共有…")) {
                 beginShareWallpaperSelection(path: path)
             }
             Divider()
-            Button("名前を編集") {
+            Button(model.localizedString("名前を編集")) {
                 startWallpaperNameEdit(path: path)
             }
-            Button("登録から削除") {
+            Button(model.localizedString("登録から削除")) {
                 model.removeRegisteredVideo(path: path)
             }
         }
@@ -831,7 +837,7 @@ extension SettingsView {
         Group {
             if editingPlaylistID == playlist.id {
                 HStack(spacing: 4) {
-                    TextField("プレイリスト名", text: $editingPlaylistNameInput)
+                    TextField(model.localizedString("プレイリスト名"), text: $editingPlaylistNameInput)
                         .textFieldStyle(.roundedBorder)
                         .controlSize(.small)
                         .font(.system(size: 11, weight: .medium))
@@ -900,13 +906,13 @@ extension SettingsView {
                     handleDraggedWallpaperDrop(providers, to: playlist.id)
                 }
                 .contextMenu {
-                    Button("このプレイリストに切り替え") {
+                    Button(model.localizedString("このプレイリストに切り替え")) {
                         model.selectPlaylist(playlist.id)
                     }
-                    Button("名前を編集") {
+                    Button(model.localizedString("名前を編集")) {
                         startPlaylistNameEdit(playlistID: playlist.id)
                     }
-                    Button("プレイリストを削除") {
+                    Button(model.localizedString("プレイリストを削除")) {
                         model.removePlaylist(playlist.id)
                     }
                 }

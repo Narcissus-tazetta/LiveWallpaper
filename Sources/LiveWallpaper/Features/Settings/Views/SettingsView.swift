@@ -93,6 +93,7 @@ struct SettingsView: View {
         if selectedTab == .settings {
             videoSettingsSection
             displaySettingsSection
+            languageSettingsSection
             cacheSettingsSection
             resetSettingsSection
             updateSettingsSection
@@ -103,9 +104,9 @@ struct SettingsView: View {
         Section {
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("現在の壁紙: \(currentWallpaperSummaryText())")
-                    Text("プレイリスト: \(currentPlaylistSummaryText())")
-                    Text("表示: \(currentDisplayModeSummaryText())")
+                    Text("\(model.localizedString("現在の壁紙")): \(currentWallpaperSummaryText())")
+                    Text("\(model.localizedString("プレイリスト")): \(currentPlaylistSummaryText())")
+                    Text("\(model.localizedString("表示")): \(currentDisplayModeSummaryText())")
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -118,35 +119,35 @@ struct SettingsView: View {
     }
 
     var wallpaperTabSection: some View {
-        Section(header: Label("壁紙", systemImage: "photo.on.rectangle")) {
+        Section(header: Label(model.localizedString("壁紙"), systemImage: "photo.on.rectangle")) {
             wallpaperLibraryPanel
             playlistSettingsPanel
         }
     }
 
     var wallpaperFitTabSection: some View {
-        Section(header: Label("配置", systemImage: "viewfinder")) {
+        Section(header: Label(model.localizedString("配置"), systemImage: "viewfinder")) {
             wallpaperFitEditorPanel
             wallpaperFitLibraryPanel
         }
     }
 
-    var body: some View {
-        Form {
-            Section {
-                HStack(spacing: 10) {
-                    tabButton(.wallpaper, title: "壁紙", systemImage: "photo.on.rectangle")
-                    tabButton(.wallpaperFit, title: "配置", systemImage: "viewfinder")
-                    tabButton(.settings, title: "設定", systemImage: "gearshape")
-                    Spacer(minLength: 0)
-                }
-                .padding(8)
-                .frame(minHeight: 72)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.secondary.opacity(0.12))
-                )
-            }
+     var body: some View {
+         Form {
+             Section {
+                 HStack(spacing: 10) {
+                     tabButton(.wallpaper, title: model.localizedString("壁紙"), systemImage: "photo.on.rectangle")
+                     tabButton(.wallpaperFit, title: model.localizedString("配置"), systemImage: "viewfinder")
+                     tabButton(.settings, title: model.localizedString("設定"), systemImage: "gearshape")
+                     Spacer(minLength: 0)
+                 }
+                 .padding(8)
+                 .frame(minHeight: 72)
+                 .background(
+                     RoundedRectangle(cornerRadius: 10)
+                         .fill(Color.secondary.opacity(0.12))
+                 )
+             }
 
             currentStatusSection
 
@@ -259,7 +260,7 @@ struct SettingsView: View {
             shareWallpaperPickerSheet
         }
         .confirmationDialog(
-            "追加先プレイリスト",
+            model.localizedString("追加先プレイリスト"),
             isPresented: $isDropPlaylistDialogPresented,
             titleVisibility: .visible
         ) {
@@ -270,30 +271,30 @@ struct SettingsView: View {
                     }
                 }
             }
-            Button("新規プレイリストを作成して追加") {
+            Button(model.localizedString("新規プレイリストを作成して追加")) {
                 Task {
                     await applyDroppedVideo(to: nil)
                 }
             }
             .disabled(!model.canAddPlaylist)
-            Button("キャンセル", role: .cancel) {
+            Button(model.localizedString("キャンセル"), role: .cancel) {
                 pendingDroppedVideoURL = nil
             }
         } message: {
             Text(pendingDroppedVideoURL?.lastPathComponent ?? "")
         }
         .confirmationDialog(
-            "設定を初期化",
+            model.localizedString("設定を初期化"),
             isPresented: $isResetSettingsDialogPresented,
             titleVisibility: .visible
         ) {
-            Button("リセット", role: .destructive) {
+            Button(model.localizedString("リセット"), role: .destructive) {
                 model.resetSettingsToDefaults()
                 syncVolumeInputWithModel()
             }
-            Button("キャンセル", role: .cancel) {}
+            Button(model.localizedString("キャンセル"), role: .cancel) {}
         } message: {
-            Text("表示・再生に関する設定を初期値へ戻します")
+            Text(model.localizedString("表示・再生に関する設定を初期値へ戻します"))
         }
     }
 }

@@ -10,8 +10,8 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem!
-    private var settingsWindowController: NSWindowController!
+    private var statusItem: NSStatusItem?
+    private var settingsWindowController: NSWindowController?
     private let wallpaperModel = WallpaperModel()
     private var launchAtLoginEnabled: Bool = false
     private var autoUpdateEnabled: Bool = true
@@ -33,6 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         autoUpdateEnabled =
             UserDefaults.standard.object(forKey: "autoUpdateEnabled") as? Bool ?? true
         NSApp.applicationIconImage = appIconImage()
+        LocalizationManager.swizzle()
+        LocalizationManager.setLanguage(wallpaperModel.effectiveAppLanguageCode)
+        NSLog("[AppDelegate] Bundle.main.resourceURL=\(String(describing: Bundle.main.resourceURL))")
         setupStatusBar()
         setupSettingsWindow()
         verifyUpdatePrerequisites()
@@ -88,11 +91,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateEnvironmentIssueDescription(_ issue: UpdateEnvironmentIssue) -> String {
         switch issue {
         case .translocated:
-            return "一時実行領域（AppTranslocation）から起動されています。"
+            return localized("一時実行領域（AppTranslocation）から起動されています。")
         case .outsideApplications:
-            return "アプリが /Applications 配下にありません。"
+            return localized("アプリが /Applications 配下にありません。")
         case .notWritable:
-            return "現在の配置先に書き込みできません。"
+            return localized("現在の配置先に書き込みできません。")
         }
     }
 
@@ -107,7 +110,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText =
-            "アップデートの前提条件を満たしていません。\n\n\(bulletText)\n\nLiveWallpaper.app を /Applications に移動して再起動してから、もう一度お試しください。"
+            localized("アップデートの前提条件を満たしていません。")
+            + "\n\n"
+            + bulletText
+            + "\n\n"
+            + localized("LiveWallpaper.app を /Applications に移動して再起動してから、もう一度お試しください。")
         alert.alertStyle = .warning
         alert.runModal()
     }
@@ -132,7 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 self.showUpdateEnvironmentAlert(
                     issues: issues,
-                    title: "アップデートを有効化するにはアプリをApplicationsに移動してください"
+                    title: self.localized("アップデートを有効化するにはアプリをApplicationsに移動してください")
                 )
             }
         }
@@ -178,7 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let message = error.localizedDescription
                 DispatchQueue.main.async {
                     let alert = NSAlert()
-                    alert.messageText = "アップデータ初期化に失敗しました"
+                    alert.messageText = self.localized("アップデータ初期化に失敗しました")
                     alert.informativeText = message
                     alert.alertStyle = .warning
                     alert.runModal()
@@ -214,13 +221,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var cancellables = Set<AnyCancellable>()
     private enum MenuTag {
-        static let audioToggle = 1001
-        static let playlistToggle = 1002
-        static let shuffleToggle = 1003
-        static let previousVideo = 1004
-        static let nextVideo = 1005
-        static let exportPackage = 1006
-        static let importPackage = 1007
+        static let openWallpaper = 1000
+        static let openWallpaperFit = 1001
+        static let openSettings = 1002
+        static let audioToggle = 1003
+        static let playlistToggle = 1004
+        static let shuffleToggle = 1005
+        static let previousVideo = 1006
+        static let nextVideo = 1007
+        static let exportPackage = 1008
+        static let importPackage = 1009
+        static let refreshPlayback = 1010
+        static let updateMenu = 1011
+        static let quitApp = 1012
     }
 
     private func setupStatusBar() {
@@ -230,20 +243,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.showsStateColumn = false
         let openWallpaperItem = NSMenuItem(
-            title: "壁紙を開く",
+            title: localized("壁紙を開く"),
             action: #selector(openWallpaperTab),
             keyEquivalent: ""
         )
         openWallpaperItem.image = wallpaperMenuIcon()
+        openWallpaperItem.tag = MenuTag.openWallpaper
         menu.addItem(openWallpaperItem)
         let openWallpaperFitItem = NSMenuItem(
-            title: "壁紙設定を開く",
+            title: localized("壁紙設定を開く"),
             action: #selector(openWallpaperFitTab),
             keyEquivalent: ""
         )
         openWallpaperFitItem.image = wallpaperFitMenuIcon()
+        openWallpaperFitItem.tag = MenuTag.openWallpaperFit
         menu.addItem(openWallpaperFitItem)
-        menu.addItem(NSMenuItem(title: "設定を開く", action: #selector(openSettings), keyEquivalent: ""))
+        let openSettingsItem = NSMenuItem(
+            title: localized("設定を開く"),
+            action: #selector(openSettings),
+            keyEquivalent: ""
+        )
+        openSettingsItem.tag = MenuTag.openSettings
+        menu.addItem(openSettingsItem)
 
         let toggleItem = NSMenuItem(
             title: audioMenuTitle(wallpaperModel.audioEnabled),
@@ -275,7 +296,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(shuffleItem)
 
         let previousItem = NSMenuItem(
-            title: "前の動画",
+            title: localized("前の動画"),
             action: #selector(playPreviousVideo),
             keyEquivalent: "["
         )
@@ -284,7 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(previousItem)
 
         let nextItem = NSMenuItem(
-            title: "次の動画",
+            title: localized("次の動画"),
             action: #selector(playNextVideo),
             keyEquivalent: "]"
         )
@@ -293,15 +314,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(nextItem)
 
         let refreshItem = NSMenuItem(
-            title: "再生をリフレッシュ",
+            title: localized("再生をリフレッシュ"),
             action: #selector(refreshPlaybackState),
             keyEquivalent: "r"
         )
         refreshItem.image = refreshMenuIcon()
+        refreshItem.tag = MenuTag.refreshPlayback
         menu.addItem(refreshItem)
 
         let exportItem = NSMenuItem(
-            title: "壁紙を共有",
+            title: localized("壁紙を共有"),
             action: #selector(exportPackage),
             keyEquivalent: "e"
         )
@@ -313,7 +335,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(exportItem)
 
         let importItem = NSMenuItem(
-            title: "壁紙を読み込む",
+            title: localized("壁紙を読み込む"),
             action: #selector(importPackage),
             keyEquivalent: "i"
         )
@@ -327,7 +349,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wallpaperModel.$audioEnabled
             .receive(on: DispatchQueue.main)
             .sink { [weak self] enabled in
-                guard let item = self?.statusItem.menu?.item(withTag: MenuTag.audioToggle)
+                guard let item = self?.statusItem?.menu?.item(withTag: MenuTag.audioToggle)
                 else { return }
                 item.title = self?.audioMenuTitle(enabled) ?? ""
                 item.image = self?.audioMenuIcon(enabled)
@@ -340,7 +362,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else {
                     return
                 }
-                if let item = statusItem.menu?.item(withTag: MenuTag.playlistToggle) {
+                if let item = statusItem?.menu?.item(withTag: MenuTag.playlistToggle) {
                     item.title = playlistMenuTitle(enabled)
                     item.image = playlistMenuIcon()
                 }
@@ -354,7 +376,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else {
                     return
                 }
-                if let item = statusItem.menu?.item(withTag: MenuTag.shuffleToggle) {
+                if let item = statusItem?.menu?.item(withTag: MenuTag.shuffleToggle) {
                     item.title = shuffleMenuTitle(enabled)
                     item.image = shuffleMenuIcon()
                 }
@@ -368,25 +390,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
+        wallpaperModel.$appLanguage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshLocalizedInterface()
+            }
+            .store(in: &cancellables)
+
         #if canImport(Sparkle)
             let updateItem = NSMenuItem(
-                title: "アップデートを確認",
+                title: localized("アップデートを確認"),
                 action: #selector(checkForUpdates),
                 keyEquivalent: "u"
             )
             updateItem.image = updateMenuIcon()
+            updateItem.tag = MenuTag.updateMenu
             menu.addItem(updateItem)
         #endif
 
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "終了", action: #selector(quitApp), keyEquivalent: "q"))
+        let quitItem = NSMenuItem(title: localized("終了"), action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.tag = MenuTag.quitApp
+        menu.addItem(quitItem)
 
-        statusItem.menu = menu
+        statusItem?.menu = menu
         refreshPlaylistMenuState()
+        refreshLocalizedInterface()
     }
 
     private func configureStatusIcon() {
-        guard let button = statusItem.button else {
+        guard let button = statusItem?.button else {
             return
         }
 
@@ -445,9 +478,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsKeyMonitor: Any?
 
     private func setupSettingsWindow() {
-        let hosting = NSHostingController(rootView: SettingsView(model: wallpaperModel))
+        let root = SettingsRootView(model: wallpaperModel).environment(\.locale, wallpaperModel.appLocale)
+        let hosting = NSHostingController(rootView: root)
         let window = NSWindow(contentViewController: hosting)
-        window.title = "Live Wallpaper 設定"
+        window.title = localized("Live Wallpaper 設定")
         window.center()
         window.setContentSize(NSSize(width: 760, height: 460))
         window.isReleasedWhenClosed = false
@@ -459,13 +493,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             if event.modifierFlags.contains(.command) {
                 if characters == "w" {
-                    if let win = self?.settingsWindowController.window, win.isKeyWindow {
+                    if let win = self?.settingsWindowController?.window, win.isKeyWindow {
                         win.close()
                         return nil
                     }
                 }
                 if characters == "q" {
-                    if let win = self?.settingsWindowController.window, win.isKeyWindow {
+                    if let win = self?.settingsWindowController?.window, win.isKeyWindow {
                         return nil
                     } else {
                         NSApp.terminate(nil)
@@ -508,6 +542,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             self, selector: #selector(openReleasePage), name: .openReleasePage, object: nil
         )
+        wallpaperModel.$appLanguage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak hosting, weak self] _ in
+                guard let hosting else { return }
+                guard let self else { return }
+                hosting.rootView = SettingsRootView(model: self.wallpaperModel)
+                    .environment(\.locale, self.wallpaperModel.appLocale)
+            }
+            .store(in: &cancellables)
     }
 
     @objc private func showOpenPanel() {
@@ -566,7 +609,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setAudioEnabled(_ enabled: Bool) {
         wallpaperModel.setAudioEnabled(enabled)
-        if let toggleItem = statusItem.menu?.item(withTag: MenuTag.audioToggle) {
+        if let toggleItem = statusItem?.menu?.item(withTag: MenuTag.audioToggle) {
             toggleItem.title = audioMenuTitle(enabled)
             toggleItem.image = audioMenuIcon(enabled)
         }
@@ -576,13 +619,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hasMultipleVideos = wallpaperModel.registeredVideoPaths.count > 1
         let playlistEnabled = wallpaperModel.playlistPlaybackEnabled
 
-        if let shuffleItem = statusItem.menu?.item(withTag: MenuTag.shuffleToggle) {
+        if let shuffleItem = statusItem?.menu?.item(withTag: MenuTag.shuffleToggle) {
             shuffleItem.isEnabled = playlistEnabled && hasMultipleVideos
         }
-        if let previousItem = statusItem.menu?.item(withTag: MenuTag.previousVideo) {
+        if let previousItem = statusItem?.menu?.item(withTag: MenuTag.previousVideo) {
             previousItem.isEnabled = hasMultipleVideos
         }
-        if let nextItem = statusItem.menu?.item(withTag: MenuTag.nextVideo) {
+        if let nextItem = statusItem?.menu?.item(withTag: MenuTag.nextVideo) {
             nextItem.isEnabled = hasMultipleVideos
         }
     }
@@ -610,7 +653,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 UserDefaults.standard.set(launchAtLoginEnabled, forKey: "launchAtLogin")
             } catch {
                 let alert = NSAlert()
-                alert.messageText = "ログイン時起動の設定に失敗しました"
+                alert.messageText = localized("ログイン時起動の設定に失敗しました")
                 alert.informativeText = error.localizedDescription
                 alert.alertStyle = .warning
                 alert.runModal()
@@ -618,7 +661,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } else {
             let alert = NSAlert()
-            alert.messageText = "このmacOSではログイン時起動設定に対応していません"
+            alert.messageText = localized("このmacOSではログイン時起動設定に対応していません")
             alert.alertStyle = .informational
             alert.runModal()
             launchAtLoginEnabled = false
@@ -644,16 +687,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.open(url)
     }
 
+    private func localized(_ key: String) -> String {
+        wallpaperModel.localizedString(key)
+    }
+
+    private func refreshLocalizedInterface() {
+        guard let menu = statusItem?.menu else {
+            return
+        }
+
+        if let item = menu.item(withTag: MenuTag.openWallpaper) {
+            item.title = localized("壁紙を開く")
+        }
+        if let item = menu.item(withTag: MenuTag.openWallpaperFit) {
+            item.title = localized("壁紙設定を開く")
+        }
+        if let item = menu.item(withTag: MenuTag.openSettings) {
+            item.title = localized("設定を開く")
+        }
+        if let item = menu.item(withTag: MenuTag.audioToggle) {
+            item.title = audioMenuTitle(wallpaperModel.audioEnabled)
+        }
+        if let item = menu.item(withTag: MenuTag.playlistToggle) {
+            item.title = playlistMenuTitle(wallpaperModel.playlistPlaybackEnabled)
+        }
+        if let item = menu.item(withTag: MenuTag.shuffleToggle) {
+            item.title = shuffleMenuTitle(wallpaperModel.shufflePlaybackEnabled)
+        }
+        if let item = menu.item(withTag: MenuTag.previousVideo) {
+            item.title = localized("前の動画")
+        }
+        if let item = menu.item(withTag: MenuTag.nextVideo) {
+            item.title = localized("次の動画")
+        }
+        if let item = menu.item(withTag: MenuTag.exportPackage) {
+            item.title = localized("壁紙を共有")
+        }
+        if let item = menu.item(withTag: MenuTag.importPackage) {
+            item.title = localized("壁紙を読み込む")
+        }
+        if let item = menu.item(withTag: MenuTag.updateMenu) {
+            item.title = localized("アップデートを確認")
+        }
+        if let item = menu.item(withTag: MenuTag.refreshPlayback) {
+            item.title = localized("再生をリフレッシュ")
+        }
+        if let item = menu.item(withTag: MenuTag.quitApp) {
+            item.title = localized("終了")
+        }
+
+        settingsWindowController?.window?.title = localized("Live Wallpaper 設定")
+    }
+
     private func audioMenuTitle(_ enabled: Bool) -> String {
-        "音声を再生: " + (enabled ? "ON" : "OFF")
+        localized("音声を再生") + ": " + (enabled ? localized("ON") : localized("OFF"))
     }
 
     private func playlistMenuTitle(_ enabled: Bool) -> String {
-        "プレイリスト連続再生: " + (enabled ? "ON" : "OFF")
+        localized("プレイリスト連続再生") + ": " + (enabled ? localized("ON") : localized("OFF"))
     }
 
     private func shuffleMenuTitle(_ enabled: Bool) -> String {
-        "シャッフル: " + (enabled ? "ON" : "OFF")
+        localized("シャッフル") + ": " + (enabled ? localized("ON") : localized("OFF"))
     }
 
     private func audioMenuIcon(_ enabled: Bool) -> NSImage? {
@@ -668,7 +763,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateMenuIcon() -> NSImage? {
         let image = NSImage(
             systemSymbolName: "arrow.triangle.2.circlepath",
-            accessibilityDescription: "アップデート"
+            accessibilityDescription: localized("アップデート")
         )
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)
@@ -679,7 +774,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func wallpaperMenuIcon() -> NSImage? {
         let image = NSImage(
             systemSymbolName: "photo.on.rectangle",
-            accessibilityDescription: "壁紙"
+            accessibilityDescription: localized("壁紙")
         )
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)
@@ -690,7 +785,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func playlistMenuIcon() -> NSImage? {
         let image = NSImage(
             systemSymbolName: "rectangle.stack",
-            accessibilityDescription: "プレイリスト"
+            accessibilityDescription: localized("プレイリスト")
         )
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)
@@ -701,7 +796,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func shuffleMenuIcon() -> NSImage? {
         let image = NSImage(
             systemSymbolName: "shuffle",
-            accessibilityDescription: "シャッフル"
+            accessibilityDescription: localized("シャッフル")
         )
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)
@@ -712,7 +807,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func previousVideoMenuIcon() -> NSImage? {
         let image = NSImage(
             systemSymbolName: "backward.fill",
-            accessibilityDescription: "前の動画"
+            accessibilityDescription: localized("前の動画")
         )
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)
@@ -723,7 +818,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func nextVideoMenuIcon() -> NSImage? {
         let image = NSImage(
             systemSymbolName: "forward.fill",
-            accessibilityDescription: "次の動画"
+            accessibilityDescription: localized("次の動画")
         )
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)
@@ -734,7 +829,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func wallpaperFitMenuIcon() -> NSImage? {
         let image = NSImage(
             systemSymbolName: "viewfinder",
-            accessibilityDescription: "壁紙設定"
+            accessibilityDescription: localized("壁紙設定")
         )
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)
@@ -745,7 +840,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func refreshMenuIcon() -> NSImage? {
         let image = NSImage(
             systemSymbolName: "arrow.clockwise",
-            accessibilityDescription: "再生リフレッシュ"
+            accessibilityDescription: localized("再生をリフレッシュ")
         )
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)
@@ -754,19 +849,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        settingsWindowController.showWindow(nil)
+        settingsWindowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         NotificationCenter.default.post(name: .openSettingsTab, object: nil)
     }
 
     @objc private func openWallpaperTab() {
-        settingsWindowController.showWindow(nil)
+        settingsWindowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         NotificationCenter.default.post(name: .openWallpaperTab, object: nil)
     }
 
     @objc private func openWallpaperFitTab() {
-        settingsWindowController.showWindow(nil)
+        settingsWindowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         NotificationCenter.default.post(name: .openWallpaperFitTab, object: nil)
     }
@@ -802,7 +897,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func importPackage() {
         let panel = NSOpenPanel()
-        panel.title = "壁紙を読み込む"
+        panel.title = localized("壁紙を読み込む")
         if #available(macOS 11.0, *) {
             panel.allowedContentTypes = [UTType(filenameExtension: "lwpkg") ?? .data]
         } else {
@@ -818,15 +913,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         func showImportSucceededAlert() {
             let alert = NSAlert()
-            alert.messageText = "インポート完了"
-            alert.informativeText = "パッケージが正常にインポートされました。"
+            alert.messageText = localized("インポート完了")
+            alert.informativeText = localized("パッケージが正常にインポートされました。")
             alert.alertStyle = .informational
             alert.runModal()
         }
 
         func showImportFailedAlert(_ message: String) {
             let alert = NSAlert()
-            alert.messageText = "インポートに失敗"
+            alert.messageText = localized("インポートに失敗")
             alert.informativeText = message
             alert.alertStyle = .critical
             alert.runModal()
@@ -843,11 +938,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     showImportSucceededAlert()
                 } catch let PackageImporter.ImportError.duplicateVideo(name) {
                     let duplicateAlert = NSAlert()
-                    duplicateAlert.messageText = "重複するビデオが見つかりました"
-                    duplicateAlert.informativeText = "\(name) は既に存在します。置き換えますか？"
+                    duplicateAlert.messageText = localized("重複するビデオが見つかりました")
+                    duplicateAlert.informativeText = "\(name) " + localized("は既に存在します。置き換えますか？")
                     duplicateAlert.alertStyle = .warning
-                    duplicateAlert.addButton(withTitle: "中止")
-                    duplicateAlert.addButton(withTitle: "置き換える")
+                    duplicateAlert.addButton(withTitle: localized("中止"))
+                    duplicateAlert.addButton(withTitle: localized("置き換える"))
 
                     if duplicateAlert.runModal() == .alertSecondButtonReturn {
                         importWithResolution(.replace)
@@ -868,14 +963,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func checkForUpdates() {
         #if canImport(Sparkle)
             guard ensureUpdateEnvironmentOrNotify(
-                title: "アップデートを確認する前に移動が必要です"
+                title: localized("アップデートを確認する前に移動が必要です")
             ) else {
                 manualUpdateCheckPending = false
                 return
             }
 
-            settingsWindowController.showWindow(nil)
-            settingsWindowController.window?.orderFrontRegardless()
+            settingsWindowController?.showWindow(nil)
+            settingsWindowController?.window?.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
             NSLog("[Sparkle] manual checkForUpdates() requested")
             manualUpdateCheckPending = true
@@ -894,7 +989,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     Self.reportSparkleError(error)
                     manualUpdateCheckPending = false
                     let alert = NSAlert()
-                    alert.messageText = "アップデータ初期化に失敗しました"
+                    alert.messageText = localized("アップデータ初期化に失敗しました")
                     alert.informativeText = error.localizedDescription
                     alert.alertStyle = .warning
                     alert.runModal()
