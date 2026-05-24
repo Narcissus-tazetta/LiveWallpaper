@@ -1,29 +1,135 @@
 import Foundation
 
+struct LanguageOption: Hashable {
+    let language: AppLanguage
+    let code: String
+    let displayNameKey: String
+    let aliases: [String]
+}
+
 enum AppLanguage: String, CaseIterable, Identifiable {
     case automatic
     case japanese
     case english
+    case traditionalChinese
 
     var id: String {
         rawValue
     }
 
+    static var selectableLanguages: [AppLanguage] {
+        [.automatic] + supportedOptions.map(\.language)
+    }
+
+    static var supportedOptions: [LanguageOption] {
+        [
+            LanguageOption(
+                language: .japanese,
+                code: "ja",
+                displayNameKey: "日本語",
+                aliases: ["ja", "ja-JP"]
+            ),
+            LanguageOption(
+                language: .english,
+                code: "en",
+                displayNameKey: "English",
+                aliases: ["en", "en-US", "en-GB", "en-AU", "en-CA"]
+            ),
+            LanguageOption(
+                language: .traditionalChinese,
+                code: "zh-Hant",
+                displayNameKey: "繁體中文",
+                aliases: [
+                    "zh-Hant",
+                    "zh-TW",
+                    "zh-HK",
+                    "zh-MO",
+                    "zh-CHT",
+                    "zh-Hant-TW",
+                    "zh-Hant-HK",
+                    "zh-Hant-MO",
+                    "zh-Hant-CHT",
+                    "zh-Hans",
+                    "zh-CN",
+                    "zh-SG",
+                    "zh-CHS"
+                ]
+            )
+        ]
+    }
+
     static var systemLanguageCode: String {
-        let preferred = Locale.preferredLanguages.first ?? Locale.current.identifier
-        let canonical = Locale.canonicalLanguageIdentifier(from: preferred)
-        let code = canonical.split(separator: "-").first.map(String.init) ?? "ja"
-        return code.isEmpty ? "ja" : code
+        resolvePreferredLanguageCode(Locale.preferredLanguages)
+    }
+
+    var displayNameKey: String {
+        switch self {
+        case .automatic:
+            return "自動（システム設定に従う）"
+        case .japanese, .english, .traditionalChinese:
+            return Self.optionByLanguage[self]?.displayNameKey ?? "English"
+        }
     }
 
     var effectiveLanguageCode: String {
         switch self {
         case .automatic:
-            return Self.systemLanguageCode == "en" ? "en" : "ja"
-        case .japanese:
-            return "ja"
-        case .english:
-            return "en"
+            return Self.systemLanguageCode
+        case .japanese, .english, .traditionalChinese:
+            return Self.optionByLanguage[self]?.code ?? "en"
         }
+    }
+}
+
+private extension AppLanguage {
+    static var optionByLanguage: [AppLanguage: LanguageOption] {
+        Dictionary(uniqueKeysWithValues: supportedOptions.map { ($0.language, $0) })
+    }
+
+    static func resolvePreferredLanguageCode(_ preferred: [String]) -> String {
+        for identifier in preferred {
+            if let option = resolveSupportedOption(identifier) {
+                return option.code
+            }
+        }
+        return optionByLanguage[.english]?.code ?? "en"
+    }
+
+    static func resolveSupportedOption(_ identifier: String) -> LanguageOption? {
+        let normalized = normalizeIdentifier(identifier)
+        if normalized.isEmpty {
+            return nil
+        }
+
+        for option in supportedOptions {
+            if normalizeIdentifier(option.code) == normalized {
+                return option
+            }
+            if option.aliases.contains(where: { normalizeIdentifier($0) == normalized }) {
+                return option
+            }
+        }
+
+        if let base = normalized.split(separator: "-").first {
+            let baseCode = String(base)
+            if baseCode == "zh" {
+                return optionByLanguage[.traditionalChinese]
+            }
+            for option in supportedOptions {
+                if normalizeIdentifier(option.code) == baseCode {
+                    return option
+                }
+                if option.aliases.contains(where: { normalizeIdentifier($0) == baseCode }) {
+                    return option
+                }
+            }
+        }
+
+        return nil
+    }
+
+    static func normalizeIdentifier(_ identifier: String) -> String {
+        let canonical = Locale.canonicalLanguageIdentifier(from: identifier)
+        return canonical.replacingOccurrences(of: "_", with: "-").lowercased()
     }
 }

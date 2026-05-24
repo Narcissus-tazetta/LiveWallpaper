@@ -9,10 +9,10 @@ struct LanguageSettingsView: View {
                 Text(model.localizedString("アプリの言語"))
                 Spacer()
                 Menu {
-                    ForEach(AppLanguage.allCases, id: \.self) { language in
+                    ForEach(AppLanguage.selectableLanguages, id: \.self) { language in
                         Button(action: { model.setAppLanguage(language) }) {
                             HStack {
-                                Text(languageDisplayName(language))
+                                Text(model.localizedString(language.displayNameKey))
                                 if model.appLanguage == language {
                                     Image(systemName: "checkmark")
                                 }
@@ -20,21 +20,11 @@ struct LanguageSettingsView: View {
                         }
                     }
                 } label: {
-                    Text(languageDisplayName(model.appLanguage))
+                    Text(model.localizedString(model.appLanguage.displayNameKey))
                         .foregroundColor(.accentColor)
                 }
             }
         }
     }
 
-    private func languageDisplayName(_ language: AppLanguage) -> String {
-        switch language {
-        case .automatic:
-            return model.localizedString("自動（システム設定に従う）")
-        case .japanese:
-            return model.localizedString("日本語")
-        case .english:
-            return model.localizedString("English")
-        }
-    }
 }

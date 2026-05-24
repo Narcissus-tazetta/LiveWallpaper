@@ -249,6 +249,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <array>
     <string>ja</string>
     <string>en</string>
+    <string>zh-Hant</string>
   </array>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
