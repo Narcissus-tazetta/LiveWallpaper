@@ -20,7 +20,7 @@ enum AppLocalization {
         NSLog("[AppLocalization] lookup key='\(key)' lang='\(languageCode)'")
         guard languageCode != "ja" else { return key }
         let bundle = resolveBundle(for: languageCode)
-        guard let bundle = bundle else {
+        guard let bundle else {
             NSLog("[AppLocalization] bundle not found for lang=\(languageCode)")
             return key
         }

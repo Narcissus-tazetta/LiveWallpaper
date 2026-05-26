@@ -155,7 +155,6 @@ extension SettingsView {
         }
     }
 
-    @ViewBuilder
     var shareWallpaperPickerSheet: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
@@ -231,7 +230,7 @@ extension SettingsView {
                     .truncationMode(.middle)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    HStack(spacing: 4) {
+                HStack(spacing: 4) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 10, weight: .semibold))
                     Text(model.localizedString("共有"))

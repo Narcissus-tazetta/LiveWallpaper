@@ -26,5 +26,4 @@ struct LanguageSettingsView: View {
             }
         }
     }
-
 }
