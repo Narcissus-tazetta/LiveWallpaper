@@ -2,7 +2,27 @@ import AppKit
 import CryptoKit
 
 extension DiskThumbnailCache {
-  func isSourceValid(path: String, entry: Entry) -> Bool {
+  nonisolated enum DiskReadResult {
+    case data(Data)
+    case invalidSource
+    case missingData
+  }
+
+  nonisolated static func loadThumbnailData(
+    sourcePath: String,
+    entry: Entry,
+    fileURL: URL
+  ) -> DiskReadResult {
+    guard isSourceValid(path: sourcePath, entry: entry) else {
+      return .invalidSource
+    }
+    guard let data = try? Data(contentsOf: fileURL) else {
+      return .missingData
+    }
+    return .data(data)
+  }
+
+  nonisolated static func isSourceValid(path: String, entry: Entry) -> Bool {
     guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
       let fileSize = attributes[.size] as? NSNumber,
       let modifiedDate = attributes[.modificationDate] as? Date
@@ -30,8 +50,10 @@ extension DiskThumbnailCache {
       return
     }
 
-    let fileURL = dataDirectoryURL().appendingPathComponent(entry.fileName)
-    try? FileManager.default.removeItem(at: fileURL)
+    let fileURL = Self.dataDirectoryURL().appendingPathComponent(entry.fileName)
+    ioQueue.async {
+      try? FileManager.default.removeItem(at: fileURL)
+    }
 
     inMemoryImages.removeValue(forKey: path)
     inMemoryLastAccess.removeValue(forKey: path)
@@ -63,46 +85,80 @@ extension DiskThumbnailCache {
   }
 
   func trimDiskIfNeeded() {
-    let fileManager = FileManager.default
-    var sizedEntries: [SizedEntry] = []
-    var totalSize: UInt64 = 0
+    let entries = metadata.entries
+    let maxBytes = maxDiskBytes
+    let dataURL = Self.dataDirectoryURL()
+    ioQueue.async { [weak self] in
+      let fileManager = FileManager.default
+      var sizedEntries: [SizedEntry] = []
+      var totalSize: UInt64 = 0
 
-    for (path, entry) in metadata.entries {
-      let fileURL = dataDirectoryURL().appendingPathComponent(entry.fileName)
-      guard let attrs = try? fileManager.attributesOfItem(atPath: fileURL.path),
-        let size = attrs[.size] as? NSNumber
-      else {
-        continue
+      for (path, entry) in entries {
+        let fileURL = dataURL.appendingPathComponent(entry.fileName)
+        guard let attrs = try? fileManager.attributesOfItem(atPath: fileURL.path),
+          let size = attrs[.size] as? NSNumber
+        else {
+          continue
+        }
+        let bytes = size.uint64Value
+        totalSize += bytes
+        sizedEntries.append(SizedEntry(path: path, entry: entry, bytes: bytes))
       }
-      let bytes = size.uint64Value
-      totalSize += bytes
-      sizedEntries.append(SizedEntry(path: path, entry: entry, bytes: bytes))
-    }
 
-    if totalSize <= maxDiskBytes {
-      return
-    }
-
-    let sorted = sizedEntries.sorted { $0.entry.lastAccessAt < $1.entry.lastAccessAt }
-    var overflow = totalSize - maxDiskBytes
-
-    for item in sorted {
-      if overflow == 0 {
-        break
+      if totalSize <= maxBytes {
+        return
       }
-      let fileURL = dataDirectoryURL().appendingPathComponent(item.entry.fileName)
-      try? fileManager.removeItem(at: fileURL)
-      metadata.entries.removeValue(forKey: item.path)
-      inMemoryImages.removeValue(forKey: item.path)
-      inMemoryLastAccess.removeValue(forKey: item.path)
-      if overflow > item.bytes {
-        overflow -= item.bytes
-      } else {
-        overflow = 0
+
+      let sorted = sizedEntries.sorted { $0.entry.lastAccessAt < $1.entry.lastAccessAt }
+      var overflow = totalSize - maxBytes
+      var removed: [(String, String)] = []
+
+      for item in sorted {
+        if overflow == 0 {
+          break
+        }
+        let fileURL = dataURL.appendingPathComponent(item.entry.fileName)
+        try? fileManager.removeItem(at: fileURL)
+        removed.append((item.path, item.entry.fileName))
+        if overflow > item.bytes {
+          overflow -= item.bytes
+        } else {
+          overflow = 0
+        }
+      }
+
+      guard !removed.isEmpty else {
+        return
+      }
+
+      Task { @MainActor in
+        guard let self else {
+          return
+        }
+        var removedAny = false
+        for (path, fileName) in removed {
+          guard let entry = self.metadata.entries[path],
+            entry.fileName == fileName
+          else {
+            continue
+          }
+          self.metadata.entries.removeValue(forKey: path)
+          self.inMemoryImages.removeValue(forKey: path)
+          self.inMemoryLastAccess.removeValue(forKey: path)
+          if let index = self.pendingQueue.firstIndex(of: path) {
+            self.pendingQueue.remove(at: index)
+          }
+          self.inFlight.remove(path)
+          self.visiblePaths.remove(path)
+          removedAny = true
+        }
+        guard removedAny else {
+          return
+        }
+        self.persistMetadata()
+        self.bumpRevision()
       }
     }
-
-    persistMetadata()
   }
 
   func persistMetadata() {
@@ -132,13 +188,35 @@ extension DiskThumbnailCache {
     metadataFlushWorkItem?.cancel()
     metadataFlushWorkItem = nil
 
-    guard let data = try? JSONEncoder().encode(metadata) else {
-      return
+    let snapshot = metadata
+    let metadataURL = Self.metadataFileURL()
+    ioQueue.async {
+      guard let data = try? JSONEncoder().encode(snapshot) else {
+        return
+      }
+      try? data.write(to: metadataURL, options: .atomic)
     }
-    try? data.write(to: metadataFileURL(), options: .atomic)
   }
 
-  func rootDirectoryURL() -> URL {
+  func flushMetadataImmediately() {
+    guard metadataDirty else {
+      return
+    }
+    metadataDirty = false
+    metadataFlushWorkItem?.cancel()
+    metadataFlushWorkItem = nil
+
+    let snapshot = metadata
+    let metadataURL = Self.metadataFileURL()
+    ioQueue.sync {
+      guard let data = try? JSONEncoder().encode(snapshot) else {
+        return
+      }
+      try? data.write(to: metadataURL, options: .atomic)
+    }
+  }
+
+  nonisolated static func rootDirectoryURL() -> URL {
     let support = FileManager.default.urls(
       for: .applicationSupportDirectory,
       in: .userDomainMask
@@ -149,17 +227,26 @@ extension DiskThumbnailCache {
       .appendingPathComponent("ThumbnailCache", isDirectory: true)
   }
 
-  func dataDirectoryURL() -> URL {
+  nonisolated static func dataDirectoryURL() -> URL {
     rootDirectoryURL().appendingPathComponent("data", isDirectory: true)
   }
 
-  func metadataFileURL() -> URL {
-    rootDirectoryURL().appendingPathComponent(metadataFileName)
+  nonisolated static func metadataFileURL() -> URL {
+    rootDirectoryURL().appendingPathComponent(Self.metadataFileName)
   }
 
-  func hashed(_ value: String) -> String {
+  nonisolated static func hashed(_ value: String) -> String {
     let digest = SHA256.hash(data: Data(value.utf8))
     return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
+  }
+
+  nonisolated static func imageData(_ image: NSImage) -> Data? {
+    guard let tiff = image.tiffRepresentation,
+      let bitmap = NSBitmapImageRep(data: tiff)
+    else {
+      return nil
+    }
+    return bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.82])
   }
 
   func bumpRevision() {

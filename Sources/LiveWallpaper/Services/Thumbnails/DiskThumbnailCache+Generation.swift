@@ -72,40 +72,54 @@ extension DiskThumbnailCache {
   }
 
   func writeToDisk(path: String, image: NSImage) {
-    guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
+    let fileName = "\(Self.hashed(path)).jpg"
+    let fileURL = Self.dataDirectoryURL().appendingPathComponent(fileName)
+    ioQueue.async { [weak self] in
+      guard let entry = DiskThumbnailCache.buildEntryForWrite(
+        sourcePath: path,
+        fileName: fileName,
+        fileURL: fileURL,
+        image: image
+      ) else {
+        return
+      }
+      Task { @MainActor in
+        guard let self else {
+          return
+        }
+        self.metadata.entries[path] = entry
+        self.persistMetadata()
+        self.trimDiskIfNeeded()
+      }
+    }
+  }
+
+  nonisolated static func buildEntryForWrite(
+    sourcePath: String,
+    fileName: String,
+    fileURL: URL,
+    image: NSImage
+  ) -> Entry? {
+    guard let attributes = try? FileManager.default.attributesOfItem(atPath: sourcePath),
       let fileSize = attributes[.size] as? NSNumber,
       let modifiedDate = attributes[.modificationDate] as? Date,
       let data = imageData(image)
     else {
-      return
+      return nil
     }
-
-    let fileName = "\(hashed(path)).jpg"
-    let fileURL = dataDirectoryURL().appendingPathComponent(fileName)
 
     do {
       try data.write(to: fileURL, options: .atomic)
     } catch {
-      return
+      return nil
     }
 
-    metadata.entries[path] = Entry(
+    return Entry(
       fileName: fileName,
-      sourcePath: path,
+      sourcePath: sourcePath,
       sourceSize: fileSize.uint64Value,
       sourceModifiedAt: modifiedDate.timeIntervalSince1970,
       lastAccessAt: Date().timeIntervalSince1970
     )
-    persistMetadata()
-    trimDiskIfNeeded()
-  }
-
-  func imageData(_ image: NSImage) -> Data? {
-    guard let tiff = image.tiffRepresentation,
-      let bitmap = NSBitmapImageRep(data: tiff)
-    else {
-      return nil
-    }
-    return bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.82])
   }
 }
