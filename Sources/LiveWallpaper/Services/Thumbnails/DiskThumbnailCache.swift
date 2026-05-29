@@ -5,6 +5,12 @@ import QuickLookThumbnailing
 
 @MainActor
 final class DiskThumbnailCache: ObservableObject {
+  enum InitializationState {
+    case idle
+    case loading
+    case ready
+  }
+
   struct Entry: Codable {
     var fileName: String
     var sourcePath: String
@@ -29,15 +35,18 @@ final class DiskThumbnailCache: ObservableObject {
   let maxInMemoryCount: Int = 90
   let maxDiskBytes: UInt64 = 500 * 1024 * 1024
   let maxConcurrentGenerations: Int = 2
-  let metadataFileName = "metadata.json"
+  static let metadataFileName = "metadata.json"
+  let ioQueue = DispatchQueue(label: "LiveWallpaper.thumbnailCache.io", qos: .utility)
 
   var inMemoryImages: [String: NSImage] = [:]
   var inMemoryLastAccess: [String: TimeInterval] = [:]
   var visiblePaths: Set<String> = []
   var pendingQueue: [String] = []
   var inFlight: Set<String> = []
+  var inFlightReads: Set<String> = []
+  var deferredRequests: Set<String> = []
   var metadata: Metadata = .init(version: 1, entries: [:])
-  var initialized: Bool = false
+  var initializationState: InitializationState = .idle
   var metadataDirty: Bool = false
   var metadataFlushWorkItem: DispatchWorkItem?
   let metadataFlushDelay: TimeInterval = 2.0
@@ -45,6 +54,10 @@ final class DiskThumbnailCache: ObservableObject {
 
   func image(for path: String) -> NSImage? {
     ensureInitialized()
+
+    guard initializationState == .ready else {
+      return nil
+    }
 
     if let cached = inMemoryImages[path] {
       touch(path)
@@ -55,22 +68,8 @@ final class DiskThumbnailCache: ObservableObject {
       return nil
     }
 
-    guard isSourceValid(path: path, entry: entry) else {
-      removeEntry(path)
-      return nil
-    }
-
-    let fileURL = dataDirectoryURL().appendingPathComponent(entry.fileName)
-    guard let image = NSImage(contentsOf: fileURL) else {
-      removeEntry(path)
-      return nil
-    }
-
-    inMemoryImages[path] = image
-    touch(path)
-    trimInMemoryIfNeeded()
-    bumpRevision()
-    return image
+    scheduleDiskRead(path: path, entry: entry)
+    return nil
   }
 
   func setVisible(path: String, isVisible: Bool) {
@@ -91,16 +90,18 @@ final class DiskThumbnailCache: ObservableObject {
   func request(path: String) {
     ensureInitialized()
 
+    guard initializationState == .ready else {
+      deferredRequests.insert(path)
+      return
+    }
+
     guard inMemoryImages[path] == nil else {
       touch(path)
       return
     }
 
-    if image(for: path) != nil {
-      return
-    }
-
-    guard FileManager.default.fileExists(atPath: path) else {
+    if let entry = metadata.entries[path] {
+      scheduleDiskRead(path: path, entry: entry)
       return
     }
     guard !inFlight.contains(path) else {
@@ -117,6 +118,10 @@ final class DiskThumbnailCache: ObservableObject {
   func processQueue() {
     ensureInitialized()
 
+    guard initializationState == .ready else {
+      return
+    }
+
     while inFlight.count < maxConcurrentGenerations, !pendingQueue.isEmpty {
       let path = pendingQueue.removeFirst()
       guard visiblePaths.contains(path) else {
@@ -126,22 +131,25 @@ final class DiskThumbnailCache: ObservableObject {
         touch(path)
         continue
       }
-      guard FileManager.default.fileExists(atPath: path) else {
-        continue
-      }
 
       inFlight.insert(path)
-      generate(path: path)
+      verifySourceExistsAndGenerate(path: path)
     }
   }
 
   func prewarm(paths: [String]) {
     ensureInitialized()
+    guard initializationState == .ready else {
+      deferredRequests.formUnion(paths)
+      return
+    }
     for path in paths {
       guard inMemoryImages[path] == nil else {
         continue
       }
-      _ = image(for: path)
+      if let entry = metadata.entries[path] {
+        scheduleDiskRead(path: path, entry: entry)
+      }
     }
   }
 
@@ -168,19 +176,21 @@ final class DiskThumbnailCache: ObservableObject {
   func clear() {
     ensureInitialized()
 
-    let fileManager = FileManager.default
-    let base = rootDirectoryURL()
-
-    do {
-      if fileManager.fileExists(atPath: base.path) {
-        try fileManager.removeItem(at: base)
+    let base = Self.rootDirectoryURL()
+    let dataURL = Self.dataDirectoryURL()
+    ioQueue.async {
+      let fileManager = FileManager.default
+      do {
+        if fileManager.fileExists(atPath: base.path) {
+          try fileManager.removeItem(at: base)
+        }
+        try fileManager.createDirectory(
+          at: dataURL,
+          withIntermediateDirectories: true
+        )
+      } catch {
+        return
       }
-      try fileManager.createDirectory(
-        at: dataDirectoryURL(),
-        withIntermediateDirectories: true
-      )
-    } catch {
-      return
     }
 
     metadata = .init(version: 1, entries: [:])
@@ -189,6 +199,8 @@ final class DiskThumbnailCache: ObservableObject {
     visiblePaths.removeAll()
     pendingQueue.removeAll()
     inFlight.removeAll()
+    inFlightReads.removeAll()
+    deferredRequests.removeAll()
     persistMetadata()
     flushMetadataIfNeeded()
     bumpRevision()
@@ -197,6 +209,62 @@ final class DiskThumbnailCache: ObservableObject {
   deinit {
     if let observer = willTerminateObserver {
       NotificationCenter.default.removeObserver(observer)
+    }
+  }
+
+  private func scheduleDiskRead(path: String, entry: Entry) {
+    guard !inFlightReads.contains(path) else {
+      return
+    }
+    inFlightReads.insert(path)
+    let fileURL = Self.dataDirectoryURL().appendingPathComponent(entry.fileName)
+    ioQueue.async { [weak self] in
+      let result = DiskThumbnailCache.loadThumbnailData(
+        sourcePath: path,
+        entry: entry,
+        fileURL: fileURL
+      )
+      Task { @MainActor in
+        guard let self else {
+          return
+        }
+        self.inFlightReads.remove(path)
+        guard let current = self.metadata.entries[path],
+          current.fileName == entry.fileName
+        else {
+          return
+        }
+        switch result {
+        case .data(let data):
+          guard let image = NSImage(data: data) else {
+            self.removeEntry(path)
+            return
+          }
+          self.inMemoryImages[path] = image
+          self.touch(path)
+          self.trimInMemoryIfNeeded()
+          self.bumpRevision()
+        case .invalidSource, .missingData:
+          self.removeEntry(path)
+        }
+      }
+    }
+  }
+
+  private func verifySourceExistsAndGenerate(path: String) {
+    ioQueue.async { [weak self] in
+      let exists = FileManager.default.fileExists(atPath: path)
+      Task { @MainActor in
+        guard let self else {
+          return
+        }
+        guard exists else {
+          self.inFlight.remove(path)
+          self.processQueue()
+          return
+        }
+        self.generate(path: path)
+      }
     }
   }
 }

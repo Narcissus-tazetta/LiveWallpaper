@@ -2,43 +2,63 @@ import AppKit
 
 extension DiskThumbnailCache {
   func ensureInitialized() {
-    guard !initialized else {
+    guard initializationState == .idle else {
       return
     }
-    initialized = true
+    initializationState = .loading
 
-    let fileManager = FileManager.default
-    do {
-      try fileManager.createDirectory(
-        at: dataDirectoryURL(),
-        withIntermediateDirectories: true
-      )
-    } catch {
-      metadata = .init(version: 1, entries: [:])
-      return
-    }
+    let dataURL = Self.dataDirectoryURL()
+    let metadataURL = Self.metadataFileURL()
+    ioQueue.async { [weak self] in
+      let fileManager = FileManager.default
+      var loadedMetadata = Metadata(version: 1, entries: [:])
+      var shouldPersist = false
 
-    let metadataURL = metadataFileURL()
-    if let data = try? Data(contentsOf: metadataURL),
-      let decoded = try? JSONDecoder().decode(Metadata.self, from: data),
-      decoded.version == 1
-    {
-      metadata = decoded
-    } else {
-      metadata = .init(version: 1, entries: [:])
-      persistMetadata()
-      flushMetadataIfNeeded()
-    }
+      do {
+        try fileManager.createDirectory(
+          at: dataURL,
+          withIntermediateDirectories: true
+        )
+      } catch {}
 
-    let observer = NotificationCenter.default.addObserver(
-      forName: NSApplication.willTerminateNotification,
-      object: nil,
-      queue: .main
-    ) { [weak self] _ in
-      MainActor.assumeIsolated {
-        self?.flushMetadataIfNeeded()
+      if let data = try? Data(contentsOf: metadataURL),
+        let decoded = try? JSONDecoder().decode(Metadata.self, from: data),
+        decoded.version == 1
+      {
+        loadedMetadata = decoded
+      } else {
+        shouldPersist = true
+      }
+
+      Task { @MainActor in
+        guard let self else {
+          return
+        }
+        self.metadata = loadedMetadata
+        self.initializationState = .ready
+        if self.willTerminateObserver == nil {
+          let observer = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+          ) { [weak self] _ in
+            MainActor.assumeIsolated {
+              self?.flushMetadataImmediately()
+            }
+          }
+          self.willTerminateObserver = observer
+        }
+        if shouldPersist {
+          self.persistMetadata()
+          self.flushMetadataIfNeeded()
+        }
+        let pending = self.deferredRequests
+        self.deferredRequests.removeAll()
+        for path in pending {
+          self.request(path: path)
+        }
+        self.bumpRevision()
       }
     }
-    willTerminateObserver = observer
   }
 }
