@@ -35,7 +35,7 @@ final class DiskThumbnailCache: ObservableObject {
   let maxInMemoryCount: Int = 90
   let maxDiskBytes: UInt64 = 500 * 1024 * 1024
   let maxConcurrentGenerations: Int = 2
-  static let metadataFileName = "metadata.json"
+  nonisolated static let metadataFileName = "metadata.json"
   let ioQueue = DispatchQueue(label: "LiveWallpaper.thumbnailCache.io", qos: .utility)
 
   var inMemoryImages: [String: NSImage] = [:]

@@ -12,6 +12,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case japanese
     case english
     case traditionalChinese
+    case vietnamese
 
     var id: String {
         rawValue
@@ -52,9 +53,15 @@ enum AppLanguage: String, CaseIterable, Identifiable {
                     "zh-Hans",
                     "zh-CN",
                     "zh-SG",
-                    "zh-CHS"
+                    "zh-CHS",
                 ]
-            )
+            ),
+            LanguageOption(
+                language: .vietnamese,
+                code: "vi",
+                displayNameKey: "Tiếng Việt",
+                aliases: ["vi", "vi-VN"]
+            ),
         ]
     }
 
@@ -66,7 +73,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self {
         case .automatic:
             return "自動（システム設定に従う）"
-        case .japanese, .english, .traditionalChinese:
+        case .japanese, .english, .traditionalChinese, .vietnamese:
             return Self.optionByLanguage[self]?.displayNameKey ?? "English"
         }
     }
@@ -75,18 +82,18 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self {
         case .automatic:
             return Self.systemLanguageCode
-        case .japanese, .english, .traditionalChinese:
+        case .japanese, .english, .traditionalChinese, .vietnamese:
             return Self.optionByLanguage[self]?.code ?? "en"
         }
     }
 }
 
-private extension AppLanguage {
-    static var optionByLanguage: [AppLanguage: LanguageOption] {
+extension AppLanguage {
+    fileprivate static var optionByLanguage: [AppLanguage: LanguageOption] {
         Dictionary(uniqueKeysWithValues: supportedOptions.map { ($0.language, $0) })
     }
 
-    static func resolvePreferredLanguageCode(_ preferred: [String]) -> String {
+    fileprivate static func resolvePreferredLanguageCode(_ preferred: [String]) -> String {
         for identifier in preferred {
             if let option = resolveSupportedOption(identifier) {
                 return option.code
@@ -95,7 +102,7 @@ private extension AppLanguage {
         return optionByLanguage[.english]?.code ?? "en"
     }
 
-    static func resolveSupportedOption(_ identifier: String) -> LanguageOption? {
+    fileprivate static func resolveSupportedOption(_ identifier: String) -> LanguageOption? {
         let normalized = normalizeIdentifier(identifier)
         if normalized.isEmpty {
             return nil
@@ -128,7 +135,7 @@ private extension AppLanguage {
         return nil
     }
 
-    static func normalizeIdentifier(_ identifier: String) -> String {
+    fileprivate static func normalizeIdentifier(_ identifier: String) -> String {
         let canonical = Locale.canonicalLanguageIdentifier(from: identifier)
         return canonical.replacingOccurrences(of: "_", with: "-").lowercased()
     }

@@ -136,14 +136,6 @@ extension AppDelegate {
         _ = wallpaperModel.clearCache()
     }
 
-    @objc func checkForUpdates() {
-        #if canImport(Sparkle)
-            updaterController?.checkForUpdates(nil)
-        #else
-            openReleasePage()
-        #endif
-    }
-
     func currentLaunchAtLoginEnabled() -> Bool {
         if #available(macOS 13.0, *) {
             return SMAppService.mainApp.status == .enabled
