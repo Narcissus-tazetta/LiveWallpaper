@@ -13,6 +13,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case english
     case traditionalChinese
     case vietnamese
+    case turkish
 
     var id: String {
         rawValue
@@ -62,6 +63,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
                 displayNameKey: "Tiếng Việt",
                 aliases: ["vi", "vi-VN"]
             ),
+            LanguageOption(
+                language: .turkish,
+                code: "tr",
+                displayNameKey: "Türkçe",
+                aliases: ["tr", "tr-TR"]
+            ),
         ]
     }
 
@@ -73,7 +80,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self {
         case .automatic:
             return "自動（システム設定に従う）"
-        case .japanese, .english, .traditionalChinese, .vietnamese:
+        default:
             return Self.optionByLanguage[self]?.displayNameKey ?? "English"
         }
     }
@@ -82,7 +89,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self {
         case .automatic:
             return Self.systemLanguageCode
-        case .japanese, .english, .traditionalChinese, .vietnamese:
+        default:
             return Self.optionByLanguage[self]?.code ?? "en"
         }
     }

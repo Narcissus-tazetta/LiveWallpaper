@@ -125,7 +125,7 @@ final class WallpaperModel: ObservableObject {
         guard let selectedID = selectedPlaylistID,
               let playlist = playlists.first(where: { $0.id == selectedID })
         else {
-            return "プレイリスト"
+            return localizedString("プレイリスト")
         }
         return playlist.name
     }
