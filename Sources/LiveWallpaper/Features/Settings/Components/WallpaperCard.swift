@@ -33,6 +33,25 @@ extension SettingsView {
                         .font(.system(size: 18))
                         .foregroundColor(.secondary)
                 }
+
+                if model.pinCurrentVideo, model.currentVideoPath == path {
+                    VStack {
+                        HStack {
+                            Spacer(minLength: 0)
+                            HStack(spacing: 3) {
+                                Image(systemName: "pin.fill")
+                                    .font(.system(size: 8, weight: .semibold))
+                                Text(model.localizedString("固定中"))
+                                    .font(.system(size: 8, weight: .semibold))
+                            }
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 3)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .padding(4)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
             }
             .frame(width: thumbnailWidth, height: 60)
             .clipped()

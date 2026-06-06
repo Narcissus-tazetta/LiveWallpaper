@@ -44,6 +44,10 @@
 "アップデートを確認" = "Check for updates";
 "終了" = "Quit";
 "音声を再生" = "Play audio";
+"ループ再生" = "Loop playback";
+"動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。" = "A single video always loops. During continuous playback with multiple videos, it advances to the next video.";
+"この動画で固定" = "Pin this video";
+"固定中" = "Pinned";
 "プレイリスト連続再生" = "Playlist loop";
 "シャッフル" = "Shuffle";
 "ON" = "ON";

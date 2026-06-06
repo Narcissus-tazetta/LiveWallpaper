@@ -128,6 +128,10 @@
 "アップデートを確認" = "Kiểm tra cập nhật";
 "終了" = "Thoát";
 "音声を再生" = "Phát âm thanh";
+"ループ再生" = "Phát lặp";
+"動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。" = "Một video luôn phát lặp. Khi có nhiều video, quá trình phát liên tục sẽ chuyển sang video tiếp theo.";
+"この動画で固定" = "Ghim video này";
+"固定中" = "Đã ghim";
 "プレイリスト連続再生" = "Phát liên tục danh sách phát";
 "シャッフル" = "Ngẫu nhiên";
 "ON" = "BẬT";

@@ -18,9 +18,12 @@ extension WallpaperModel {
             UserDefaults.standard.object(forKey: "playlistPlaybackEnabled") as? Bool ?? false
         shufflePlaybackEnabled =
             UserDefaults.standard.object(forKey: "shufflePlaybackEnabled") as? Bool ?? false
+        videoLoopEnabled =
+            UserDefaults.standard.object(forKey: "videoLoopEnabled") as? Bool ?? true
         if !playlistPlaybackEnabled {
             shufflePlaybackEnabled = false
         }
+        pinCurrentVideo = false
         lightweightMode = UserDefaults.standard.object(forKey: "lightweightMode") as? Bool ?? false
         audioEnabled = UserDefaults.standard.object(forKey: "audioEnabled") as? Bool ?? false
         restorePlaybackSettingState()
@@ -197,6 +200,8 @@ extension WallpaperModel {
         setQualityPreset(.auto)
         setPlaylistPlaybackEnabled(false)
         setShufflePlaybackEnabled(false)
+        setVideoLoopEnabled(true)
+        clearPinCurrentVideo()
         autoFrameRateEnabled = true
         UserDefaults.standard.set(true, forKey: "autoFrameRateEnabled")
         setDesktopLevelOffset(.zero)

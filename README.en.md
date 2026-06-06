@@ -6,6 +6,7 @@
 Japanese README: [README.md](README.md)
 
 Sry I'm not good at english so this document is using AI
+- As a student, I currently lack the funds to release my apps on the App Store. I’m looking for a kind sponsor to support my journey!
 
 LiveWallpaper lets you set your favorite videos as your Mac desktop wallpaper.
 It is designed to reduce system load (battery and CPU usage) while you are working.
@@ -22,6 +23,8 @@ It is designed to reduce system load (battery and CPU usage) while you are worki
     - Supports frame rate and decode mode settings tuned for different Mac workloads.
 - Auto updates: Integrated with Sparkle for in-app updates.
 - Auto updates: Integrated with Sparkle for in-app updates.
+
+<video src="https://github.com/user-attachments/assets/166b9fb1-67c6-412b-a253-e15498f99399" width="60%" controls autoplay loop muted></video>
 
 ## Other Features (Detailed)
 

@@ -128,6 +128,10 @@
 "アップデートを確認" = "Güncellemeleri kontrol et";
 "終了" = "Çıkış";
 "音声を再生" = "Sesi oynat";
+"ループ再生" = "Döngüde oynat";
+"動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。" = "Tek bir video her zaman döngüde oynar. Birden fazla video varken, kesintisiz oynatma sonraki videoya geçer.";
+"この動画で固定" = "Bu videoyu sabitle";
+"固定中" = "Sabitlendi";
 "プレイリスト連続再生" = "Oynatma listesi döngüsü";
 "シャッフル" = "Karışık";
 "ON" = "AÇIK";

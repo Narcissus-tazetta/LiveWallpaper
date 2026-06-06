@@ -36,6 +36,13 @@ extension AppDelegate {
     wallpaperModel.setPlaylistPlaybackEnabled(!wallpaperModel.playlistPlaybackEnabled)
   }
 
+  @objc func togglePinCurrentVideo() {
+    guard wallpaperModel.canPinCurrentVideo else {
+      return
+    }
+    wallpaperModel.setPinCurrentVideo(!wallpaperModel.pinCurrentVideo)
+  }
+
   @objc func toggleShufflePlayback() {
     wallpaperModel.setShufflePlaybackEnabled(!wallpaperModel.shufflePlaybackEnabled)
   }

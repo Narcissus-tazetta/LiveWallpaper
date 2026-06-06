@@ -51,6 +51,15 @@ extension AppDelegate {
         playlistItem.tag = MenuTag.playlistToggle
         menu.addItem(playlistItem)
 
+        let pinItem = NSMenuItem(
+            title: pinCurrentVideoMenuTitle(wallpaperModel.pinCurrentVideo),
+            action: #selector(togglePinCurrentVideo),
+            keyEquivalent: ""
+        )
+        pinItem.image = pinCurrentVideoMenuIcon()
+        pinItem.tag = MenuTag.pinCurrentVideoToggle
+        menu.addItem(pinItem)
+
         let shuffleItem = NSMenuItem(
             title: shuffleMenuTitle(wallpaperModel.shufflePlaybackEnabled),
             action: #selector(toggleShufflePlayback),
@@ -131,7 +140,21 @@ extension AppDelegate {
                     item.title = playlistMenuTitle(enabled)
                     item.image = playlistMenuIcon()
                 }
-                refreshPlaylistMenuState()
+                refreshPlaybackMenuState()
+            }
+            .store(in: &cancellables)
+
+        wallpaperModel.$pinCurrentVideo
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] enabled in
+                guard let self else {
+                    return
+                }
+                if let item = statusItem?.menu?.item(withTag: MenuTag.pinCurrentVideoToggle) {
+                    item.title = pinCurrentVideoMenuTitle(enabled)
+                    item.image = pinCurrentVideoMenuIcon()
+                }
+                refreshPlaybackMenuState()
             }
             .store(in: &cancellables)
 
@@ -151,7 +174,7 @@ extension AppDelegate {
         wallpaperModel.$registeredVideoPaths
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.refreshPlaylistMenuState()
+                self?.refreshPlaybackMenuState()
             }
             .store(in: &cancellables)
 
@@ -183,7 +206,7 @@ extension AppDelegate {
         menu.addItem(quitItem)
 
         statusItem?.menu = menu
-        refreshPlaylistMenuState()
+        refreshPlaybackMenuState()
         refreshLocalizedInterface()
     }
 
@@ -244,12 +267,19 @@ extension AppDelegate {
         return nil
     }
 
-    func refreshPlaylistMenuState() {
+    func refreshPlaybackMenuState() {
         let hasMultipleVideos = wallpaperModel.registeredVideoPaths.count > 1
         let playlistEnabled = wallpaperModel.playlistPlaybackEnabled
+        let canPin = wallpaperModel.canPinCurrentVideo
 
+        if let pinItem = statusItem?.menu?.item(withTag: MenuTag.pinCurrentVideoToggle) {
+            pinItem.isHidden = !canPin
+            pinItem.title = pinCurrentVideoMenuTitle(wallpaperModel.pinCurrentVideo)
+            pinItem.image = pinCurrentVideoMenuIcon()
+        }
         if let shuffleItem = statusItem?.menu?.item(withTag: MenuTag.shuffleToggle) {
-            shuffleItem.isEnabled = playlistEnabled && hasMultipleVideos
+            shuffleItem.isEnabled =
+                playlistEnabled && hasMultipleVideos && !wallpaperModel.pinCurrentVideo
         }
         if let previousItem = statusItem?.menu?.item(withTag: MenuTag.previousVideo) {
             previousItem.isEnabled = hasMultipleVideos
@@ -278,6 +308,9 @@ extension AppDelegate {
         }
         if let item = menu.item(withTag: MenuTag.playlistToggle) {
             item.title = playlistMenuTitle(wallpaperModel.playlistPlaybackEnabled)
+        }
+        if let item = menu.item(withTag: MenuTag.pinCurrentVideoToggle) {
+            item.title = pinCurrentVideoMenuTitle(wallpaperModel.pinCurrentVideo)
         }
         if let item = menu.item(withTag: MenuTag.shuffleToggle) {
             item.title = shuffleMenuTitle(wallpaperModel.shufflePlaybackEnabled)
@@ -321,6 +354,10 @@ extension AppDelegate {
         localized("シャッフル") + ": " + (enabled ? localized("ON") : localized("OFF"))
     }
 
+    func pinCurrentVideoMenuTitle(_ enabled: Bool) -> String {
+        localized("この動画で固定") + ": " + (enabled ? localized("ON") : localized("OFF"))
+    }
+
     func audioMenuIcon(_ enabled: Bool) -> NSImage? {
         let symbolName: String = enabled ? "speaker.wave.2" : "speaker.slash"
         let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "音声")
@@ -356,6 +393,17 @@ extension AppDelegate {
         let image = NSImage(
             systemSymbolName: "rectangle.stack",
             accessibilityDescription: localized("プレイリスト")
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    func pinCurrentVideoMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: "pin.fill",
+            accessibilityDescription: localized("この動画で固定")
         )
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)

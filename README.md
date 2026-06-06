@@ -8,7 +8,7 @@ English README: [README.en.md](README.en.md)
 LiveWallpaperは、お気に入りの動画をMacのデスクトップ壁紙に設定できるアプリです。
 他の作業をしている時のMacの負担（バッテリーやCPUの消費）をなるべく減らせるように、システムに配慮した設計にしています。
 
-[!IMPORTANT] 現在学生のためappstoreに出す資金がないので資金提供をしてくれる優しい人待ってます。
+- 現在学生のためappstoreに出す資金がないので資金提供をしてくれる優しい人待ってます。
 
 ## 主な機能
 
@@ -22,6 +22,9 @@ LiveWallpaperは、お気に入りの動画をMacのデスクトップ壁紙に�
     - フレームレート（30fps / 60fps / 制限なし）や、Macの負荷に合わせたデコードモードの設定ができます。
 - **自動アップデート**: Sparkleを組み込んでいるので、アプリ内から簡単に最新版へアップデートできます。
 - **自動アップデート**: Sparkleを組み込んでいるので、アプリ内から簡単に最新版へアップデートできます。
+
+<video src="https://github.com/user-attachments/assets/166b9fb1-67c6-412b-a253-e15498f99399" width="60%" controls autoplay loop muted></video>
+
 
 ## その他の機能（詳しく）
 
@@ -38,7 +41,7 @@ LiveWallpaperは、お気に入りの動画をMacのデスクトップ壁紙に�
 
 ## インストールと起動について
 
-1. [Releases](../../releases) ページから、最新の `LiveWallpaper-macos-vX.Y.Z.dmg` をダウンロードします。
+1. [Releases](../../releases) ページから、最新の `LiveWallpaper-macos-v1.~.~.dmg` をダウンロードします。
 2. DMGを開き、`LiveWallpaper.app` を **「アプリケーション」フォルダ** に移動してください。
 3. すでにインストール済みの場合は、同名アプリを置き換えてください。
 

@@ -93,6 +93,8 @@ final class WallpaperModel: ObservableObject {
     @Published var autoFrameRateEnabled: Bool = true
     @Published var playlistPlaybackEnabled: Bool = false
     @Published var shufflePlaybackEnabled: Bool = false
+    @Published var videoLoopEnabled: Bool = true
+    @Published var pinCurrentVideo: Bool = false
     @Published var currentVideoIndex: Int?
     @Published var desktopLevelOffset: DesktopLevelOffset = .zero
     @Published var useFullScreenAuxiliary: Bool = false

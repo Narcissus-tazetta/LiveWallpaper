@@ -19,5 +19,6 @@ extension SettingsView {
         case decode
         case desktopLevel
         case fullScreenAuxiliary
+        case videoLoop
     }
 }

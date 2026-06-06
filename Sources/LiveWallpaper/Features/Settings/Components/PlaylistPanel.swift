@@ -51,6 +51,33 @@ extension SettingsView {
             if !model.registeredVideoPaths.isEmpty {
                 let registeredCount = model.registeredVideoPaths.count
                 VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            compactToggle(
+                                model.localizedString("ループ再生"),
+                                isOn: Binding<Bool>(
+                                    get: { model.videoLoopEnabled },
+                                    set: { model.setVideoLoopEnabled($0) }
+                                )
+                            )
+                            .disabled(!model.isVideoLoopSettingEnabled)
+
+                            helpIconButton(for: .videoLoop)
+                                .disabled(false)
+                        }
+
+                        if expandedHelpTopics.contains(.videoLoop) {
+                            Text(
+                                model.localizedString(
+                                    "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。"
+                                )
+                            )
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
                     HStack(spacing: 14) {
                         compactToggle(
                             model.localizedString("プレイリスト連続再生"),
@@ -67,7 +94,11 @@ extension SettingsView {
                                 set: { model.setShufflePlaybackEnabled($0) }
                             )
                         )
-                        .disabled(!model.playlistPlaybackEnabled || registeredCount < 2)
+                        .disabled(
+                            !model.playlistPlaybackEnabled
+                                || registeredCount < 2
+                                || model.pinCurrentVideo
+                        )
 
                         Spacer(minLength: 12)
 
@@ -202,7 +233,7 @@ extension SettingsView {
                             hoveredPlaylistDropTargetID == playlist.id
                                 ? Color.accentColor
                                 : Color
-                                .clear,
+                                    .clear,
                             lineWidth: 2
                         )
                 )

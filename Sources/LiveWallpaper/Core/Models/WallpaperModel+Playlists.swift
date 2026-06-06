@@ -194,7 +194,11 @@ extension WallpaperModel {
         guard playlists.contains(where: { $0.id == playlistID }) else {
             return
         }
+        let playlistChanged = selectedPlaylistID != playlistID
         selectedPlaylistID = playlistID
+        if playlistChanged {
+            clearPinCurrentVideo()
+        }
         syncActivePlaylistPaths()
 
         if let currentPath = currentVideoPath,
@@ -247,7 +251,7 @@ extension WallpaperModel {
         return false
     }
 
-    func playNextVideo() {
+    func playNextVideo(advancingPlaylist: Bool = false) {
         guard !registeredVideoPaths.isEmpty else {
             return
         }
@@ -258,7 +262,10 @@ extension WallpaperModel {
             return
         }
         let nextIndex = resolvedNextIndex(forward: true)
-        selectRegisteredVideo(path: registeredVideoPaths[nextIndex])
+        selectRegisteredVideo(
+            path: registeredVideoPaths[nextIndex],
+            clearsPin: !advancingPlaylist
+        )
     }
 
     func playPreviousVideo() {
@@ -272,7 +279,7 @@ extension WallpaperModel {
             return
         }
         let previousIndex = resolvedNextIndex(forward: false)
-        selectRegisteredVideo(path: registeredVideoPaths[previousIndex])
+        selectRegisteredVideo(path: registeredVideoPaths[previousIndex], clearsPin: true)
     }
 
     private func resolvedNextIndex(forward: Bool) -> Int {
@@ -359,7 +366,7 @@ extension WallpaperModel {
         )
     }
 
-    func selectRegisteredVideo(path: String) {
+    func selectRegisteredVideo(path: String, clearsPin: Bool = true) {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return
@@ -367,6 +374,10 @@ extension WallpaperModel {
         guard FileManager.default.fileExists(atPath: trimmed) else {
             removeRegisteredVideo(path: trimmed)
             return
+        }
+        let previousPath = currentVideoPath
+        if clearsPin, pinCurrentVideo, previousPath != trimmed {
+            clearPinCurrentVideo()
         }
         addVideoPathToSelectedPlaylist(trimmed)
         syncActivePlaylistPaths()
@@ -488,5 +499,6 @@ extension WallpaperModel {
             registeredVideoPaths = []
         }
         pruneWallpaperPresentationsForExistingPaths()
+        normalizePlaybackConstraints()
     }
 }

@@ -76,17 +76,44 @@ extension WallpaperModel {
         UserDefaults.standard.set(enabled, forKey: "playlistPlaybackEnabled")
         if !enabled {
             setShufflePlaybackEnabled(false)
+            clearPinCurrentVideo()
         }
+        normalizePlaybackConstraints()
         requestPlaybackReconfiguration()
     }
 
     func setShufflePlaybackEnabled(_ enabled: Bool) {
-        let normalized = playlistPlaybackEnabled ? enabled : false
+        let normalized = playlistPlaybackEnabled && !pinCurrentVideo ? enabled : false
         guard shufflePlaybackEnabled != normalized else {
             return
         }
         shufflePlaybackEnabled = normalized
         UserDefaults.standard.set(normalized, forKey: "shufflePlaybackEnabled")
+    }
+
+    func setVideoLoopEnabled(_ enabled: Bool) {
+        guard videoLoopEnabled != enabled else {
+            return
+        }
+        videoLoopEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "videoLoopEnabled")
+        requestPlaybackReconfiguration()
+    }
+
+    func setPinCurrentVideo(_ enabled: Bool) {
+        guard pinCurrentVideo != enabled else {
+            return
+        }
+        if enabled {
+            guard canPinCurrentVideo else {
+                return
+            }
+            pinCurrentVideo = true
+            setShufflePlaybackEnabled(false)
+        } else {
+            pinCurrentVideo = false
+        }
+        requestPlaybackReconfiguration()
     }
 
     func refreshPlaybackState() {
@@ -118,21 +145,20 @@ extension WallpaperModel {
                 guard let self else {
                     return
                 }
-                guard self.playlistPlaybackEnabled else {
-                    return
-                }
                 guard let finishedItem = note.object as? AVPlayerItem,
                       let player = self.sharedPlayer,
                       player.currentItem === finishedItem
                 else {
                     return
                 }
-                guard self.registeredVideoPaths.count > 1 else {
-                    player.seek(to: .zero)
-                    player.play()
-                    return
+                switch self.playbackEndBehavior() {
+                case .loopCurrent:
+                    break
+                case .advancePlaylist:
+                    self.playNextVideo(advancingPlaylist: true)
+                case .playOnce:
+                    player.pause()
                 }
-                self.playNextVideo()
             }
         }
     }
@@ -474,11 +500,11 @@ extension WallpaperModel {
             : profile.buffer
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
         configureFrameRateComposition(item: item, asset: asset, targetFPS: targetFPS)
-        if playlistPlaybackEnabled {
+        if shouldUsePlaybackLooper() {
+            sharedLooper = AVPlayerLooper(player: player, templateItem: item)
+        } else {
             player.insert(item, after: nil)
             sharedLooper = nil
-        } else {
-            sharedLooper = AVPlayerLooper(player: player, templateItem: item)
         }
         applyAudioSettings()
         applySuspensionStateToPlayers()
