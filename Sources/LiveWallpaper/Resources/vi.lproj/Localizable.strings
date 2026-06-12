@@ -47,7 +47,7 @@
 "アップデート" = "Cập nhật";
 "手動ダウンロード" = "Tải xuống thủ công";
 "壁紙を開く" = "Mở hình nền";
-"壁紙設定を開く" = "Mở cài đặt hình nền";
+"壁紙設定を開く" = "Mở chỉnh bố trí hình nền";
 "設定を開く" = "Mở cài đặt";
 "前の動画" = "Video trước";
 "次の動画" = "Video tiếp theo";
@@ -145,7 +145,7 @@
 "インポートに失敗" = "Nhập thất bại";
 "重複するビデオが見つかりました" = "Đã tìm thấy video trùng lặp";
 "は既に存在します。置き換えますか？" = "đã tồn tại. Bạn có muốn thay thế không?";
-"中止" = "Dừng";
+"中止" = "Hủy";
 "置き換える" = "Thay thế";
 "アップデートを確認する前に移動が必要です" = "Cần di chuyển ứng dụng trước khi kiểm tra cập nhật.";
 "アップデータ初期化に失敗しました" = "Khởi tạo trình cập nhật thất bại";
@@ -180,3 +180,7 @@
 "軽量" = "Nhẹ";
 "高負荷" = "Nặng";
 "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Chọn cách giải mã video. Tự động theo môi trường, Cân bằng ưu tiên mượt, Tiết kiệm pin giảm CPU và điện năng.";
+"1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます" = "1. Nhấn \"Thêm video\" để chọn video.\n2. Video đã chọn sẽ phát ngay làm hình nền.";
+"壁紙を保存するフォルダを選択してください" = "Chọn thư mục để lưu hình nền.";
+"設定を初期化" = "Đặt lại cài đặt";
+"表示・再生に関する設定を初期値へ戻します" = "Khôi phục cài đặt hiển thị và phát lại về mặc định.";
