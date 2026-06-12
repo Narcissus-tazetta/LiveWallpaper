@@ -10,7 +10,7 @@
 "プレイリスト・設定" = "Oynatma Listesi ve Ayarlar";
 "選択中" = "Seçili";
 "本" = "öğe";
-"クリック貫通を有効にする" = "Tıklamayı iletmeyi etkinleştir";
+"クリック貫通を有効にする" = "Tıklama geçişini etkinleştir";
 "ログイン時に自動起動する" = "Oturum açarken otomatik başlat";
 "音声を再生する" = "Sesi oynat";
 "音量" = "Ses Düzeyi";
@@ -132,7 +132,7 @@
 "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。" = "Tek bir video her zaman döngüde oynar. Birden fazla video varken, kesintisiz oynatma sonraki videoya geçer.";
 "この動画で固定" = "Bu videoyu sabitle";
 "固定中" = "Sabitlendi";
-"プレイリスト連続再生" = "Oynatma listesi döngüsü";
+"プレイリスト連続再生" = "Oynatma listesi sürekli oynatma";
 "シャッフル" = "Karışık";
 "ON" = "AÇIK";
 "OFF" = "KAPALI";
@@ -182,3 +182,5 @@
 "軽量" = "Hafif";
 "高負荷" = "Yüksek";
 "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Video kod çözme yöntemini seçin. Otomatik ortama göre, Dengeli akıcılığı, Güç Tasarrufu CPU ve güç tüketimini azaltır.";
+"1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます" = "1. Video seçmek için \"Video Ekle\"ye basın.\n2. Seçilen video doğrudan duvar kağıdı olarak oynatılır.";
+"壁紙を保存するフォルダを選択してください" = "Duvar kağıdını kaydetmek için bir klasör seçin.";

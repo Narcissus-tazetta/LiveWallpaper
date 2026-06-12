@@ -48,7 +48,7 @@
 "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。" = "A single video always loops. During continuous playback with multiple videos, it advances to the next video.";
 "この動画で固定" = "Pin this video";
 "固定中" = "Pinned";
-"プレイリスト連続再生" = "Playlist loop";
+"プレイリスト連続再生" = "Continuous playlist playback";
 "シャッフル" = "Shuffle";
 "ON" = "ON";
 "OFF" = "OFF";
@@ -160,6 +160,12 @@
 "今すぐ確認" = "Check Now";
 "更新が失敗する場合は、Releasesから最新版を取得して /Applications の LiveWallpaper.app を置き換えてください" = "If updates fail, download the latest release and replace /Applications/LiveWallpaper.app.";
 "動画を追加" = "Add Video";
+"%" = "%";
+"(選択なし)" = "(None selected)";
+"X" = "X";
+"Y" = "Y";
+"1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます" = "1. Press \"Add Video\" to choose a video.\n2. The selected video plays as your wallpaper.";
+"壁紙を保存するフォルダを選択してください" = "Choose a folder to save the wallpaper.";
 "静止画" = "Still";
 "設定をリセット" = "Reset Settings";
 "手動ダウンロード" = "Manual Download";
