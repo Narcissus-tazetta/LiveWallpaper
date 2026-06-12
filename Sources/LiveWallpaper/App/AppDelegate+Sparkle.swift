@@ -84,6 +84,7 @@
                 return
             }
 
+            syncLaunchAtLoginState()
             settingsWindowController?.showWindow(nil)
             settingsWindowController?.window?.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)

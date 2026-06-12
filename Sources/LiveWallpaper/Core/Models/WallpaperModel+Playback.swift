@@ -68,6 +68,15 @@ extension WallpaperModel {
         requestPlaybackReconfiguration()
     }
 
+    func setAutoFrameRateEnabled(_ enabled: Bool) {
+        guard autoFrameRateEnabled != enabled else {
+            return
+        }
+        autoFrameRateEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "autoFrameRateEnabled")
+        startAutoFrameRateMonitoring()
+    }
+
     func setPlaylistPlaybackEnabled(_ enabled: Bool) {
         guard playlistPlaybackEnabled != enabled else {
             return
@@ -196,97 +205,10 @@ extension WallpaperModel {
             player.removeAllItems()
         }
         sharedLooper = nil
-        suspendedDisplayIDs.removeAll()
-    }
-
-    private func targetPlaybackFrameRate() -> Int? {
-        // NOTE:
-        // Some movie files become black (audio only) when AVPlayerItem.videoComposition
-        // is used for frame throttling. Keep compatibility by avoiding this path and
-        // controlling load through bitrate/buffer tuning instead.
-        nil
-    }
-
-    private func configureFrameRateComposition(
-        item: AVPlayerItem,
-        asset: AVURLAsset,
-        targetFPS: Int?
-    ) {
-        guard let fps = targetFPS else {
-            item.videoComposition = nil
-            return
-        }
-
-        let composition = AVMutableVideoComposition(propertiesOf: asset)
-        composition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(fps, 1)))
-        item.videoComposition = composition
     }
 
     private func reapplyPlaybackForCurrentVideoIfNeeded() {
         requestPlaybackReconfiguration()
-    }
-
-    private func schedulePlaybackStartupValidation(
-        url: URL,
-        usedFrameRateComposition: Bool
-    ) {
-        playbackStartupValidationWorkItem?.cancel()
-
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self else {
-                return
-            }
-            guard currentVideoPath == url.path else {
-                return
-            }
-            guard let player = sharedPlayer else {
-                return
-            }
-
-            let screens = targetScreens()
-            if !screens.isEmpty,
-               suspendedDisplayIDs.count >= screens.count
-            {
-                return
-            }
-
-            let hasFailedItem = player.currentItem?.status == .failed
-            let isPlayingOrWaiting: Bool = {
-                if player.rate > 0.01 {
-                    return true
-                }
-                return player.timeControlStatus == .playing
-                    || player.timeControlStatus == .waitingToPlayAtSpecifiedRate
-            }()
-
-            guard usedFrameRateComposition else {
-                if !isPlayingOrWaiting {
-                    NSLog(
-                        "[Playback] startup stalled for \(url.lastPathComponent) even in fallback mode"
-                    )
-                }
-                return
-            }
-
-            guard hasFailedItem || !isPlayingOrWaiting else {
-                return
-            }
-
-            guard targetPlaybackFrameRate() != nil else {
-                return
-            }
-
-            guard lastPlaybackFallbackPath != url.path else {
-                return
-            }
-
-            lastPlaybackFallbackPath = url.path
-            NSLog("[Playback] retry without frame-rate composition: \(url.lastPathComponent)")
-            playVideo(url: url, bypassFrameRateComposition: true)
-        }
-
-        playbackStartupValidationWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6, execute: workItem)
     }
 
     func applyLightweightSettings() {
@@ -371,22 +293,12 @@ extension WallpaperModel {
 
     private func resolvedDecodeMode() -> DecodeMode {
         switch decodeMode {
-        case .automatic:
+        case .automatic, .gpuAdaptive:
             switch playbackEnvironment.chipClass {
             case .appleSilicon:
                 return .balanced
             case .intel:
                 return playbackEnvironment.logicalCores >= 8 ? .balanced : .efficiency
-            }
-        case .gpuAdaptive:
-            switch playbackEnvironment.chipClass {
-            case .appleSilicon:
-                return .balanced
-            case .intel:
-                if playbackEnvironment.logicalCores >= 8 {
-                    return .balanced
-                }
-                return .efficiency
             }
         default:
             return decodeMode
@@ -408,9 +320,7 @@ extension WallpaperModel {
 
     private func decodeBitRateFactor() -> Double {
         switch resolvedDecodeMode() {
-        case .automatic:
-            return 1.0
-        case .gpuAdaptive:
+        case .automatic, .gpuAdaptive:
             return 1.0
         case .balanced:
             return 1.05
@@ -421,9 +331,7 @@ extension WallpaperModel {
 
     private func baseBufferDuration() -> TimeInterval {
         switch resolvedDecodeMode() {
-        case .automatic:
-            return 1.0
-        case .gpuAdaptive:
+        case .automatic, .gpuAdaptive:
             return 1.0
         case .balanced:
             return 1.5
@@ -469,10 +377,7 @@ extension WallpaperModel {
         return (bitRate: max(bitRate, 500_000), buffer: max(buffer, 0))
     }
 
-    func playVideo(
-        url: URL,
-        bypassFrameRateComposition: Bool = false
-    ) {
+    func playVideo(url: URL) {
         let effectiveDecode = resolvedDecodeMode()
         let asset = AVURLAsset(
             url: url,
@@ -481,25 +386,16 @@ extension WallpaperModel {
             ]
         )
         let profile = resolvePlaybackProfile()
-        let targetFPS = bypassFrameRateComposition ? nil : targetPlaybackFrameRate()
         stopAllPlayers()
-
-        if !bypassFrameRateComposition {
-            lastPlaybackFallbackPath = nil
-        }
 
         let player = ensureSharedPlayer()
         attachSharedPlayerToAllViews()
 
         let item = AVPlayerItem(asset: asset)
-        item.preferredPeakBitRate = bypassFrameRateComposition
-            ? max(profile.bitRate, 2_000_000)
-            : profile.bitRate
-        item.preferredForwardBufferDuration = bypassFrameRateComposition
-            ? max(profile.buffer, 0.3)
-            : profile.buffer
+        item.preferredPeakBitRate = profile.bitRate
+        item.preferredForwardBufferDuration = profile.buffer
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
-        configureFrameRateComposition(item: item, asset: asset, targetFPS: targetFPS)
+        item.videoComposition = nil
         if shouldUsePlaybackLooper() {
             sharedLooper = AVPlayerLooper(player: player, templateItem: item)
         } else {
@@ -509,10 +405,6 @@ extension WallpaperModel {
         applyAudioSettings()
         applySuspensionStateToPlayers()
         evaluateForegroundCoverageState()
-        schedulePlaybackStartupValidation(
-            url: url,
-            usedFrameRateComposition: !bypassFrameRateComposition && targetFPS != nil
-        )
     }
 
     @discardableResult

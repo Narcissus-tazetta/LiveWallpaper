@@ -7,8 +7,13 @@ extension DiskThumbnailCache {
     }
     initializationState = .loading
 
-    let dataURL = Self.dataDirectoryURL()
-    let metadataURL = Self.metadataFileURL()
+    guard let dataURL = Self.dataDirectoryURL(),
+          let metadataURL = Self.metadataFileURL()
+    else {
+      initializationState = .ready
+      bumpRevision()
+      return
+    }
     ioQueue.async { [weak self] in
       let fileManager = FileManager.default
       var loadedMetadata = Metadata(version: 1, entries: [:])

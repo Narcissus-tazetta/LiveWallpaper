@@ -162,6 +162,9 @@ struct SettingsView: View {
                 selectedTab = .wallpaper
                 isWallpaperShareSheetPresented = true
             }
+            .onReceive(NotificationCenter.default.publisher(for: .thumbnailCacheDidClear)) { _ in
+                thumbnailCache.clear()
+            }
             .onChange(of: selectedTab) { tab in
                 if tab == .wallpaperFit {
                     ensureFitEditorScreenSelection()
@@ -300,6 +303,14 @@ struct SettingsView: View {
         case .settings:
             SettingsTabView {
                 Group {
+                    if let message = model.persistenceFailureMessage {
+                        Section {
+                            Text(message)
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
                     videoSettingsSection
                     displaySettingsSection
                     languageSettingsSection

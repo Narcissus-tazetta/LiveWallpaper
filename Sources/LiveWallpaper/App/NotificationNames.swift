@@ -10,6 +10,7 @@ extension Notification.Name {
     static let toggleLaunchAtLogin = Notification.Name("ToggleLaunchAtLogin")
     static let openCacheFolder = Notification.Name("OpenCacheFolder")
     static let clearCache = Notification.Name("ClearCache")
+    static let thumbnailCacheDidClear = Notification.Name("ThumbnailCacheDidClear")
     static let toggleAutoUpdate = Notification.Name("ToggleAutoUpdate")
     static let checkUpdatesNow = Notification.Name("CheckUpdatesNow")
     static let refreshPlayback = Notification.Name("RefreshPlayback")

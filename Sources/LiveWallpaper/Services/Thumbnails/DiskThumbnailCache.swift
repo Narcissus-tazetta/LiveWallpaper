@@ -176,8 +176,11 @@ final class DiskThumbnailCache: ObservableObject {
   func clear() {
     ensureInitialized()
 
-    let base = Self.rootDirectoryURL()
-    let dataURL = Self.dataDirectoryURL()
+    guard let base = Self.rootDirectoryURL(),
+          let dataURL = Self.dataDirectoryURL()
+    else {
+      return
+    }
     ioQueue.async {
       let fileManager = FileManager.default
       do {
@@ -217,7 +220,10 @@ final class DiskThumbnailCache: ObservableObject {
       return
     }
     inFlightReads.insert(path)
-    let fileURL = Self.dataDirectoryURL().appendingPathComponent(entry.fileName)
+    guard let fileURL = Self.dataDirectoryURL()?.appendingPathComponent(entry.fileName) else {
+      inFlightReads.remove(path)
+      return
+    }
     ioQueue.async { [weak self] in
       let result = DiskThumbnailCache.loadThumbnailData(
         sourcePath: path,

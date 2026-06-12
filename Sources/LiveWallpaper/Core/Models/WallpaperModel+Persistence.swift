@@ -14,6 +14,13 @@ extension WallpaperModel {
         {
             fitMode = restoredFit
         }
+        if let offsetValue = UserDefaults.standard.object(forKey: "desktopLevelOffset") as? Int,
+           let restoredOffset = DesktopLevelOffset(rawValue: offsetValue)
+        {
+            desktopLevelOffset = restoredOffset
+        }
+        useFullScreenAuxiliary =
+            UserDefaults.standard.object(forKey: "useFullScreenAuxiliary") as? Bool ?? false
         playlistPlaybackEnabled =
             UserDefaults.standard.object(forKey: "playlistPlaybackEnabled") as? Bool ?? false
         shufflePlaybackEnabled =
@@ -34,10 +41,10 @@ extension WallpaperModel {
         }
         autoFrameRateEnabled =
             UserDefaults.standard.object(forKey: "autoFrameRateEnabled") as? Bool ?? true
-        let savedAudioVolume: Float = UserDefaults.standard.float(forKey: "audioVolume")
-        audioVolume = savedAudioVolume == 0 ? 1.0 : min(max(savedAudioVolume, 0), 1)
-        if UserDefaults.standard.object(forKey: "audioVolume") is NSNumber {
-            audioVolume = min(max(savedAudioVolume, 0), 1)
+        if UserDefaults.standard.object(forKey: "audioVolume") != nil {
+            audioVolume = min(max(UserDefaults.standard.float(forKey: "audioVolume"), 0), 1)
+        } else {
+            audioVolume = 1.0
         }
         if let appLanguageValue = UserDefaults.standard.string(forKey: "appLanguage"),
            let restoredAppLanguage = AppLanguage(rawValue: appLanguageValue)
@@ -131,7 +138,7 @@ extension WallpaperModel {
         {
             wallpaperPresentationByPath = decoded.filter { allPaths.contains($0.key) }
         }
-        persistPlaylistState()
+        persistPlaylistStateImmediately()
     }
 
     private func restorePlaybackSettingState() {
@@ -143,7 +150,12 @@ extension WallpaperModel {
         if let decodeValue = UserDefaults.standard.string(forKey: "decodeMode"),
            let restoredDecodeMode = DecodeMode(rawValue: decodeValue)
         {
-            decodeMode = restoredDecodeMode
+            if restoredDecodeMode == .gpuAdaptive {
+                decodeMode = .automatic
+                UserDefaults.standard.set(DecodeMode.automatic.rawValue, forKey: "decodeMode")
+            } else {
+                decodeMode = restoredDecodeMode
+            }
         }
         if let workProfileValue = UserDefaults.standard.string(forKey: "workProfile"),
            let restoredWorkProfile = WorkProfile(rawValue: workProfileValue)
@@ -173,18 +185,11 @@ extension WallpaperModel {
     }
 
     func persistWallpaperPresentationState() {
-        if let data = try? JSONEncoder().encode(wallpaperPresentationByPath) {
-            UserDefaults.standard.set(data, forKey: wallpaperPresentationStorageKey)
-        }
+        schedulePersistedStateFlush()
     }
 
     func persistPlaylistState() {
-        if let data = try? JSONEncoder().encode(playlists) {
-            UserDefaults.standard.set(data, forKey: "playlistsData")
-        }
-        UserDefaults.standard.set(registeredVideoPaths, forKey: "registeredVideoPaths")
-        UserDefaults.standard.set(selectedPlaylistID?.uuidString, forKey: "selectedPlaylistID")
-        persistWallpaperPresentationState()
+        schedulePersistedStateFlush()
     }
 
     func resetSettingsToDefaults() {
@@ -202,8 +207,7 @@ extension WallpaperModel {
         setShufflePlaybackEnabled(false)
         setVideoLoopEnabled(true)
         clearPinCurrentVideo()
-        autoFrameRateEnabled = true
-        UserDefaults.standard.set(true, forKey: "autoFrameRateEnabled")
+        setAutoFrameRateEnabled(true)
         setDesktopLevelOffset(.zero)
         setFullScreenAuxiliary(false)
         _ = setSuspendWhenOtherAppFullScreen(false)

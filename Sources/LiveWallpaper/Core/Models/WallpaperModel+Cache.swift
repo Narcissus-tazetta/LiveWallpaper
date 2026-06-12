@@ -57,7 +57,9 @@ extension WallpaperModel {
             currentVideoPath = nil
             currentVideoIndex = nil
             UserDefaults.standard.removeObject(forKey: "videoPath")
-            persistPlaylistState()
+            persistPlaylistStateImmediately()
+            evaluateForegroundCoverageState()
+            NotificationCenter.default.post(name: .thumbnailCacheDidClear, object: nil)
             return true
         } catch {
             return false

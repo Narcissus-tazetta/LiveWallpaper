@@ -171,3 +171,14 @@
 "現在の壁紙プレビュー" = "Geçerli duvar kağıdı önizlemesi";
 "設定を初期化" = "Ayarları sıfırla";
 "表示・再生に関する設定を初期値へ戻します" = "Görüntü ve oynatma ayarlarını varsayılan değerlerine sıfırlar.";
+"アクセシビリティ権限が必要です。システム設定でLiveWallpaperを許可してください。" = "Erişilebilirlik izni gerekli. Sistem Ayarları > Gizlilik ve Güvenlik > Erişilebilirlik bölümünden LiveWallpaper'a izin verin.";
+"設定の保存に失敗しています。空き容量などを確認してください。" = "Ayarlar kaydedilemedi. Boş alanı kontrol edip tekrar deneyin.";
+"キャッシュの削除に失敗しました" = "Önbellek temizlenemedi";
+"保存先フォルダへのアクセスに失敗した可能性があります。" = "Uygulama depolama klasörüne erişememiş olabilir.";
+"固定はアプリ再起動まで有効です。" = "Sabitleme, uygulama yeniden başlatılana kadar geçerlidir.";
+"環境に応じて再生負荷を自動調整" = "Ortama göre oynatma yükünü otomatik ayarla";
+"再生負荷" = "Oynatma yükü";
+"再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。" = "Oynatma yükü ön ayarını seçin. Yalnızca dahili bit hızını ayarlar; görüntü çözünürlüğü değişmez.";
+"軽量" = "Hafif";
+"高負荷" = "Yüksek";
+"動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Video kod çözme yöntemini seçin. Otomatik ortama göre, Dengeli akıcılığı, Güç Tasarrufu CPU ve güç tüketimini azaltır.";

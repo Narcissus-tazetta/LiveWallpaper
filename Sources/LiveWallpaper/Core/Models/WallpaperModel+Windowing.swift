@@ -28,6 +28,7 @@ extension WallpaperModel {
             return
         }
         desktopLevelOffset = offset
+        UserDefaults.standard.set(offset.rawValue, forKey: "desktopLevelOffset")
         scheduleWindowOptionsApply()
     }
 
@@ -36,6 +37,7 @@ extension WallpaperModel {
             return
         }
         useFullScreenAuxiliary = enabled
+        UserDefaults.standard.set(enabled, forKey: "useFullScreenAuxiliary")
         scheduleWindowOptionsApply()
     }
 

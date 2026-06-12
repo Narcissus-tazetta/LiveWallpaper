@@ -123,120 +123,52 @@ extension WallpaperModel {
         AXIsProcessTrusted()
     }
 
+    private func ensureAXCoverageObserver() -> ForegroundCoverageAXObserver {
+        if let axCoverageObserver {
+            return axCoverageObserver
+        }
+        let observer = ForegroundCoverageAXObserver()
+        axCoverageObserver = observer
+        return observer
+    }
+
+    private func updateAccessibilityCoverageStatusMessage(isTrusted: Bool) {
+        if isTrusted {
+            suspendWhenOtherAppStatusMessage = nil
+            return
+        }
+        suspendWhenOtherAppStatusMessage = localizedString(
+            "アクセシビリティ権限が必要です。システム設定でLiveWallpaperを許可してください。"
+        )
+    }
+
     private func updateAXObserverForFrontmostApplication() {
         guard suspendWhenOtherAppFullScreen else {
             removeAXObserver()
             return
         }
-        guard isAccessibilityTrusted() else {
+
+        let trusted = isAccessibilityTrusted()
+        updateAccessibilityCoverageStatusMessage(isTrusted: trusted)
+        guard trusted else {
             removeAXObserver()
             return
         }
+
         guard let app = NSWorkspace.shared.frontmostApplication else {
             removeAXObserver()
             return
         }
 
-        let pid = app.processIdentifier
-        if observedAppPID == pid, axObserver != nil {
-            return
-        }
-
-        removeAXObserver()
-
-        let appElement = AXUIElementCreateApplication(pid)
-        var newObserver: AXObserver?
-        let callback: AXObserverCallback = { _, _, _, refcon in
-            guard let refcon else {
-                return
-            }
-            let model = Unmanaged<WallpaperModel>.fromOpaque(refcon).takeUnretainedValue()
+        _ = ensureAXCoverageObserver().attach(to: app) { [weak self] in
             Task { @MainActor in
-                model.scheduleForegroundCoverageEvaluation()
+                self?.scheduleForegroundCoverageEvaluation()
             }
         }
-
-        let result = AXObserverCreate(pid, callback, &newObserver)
-        guard result == .success, let observer = newObserver else {
-            return
-        }
-
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
-        _ = AXObserverAddNotification(
-            observer,
-            appElement,
-            kAXFocusedWindowChangedNotification as CFString,
-            refcon
-        )
-        _ = AXObserverAddNotification(
-            observer,
-            appElement,
-            kAXWindowMovedNotification as CFString,
-            refcon
-        )
-        _ = AXObserverAddNotification(
-            observer,
-            appElement,
-            kAXWindowResizedNotification as CFString,
-            refcon
-        )
-        _ = AXObserverAddNotification(
-            observer,
-            appElement,
-            kAXMainWindowChangedNotification as CFString,
-            refcon
-        )
-
-        CFRunLoopAddSource(
-            CFRunLoopGetMain(),
-            AXObserverGetRunLoopSource(observer),
-            .defaultMode
-        )
-
-        axObserver = observer
-        observedAppElement = appElement
-        observedAppPID = pid
     }
 
     func removeAXObserver() {
-        guard let observer = axObserver else {
-            observedAppElement = nil
-            observedAppPID = nil
-            return
-        }
-
-        if let appElement = observedAppElement {
-            _ = AXObserverRemoveNotification(
-                observer,
-                appElement,
-                kAXFocusedWindowChangedNotification as CFString
-            )
-            _ = AXObserverRemoveNotification(
-                observer,
-                appElement,
-                kAXWindowMovedNotification as CFString
-            )
-            _ = AXObserverRemoveNotification(
-                observer,
-                appElement,
-                kAXWindowResizedNotification as CFString
-            )
-            _ = AXObserverRemoveNotification(
-                observer,
-                appElement,
-                kAXMainWindowChangedNotification as CFString
-            )
-        }
-
-        CFRunLoopRemoveSource(
-            CFRunLoopGetMain(),
-            AXObserverGetRunLoopSource(observer),
-            .defaultMode
-        )
-
-        axObserver = nil
-        observedAppElement = nil
-        observedAppPID = nil
+        axCoverageObserver?.detach()
     }
 
     func scheduleForegroundCoverageEvaluation() {
@@ -295,24 +227,32 @@ extension WallpaperModel {
         applyCoveringAppSuspension(coveredDisplayIDs)
     }
 
-    private func displayIDsForFrontmostAppPresence() -> Set<String> {
+    private func frontmostAppForCoverageEvaluation() -> NSRunningApplication? {
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
-            return []
+            return nil
         }
 
         if let bundleID = frontmostApp.bundleIdentifier,
            suspendExclusionBundleIDs.contains(normalizeBundleID(bundleID))
         {
-            return []
+            return nil
         }
 
         if frontmostApp.bundleIdentifier == "com.apple.finder" {
-            return []
+            return nil
         }
 
         let frontmostPID = frontmostApp.processIdentifier
         let ownPID = ProcessInfo.processInfo.processIdentifier
         guard frontmostPID != ownPID else {
+            return nil
+        }
+
+        return frontmostApp
+    }
+
+    private func displayIDsForFrontmostAppPresence() -> Set<String> {
+        guard frontmostAppForCoverageEvaluation() != nil else {
             return []
         }
 
@@ -338,23 +278,7 @@ extension WallpaperModel {
     }
 
     private func coveredDisplayIDsByFrontmostApp() -> Set<String> {
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
-            return []
-        }
-
-        if let bundleID = frontmostApp.bundleIdentifier,
-           suspendExclusionBundleIDs.contains(normalizeBundleID(bundleID))
-        {
-            return []
-        }
-
-        if frontmostApp.bundleIdentifier == "com.apple.finder" {
-            return []
-        }
-
-        let frontmostPID = frontmostApp.processIdentifier
-        let ownPID = ProcessInfo.processInfo.processIdentifier
-        guard frontmostPID != ownPID else {
+        guard let frontmostApp = frontmostAppForCoverageEvaluation() else {
             return []
         }
 
@@ -366,6 +290,8 @@ extension WallpaperModel {
         else {
             return []
         }
+
+        let frontmostPID = frontmostApp.processIdentifier
 
         let screenInfos = targetScreens().map { screen in
             (
@@ -424,25 +350,11 @@ extension WallpaperModel {
     }
 
     private func fullScreenDisplayIDsByFrontmostApp() -> Set<String> {
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
-            return []
-        }
-
-        if let bundleID = frontmostApp.bundleIdentifier,
-           suspendExclusionBundleIDs.contains(normalizeBundleID(bundleID))
-        {
-            return []
-        }
-
-        if frontmostApp.bundleIdentifier == "com.apple.finder" {
+        guard let frontmostApp = frontmostAppForCoverageEvaluation() else {
             return []
         }
 
         let frontmostPID = frontmostApp.processIdentifier
-        let ownPID = ProcessInfo.processInfo.processIdentifier
-        guard frontmostPID != ownPID else {
-            return []
-        }
 
         let appElement = AXUIElementCreateApplication(frontmostPID)
         var focusedWindow: CFTypeRef?

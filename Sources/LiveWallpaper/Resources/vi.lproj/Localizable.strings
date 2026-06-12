@@ -169,3 +169,14 @@
 "追加" = "Thêm";
 "LiveWallpaper" = "LiveWallpaper";
 "現在の壁紙プレビュー" = "Xem trước hình nền hiện tại";
+"アクセシビリティ権限が必要です。システム設定でLiveWallpaperを許可してください。" = "Cần quyền Trợ năng. Hãy cho phép LiveWallpaper trong Cài đặt hệ thống > Quyền riêng tư và bảo mật > Trợ năng.";
+"設定の保存に失敗しています。空き容量などを確認してください。" = "Không thể lưu cài đặt. Hãy kiểm tra dung lượng trống và thử lại.";
+"キャッシュの削除に失敗しました" = "Không thể xóa bộ nhớ đệm";
+"保存先フォルダへのアクセスに失敗した可能性があります。" = "Ứng dụng có thể không truy cập được thư mục lưu trữ.";
+"固定はアプリ再起動まで有効です。" = "Ghim có hiệu lực đến khi khởi động lại ứng dụng.";
+"環境に応じて再生負荷を自動調整" = "Tự động điều chỉnh tải phát theo môi trường";
+"再生負荷" = "Tải phát";
+"再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。" = "Chọn mức tải phát. Chỉ điều chỉnh bitrate nội bộ; độ phân giải hiển thị không đổi.";
+"軽量" = "Nhẹ";
+"高負荷" = "Nặng";
+"動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Chọn cách giải mã video. Tự động theo môi trường, Cân bằng ưu tiên mượt, Tiết kiệm pin giảm CPU và điện năng.";

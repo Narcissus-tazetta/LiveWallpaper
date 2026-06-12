@@ -163,9 +163,9 @@ extension SettingsView {
       case .off:
         model.localizedString("制限なし")
       case .fps30:
-        "30fps"
+        model.localizedString("軽量")
       case .fps60:
-        "60fps"
+        model.localizedString("高負荷")
       }
 
     return "\(qualityText)・\(workProfileText)・\(frameRateText)"
@@ -178,6 +178,10 @@ extension SettingsView {
       advancedFrameRateRow
       advancedDecodeRow
       advancedDesktopLevelRow
+
+      Toggle(isOn: autoFrameRateBinding) {
+        Text(model.localizedString("環境に応じて再生負荷を自動調整"))
+      }
 
       Toggle(isOn: fullScreenAuxiliaryBinding) {
         HStack(spacing: 6) {
@@ -268,7 +272,7 @@ extension SettingsView {
     VStack(alignment: .leading, spacing: 0) {
       HStack(spacing: 24) {
         HStack {
-          Text(model.localizedString("フレームレート"))
+          Text(model.localizedString("再生負荷"))
             .lineLimit(1)
           Spacer(minLength: 8)
           helpIconButton(for: .frameRate)
@@ -277,8 +281,8 @@ extension SettingsView {
 
         Picker("", selection: frameRateLimitBinding) {
           Text(model.localizedString("制限なし")).tag(FrameRateLimit.off)
-          Text("30").tag(FrameRateLimit.fps30)
-          Text("60").tag(FrameRateLimit.fps60)
+          Text(model.localizedString("軽量")).tag(FrameRateLimit.fps30)
+          Text(model.localizedString("高負荷")).tag(FrameRateLimit.fps60)
         }
         .pickerStyle(.segmented)
         .labelsHidden()
@@ -286,7 +290,11 @@ extension SettingsView {
       }
 
       if expandedHelpTopics.contains(.frameRate) {
-        Text(model.localizedString("動画の再生上限を選べます。制限なしは滑らかさ優先、30/60 はCPUと電力を抑えやすくなります。"))
+        Text(
+          model.localizedString(
+            "再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。"
+          )
+        )
           .font(.caption)
           .foregroundColor(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -308,20 +316,19 @@ extension SettingsView {
         EqualSegmentedControl(
           options: [
             (model.localizedString("自動"), DecodeMode.automatic),
-            ("GPU", DecodeMode.gpuAdaptive),
             (model.localizedString("標準"), DecodeMode.balanced),
-            (model.localizedString("省電"), DecodeMode.efficiency),
+            (model.localizedString("省電"), DecodeMode.efficiency)
           ],
           selection: decodeModeBinding
         )
-        .frame(width: 280, height: 24, alignment: .leading)
+        .frame(width: 240, height: 24, alignment: .leading)
       }
 
       if expandedHelpTopics.contains(.decode) {
         Text(
           model
             .localizedString(
-              "動画データのデコード方法を切り替えます。自動はハードウェア/ソフトウェアを状況に応じて選び、標準はGPUハードウェア優先で滑らかさを保ちます。省電力はソフトウェア再生を多用し、CPU負荷と消費電力を低く抑えますが再生品質が落ちる場合があります。"
+              "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。"
             )
         )
         .font(.caption)

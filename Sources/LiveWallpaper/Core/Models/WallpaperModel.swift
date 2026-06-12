@@ -63,17 +63,15 @@ final class WallpaperModel: ObservableObject {
     var frontmostAppObserver: NSObjectProtocol?
     var activeSpaceObserver: NSObjectProtocol?
     var playerItemEndObserver: NSObjectProtocol?
-    var axObserver: AXObserver?
-    var observedAppElement: AXUIElement?
-    var observedAppPID: pid_t?
+    var axCoverageObserver: ForegroundCoverageAXObserver?
     var suspendedDisplayIDs: Set<String> = []
     var autoFrameRateTimer: Timer?
     var autoFrameRateBitRateFactor: Double = 1.0
     var autoFrameRateBufferAdjustment: TimeInterval = 0
     var coverageEvaluationWorkItem: DispatchWorkItem?
     var coverageEvaluationGeneration: UInt64 = 0
-    var playbackStartupValidationWorkItem: DispatchWorkItem?
-    var lastPlaybackFallbackPath: String?
+    var statePersistWorkItem: DispatchWorkItem?
+    var persistenceFailureCount: Int = 0
     var lastCoverageEvaluationAt: CFAbsoluteTime = 0
     let playbackEnvironment: PlaybackEnvironment
     var videoAspectRatioByPath: [String: Double] = [:]
@@ -101,12 +99,14 @@ final class WallpaperModel: ObservableObject {
     @Published var suspendWhenOtherAppFullScreen: Bool = false
     @Published var suspendExclusionBundleIDs: [String] = []
     @Published var suspendWhenOtherAppStatusMessage: String?
+    @Published var persistenceFailureMessage: String?
 
     @Published var playlists: [WallpaperPlaylist] = []
     @Published var selectedPlaylistID: UUID?
     @Published var currentVideoPath: String?
     @Published var registeredVideoPaths: [String] = []
     @Published var registeredVideoDisplayNames: [String: String] = [:]
+    @Published var launchAtLoginEnabled: Bool = false
     @Published var appLanguage: AppLanguage = .automatic
     @Published var wallpaperPresentationByPath:
         [String: [String: WallpaperPresentation]] = [:]
@@ -197,7 +197,7 @@ final class WallpaperModel: ObservableObject {
         windowOptionsWorkItem?.cancel()
         windowRetireWorkItem?.cancel()
         coverageEvaluationWorkItem?.cancel()
-        playbackStartupValidationWorkItem?.cancel()
+        statePersistWorkItem?.cancel()
         retiredWindows.removeAll()
         if let observer: any NSObjectProtocol = screenChangeObserver {
             NotificationCenter.default.removeObserver(observer)
@@ -213,9 +213,8 @@ final class WallpaperModel: ObservableObject {
         }
         autoFrameRateTimer?.invalidate()
         autoFrameRateTimer = nil
-        MainActor.assumeIsolated {
-            removeAXObserver()
-        }
+        axCoverageObserver?.detach()
+        axCoverageObserver = nil
     }
 
     func currentAppVersion() -> String {

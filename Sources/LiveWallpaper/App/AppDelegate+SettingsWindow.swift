@@ -122,6 +122,13 @@ extension AppDelegate {
         }
     }
 
+    func syncLaunchAtLoginState() {
+        let enabled = currentLaunchAtLoginEnabled()
+        launchAtLoginEnabled = enabled
+        wallpaperModel.launchAtLoginEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "launchAtLogin")
+    }
+
     @objc func handleAutoUpdateToggle(_ note: Notification) {
         if let enabled: Bool = note.object as? Bool {
             setAutoUpdateEnabled(enabled)
@@ -133,7 +140,14 @@ extension AppDelegate {
     }
 
     @objc func handleClearCache() {
-        _ = wallpaperModel.clearCache()
+        if wallpaperModel.clearCache() {
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = localized("キャッシュの削除に失敗しました")
+        alert.informativeText = localized("保存先フォルダへのアクセスに失敗した可能性があります。")
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 
     func currentLaunchAtLoginEnabled() -> Bool {
@@ -155,22 +169,21 @@ extension AppDelegate {
                         try SMAppService.mainApp.unregister()
                     }
                 }
-                launchAtLoginEnabled = currentLaunchAtLoginEnabled()
-                UserDefaults.standard.set(launchAtLoginEnabled, forKey: "launchAtLogin")
+                syncLaunchAtLoginState()
             } catch {
                 let alert = NSAlert()
                 alert.messageText = localized("ログイン時起動の設定に失敗しました")
                 alert.informativeText = error.localizedDescription
                 alert.alertStyle = .warning
                 alert.runModal()
-                launchAtLoginEnabled = currentLaunchAtLoginEnabled()
+                syncLaunchAtLoginState()
             }
         } else {
             let alert = NSAlert()
             alert.messageText = localized("このmacOSではログイン時起動設定に対応していません")
             alert.alertStyle = .informational
             alert.runModal()
-            launchAtLoginEnabled = false
+            syncLaunchAtLoginState()
         }
     }
 

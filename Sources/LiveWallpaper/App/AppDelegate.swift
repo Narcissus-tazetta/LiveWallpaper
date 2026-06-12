@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        launchAtLoginEnabled = currentLaunchAtLoginEnabled()
+        syncLaunchAtLoginState()
         autoUpdateEnabled =
             UserDefaults.standard.object(forKey: "autoUpdateEnabled") as? Bool ?? true
         NSApp.applicationIconImage = appIconImage()
@@ -62,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     deinit {
+        NotificationCenter.default.removeObserver(self)
         if let monitor: Any = settingsKeyMonitor {
             NSEvent.removeMonitor(monitor)
         }

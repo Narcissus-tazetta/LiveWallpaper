@@ -72,8 +72,11 @@ extension DiskThumbnailCache {
   }
 
   func writeToDisk(path: String, image: NSImage) {
+    guard let dataDirectoryURL = Self.dataDirectoryURL() else {
+      return
+    }
     let fileName = "\(Self.hashed(path)).jpg"
-    let fileURL = Self.dataDirectoryURL().appendingPathComponent(fileName)
+    let fileURL = dataDirectoryURL.appendingPathComponent(fileName)
     ioQueue.async { [weak self] in
       guard let entry = DiskThumbnailCache.buildEntryForWrite(
         sourcePath: path,

@@ -3,18 +3,21 @@ import UniformTypeIdentifiers
 
 extension AppDelegate {
   @objc func openSettings() {
+    syncLaunchAtLoginState()
     settingsWindowController?.showWindow(nil)
     NSApp.activate(ignoringOtherApps: true)
     NotificationCenter.default.post(name: .openSettingsTab, object: nil)
   }
 
   @objc func openWallpaperTab() {
+    syncLaunchAtLoginState()
     settingsWindowController?.showWindow(nil)
     NSApp.activate(ignoringOtherApps: true)
     NotificationCenter.default.post(name: .openWallpaperTab, object: nil)
   }
 
   @objc func openWallpaperFitTab() {
+    syncLaunchAtLoginState()
     settingsWindowController?.showWindow(nil)
     NSApp.activate(ignoringOtherApps: true)
     NotificationCenter.default.post(name: .openWallpaperFitTab, object: nil)

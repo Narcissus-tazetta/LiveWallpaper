@@ -100,6 +100,16 @@ extension SettingsView {
                                 || model.pinCurrentVideo
                         )
 
+                        if model.canPinCurrentVideo || model.pinCurrentVideo {
+                            compactToggle(
+                                model.localizedString("この動画で固定"),
+                                isOn: Binding<Bool>(
+                                    get: { model.pinCurrentVideo },
+                                    set: { model.setPinCurrentVideo($0) }
+                                )
+                            )
+                        }
+
                         Spacer(minLength: 12)
 
                         if let index = model.currentVideoIndex {
@@ -127,6 +137,12 @@ extension SettingsView {
                         .disabled(registeredCount < 2)
 
                         Spacer(minLength: 0)
+                    }
+
+                    if model.canPinCurrentVideo || model.pinCurrentVideo {
+                        Text(model.localizedString("固定はアプリ再起動まで有効です。"))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                     }
 
                     GeometryReader { proxy in

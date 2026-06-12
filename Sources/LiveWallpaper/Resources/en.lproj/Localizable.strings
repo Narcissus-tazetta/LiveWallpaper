@@ -165,3 +165,14 @@
 "手動ダウンロード" = "Manual Download";
 "画面" = "Screen";
 "メイン" = "Main";
+"アクセシビリティ権限が必要です。システム設定でLiveWallpaperを許可してください。" = "Accessibility permission is required. Allow LiveWallpaper in System Settings > Privacy & Security > Accessibility.";
+"設定の保存に失敗しています。空き容量などを確認してください。" = "Failed to save settings. Check available storage and try again.";
+"キャッシュの削除に失敗しました" = "Failed to clear cache";
+"保存先フォルダへのアクセスに失敗した可能性があります。" = "The app may not have access to the storage folder.";
+"固定はアプリ再起動まで有効です。" = "Pinning stays active until the app restarts.";
+"環境に応じて再生負荷を自動調整" = "Automatically adjust playback load for current conditions";
+"再生負荷" = "Playback load";
+"再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。" = "Choose a playback load preset. This adjusts internal bitrate only; display resolution does not change.";
+"軽量" = "Light";
+"高負荷" = "Heavy";
+"動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Choose how video is decoded. Automatic adapts to your Mac, Balanced favors smooth playback, and Power Saving reduces CPU use and power draw.";

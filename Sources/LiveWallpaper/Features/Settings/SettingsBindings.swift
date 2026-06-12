@@ -10,7 +10,7 @@ extension SettingsView {
 
   var launchAtLoginBinding: Binding<Bool> {
     Binding(
-      get: { UserDefaults.standard.bool(forKey: "launchAtLogin") },
+      get: { model.launchAtLoginEnabled },
       set: { NotificationCenter.default.post(name: .toggleLaunchAtLogin, object: $0) }
     )
   }
@@ -96,6 +96,13 @@ extension SettingsView {
     Binding(
       get: { model.useFullScreenAuxiliary },
       set: { model.setFullScreenAuxiliary($0) }
+    )
+  }
+
+  var autoFrameRateBinding: Binding<Bool> {
+    Binding(
+      get: { model.autoFrameRateEnabled },
+      set: { model.setAutoFrameRateEnabled($0) }
     )
   }
 

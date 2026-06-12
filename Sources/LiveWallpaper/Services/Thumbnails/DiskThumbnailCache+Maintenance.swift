@@ -50,7 +50,11 @@ extension DiskThumbnailCache {
       return
     }
 
-    let fileURL = Self.dataDirectoryURL().appendingPathComponent(entry.fileName)
+    guard let dataDirectoryURL = Self.dataDirectoryURL() else {
+      return
+    }
+
+    let fileURL = dataDirectoryURL.appendingPathComponent(entry.fileName)
     ioQueue.async {
       try? FileManager.default.removeItem(at: fileURL)
     }
@@ -87,7 +91,9 @@ extension DiskThumbnailCache {
   func trimDiskIfNeeded() {
     let entries = metadata.entries
     let maxBytes = maxDiskBytes
-    let dataURL = Self.dataDirectoryURL()
+    guard let dataURL = Self.dataDirectoryURL() else {
+      return
+    }
     ioQueue.async { [weak self] in
       let fileManager = FileManager.default
       var sizedEntries: [SizedEntry] = []
@@ -189,12 +195,17 @@ extension DiskThumbnailCache {
     metadataFlushWorkItem = nil
 
     let snapshot = metadata
-    let metadataURL = Self.metadataFileURL()
+    guard let metadataURL = Self.metadataFileURL() else {
+      NSLog("[ThumbnailCache] metadata path unavailable")
+      return
+    }
     ioQueue.async {
-      guard let data = try? JSONEncoder().encode(snapshot) else {
-        return
+      do {
+        let data = try JSONEncoder().encode(snapshot)
+        try data.write(to: metadataURL, options: .atomic)
+      } catch {
+        NSLog("[ThumbnailCache] metadata flush failed error=\(error.localizedDescription)")
       }
-      try? data.write(to: metadataURL, options: .atomic)
     }
   }
 
@@ -207,32 +218,47 @@ extension DiskThumbnailCache {
     metadataFlushWorkItem = nil
 
     let snapshot = metadata
-    let metadataURL = Self.metadataFileURL()
+    guard let metadataURL = Self.metadataFileURL() else {
+      NSLog("[ThumbnailCache] metadata path unavailable")
+      return
+    }
     ioQueue.sync {
-      guard let data = try? JSONEncoder().encode(snapshot) else {
-        return
+      do {
+        let data = try JSONEncoder().encode(snapshot)
+        try data.write(to: metadataURL, options: .atomic)
+      } catch {
+        NSLog("[ThumbnailCache] metadata flush failed error=\(error.localizedDescription)")
       }
-      try? data.write(to: metadataURL, options: .atomic)
     }
   }
 
-  nonisolated static func rootDirectoryURL() -> URL {
-    let support = FileManager.default.urls(
-      for: .applicationSupportDirectory,
-      in: .userDomainMask
-    ).first!
+  nonisolated static func rootDirectoryURL() -> URL? {
+    guard
+      let support = FileManager.default.urls(
+        for: .applicationSupportDirectory,
+        in: .userDomainMask
+      ).first
+    else {
+      return nil
+    }
     return
       support
       .appendingPathComponent("LiveWallpaper", isDirectory: true)
       .appendingPathComponent("ThumbnailCache", isDirectory: true)
   }
 
-  nonisolated static func dataDirectoryURL() -> URL {
-    rootDirectoryURL().appendingPathComponent("data", isDirectory: true)
+  nonisolated static func dataDirectoryURL() -> URL? {
+    guard let rootDirectoryURL = rootDirectoryURL() else {
+      return nil
+    }
+    return rootDirectoryURL.appendingPathComponent("data", isDirectory: true)
   }
 
-  nonisolated static func metadataFileURL() -> URL {
-    rootDirectoryURL().appendingPathComponent(Self.metadataFileName)
+  nonisolated static func metadataFileURL() -> URL? {
+    guard let rootDirectoryURL = rootDirectoryURL() else {
+      return nil
+    }
+    return rootDirectoryURL.appendingPathComponent(Self.metadataFileName)
   }
 
   nonisolated static func hashed(_ value: String) -> String {
