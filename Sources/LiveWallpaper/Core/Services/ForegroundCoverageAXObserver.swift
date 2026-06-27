@@ -19,11 +19,18 @@ final class ForegroundCoverageAXObserver {
         }
     }
 
-    private static let notificationNames: [CFString] = [
+    private static let requiredNotificationNames: [CFString] = [
         kAXFocusedWindowChangedNotification as CFString,
         kAXWindowMovedNotification as CFString,
         kAXWindowResizedNotification as CFString,
         kAXMainWindowChangedNotification as CFString
+    ]
+
+    private static let optionalNotificationNames: [CFString] = [
+        kAXWindowCreatedNotification as CFString,
+        kAXWindowMiniaturizedNotification as CFString,
+        kAXWindowDeminiaturizedNotification as CFString,
+        kAXUIElementDestroyedNotification as CFString
     ]
 
     private static let axCallback: AXObserverCallback = { _, _, _, refcon in
@@ -80,12 +87,15 @@ final class ForegroundCoverageAXObserver {
 
         let appElement = AXUIElementCreateApplication(pid)
 
-        for notification in Self.notificationNames {
+        for notification in Self.requiredNotificationNames {
             let addResult = AXObserverAddNotification(observer, appElement, notification, refcon)
             if addResult != .success {
                 detach()
                 return false
             }
+        }
+        for notification in Self.optionalNotificationNames {
+            _ = AXObserverAddNotification(observer, appElement, notification, refcon)
         }
 
         CFRunLoopAddSource(
@@ -111,7 +121,7 @@ final class ForegroundCoverageAXObserver {
         }
 
         if let appElement = observedAppElement {
-            for notification in Self.notificationNames {
+            for notification in Self.requiredNotificationNames + Self.optionalNotificationNames {
                 _ = AXObserverRemoveNotification(observer, appElement, notification)
             }
         }

@@ -3,6 +3,11 @@ enum DisplayMode: String {
     case allScreens
 }
 
+enum SuspendDetectionMode: String {
+    case frontmostAppPresence
+    case preciseWindowCoverage
+}
+
 enum VideoFitMode: String, Codable {
     case fill
     case fit

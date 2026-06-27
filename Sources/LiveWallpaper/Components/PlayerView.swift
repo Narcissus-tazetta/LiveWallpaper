@@ -26,8 +26,8 @@ final class PlayerView: NSView {
     private func setupLayers() {
         wantsLayer = true
         layer?.masksToBounds = true
-        layer?.backgroundColor = NSColor.black.cgColor
-        playerLayer.backgroundColor = NSColor.black.cgColor
+        layer?.backgroundColor = NSColor.clear.cgColor
+        playerLayer.backgroundColor = NSColor.clear.cgColor
         playerLayer.needsDisplayOnBoundsChange = true
         if playerLayer.superlayer == nil {
             layer?.addSublayer(playerLayer)

@@ -29,20 +29,72 @@ extension SettingsView {
       }
 
       Toggle(model.localizedString("再生の軽量モード（省電力）"), isOn: lightweightModeBinding)
-      Toggle(model.localizedString("他のアプリが前面にあるとき再生を停止"), isOn: suspendWhenFullScreenBinding)
-
-      if let statusMessage = model.suspendWhenOtherAppStatusMessage {
-        Text(statusMessage)
-          .font(.caption)
-          .foregroundColor(.secondary)
-      }
+      Toggle(model.localizedString("作業中は壁紙の再生を自動停止"), isOn: suspendWhenFullScreenBinding)
 
       if model.suspendWhenOtherAppFullScreen {
+        suspendDetectionModeSection
         suspendExclusionSection
       }
 
       advancedSettingsSection
     }
+  }
+
+  var suspendDetectionModeSection: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 16) {
+        Text(model.localizedString("停止判定"))
+          .font(.caption)
+          .foregroundColor(.secondary)
+          .frame(width: 130, alignment: .leading)
+        Picker("", selection: suspendDetectionModeBinding) {
+          Text(model.localizedString("前面アプリ")).tag(SuspendDetectionMode.frontmostAppPresence)
+          Text(model.localizedString("画面を覆う時")).tag(SuspendDetectionMode.preciseWindowCoverage)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 240, alignment: .leading)
+      }
+
+      Text(suspendDetectionModeDescription())
+        .font(.caption)
+        .foregroundColor(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+      if shouldShowAccessibilityCoverageWarning {
+        VStack(alignment: .leading, spacing: 6) {
+          Text(accessibilityCoverageWarningText())
+            .font(.caption)
+            .foregroundColor(.red)
+            .frame(maxWidth: .infinity, alignment: .leading)
+          Button(model.localizedString("アクセシビリティ許可を開く")) {
+            model.requestAccessibilityPermissionForCoverage()
+          }
+          .buttonStyle(.borderedProminent)
+          .controlSize(.small)
+        }
+      }
+    }
+    .padding(.vertical, 6)
+  }
+
+  func suspendDetectionModeDescription() -> String {
+    switch model.suspendDetectionMode {
+    case .frontmostAppPresence:
+      return model.localizedString("Screen Recording権限を使わず、他のアプリが前面にある間は対象ディスプレイの再生を止めます。")
+    case .preciseWindowCoverage:
+      return model.localizedString("アクセシビリティ権限がある場合、前面ウィンドウが画面を大きく覆う時だけ停止します。判定できない時は安全側として停止します。")
+    }
+  }
+
+  var shouldShowAccessibilityCoverageWarning: Bool {
+    model.suspendWhenOtherAppFullScreen
+      && model.suspendDetectionMode == .preciseWindowCoverage
+      && !model.accessibilityTrustedForCoverage
+  }
+
+  func accessibilityCoverageWarningText() -> String {
+    model.localizedString("精密な停止判定にはアクセシビリティ権限が必要です。許可されるまでは安全側として前面アプリがある画面を停止します。")
   }
 
   var suspendExclusionSection: some View {

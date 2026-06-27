@@ -59,6 +59,9 @@ final class WallpaperModel: ObservableObject {
     var windowOptionsWorkItem: DispatchWorkItem?
     var windowRetireWorkItem: DispatchWorkItem?
     var retiredWindows: [NSWindow] = []
+    var displayIDByWindow: [ObjectIdentifier: String] = [:]
+    var activeSpaceWindowRefreshWorkItems: [DispatchWorkItem] = []
+    var activeSpaceCoverageWorkItems: [DispatchWorkItem] = []
     var lastScreenSignatures: [ScreenSignature] = []
     var frontmostAppObserver: NSObjectProtocol?
     var activeSpaceObserver: NSObjectProtocol?
@@ -69,6 +72,7 @@ final class WallpaperModel: ObservableObject {
     var autoFrameRateBitRateFactor: Double = 1.0
     var autoFrameRateBufferAdjustment: TimeInterval = 0
     var coverageEvaluationWorkItem: DispatchWorkItem?
+    var activeSpaceTransitionWorkItem: DispatchWorkItem?
     var coverageEvaluationGeneration: UInt64 = 0
     var statePersistWorkItem: DispatchWorkItem?
     var persistenceFailureCount: Int = 0
@@ -97,8 +101,9 @@ final class WallpaperModel: ObservableObject {
     @Published var desktopLevelOffset: DesktopLevelOffset = .zero
     @Published var useFullScreenAuxiliary: Bool = false
     @Published var suspendWhenOtherAppFullScreen: Bool = false
+    @Published var suspendDetectionMode: SuspendDetectionMode = .frontmostAppPresence
+    @Published var accessibilityTrustedForCoverage: Bool = false
     @Published var suspendExclusionBundleIDs: [String] = []
-    @Published var suspendWhenOtherAppStatusMessage: String?
     @Published var persistenceFailureMessage: String?
 
     @Published var playlists: [WallpaperPlaylist] = []
@@ -174,6 +179,7 @@ final class WallpaperModel: ObservableObject {
         configurePlayer()
         restoreState()
         LocalizationManager.setLanguage(effectiveAppLanguageCode)
+        refreshAccessibilityTrustForCoverage()
         rebuildWindows()
         if let savedPath: String = currentVideoPath {
             playVideo(url: URL(fileURLWithPath: savedPath))
@@ -197,7 +203,12 @@ final class WallpaperModel: ObservableObject {
         windowRebuildWorkItem?.cancel()
         windowOptionsWorkItem?.cancel()
         windowRetireWorkItem?.cancel()
+        activeSpaceWindowRefreshWorkItems.forEach { $0.cancel() }
+        activeSpaceWindowRefreshWorkItems.removeAll()
+        activeSpaceCoverageWorkItems.forEach { $0.cancel() }
+        activeSpaceCoverageWorkItems.removeAll()
         coverageEvaluationWorkItem?.cancel()
+        activeSpaceTransitionWorkItem?.cancel()
         statePersistWorkItem?.cancel()
         retiredWindows.removeAll()
         if let observer: any NSObjectProtocol = screenChangeObserver {

@@ -57,6 +57,13 @@ extension SettingsView {
     )
   }
 
+  var suspendDetectionModeBinding: Binding<SuspendDetectionMode> {
+    Binding(
+      get: { model.suspendDetectionMode },
+      set: { model.setSuspendDetectionMode($0) }
+    )
+  }
+
   var qualityPresetBinding: Binding<QualityPreset> {
     Binding(
       get: { model.qualityPreset },

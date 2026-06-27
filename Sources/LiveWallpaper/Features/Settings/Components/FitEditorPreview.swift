@@ -114,10 +114,14 @@ extension SettingsView {
             }
             .contentShape(RoundedRectangle(cornerRadius: 12))
             .onAppear {
-                updateFitEditorPreviewFrameSize(frameSize, path: path, screenID: screenID)
+                DispatchQueue.main.async {
+                    updateFitEditorPreviewFrameSize(frameSize, path: path, screenID: screenID)
+                }
             }
             .onChange(of: frameSize) { newSize in
-                updateFitEditorPreviewFrameSize(newSize, path: path, screenID: screenID)
+                DispatchQueue.main.async {
+                    updateFitEditorPreviewFrameSize(newSize, path: path, screenID: screenID)
+                }
             }
         }
         .frame(maxWidth: .infinity)

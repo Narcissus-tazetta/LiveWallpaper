@@ -8,21 +8,47 @@ extension WallpaperModel {
     func setSuspendWhenOtherAppFullScreen(_ enabled: Bool) -> Bool {
         guard suspendWhenOtherAppFullScreen != enabled else {
             if enabled {
-                suspendWhenOtherAppStatusMessage = nil
                 evaluateForegroundCoverageState()
             } else {
-                suspendWhenOtherAppStatusMessage = nil
                 applyCoveringAppSuspension(false)
             }
             return true
         }
 
-        suspendWhenOtherAppStatusMessage = nil
-        suspendWhenOtherAppFullScreen = enabled
         UserDefaults.standard.set(enabled, forKey: "suspendWhenOtherAppFullScreen")
-        configureForegroundCoverageMonitoring()
-        evaluateForegroundCoverageState()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            guard self.suspendWhenOtherAppFullScreen != enabled else {
+                return
+            }
+            self.suspendWhenOtherAppFullScreen = enabled
+            self.configureForegroundCoverageMonitoring()
+            self.evaluateForegroundCoverageState()
+        }
         return true
+    }
+
+    func setSuspendDetectionMode(_ mode: SuspendDetectionMode) {
+        guard suspendDetectionMode != mode else {
+            evaluateForegroundCoverageState()
+            return
+        }
+
+        UserDefaults.standard.set(mode.rawValue, forKey: "suspendDetectionMode")
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            guard self.suspendDetectionMode != mode else {
+                return
+            }
+            self.suspendDetectionMode = mode
+            self.refreshAccessibilityTrustForCoverage()
+            self.configureForegroundCoverageMonitoring()
+            self.evaluateForegroundCoverageState()
+        }
     }
 
     func addSuspendExclusionBundleID(_ bundleID: String) {
@@ -68,7 +94,7 @@ extension WallpaperModel {
             return false
         }
         guard let bundle = Bundle(url: resolvedURL),
-              let bundleID = bundle.bundleIdentifier
+            let bundleID = bundle.bundleIdentifier
         else {
             return false
         }
@@ -87,21 +113,29 @@ extension WallpaperModel {
         }
 
         guard suspendWhenOtherAppFullScreen else {
+            refreshAccessibilityTrustForCoverage()
             coverageEvaluationWorkItem?.cancel()
             coverageEvaluationWorkItem = nil
+            activeSpaceTransitionWorkItem?.cancel()
+            activeSpaceTransitionWorkItem = nil
+            activeSpaceCoverageWorkItems.forEach { $0.cancel() }
+            activeSpaceCoverageWorkItems.removeAll()
             removeAXObserver()
             applyCoveringAppSuspension(false)
             return
         }
 
         let workspaceCenter = NSWorkspace.shared.notificationCenter
+        refreshAccessibilityTrustForCoverage()
         frontmostAppObserver = workspaceCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.updateAXObserverForFrontmostApplication()
+                if self?.suspendDetectionMode == .preciseWindowCoverage {
+                    self?.updateAXObserverForFrontmostApplication()
+                }
                 self?.scheduleForegroundCoverageEvaluation()
             }
         }
@@ -112,15 +146,68 @@ extension WallpaperModel {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.scheduleForegroundCoverageEvaluation()
+                self?.handleActiveSpaceDidChange()
             }
         }
 
-        updateAXObserverForFrontmostApplication()
+        if suspendDetectionMode == .preciseWindowCoverage {
+            updateAXObserverForFrontmostApplication()
+        } else {
+            removeAXObserver()
+        }
     }
 
     private func isAccessibilityTrusted() -> Bool {
         AXIsProcessTrusted()
+    }
+
+    @discardableResult
+    func refreshAccessibilityTrustForCoverage() -> Bool {
+        let trusted = isAccessibilityTrusted()
+        guard accessibilityTrustedForCoverage != trusted else {
+            return trusted
+        }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            guard self.accessibilityTrustedForCoverage != trusted else {
+                return
+            }
+            self.accessibilityTrustedForCoverage = trusted
+        }
+        return trusted
+    }
+
+    func requestAccessibilityPermissionForCoverage() {
+        let options =
+            [
+                kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
+            ] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+
+        if let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        ) {
+            NSWorkspace.shared.open(url)
+        }
+
+        pollAccessibilityPermissionAfterRequest()
+    }
+
+    private func pollAccessibilityPermissionAfterRequest() {
+        for delay in [0.2, 0.8, 1.6, 3.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self else {
+                    return
+                }
+                let trusted = self.refreshAccessibilityTrustForCoverage()
+                if trusted {
+                    self.updateAXObserverForFrontmostApplication()
+                }
+                self.scheduleForegroundCoverageEvaluation()
+            }
+        }
     }
 
     private func ensureAXCoverageObserver() -> ForegroundCoverageAXObserver {
@@ -132,24 +219,13 @@ extension WallpaperModel {
         return observer
     }
 
-    private func updateAccessibilityCoverageStatusMessage(isTrusted: Bool) {
-        if isTrusted {
-            suspendWhenOtherAppStatusMessage = nil
-            return
-        }
-        suspendWhenOtherAppStatusMessage = localizedString(
-            "アクセシビリティ権限が必要です。システム設定でLiveWallpaperを許可してください。"
-        )
-    }
-
     private func updateAXObserverForFrontmostApplication() {
         guard suspendWhenOtherAppFullScreen else {
             removeAXObserver()
             return
         }
 
-        let trusted = isAccessibilityTrusted()
-        updateAccessibilityCoverageStatusMessage(isTrusted: trusted)
+        let trusted = refreshAccessibilityTrustForCoverage()
         guard trusted else {
             removeAXObserver()
             return
@@ -189,11 +265,21 @@ extension WallpaperModel {
         let generation = coverageEvaluationGeneration
         coverageEvaluationWorkItem?.cancel()
         let delay = max(0.2 - elapsed, 0.05)
+        scheduleForegroundCoverageEvaluation(after: delay, generation: generation)
+    }
+
+    private func scheduleForegroundCoverageEvaluation(
+        after delay: TimeInterval,
+        generation: UInt64? = nil
+    ) {
+        coverageEvaluationGeneration &+= generation == nil ? 1 : 0
+        let expectedGeneration = generation ?? coverageEvaluationGeneration
+        coverageEvaluationWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else {
                 return
             }
-            guard generation == coverageEvaluationGeneration else {
+            guard expectedGeneration == coverageEvaluationGeneration else {
                 return
             }
             lastCoverageEvaluationAt = CFAbsoluteTimeGetCurrent()
@@ -201,7 +287,49 @@ extension WallpaperModel {
             coverageEvaluationWorkItem = nil
         }
         coverageEvaluationWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(delay, 0.05), execute: workItem)
+    }
+
+    private func handleActiveSpaceDidChange() {
+        guard suspendWhenOtherAppFullScreen, currentVideoPath != nil else {
+            scheduleForegroundCoverageEvaluation()
+            return
+        }
+
+        activeSpaceTransitionWorkItem?.cancel()
+        scheduleActiveSpaceWindowRefresh()
+        scheduleActiveSpaceCoverageEvaluations()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else {
+                return
+            }
+            activeSpaceTransitionWorkItem = nil
+            lastCoverageEvaluationAt = CFAbsoluteTimeGetCurrent()
+            scheduleActiveSpaceWindowRefresh()
+        }
+        activeSpaceTransitionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9, execute: workItem)
+    }
+
+    private func scheduleActiveSpaceCoverageEvaluations() {
+        activeSpaceCoverageWorkItems.forEach { $0.cancel() }
+        activeSpaceCoverageWorkItems.removeAll()
+
+        for delay in [0.0, 0.15, 0.45, 0.9] {
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else {
+                    return
+                }
+                if suspendDetectionMode == .preciseWindowCoverage {
+                    updateAXObserverForFrontmostApplication()
+                }
+                lastCoverageEvaluationAt = CFAbsoluteTimeGetCurrent()
+                evaluateForegroundCoverageState()
+            }
+            activeSpaceCoverageWorkItems.append(workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+        }
     }
 
     func evaluateForegroundCoverageState() {
@@ -214,31 +342,47 @@ extension WallpaperModel {
             return
         }
 
-        let frontmostAppDisplayIDs = displayIDsForFrontmostAppPresence()
-        if !frontmostAppDisplayIDs.isEmpty {
-            applyCoveringAppSuspension(frontmostAppDisplayIDs)
-            return
+        let snapshot = foregroundCoverageSnapshot()
+        if suspendDetectionMode == .frontmostAppPresence {
+            removeAXObserver()
         }
-
-        updateAXObserverForFrontmostApplication()
-        let fullScreenDisplayIDs = fullScreenDisplayIDsByFrontmostApp()
-        let coveredDisplayIDs =
-            fullScreenDisplayIDs.isEmpty ? coveredDisplayIDsByFrontmostApp() : fullScreenDisplayIDs
-        applyCoveringAppSuspension(coveredDisplayIDs)
+        applyCoveringAppSuspension(
+            ForegroundCoverageEngine.suspendedDisplayIDs(
+                mode: suspendDetectionMode,
+                snapshot: snapshot
+            )
+        )
     }
 
-    private func frontmostAppForCoverageEvaluation() -> NSRunningApplication? {
+    private func foregroundCoverageSnapshot() -> ForegroundCoverageSnapshot {
+        let app = frontmostAppStateForCoverageEvaluation()
+        let targetIDs = Set(targetScreens().map { displayIDString(for: $0) })
+
+        guard suspendDetectionMode == .preciseWindowCoverage, let app else {
+            return ForegroundCoverageSnapshot(
+                app: app,
+                targetDisplayIDs: targetIDs,
+                axProbe: .unavailable,
+                cgProbe: .unavailable
+            )
+        }
+
+        return ForegroundCoverageSnapshot(
+            app: app,
+            targetDisplayIDs: targetIDs,
+            axProbe: axCoverageProbe(for: app),
+            cgProbe: cgCoverageProbe(for: app)
+        )
+    }
+
+    private func frontmostAppStateForCoverageEvaluation() -> ForegroundCoverageAppState? {
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
             return nil
         }
 
         if let bundleID = frontmostApp.bundleIdentifier,
-           suspendExclusionBundleIDs.contains(normalizeBundleID(bundleID))
+            suspendExclusionBundleIDs.contains(normalizeBundleID(bundleID))
         {
-            return nil
-        }
-
-        if frontmostApp.bundleIdentifier == "com.apple.finder" {
             return nil
         }
 
@@ -248,15 +392,12 @@ extension WallpaperModel {
             return nil
         }
 
-        return frontmostApp
-    }
-
-    private func displayIDsForFrontmostAppPresence() -> Set<String> {
-        guard frontmostAppForCoverageEvaluation() != nil else {
-            return []
-        }
-
-        return Set(targetScreens().map { displayIDString(for: $0) })
+        let bundleID = frontmostApp.bundleIdentifier
+        return ForegroundCoverageAppState(
+            pid: frontmostPID,
+            bundleID: bundleID,
+            isFinder: bundleID == "com.apple.finder"
+        )
     }
 
     private func applyCoveringAppSuspension(_ shouldSuspend: Bool) {
@@ -277,155 +418,159 @@ extension WallpaperModel {
         applySuspensionStateToPlayers()
     }
 
-    private func coveredDisplayIDsByFrontmostApp() -> Set<String> {
-        guard let frontmostApp = frontmostAppForCoverageEvaluation() else {
-            return []
+    private func targetCoverageDisplays() -> [ForegroundCoverageDisplay] {
+        targetScreens().map { screen in
+            let displayID =
+                (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?
+                .uint32Value ?? 0
+            var frames = [screen.frame]
+            let quartzFrame = CGDisplayBounds(displayID)
+            if !quartzFrame.isNull, !quartzFrame.isEmpty, quartzFrame != screen.frame {
+                frames.append(quartzFrame)
+            }
+            return ForegroundCoverageDisplay(
+                id: displayIDString(for: screen),
+                frames: frames
+            )
         }
+    }
 
+    private func cgCoverageProbe(for app: ForegroundCoverageAppState) -> ForegroundCoverageProbe {
         guard
             let windowInfo = CGWindowListCopyWindowInfo(
                 [.optionOnScreenOnly, .excludeDesktopElements],
                 kCGNullWindowID
             ) as? [[String: Any]]
         else {
-            return []
+            return .uncertain
         }
 
-        let frontmostPID = frontmostApp.processIdentifier
-
-        let screenInfos = targetScreens().map { screen in
-            (
-                id: displayIDString(for: screen),
-                frame: screen.frame,
-                area: max(screen.frame.width * screen.frame.height, 1)
-            )
-        }
-        guard !screenInfos.isEmpty else {
-            return []
+        let displays = targetCoverageDisplays()
+        guard !displays.isEmpty else {
+            return .clear
         }
 
-        var covered: Set<String> = []
+        var windows: [ForegroundCoverageWindow] = []
+        var sawRestrictedFrontmostWindow = false
 
         for info in windowInfo {
             let ownerPID = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value
-            guard ownerPID == frontmostPID else {
+            guard ownerPID == app.pid else {
                 continue
             }
 
             let alpha = (info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1
-            if alpha <= 0.01 {
-                continue
-            }
-
             let layer = (info[kCGWindowLayer as String] as? NSNumber)?.intValue ?? 0
-            if layer < 0 {
-                continue
-            }
-
             guard
                 let boundsDictionary = info[kCGWindowBounds as String] as? NSDictionary,
                 let bounds = CGRect(dictionaryRepresentation: boundsDictionary)
             else {
+                sawRestrictedFrontmostWindow = true
                 continue
             }
 
-            guard bounds.width >= 120, bounds.height >= 120 else {
-                continue
-            }
-
-            for screen in screenInfos {
-                let intersection = bounds.intersection(screen.frame)
-                guard !intersection.isNull, !intersection.isEmpty else {
-                    continue
-                }
-                let intersectionArea = intersection.width * intersection.height
-                let coveredRatio = intersectionArea / screen.area
-                if coveredRatio >= 0.9 {
-                    covered.insert(screen.id)
-                }
-            }
+            windows.append(
+                ForegroundCoverageWindow(
+                    bounds: bounds,
+                    alpha: alpha,
+                    layer: layer
+                )
+            )
         }
 
-        return covered
+        guard !sawRestrictedFrontmostWindow else {
+            return .uncertain
+        }
+        guard !windows.isEmpty else {
+            return app.isFinder ? .clear : .uncertain
+        }
+
+        let covered = ForegroundCoverageGeometry.coveredDisplayIDs(
+            by: windows,
+            displays: displays,
+            coverageThreshold: 0.9
+        )
+        return covered.isEmpty ? .clear : .covered(covered)
     }
 
-    private func fullScreenDisplayIDsByFrontmostApp() -> Set<String> {
-        guard let frontmostApp = frontmostAppForCoverageEvaluation() else {
-            return []
+    private func axCoverageProbe(for app: ForegroundCoverageAppState) -> ForegroundCoverageProbe {
+        guard isAccessibilityTrusted() else {
+            return .uncertain
         }
 
-        let frontmostPID = frontmostApp.processIdentifier
+        guard let windowElement = frontmostAXWindowElement(for: app.pid) else {
+            return app.isFinder ? .clear : .uncertain
+        }
 
-        let appElement = AXUIElementCreateApplication(frontmostPID)
+        guard let bounds = boundsForAXWindow(windowElement) else {
+            return .uncertain
+        }
+
+        let isMiniaturized =
+            boolAXAttribute(
+                kAXMinimizedAttribute as CFString,
+                in: windowElement
+            ) ?? false
+        let isFullScreen =
+            boolAXAttribute(
+                "AXFullScreen" as CFString,
+                in: windowElement
+            ) ?? false
+        let threshold: CGFloat = isFullScreen ? 0.95 : 0.9
+
+        let displays = targetCoverageDisplays()
+        guard !displays.isEmpty else {
+            return .clear
+        }
+
+        let covered = ForegroundCoverageGeometry.coveredDisplayIDs(
+            by: [
+                ForegroundCoverageWindow(
+                    bounds: bounds,
+                    isMiniaturized: isMiniaturized
+                )
+            ],
+            displays: displays,
+            coverageThreshold: threshold
+        )
+        if isFullScreen, covered.isEmpty {
+            return .uncertain
+        }
+        return covered.isEmpty ? .clear : .covered(covered)
+    }
+
+    private func frontmostAXWindowElement(for pid: pid_t) -> AXUIElement? {
+        let appElement = AXUIElementCreateApplication(pid)
         var focusedWindow: CFTypeRef?
         let focusedResult = AXUIElementCopyAttributeValue(
             appElement,
             kAXFocusedWindowAttribute as CFString,
             &focusedWindow
         )
-        if focusedResult != .success {
-            var mainWindow: CFTypeRef?
-            let mainResult = AXUIElementCopyAttributeValue(
-                appElement,
-                kAXMainWindowAttribute as CFString,
-                &mainWindow
-            )
-            if mainResult == .success {
-                focusedWindow = mainWindow
-            }
+        if focusedResult == .success, let focusedWindow {
+            return unsafeBitCast(focusedWindow, to: AXUIElement.self)
         }
 
-        guard let windowRef = focusedWindow else {
-            return []
-        }
-        let windowElement = unsafeBitCast(windowRef, to: AXUIElement.self)
-
-        var fullScreenValue: CFTypeRef?
-        let fullScreenAttribute: CFString = "AXFullScreen" as CFString
-        let fullScreenResult = AXUIElementCopyAttributeValue(
-            windowElement,
-            fullScreenAttribute,
-            &fullScreenValue
+        var mainWindow: CFTypeRef?
+        let mainResult = AXUIElementCopyAttributeValue(
+            appElement,
+            kAXMainWindowAttribute as CFString,
+            &mainWindow
         )
-        guard fullScreenResult == .success,
-              let number = fullScreenValue as? NSNumber,
-              number.boolValue
-        else {
-            return []
+        if mainResult == .success, let mainWindow {
+            return unsafeBitCast(mainWindow, to: AXUIElement.self)
         }
 
-        guard let bounds = boundsForAXWindow(windowElement) else {
-            return coveredDisplayIDsByFrontmostApp()
-        }
+        return nil
+    }
 
-        let screenInfos = targetScreens().map { screen in
-            (
-                id: displayIDString(for: screen),
-                frame: screen.frame,
-                area: max(screen.frame.width * screen.frame.height, 1)
-            )
+    private func boolAXAttribute(_ attribute: CFString, in element: AXUIElement) -> Bool? {
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(element, attribute, &value)
+        guard result == .success else {
+            return nil
         }
-        guard !screenInfos.isEmpty else {
-            return []
-        }
-
-        var covered: Set<String> = []
-        for screen in screenInfos {
-            let intersection = bounds.intersection(screen.frame)
-            guard !intersection.isNull, !intersection.isEmpty else {
-                continue
-            }
-            let coveredRatio = (intersection.width * intersection.height) / screen.area
-            if coveredRatio >= 0.95 {
-                covered.insert(screen.id)
-            }
-        }
-
-        if !covered.isEmpty {
-            return covered
-        }
-
-        return coveredDisplayIDsByFrontmostApp()
+        return (value as? NSNumber)?.boolValue
     }
 
     private func boundsForAXWindow(_ windowElement: AXUIElement) -> CGRect? {
@@ -444,11 +589,11 @@ extension WallpaperModel {
         )
 
         guard positionResult == .success,
-              sizeResult == .success,
-              let positionValue,
-              let sizeValue,
-              CFGetTypeID(positionValue) == AXValueGetTypeID(),
-              CFGetTypeID(sizeValue) == AXValueGetTypeID()
+            sizeResult == .success,
+            let positionValue,
+            let sizeValue,
+            CFGetTypeID(positionValue) == AXValueGetTypeID(),
+            CFGetTypeID(sizeValue) == AXValueGetTypeID()
         else {
             return nil
         }
@@ -459,9 +604,9 @@ extension WallpaperModel {
         var point = CGPoint.zero
         var size = CGSize.zero
         guard AXValueGetType(axPosition) == .cgPoint,
-              AXValueGetType(axSize) == .cgSize,
-              AXValueGetValue(axPosition, .cgPoint, &point),
-              AXValueGetValue(axSize, .cgSize, &size)
+            AXValueGetType(axSize) == .cgSize,
+            AXValueGetValue(axPosition, .cgPoint, &point),
+            AXValueGetValue(axSize, .cgSize, &size)
         else {
             return nil
         }
