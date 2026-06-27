@@ -57,6 +57,13 @@ extension WallpaperModel {
         applyLightweightSettings()
         suspendWhenOtherAppFullScreen =
             UserDefaults.standard.object(forKey: "suspendWhenOtherAppFullScreen") as? Bool ?? false
+        if let detectionModeValue = UserDefaults.standard.string(
+            forKey: "suspendDetectionMode"
+        ),
+            let restoredDetectionMode = SuspendDetectionMode(rawValue: detectionModeValue)
+        {
+            suspendDetectionMode = restoredDetectionMode
+        }
         if let savedExclusions = UserDefaults.standard.stringArray(
             forKey: "suspendExclusionBundleIDs"
         ) {
@@ -65,8 +72,6 @@ extension WallpaperModel {
             )
             .sorted()
         }
-        suspendWhenOtherAppStatusMessage = nil
-
         if let playlistData = UserDefaults.standard.data(forKey: "playlistsData"),
            let decoded = try? JSONDecoder().decode([WallpaperPlaylist].self, from: playlistData)
         {
@@ -222,9 +227,9 @@ extension WallpaperModel {
         setFullScreenAuxiliary(false)
         setAdvancedSharingEnabled(false)
         _ = setSuspendWhenOtherAppFullScreen(false)
+        setSuspendDetectionMode(.frontmostAppPresence)
         suspendExclusionBundleIDs = []
         UserDefaults.standard.removeObject(forKey: "suspendExclusionBundleIDs")
-        suspendWhenOtherAppStatusMessage = nil
         startAutoFrameRateMonitoring()
     }
 }

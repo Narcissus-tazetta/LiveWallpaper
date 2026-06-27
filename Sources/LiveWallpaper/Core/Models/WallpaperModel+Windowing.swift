@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Foundation
 
 @MainActor
@@ -18,27 +19,51 @@ extension WallpaperModel {
         guard displayMode != mode else {
             return
         }
-        displayMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: "displayMode")
-        scheduleWindowRebuild()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            guard self.displayMode != mode else {
+                return
+            }
+            self.displayMode = mode
+            self.scheduleWindowRebuild()
+        }
     }
 
     func setDesktopLevelOffset(_ offset: DesktopLevelOffset) {
         guard desktopLevelOffset != offset else {
             return
         }
-        desktopLevelOffset = offset
         UserDefaults.standard.set(offset.rawValue, forKey: "desktopLevelOffset")
-        scheduleWindowOptionsApply()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            guard self.desktopLevelOffset != offset else {
+                return
+            }
+            self.desktopLevelOffset = offset
+            self.scheduleWindowOptionsApply()
+        }
     }
 
     func setFullScreenAuxiliary(_ enabled: Bool) {
         guard useFullScreenAuxiliary != enabled else {
             return
         }
-        useFullScreenAuxiliary = enabled
         UserDefaults.standard.set(enabled, forKey: "useFullScreenAuxiliary")
-        scheduleWindowOptionsApply()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            guard self.useFullScreenAuxiliary != enabled else {
+                return
+            }
+            self.useFullScreenAuxiliary = enabled
+            self.scheduleWindowOptionsApply()
+        }
     }
 
     func availableDisplayScreens() -> [DisplayScreenInfo] {
@@ -56,6 +81,12 @@ extension WallpaperModel {
     }
 
     private func displayIDForWindow(at index: Int) -> String {
+        if index < windows.count {
+            let window = windows[index]
+            if let displayID = displayIDByWindow[ObjectIdentifier(window)] {
+                return displayID
+            }
+        }
         if index < windows.count, let screen = windows[index].screen {
             return displayIDString(for: screen)
         }
@@ -103,65 +134,57 @@ extension WallpaperModel {
         let screens: [NSScreen] = targetScreens()
         let player = ensureSharedPlayer()
 
-        if windows.count > screens.count {
-            let extras = Array(windows[screens.count...])
-            for window in extras {
-                prepareWindowForRetire(window)
-                window.orderOut(nil)
+        var reusableByDisplayID: [String: (window: NSWindow, playerView: PlayerView)] = [:]
+        for index in windows.indices where index < playerViews.count {
+            let displayID = displayIDForWindow(at: index)
+            if reusableByDisplayID[displayID] == nil {
+                reusableByDisplayID[displayID] = (windows[index], playerViews[index])
             }
-            windows.removeLast(windows.count - screens.count)
-            playerViews.removeLast(playerViews.count - screens.count)
-            retireWindows(extras)
         }
 
-        for (index, screen) in screens.enumerated() {
-            if index < windows.count {
-                let window = windows[index]
-                let playerView = playerViews[index]
+        var nextWindows: [NSWindow] = []
+        var nextPlayerViews: [PlayerView] = []
+        var reusedWindowIDs: Set<ObjectIdentifier> = []
 
-                applyWindowOptions(window)
-                window.ignoresMouseEvents = clickThrough
-                if window.frame != screen.frame {
-                    window.setFrame(screen.frame, display: true)
-                }
-                applyPlayerPresentation(to: playerView, screen: screen)
-                if playerView.playerLayer.player !== player {
-                    playerView.playerLayer.player = player
-                }
-                if window.contentView !== playerView {
-                    window.contentView = playerView
-                }
-                window.orderBack(nil)
-                window.orderFront(nil)
-                continue
-            }
-
-            let frame: NSRect = screen.frame
-            let window = NSWindow(
-                contentRect: frame,
-                styleMask: [.borderless],
-                backing: .buffered,
-                defer: false
+        for screen in screens {
+            let displayID = displayIDString(for: screen)
+            let pair = reusableByDisplayID[displayID] ?? makeWallpaperWindow(
+                for: screen,
+                player: player
             )
+            let window = pair.window
+            let playerView = pair.playerView
 
             applyWindowOptions(window)
-            window.backgroundColor = .clear
-            window.isOpaque = false
-            window.hasShadow = false
             window.ignoresMouseEvents = clickThrough
-            window.setFrame(frame, display: true)
-
-            let playerView = PlayerView(frame: CGRect(origin: .zero, size: frame.size))
-            playerView.autoresizingMask = [.width, .height]
+            if window.frame != screen.frame {
+                window.setFrame(screen.frame, display: true)
+            }
             applyPlayerPresentation(to: playerView, screen: screen)
-            playerView.playerLayer.player = player
-            window.contentView = playerView
+            if playerView.playerLayer.player !== player {
+                playerView.playerLayer.player = player
+            }
+            if window.contentView !== playerView {
+                window.contentView = playerView
+            }
             window.orderBack(nil)
             window.orderFront(nil)
 
-            windows.append(window)
-            playerViews.append(playerView)
+            displayIDByWindow[ObjectIdentifier(window)] = displayID
+            reusedWindowIDs.insert(ObjectIdentifier(window))
+            nextWindows.append(window)
+            nextPlayerViews.append(playerView)
         }
+
+        let obsoleteWindows = windows.filter { !reusedWindowIDs.contains(ObjectIdentifier($0)) }
+        for window in obsoleteWindows {
+            prepareWindowForRetire(window)
+            window.orderOut(nil)
+        }
+        retireWindows(obsoleteWindows)
+
+        windows = nextWindows
+        playerViews = nextPlayerViews
 
         let validDisplayIDs = Set(screens.map { displayIDString(for: $0) })
         suspendedDisplayIDs = suspendedDisplayIDs.intersection(validDisplayIDs)
@@ -170,7 +193,32 @@ extension WallpaperModel {
         lastScreenSignatures = screenSignatures(for: screens)
     }
 
+    private func makeWallpaperWindow(
+        for screen: NSScreen,
+        player: AVQueuePlayer
+    ) -> (window: NSWindow, playerView: PlayerView) {
+        let frame: NSRect = screen.frame
+        let window = NSWindow(
+            contentRect: frame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.hasShadow = false
+        window.setFrame(frame, display: true)
+
+        let playerView = PlayerView(frame: CGRect(origin: .zero, size: frame.size))
+        playerView.autoresizingMask = [.width, .height]
+        playerView.playerLayer.player = player
+        window.contentView = playerView
+        return (window, playerView)
+    }
+
     private func prepareWindowForRetire(_ window: NSWindow) {
+        displayIDByWindow.removeValue(forKey: ObjectIdentifier(window))
         if let playerView = window.contentView as? PlayerView {
             presentationCacheByPlayerView.removeValue(forKey: ObjectIdentifier(playerView))
             playerView.playerLayer.player = nil
@@ -215,6 +263,50 @@ extension WallpaperModel {
         window.collectionBehavior = behavior
     }
 
+    func scheduleActiveSpaceWindowRefresh() {
+        activeSpaceWindowRefreshWorkItems.forEach { $0.cancel() }
+        activeSpaceWindowRefreshWorkItems.removeAll()
+
+        for delay in [0.03, 0.18, 0.45] {
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else {
+                    return
+                }
+                refreshWallpaperWindowsForActiveSpace()
+            }
+            activeSpaceWindowRefreshWorkItems.append(workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+        }
+    }
+
+    private func refreshWallpaperWindowsForActiveSpace() {
+        let screensByID = Dictionary(
+            uniqueKeysWithValues: targetScreens().map { (displayIDString(for: $0), $0) }
+        )
+
+        for (index, window) in windows.enumerated() {
+            applyWindowOptions(window)
+            window.ignoresMouseEvents = clickThrough
+            let displayID = displayIDForWindow(at: index)
+            if let screen = screensByID[displayID] {
+                if window.frame != screen.frame {
+                    window.setFrame(screen.frame, display: true)
+                }
+                if index < playerViews.count {
+                    let playerView = playerViews[index]
+                    applyPlayerPresentation(to: playerView, screen: screen)
+                    if playerView.playerLayer.player !== sharedPlayer {
+                        playerView.playerLayer.player = sharedPlayer
+                    }
+                    if window.contentView !== playerView {
+                        window.contentView = playerView
+                    }
+                }
+            }
+            window.orderFrontRegardless()
+        }
+    }
+
     func scheduleScreenSync() {
         screenChangeWorkItem?.cancel()
 
@@ -234,17 +326,6 @@ extension WallpaperModel {
         let signatures = screenSignatures(for: screens)
 
         guard signatures != lastScreenSignatures else {
-            return
-        }
-
-        if screens.count == windows.count {
-            for (index, screen) in screens.enumerated() {
-                if windows[index].frame != screen.frame {
-                    windows[index].setFrame(screen.frame, display: true)
-                }
-                applyPlayerPresentation(to: playerViews[index], screen: screen)
-            }
-            lastScreenSignatures = signatures
             return
         }
 

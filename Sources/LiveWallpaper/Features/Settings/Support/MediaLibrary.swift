@@ -265,20 +265,46 @@ extension SettingsView {
             return
         }
         guard let path = resolvedFitEditorVideoPath(), !path.isEmpty else {
-            fitEditorDraftPath = ""
-            fitEditorDraftScreenID = ""
+            clearFitEditorDraft()
             return
         }
         loadFitEditorDraft(path: path, screenID: resolvedFitScreenID())
     }
 
     func loadFitEditorDraft(path: String, screenID: String) {
+        let fitMode = model.wallpaperFitMode(path: path, screenID: screenID)
+        let zoom = model.wallpaperZoom(path: path, screenID: screenID)
+        let offsetX = model.wallpaperOffsetX(path: path, screenID: screenID)
+        let offsetY = model.wallpaperOffsetY(path: path, screenID: screenID)
+
+        guard fitEditorDraftPath != path
+            || fitEditorDraftScreenID != screenID
+            || fitEditorDraftFitMode != fitMode
+            || fitEditorDraftZoom != zoom
+            || fitEditorDraftOffsetX != offsetX
+            || fitEditorDraftOffsetY != offsetY
+        else {
+            return
+        }
+
         fitEditorDraftPath = path
         fitEditorDraftScreenID = screenID
-        fitEditorDraftFitMode = model.wallpaperFitMode(path: path, screenID: screenID)
-        fitEditorDraftZoom = model.wallpaperZoom(path: path, screenID: screenID)
-        fitEditorDraftOffsetX = model.wallpaperOffsetX(path: path, screenID: screenID)
-        fitEditorDraftOffsetY = model.wallpaperOffsetY(path: path, screenID: screenID)
+        fitEditorDraftFitMode = fitMode
+        fitEditorDraftZoom = zoom
+        fitEditorDraftOffsetX = offsetX
+        fitEditorDraftOffsetY = offsetY
+    }
+
+    func clearFitEditorDraft() {
+        guard !fitEditorDraftPath.isEmpty || !fitEditorDraftScreenID.isEmpty else {
+            return
+        }
+        fitEditorDraftPath = ""
+        fitEditorDraftScreenID = ""
+        fitEditorDraftFitMode = .fill
+        fitEditorDraftZoom = 1.0
+        fitEditorDraftOffsetX = 0.0
+        fitEditorDraftOffsetY = 0.0
     }
 
     func ensureFitEditorDraft(path: String, screenID: String) {
@@ -289,22 +315,30 @@ extension SettingsView {
     }
 
     func fitEditorFitMode(path: String, screenID: String) -> VideoFitMode {
-        ensureFitEditorDraft(path: path, screenID: screenID)
+        guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+            return model.wallpaperFitMode(path: path, screenID: screenID)
+        }
         return fitEditorDraftFitMode
     }
 
     func fitEditorZoom(path: String, screenID: String) -> Double {
-        ensureFitEditorDraft(path: path, screenID: screenID)
+        guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+            return model.wallpaperZoom(path: path, screenID: screenID)
+        }
         return fitEditorDraftZoom
     }
 
     func fitEditorOffsetX(path: String, screenID: String) -> Double {
-        ensureFitEditorDraft(path: path, screenID: screenID)
+        guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+            return model.wallpaperOffsetX(path: path, screenID: screenID)
+        }
         return fitEditorDraftOffsetX
     }
 
     func fitEditorOffsetY(path: String, screenID: String) -> Double {
-        ensureFitEditorDraft(path: path, screenID: screenID)
+        guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+            return model.wallpaperOffsetY(path: path, screenID: screenID)
+        }
         return fitEditorDraftOffsetY
     }
 
@@ -340,6 +374,9 @@ extension SettingsView {
     }
 
     func updateFitEditorPreviewFrameSize(_ frameSize: CGSize, path: String, screenID: String) {
+        guard fitEditorPreviewFrameSize != frameSize else {
+            return
+        }
         fitEditorPreviewFrameSize = frameSize
         guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
             return

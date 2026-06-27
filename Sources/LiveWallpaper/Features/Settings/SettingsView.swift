@@ -165,6 +165,9 @@ struct SettingsView: View {
             .onReceive(NotificationCenter.default.publisher(for: .thumbnailCacheDidClear)) { _ in
                 thumbnailCache.clear()
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                model.refreshAccessibilityTrustForCoverage()
+            }
             .onChange(of: selectedTab) { tab in
                 if tab == .wallpaperFit {
                     ensureFitEditorScreenSelection()
@@ -198,6 +201,7 @@ struct SettingsView: View {
                 syncVolumeInputWithModel()
                 pruneMissingWallpaperThumbnails()
                 requestCurrentWallpaperThumbnailIfNeeded()
+                model.refreshAccessibilityTrustForCoverage()
                 thumbnailCache.prewarm(paths: Array(model.allRegisteredVideoPaths.prefix(10)))
                 processThumbnailQueue()
                 ensureFitEditorScreenSelection()
