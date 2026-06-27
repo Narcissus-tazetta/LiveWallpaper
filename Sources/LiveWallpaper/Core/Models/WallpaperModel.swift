@@ -108,6 +108,7 @@ final class WallpaperModel: ObservableObject {
     @Published var registeredVideoDisplayNames: [String: String] = [:]
     @Published var launchAtLoginEnabled: Bool = false
     @Published var appLanguage: AppLanguage = .automatic
+    @Published var advancedSharingEnabled: Bool = false
     @Published var wallpaperPresentationByPath:
         [String: [String: WallpaperPresentation]] = [:]
 

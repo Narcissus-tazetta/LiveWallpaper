@@ -161,7 +161,7 @@ extension SettingsView {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.localizedString("共有する壁紙を選択"))
                         .font(.system(size: 18, weight: .semibold))
-                    Text(model.localizedString("選ぶと保存先フォルダを指定して、.lwpkg と .mov を出力します"))
+                    Text(shareWallpaperPickerDescriptionText())
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -254,33 +254,90 @@ extension SettingsView {
     }
 
     func shareWallpaper(path: String) {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = model.localizedString("共有")
-        panel.message = model.localizedString("壁紙を保存するフォルダを選択してください")
-
-        if panel.runModal() == .OK,
-           let folderURL = panel.url
-        {
-            Task {
-                do {
-                    let exporter = PackageExporter()
-                    try await exporter.exportSingleWallpaper(
-                        model: model,
-                        videoPath: path,
-                        outputFolderURL: folderURL
-                    )
-                } catch {
-                    let alert = NSAlert()
-                    alert.messageText = model.localizedString("共有に失敗しました")
-                    alert.informativeText = error.localizedDescription
-                    alert.alertStyle = .warning
-                    alert.runModal()
-                }
+        Task { @MainActor in
+            do {
+                let shareFolderURL = try prepareWallpaperShareFolder()
+                let exporter = PackageExporter()
+                let shareURLs = try await exporter.exportSingleWallpaper(
+                    model: model,
+                    videoPath: path,
+                    outputFolderURL: shareFolderURL,
+                    includePackage: model.advancedSharingEnabled
+                )
+                presentWallpaperSharePicker(for: shareURLs)
+            } catch {
+                showShareFailureAlert(message: error.localizedDescription)
             }
         }
+    }
+
+    func shareWallpaperPickerDescriptionText() -> String {
+        if model.advancedSharingEnabled {
+            return model.localizedString("選ぶと macOS の共有シートを開き、動画ファイルと .lwpkg を共有できます")
+        }
+        return model.localizedString("選ぶと macOS の共有シートを開き、動画ファイルを共有できます")
+    }
+
+    func prepareWallpaperShareFolder() throws -> URL {
+        let rootURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "LiveWallpaperShares",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        cleanupOldWallpaperShareFolders(in: rootURL)
+
+        let shareFolderURL = rootURL.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: shareFolderURL, withIntermediateDirectories: true)
+        return shareFolderURL
+    }
+
+    func cleanupOldWallpaperShareFolders(in rootURL: URL) {
+        guard let folderURLs = try? FileManager.default.contentsOfDirectory(
+            at: rootURL,
+            includingPropertiesForKeys: [.creationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return
+        }
+
+        let expirationDate = Date().addingTimeInterval(-24 * 60 * 60)
+        for folderURL in folderURLs {
+            let values = try? folderURL.resourceValues(forKeys: [.creationDateKey])
+            if values?.creationDate ?? .distantPast < expirationDate {
+                try? FileManager.default.removeItem(at: folderURL)
+            }
+        }
+    }
+
+    func presentWallpaperSharePicker(for urls: [URL]) {
+        guard let window = NSApp.keyWindow ?? NSApp.mainWindow,
+              let view = window.contentView
+        else {
+            let alert = NSAlert()
+            alert.messageText = model.localizedString("共有に失敗しました")
+            alert.informativeText = model.localizedString("共有シートを開けませんでした")
+            alert.alertStyle = .warning
+            alert.runModal()
+            return
+        }
+
+        let picker = NSSharingServicePicker(items: urls)
+        picker.show(relativeTo: sharePickerAnchorRect(in: view, window: window), of: view, preferredEdge: .maxY)
+    }
+
+    func sharePickerAnchorRect(in view: NSView, window: NSWindow) -> NSRect {
+        let windowPoint = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+        let viewPoint = view.convert(windowPoint, from: nil)
+        let fallbackPoint = NSPoint(x: view.bounds.midX, y: view.bounds.midY)
+        let anchorPoint = view.bounds.contains(viewPoint) ? viewPoint : fallbackPoint
+        return NSRect(x: anchorPoint.x, y: anchorPoint.y, width: 1, height: 1)
+    }
+
+    func showShareFailureAlert(message: String) {
+        let alert = NSAlert()
+        alert.messageText = model.localizedString("共有に失敗しました")
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 }

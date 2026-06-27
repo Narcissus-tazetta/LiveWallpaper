@@ -51,6 +51,8 @@ extension WallpaperModel {
         {
             appLanguage = restoredAppLanguage
         }
+        advancedSharingEnabled =
+            UserDefaults.standard.object(forKey: "advancedSharingEnabled") as? Bool ?? false
         applyAudioSettings()
         applyLightweightSettings()
         suspendWhenOtherAppFullScreen =
@@ -192,6 +194,14 @@ extension WallpaperModel {
         schedulePersistedStateFlush()
     }
 
+    func setAdvancedSharingEnabled(_ enabled: Bool) {
+        guard advancedSharingEnabled != enabled else {
+            return
+        }
+        advancedSharingEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "advancedSharingEnabled")
+    }
+
     func resetSettingsToDefaults() {
         setClickThrough(true)
         setDisplayMode(.mainOnly)
@@ -210,6 +220,7 @@ extension WallpaperModel {
         setAutoFrameRateEnabled(true)
         setDesktopLevelOffset(.zero)
         setFullScreenAuxiliary(false)
+        setAdvancedSharingEnabled(false)
         _ = setSuspendWhenOtherAppFullScreen(false)
         suspendExclusionBundleIDs = []
         UserDefaults.standard.removeObject(forKey: "suspendExclusionBundleIDs")

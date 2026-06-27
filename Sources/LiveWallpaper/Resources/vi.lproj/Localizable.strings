@@ -184,3 +184,11 @@
 "壁紙を保存するフォルダを選択してください" = "Chọn thư mục để lưu hình nền.";
 "設定を初期化" = "Đặt lại cài đặt";
 "表示・再生に関する設定を初期値へ戻します" = "Khôi phục cài đặt hiển thị và phát lại về mặc định.";
+"高度な共有を有効にする" = "Bật chia sẻ nâng cao";
+"オフのときは動画ファイルだけを書き出します。オンにすると配置情報を含む .lwpkg も一緒に書き出します。" = "Khi tắt, chỉ xuất tệp video. Khi bật, cũng xuất gói .lwpkg có thông tin bố cục.";
+"選ぶと保存先フォルダを指定して、動画ファイルを書き出します" = "Chọn thư mục đích để xuất tệp video.";
+"選ぶと保存先フォルダを指定して、動画ファイルと .lwpkg を出力します" = "Chọn thư mục đích để xuất tệp video và gói .lwpkg.";
+"オフのときは動画ファイルだけを共有します。オンにすると配置情報を含む .lwpkg も一緒に共有します。" = "Khi tắt, chỉ chia sẻ tệp video. Khi bật, cũng chia sẻ gói .lwpkg có thông tin bố cục.";
+"選ぶと macOS の共有シートを開き、動画ファイルを共有できます" = "Chọn hình nền để mở bảng chia sẻ macOS cho tệp video.";
+"選ぶと macOS の共有シートを開き、動画ファイルと .lwpkg を共有できます" = "Chọn hình nền để mở bảng chia sẻ macOS cho tệp video và gói .lwpkg.";
+"共有シートを開けませんでした" = "Không thể mở bảng chia sẻ.";
