@@ -312,6 +312,7 @@ struct SettingsView: View {
                         }
                     }
                     videoSettingsSection
+                    shareSettingsSection
                     displaySettingsSection
                     languageSettingsSection
                     cacheSettingsSection

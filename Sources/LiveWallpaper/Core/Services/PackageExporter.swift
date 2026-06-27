@@ -89,8 +89,37 @@ final class PackageExporter {
     func exportSingleWallpaper(
         model: WallpaperModel,
         videoPath: String,
-        outputFolderURL: URL
-    ) async throws {
+        outputFolderURL: URL,
+        includePackage: Bool
+    ) async throws -> [URL] {
+        let baseFileName = ExportFileNameSanitizer.sanitizedExportFileName(
+            model.registeredVideoDisplayName(for: videoPath)
+        )
+        var outputURLs: [URL] = []
+        if includePackage {
+            let packageURL = try await exportSingleWallpaperPackage(
+                model: model,
+                videoPath: videoPath,
+                outputFolderURL: outputFolderURL,
+                baseFileName: baseFileName
+            )
+            outputURLs.append(packageURL)
+        }
+        let videoURL = try copyOriginalVideo(
+            from: URL(fileURLWithPath: videoPath),
+            to: outputFolderURL,
+            baseFileName: baseFileName
+        )
+        outputURLs.append(videoURL)
+        return outputURLs
+    }
+
+    private func exportSingleWallpaperPackage(
+        model: WallpaperModel,
+        videoPath: String,
+        outputFolderURL: URL,
+        baseFileName: String
+    ) async throws -> URL {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
@@ -143,18 +172,28 @@ final class PackageExporter {
         let manifestURL = contentDir.appendingPathComponent("metadata.json")
         try manifestData.write(to: manifestURL)
 
-        let baseFileName = ExportFileNameSanitizer.sanitizedExportFileName(
-            model.registeredVideoDisplayName(for: videoPath)
-        )
         let packageFileName = "\(baseFileName).lwpkg"
         let packageURL = outputFolderURL.appendingPathComponent(packageFileName)
         try archiveWriter.createPackage(from: contentDir, outputURL: packageURL)
+        return packageURL
+    }
 
-        let videoFileName = "\(baseFileName).mov"
+    private func copyOriginalVideo(
+        from sourceURL: URL,
+        to outputFolderURL: URL,
+        baseFileName: String
+    ) throws -> URL {
+        let fileExtension = sourceURL.pathExtension.isEmpty ? "mov" : sourceURL.pathExtension
+        let videoFileName = "\(baseFileName).\(fileExtension)"
         let videoOutputURL = outputFolderURL.appendingPathComponent(videoFileName)
+
+        if sourceURL.standardizedFileURL.path == videoOutputURL.standardizedFileURL.path {
+            return videoOutputURL
+        }
         if fileManager.fileExists(atPath: videoOutputURL.path) {
             try fileManager.removeItem(at: videoOutputURL)
         }
-        try fileManager.copyItem(atPath: videoPath, toPath: videoOutputURL.path)
+        try fileManager.copyItem(at: sourceURL, to: videoOutputURL)
+        return videoOutputURL
     }
 }

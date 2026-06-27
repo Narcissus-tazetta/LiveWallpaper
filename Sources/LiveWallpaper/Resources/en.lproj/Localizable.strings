@@ -182,3 +182,11 @@
 "軽量" = "Light";
 "高負荷" = "Heavy";
 "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Choose how video is decoded. Automatic adapts to your Mac, Balanced favors smooth playback, and Power Saving reduces CPU use and power draw.";
+"高度な共有を有効にする" = "Enable advanced sharing";
+"オフのときは動画ファイルだけを書き出します。オンにすると配置情報を含む .lwpkg も一緒に書き出します。" = "When off, sharing exports only the video file. When on, it also exports a .lwpkg package with layout information.";
+"選ぶと保存先フォルダを指定して、動画ファイルを書き出します" = "Choose a destination folder to export the video file.";
+"選ぶと保存先フォルダを指定して、動画ファイルと .lwpkg を出力します" = "Choose a destination folder to export the video file and a .lwpkg package.";
+"オフのときは動画ファイルだけを共有します。オンにすると配置情報を含む .lwpkg も一緒に共有します。" = "When off, sharing sends only the video file. When on, it also shares a .lwpkg package with layout information.";
+"選ぶと macOS の共有シートを開き、動画ファイルを共有できます" = "Choose a wallpaper to open the macOS share sheet for the video file.";
+"選ぶと macOS の共有シートを開き、動画ファイルと .lwpkg を共有できます" = "Choose a wallpaper to open the macOS share sheet for the video file and .lwpkg package.";
+"共有シートを開けませんでした" = "Could not open the share sheet.";

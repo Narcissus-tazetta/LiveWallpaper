@@ -112,4 +112,11 @@ extension SettingsView {
       set: { NotificationCenter.default.post(name: .toggleAutoUpdate, object: $0) }
     )
   }
+
+  var advancedSharingBinding: Binding<Bool> {
+    Binding(
+      get: { model.advancedSharingEnabled },
+      set: { model.setAdvancedSharingEnabled($0) }
+    )
+  }
 }

@@ -16,7 +16,7 @@ extension DiskThumbnailCache {
     }
     ioQueue.async { [weak self] in
       let fileManager = FileManager.default
-      var loadedMetadata = Metadata(version: 1, entries: [:])
+      var loadedMetadata = Metadata(version: Self.metadataVersion, entries: [:])
       var shouldPersist = false
 
       do {
@@ -28,7 +28,7 @@ extension DiskThumbnailCache {
 
       if let data = try? Data(contentsOf: metadataURL),
         let decoded = try? JSONDecoder().decode(Metadata.self, from: data),
-        decoded.version == 1
+        decoded.version == Self.metadataVersion
       {
         loadedMetadata = decoded
       } else {

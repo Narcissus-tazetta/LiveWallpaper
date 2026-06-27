@@ -18,7 +18,9 @@ extension DiskThumbnailCache {
           return
         }
 
-        if let cgImage = representation?.cgImage {
+        if let cgImage = representation?.cgImage,
+          !ThumbnailImageScorer.isLowInformation(cgImage)
+        {
           let image = NSImage(
             cgImage: cgImage,
             size: NSSize(width: cgImage.width, height: cgImage.height)
@@ -56,16 +58,33 @@ extension DiskThumbnailCache {
     let generator = AVAssetImageGenerator(asset: asset)
     generator.appliesPreferredTrackTransform = true
     generator.maximumSize = CGSize(width: 420, height: 236)
-    let candidates = [0.2, 1.0]
+    generator.requestedTimeToleranceBefore = .zero
+    generator.requestedTimeToleranceAfter = .positiveInfinity
 
-    for seconds in candidates {
+    let candidateSeconds: [Double] = [0.2, 0.8, 1.5, 3.0, 6.0, 10.0, 15.0, 30.0]
+    var bestImage: CGImage?
+    var bestScore: Double = -1
+
+    for seconds in candidateSeconds {
       let time = CMTime(seconds: seconds, preferredTimescale: 600)
-      if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
-        return NSImage(
-          cgImage: cgImage,
-          size: NSSize(width: cgImage.width, height: cgImage.height)
-        )
+      guard let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) else {
+        continue
       }
+      let score = ThumbnailImageScorer.score(cgImage)
+      if score > bestScore {
+        bestScore = score
+        bestImage = cgImage
+      }
+      if score >= 1200 {
+        break
+      }
+    }
+
+    if let bestImage {
+      return NSImage(
+        cgImage: bestImage,
+        size: NSSize(width: bestImage.width, height: bestImage.height)
+      )
     }
 
     return nil
