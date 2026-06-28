@@ -19,17 +19,9 @@ extension WallpaperModel {
         guard displayMode != mode else {
             return
         }
+        displayMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: "displayMode")
-        DispatchQueue.main.async { [weak self] in
-            guard let self else {
-                return
-            }
-            guard self.displayMode != mode else {
-                return
-            }
-            self.displayMode = mode
-            self.scheduleWindowRebuild()
-        }
+        scheduleWindowRebuild()
     }
 
     func setDesktopLevelOffset(_ offset: DesktopLevelOffset) {

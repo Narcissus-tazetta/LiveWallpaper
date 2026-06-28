@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 @MainActor
@@ -53,6 +54,11 @@ extension WallpaperModel {
         }
         advancedSharingEnabled =
             UserDefaults.standard.object(forKey: "advancedSharingEnabled") as? Bool ?? false
+        lockScreenSyncEnabled =
+            UserDefaults.standard.object(forKey: "lockScreenSyncEnabled") as? Bool ?? false
+        lockScreenSyncStatus = lockScreenSyncEnabled
+            ? (lockScreenSyncService.isSupported ? .idle : .unsupported)
+            : .disabled
         applyAudioSettings()
         applyLightweightSettings()
         suspendWhenOtherAppFullScreen =
@@ -207,6 +213,241 @@ extension WallpaperModel {
         UserDefaults.standard.set(enabled, forKey: "advancedSharingEnabled")
     }
 
+    func setLockScreenSyncEnabled(_ enabled: Bool) {
+        if !enabled {
+            guard lockScreenSyncEnabled || lockScreenSyncService.hasActiveLease else {
+                lockScreenSyncStatus = .disabled
+                UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+                return
+            }
+            lockScreenSyncEnabled = false
+            UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+            removeLockScreenSync()
+            return
+        }
+
+        guard lockScreenSyncEnabled != enabled else {
+            return
+        }
+
+        lockScreenSyncEnabled = true
+        UserDefaults.standard.set(true, forKey: "lockScreenSyncEnabled")
+        lockScreenSyncStatus = lockScreenSyncService.isSupported ? .idle : .unsupported
+        syncCurrentVideoToLockScreen()
+    }
+
+    func syncCurrentVideoToLockScreen() {
+        guard lockScreenSyncEnabled else {
+            lockScreenSyncStatus = .disabled
+            return
+        }
+        guard lockScreenSyncService.isSupported else {
+            lockScreenSyncStatus = .unsupported
+            return
+        }
+        guard let currentVideoPath,
+              FileManager.default.fileExists(atPath: currentVideoPath)
+        else {
+            lockScreenSyncStatus = .idle
+            return
+        }
+
+        let videoURL = URL(fileURLWithPath: currentVideoPath)
+        let service = lockScreenSyncService
+
+        lockScreenSyncTask?.cancel()
+        lockScreenSyncStatus = .syncing
+        lockScreenSyncTask = Task { [weak self] in
+            do {
+                let borrowedAsset = try await service.sync(videoURL: videoURL)
+                await MainActor.run {
+                    guard let self, !Task.isCancelled else {
+                        return
+                    }
+                    self.lockScreenSyncStatus = .borrowed(borrowedAsset.name)
+                }
+            } catch LockScreenSyncError.noDownloadedAerials {
+                await MainActor.run {
+                    guard let self, !Task.isCancelled else {
+                        return
+                    }
+                    self.lockScreenSyncStatus = .noAerialDownloaded
+                }
+            } catch {
+                await MainActor.run {
+                    guard let self, !Task.isCancelled else {
+                        return
+                    }
+                    self.lockScreenSyncStatus = .failed(error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    func removeLockScreenSync() {
+        let service = lockScreenSyncService
+
+        lockScreenSyncTask?.cancel()
+        lockScreenUnlockResetWorkItem?.cancel()
+        lockScreenUnlockResetWorkItem = nil
+        lockScreenSyncStatus = .removing
+        lockScreenSyncTask = Task { [weak self] in
+            do {
+                try service.restoreOriginalAerialAndWallpaperStore()
+                await MainActor.run {
+                    guard let self, !Task.isCancelled else {
+                        return
+                    }
+                    self.lockScreenSyncEnabled = false
+                    UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+                    self.lockScreenSyncStatus = .restored
+                }
+            } catch {
+                await MainActor.run {
+                    guard let self, !Task.isCancelled else {
+                        return
+                    }
+                    self.lockScreenSyncStatus = .failed(error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    func restoreLockScreenWallpaperSettings() {
+        let service = lockScreenSyncService
+        lockScreenSyncTask?.cancel()
+        lockScreenUnlockResetWorkItem?.cancel()
+        lockScreenUnlockResetWorkItem = nil
+        lockScreenSyncStatus = .restoring
+        lockScreenSyncTask = Task { [weak self] in
+            do {
+                try service.restoreWallpaperStoreBackup()
+                await MainActor.run {
+                    guard let self, !Task.isCancelled else {
+                        return
+                    }
+                    self.lockScreenSyncEnabled = false
+                    UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+                    self.lockScreenSyncStatus = .restored
+                }
+            } catch {
+                await MainActor.run {
+                    guard let self, !Task.isCancelled else {
+                        return
+                    }
+                    self.lockScreenSyncStatus = .failed(error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    func openLockScreenWallpaperSettings() {
+        lockScreenSyncService.openWallpaperSettings()
+    }
+
+    func handleScreenUnlockedForLockScreenSync(delay: TimeInterval = 1.5) {
+        guard shouldResetAerialExtensionAfterUnlock else {
+            return
+        }
+
+        lockScreenUnlockResetWorkItem?.cancel()
+        let initialSignature = displayReadySignature()
+        let deadline = Date().addingTimeInterval(max(delay, 1.5) + 3.0)
+        let workItem = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                self?.waitForDisplaysThenResetAerialExtension(
+                    previousSignature: initialSignature,
+                    deadline: deadline
+                )
+            }
+        }
+        lockScreenUnlockResetWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
+
+    private func waitForDisplaysThenResetAerialExtension(
+        previousSignature: String,
+        deadline: Date
+    ) {
+        guard shouldResetAerialExtensionAfterUnlock else {
+            return
+        }
+
+        let currentSignature = displayReadySignature()
+        if currentSignature == previousSignature || Date() >= deadline {
+            lockScreenSyncService.resetAerialExtensionAfterUnlock()
+            lockScreenUnlockResetWorkItem = nil
+            return
+        }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else {
+                    return
+                }
+                self.waitForDisplaysThenResetAerialExtension(
+                    previousSignature: currentSignature,
+                    deadline: deadline
+                )
+            }
+        }
+        lockScreenUnlockResetWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
+    }
+
+    private func displayReadySignature() -> String {
+        NSScreen.screens
+            .map { screen in
+                let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? ""
+                return "\(id):\(screen.frame.integral)"
+            }
+            .sorted()
+            .joined(separator: "|")
+    }
+
+    var shouldResetAerialExtensionAfterUnlock: Bool {
+        lockScreenSyncEnabled
+            && lockScreenSyncService.isSupported
+            && lockScreenSyncService.hasActiveLease
+    }
+
+    func recoverStaleLockScreenSyncOnLaunchIfNeeded() {
+        guard lockScreenSyncService.hasActiveLease else {
+            return
+        }
+
+        lockScreenSyncStatus = .recovering
+        do {
+            try lockScreenSyncService.restoreOriginalAerialAndWallpaperStore()
+            lockScreenSyncEnabled = false
+            UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+            lockScreenSyncStatus = .recovered
+        } catch {
+            lockScreenSyncEnabled = false
+            UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+            lockScreenSyncStatus = .failed(error.localizedDescription)
+        }
+    }
+
+    func restoreLockScreenSyncBeforeExit() {
+        lockScreenSyncTask?.cancel()
+        lockScreenUnlockResetWorkItem?.cancel()
+        lockScreenUnlockResetWorkItem = nil
+        guard lockScreenSyncService.hasActiveLease else {
+            return
+        }
+
+        do {
+            try lockScreenSyncService.restoreOriginalAerialAndWallpaperStore()
+            lockScreenSyncEnabled = false
+            UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+            lockScreenSyncStatus = .restored
+        } catch {
+            lockScreenSyncStatus = .failed(error.localizedDescription)
+            NSLog("[LockScreenSync] Failed to restore before exit: \(error.localizedDescription)")
+        }
+    }
+
     func resetSettingsToDefaults() {
         setClickThrough(true)
         setDisplayMode(.mainOnly)
@@ -226,6 +467,7 @@ extension WallpaperModel {
         setDesktopLevelOffset(.zero)
         setFullScreenAuxiliary(false)
         setAdvancedSharingEnabled(false)
+        setLockScreenSyncEnabled(false)
         _ = setSuspendWhenOtherAppFullScreen(false)
         setSuspendDetectionMode(.frontmostAppPresence)
         suspendExclusionBundleIDs = []

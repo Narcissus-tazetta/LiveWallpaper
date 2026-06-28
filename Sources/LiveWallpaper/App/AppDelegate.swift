@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var autoUpdateEnabled: Bool = true
     var cancellables = Set<AnyCancellable>()
     var settingsKeyMonitor: Any?
+    var screenUnlockObserver: NSObjectProtocol?
     #if canImport(Sparkle)
         var updaterController: SPUStandardUpdaterController?
         var sparkleStarted = false
@@ -53,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         setupStatusBar()
         setupSettingsWindow()
+        setupScreenUnlockObserver()
         verifyUpdatePrerequisites()
         setupSparkleUpdater()
     }
@@ -61,8 +63,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wallpaperModel.localizedString(key)
     }
 
+    func applicationWillTerminate(_: Notification) {
+        wallpaperModel.restoreLockScreenSyncBeforeExit()
+    }
+
+    private func setupScreenUnlockObserver() {
+        screenUnlockObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.screenIsUnlocked"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.wallpaperModel.handleScreenUnlockedForLockScreenSync()
+            }
+        }
+    }
+
     deinit {
         NotificationCenter.default.removeObserver(self)
+        if let observer = screenUnlockObserver {
+            DistributedNotificationCenter.default().removeObserver(observer)
+        }
         if let monitor: Any = settingsKeyMonitor {
             NSEvent.removeMonitor(monitor)
         }
