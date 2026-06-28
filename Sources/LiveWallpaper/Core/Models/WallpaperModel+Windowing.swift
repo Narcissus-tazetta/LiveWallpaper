@@ -107,6 +107,15 @@ extension WallpaperModel {
             return
         }
         let displayIDs = (0 ..< displayCount).map { displayIDForWindow(at: $0) }
+        for index in playerViews.indices {
+            let displayID = index < displayIDs
+                .count ? displayIDs[index] : displayIDForWindow(at: index)
+            let shouldDetachPlayer = suspendedDisplayIDs.contains(displayID)
+            let expectedPlayer = shouldDetachPlayer ? nil : player
+            if playerViews[index].playerLayer.player !== expectedPlayer {
+                playerViews[index].playerLayer.player = expectedPlayer
+            }
+        }
         let allSuspended = displayIDs.allSatisfy { suspendedDisplayIDs.contains($0) }
         if allSuspended {
             player.pause()
@@ -305,6 +314,7 @@ extension WallpaperModel {
             }
             window.orderFrontRegardless()
         }
+        applySuspensionStateToPlayers()
     }
 
     func scheduleScreenSync() {
