@@ -16,17 +16,9 @@ extension WallpaperModel {
         }
 
         UserDefaults.standard.set(enabled, forKey: "suspendWhenOtherAppFullScreen")
-        DispatchQueue.main.async { [weak self] in
-            guard let self else {
-                return
-            }
-            guard self.suspendWhenOtherAppFullScreen != enabled else {
-                return
-            }
-            self.suspendWhenOtherAppFullScreen = enabled
-            self.configureForegroundCoverageMonitoring()
-            self.evaluateForegroundCoverageState()
-        }
+        suspendWhenOtherAppFullScreen = enabled
+        configureForegroundCoverageMonitoring()
+        evaluateForegroundCoverageState()
         return true
     }
 
@@ -37,18 +29,10 @@ extension WallpaperModel {
         }
 
         UserDefaults.standard.set(mode.rawValue, forKey: "suspendDetectionMode")
-        DispatchQueue.main.async { [weak self] in
-            guard let self else {
-                return
-            }
-            guard self.suspendDetectionMode != mode else {
-                return
-            }
-            self.suspendDetectionMode = mode
-            self.refreshAccessibilityTrustForCoverage()
-            self.configureForegroundCoverageMonitoring()
-            self.evaluateForegroundCoverageState()
-        }
+        suspendDetectionMode = mode
+        refreshAccessibilityTrustForCoverage()
+        configureForegroundCoverageMonitoring()
+        evaluateForegroundCoverageState()
     }
 
     func addSuspendExclusionBundleID(_ bundleID: String) {

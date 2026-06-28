@@ -81,9 +81,25 @@ extension SettingsView {
 
     func requestCurrentWallpaperThumbnailIfNeeded() {
         guard let currentPath = model.currentVideoPath else {
+            releaseCurrentWallpaperThumbnailVisibility()
             return
         }
+        if let previousPath = currentWallpaperPreviewThumbnailPath,
+           previousPath != currentPath
+        {
+            setThumbnailVisibility(path: previousPath, isVisible: false)
+        }
+        currentWallpaperPreviewThumbnailPath = currentPath
+        setThumbnailVisibility(path: currentPath, isVisible: true)
         requestWallpaperThumbnail(path: currentPath)
+    }
+
+    func releaseCurrentWallpaperThumbnailVisibility() {
+        guard let currentWallpaperPreviewThumbnailPath else {
+            return
+        }
+        setThumbnailVisibility(path: currentWallpaperPreviewThumbnailPath, isVisible: false)
+        self.currentWallpaperPreviewThumbnailPath = nil
     }
 
     @ViewBuilder

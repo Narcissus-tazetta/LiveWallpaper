@@ -35,6 +35,7 @@ struct SettingsView: View {
     @State var isResetSettingsDialogPresented: Bool = false
     @State var isWallpaperShareSheetPresented: Bool = false
     @State var keyEventMonitor: Any?
+    @State var currentWallpaperPreviewThumbnailPath: String?
     @FocusState var isVolumeInputFocused: Bool
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
@@ -212,6 +213,7 @@ struct SettingsView: View {
             }
             .onDisappear {
                 model.removeEmptyPlaylists()
+                releaseCurrentWallpaperThumbnailVisibility()
                 removeFitKeyMonitor()
             }
     }
