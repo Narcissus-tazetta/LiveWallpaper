@@ -126,4 +126,11 @@ extension SettingsView {
       set: { model.setAdvancedSharingEnabled($0) }
     )
   }
+
+  var lockScreenSyncBinding: Binding<Bool> {
+    Binding(
+      get: { model.lockScreenSyncEnabled },
+      set: { model.setLockScreenSyncEnabled($0) }
+    )
+  }
 }

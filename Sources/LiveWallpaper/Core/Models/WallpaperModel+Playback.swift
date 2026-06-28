@@ -404,6 +404,7 @@ extension WallpaperModel {
         }
         applyAudioSettings()
         applySuspensionStateToPlayers()
+        syncCurrentVideoToLockScreen()
         evaluateForegroundCoverageState()
     }
 

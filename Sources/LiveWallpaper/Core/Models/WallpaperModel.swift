@@ -75,9 +75,12 @@ final class WallpaperModel: ObservableObject {
     var activeSpaceTransitionWorkItem: DispatchWorkItem?
     var coverageEvaluationGeneration: UInt64 = 0
     var statePersistWorkItem: DispatchWorkItem?
+    var lockScreenUnlockResetWorkItem: DispatchWorkItem?
     var persistenceFailureCount: Int = 0
     var lastCoverageEvaluationAt: CFAbsoluteTime = 0
     let playbackEnvironment: PlaybackEnvironment
+    let lockScreenSyncService: LockScreenSyncService = .init()
+    var lockScreenSyncTask: Task<Void, Never>?
     var videoAspectRatioByPath: [String: Double] = [:]
     var loadingVideoAspectRatioPaths: Set<String> = []
     var presentationCacheByPlayerView: [ObjectIdentifier: PresentationCacheKey] = [:]
@@ -114,6 +117,8 @@ final class WallpaperModel: ObservableObject {
     @Published var launchAtLoginEnabled: Bool = false
     @Published var appLanguage: AppLanguage = .automatic
     @Published var advancedSharingEnabled: Bool = false
+    @Published var lockScreenSyncEnabled: Bool = false
+    @Published var lockScreenSyncStatus: LockScreenSyncStatus = .disabled
     @Published var wallpaperPresentationByPath:
         [String: [String: WallpaperPresentation]] = [:]
 
@@ -178,6 +183,7 @@ final class WallpaperModel: ObservableObject {
         playbackEnvironment = Self.detectPlaybackEnvironment()
         configurePlayer()
         restoreState()
+        recoverStaleLockScreenSyncOnLaunchIfNeeded()
         LocalizationManager.setLanguage(effectiveAppLanguageCode)
         refreshAccessibilityTrustForCoverage()
         rebuildWindows()
@@ -210,6 +216,8 @@ final class WallpaperModel: ObservableObject {
         coverageEvaluationWorkItem?.cancel()
         activeSpaceTransitionWorkItem?.cancel()
         statePersistWorkItem?.cancel()
+        lockScreenUnlockResetWorkItem?.cancel()
+        lockScreenSyncTask?.cancel()
         retiredWindows.removeAll()
         if let observer: any NSObjectProtocol = screenChangeObserver {
             NotificationCenter.default.removeObserver(observer)
