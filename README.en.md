@@ -6,7 +6,6 @@
 Japanese README: [README.md](README.md)
 
 Sry I'm not good at english so this document is using AI
-- As a student, I currently lack the funds to release my apps on the App Store. I’m looking for a kind sponsor to support my journey!
 
 LiveWallpaper lets you set your favorite videos as your Mac desktop wallpaper.
 It is designed to reduce system load (battery and CPU usage) while you are working.
