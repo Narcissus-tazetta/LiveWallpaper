@@ -76,7 +76,7 @@ enum ForegroundCoverageGeometry {
             return false
         }
         guard window.bounds.width >= minimumWindowSize.width,
-              window.bounds.height >= minimumWindowSize.height
+            window.bounds.height >= minimumWindowSize.height
         else {
             return false
         }

@@ -21,7 +21,7 @@ LiveWallpaperは、お気に入りの動画をMacのデスクトップ壁紙に�
 - **自動アップデート**: Sparkleを組み込んでいるので、アプリ内から簡単に最新版へアップデートできます。
 - **自動アップデート**: Sparkleを組み込んでいるので、アプリ内から簡単に最新版へアップデートできます。
 
-<video src="https://github.com/user-attachments/assets/166b9fb1-67c6-412b-a253-e15498f99399" width="60%" controls autoplay loop muted></video>
+<video src="https://github.com/user-attachments/assets/fb32f0ec-b0ca-4877-9ada-b77af7b3757e" width="60%" controls autoplay loop muted></video>
 
 
 ## その他の機能（詳しく）
