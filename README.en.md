@@ -23,7 +23,7 @@ It is designed to reduce system load (battery and CPU usage) while you are worki
 - Auto updates: Integrated with Sparkle for in-app updates.
 - Auto updates: Integrated with Sparkle for in-app updates.
 
-<video src="https://github.com/user-attachments/assets/166b9fb1-67c6-412b-a253-e15498f99399" width="60%" controls autoplay loop muted></video>
+<video src="https://github.com/user-attachments/assets/fb32f0ec-b0ca-4877-9ada-b77af7b3757e" width="60%" controls autoplay loop muted></video>
 
 ## Other Features (Detailed)
 
