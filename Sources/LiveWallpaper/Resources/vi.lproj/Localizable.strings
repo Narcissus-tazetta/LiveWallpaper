@@ -214,3 +214,17 @@
 "未対応" = "Không hỗ trợ";
 "ロック画面壁紙プレビュー" = "Xem trước hình nền màn hình khóa";
 "オンにすると選択中のロック画面動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "Khi bật, video màn hình khóa đã chọn sẽ được đặt tạm làm hình nền Aerial của hệ thống. Hình nền gốc được khôi phục khi thoát app.";
+"Web壁紙" = "Hình nền Web";
+"WebサイトのURLを入力すると、そのページを壁紙として表示できます" = "Nhập URL trang web để hiển thị trang đó làm hình nền.";
+"https://example.com" = "https://example.com";
+"登録済みのWeb壁紙はありません" = "Chưa có hình nền web nào.";
+"読み込み中" = "Đang tải";
+"表示中" = "Đang hiển thị";
+"読み込み失敗" = "Tải thất bại";
+"適用" = "Áp dụng";
+"URLを入力してください" = "Vui lòng nhập URL.";
+"有効なURLを入力してください" = "Vui lòng nhập URL hợp lệ.";
+"http または https のURLのみ対応しています" = "Chỉ hỗ trợ URL http và https.";
+"クリップボードから貼り付け" = "Dán từ clipboard";
+"YouTubeのURLは動画のみの表示に自動変換されます" = "URL YouTube sẽ tự động chuyển sang chế độ chỉ phát video.";
+"※ いま動作確認できているのは YouTube だけです。ほかのサイトも試せますが、表示できない場合があります" = "Hiện chỉ xác nhận YouTube hoạt động ổn. Bạn vẫn có thể thử site khác, nhưng có thể không hiển thị được.";

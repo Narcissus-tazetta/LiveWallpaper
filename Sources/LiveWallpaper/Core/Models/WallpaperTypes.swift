@@ -1,3 +1,8 @@
+enum WallpaperKind: String, Codable {
+    case video
+    case web
+}
+
 enum DisplayMode: String {
     case mainOnly
     case allScreens

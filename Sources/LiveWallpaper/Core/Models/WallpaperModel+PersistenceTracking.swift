@@ -49,6 +49,14 @@ extension WallpaperModel {
             UserDefaults.standard.set(selectedPlaylistID?.uuidString, forKey: "selectedPlaylistID")
             let presentationData = try JSONEncoder().encode(wallpaperPresentationByPath)
             UserDefaults.standard.set(presentationData, forKey: wallpaperPresentationStorageKey)
+            let webData = try JSONEncoder().encode(webWallpaperSources)
+            UserDefaults.standard.set(webData, forKey: "webWallpaperSourcesData")
+            UserDefaults.standard.set(wallpaperKind.rawValue, forKey: "wallpaperKind")
+            if let webID = currentWebWallpaperID {
+                UserDefaults.standard.set(webID.uuidString, forKey: "currentWebWallpaperID")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "currentWebWallpaperID")
+            }
             recordPersistenceSuccess()
         } catch {
             recordPersistenceFailure(key: "persistedState", error: error)

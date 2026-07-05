@@ -6,10 +6,12 @@ struct SettingsView: View {
     @ObservedObject var model: WallpaperModel
     @State var selectedTab: SettingsTab = .wallpaper
     @State var isAdvancedExpanded: Bool = false
+    @State var isWebWallpaperExpanded: Bool = false
     @State var volumeInput: String = ""
     @State var expandedHelpTopics: Set<HelpTopic> = []
     @State var hoveredHelpTopic: HelpTopic?
     @StateObject var thumbnailCache: DiskThumbnailCache
+    @StateObject var webThumbnailStore: WebWallpaperThumbnailStore
     @State var editingPlaylistID: UUID?
     @State var editingPlaylistNameInput: String = ""
     @State var editingWallpaperPath: String?
@@ -38,6 +40,7 @@ struct SettingsView: View {
     @State var keyEventMonitor: Any?
     @State var currentWallpaperPreviewThumbnailPath: String?
     @State var currentLockScreenPreviewThumbnailPath: String?
+    @State var webURLInput: String = ""
     @FocusState var isVolumeInputFocused: Bool
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
@@ -49,6 +52,7 @@ struct SettingsView: View {
     init(model: WallpaperModel) {
         self.model = model
         _thumbnailCache = StateObject(wrappedValue: DiskThumbnailCache())
+        _webThumbnailStore = StateObject(wrappedValue: WebWallpaperThumbnailStore())
     }
 
     func wallpaperGridLayout(for availableWidth: CGFloat) -> ([GridItem], CGFloat) {
@@ -154,9 +158,6 @@ struct SettingsView: View {
 
     private func applyMainModifiers<V: View>(_ view: V) -> some View {
         view
-            .onTapGesture {
-                NSApp.keyWindow?.makeFirstResponder(nil)
-            }
             .font(.system(size: 14, weight: .medium))
             .tint(.accentColor)
             .formStyle(.grouped)
@@ -172,6 +173,9 @@ struct SettingsView: View {
 
     private func applyNotificationAndChangeModifiers<V: View>(_ view: V) -> some View {
         view
+            .onChange(of: model.webWallpaperSources) { sources in
+                webThumbnailStore.prune(validSourceIDs: Set(sources.map(\.id)))
+            }
             .onChange(of: model.audioVolume) { _ in
                 if !isVolumeInputFocused {
                     syncVolumeInputWithModel()
@@ -239,6 +243,11 @@ struct SettingsView: View {
                 syncFitEditorDraftWithCurrentSelection()
                 prepareFitPreviewStillImageIfNeeded()
             }
+            .onChange(of: model.currentWebWallpaperID) { _ in
+                if let source = model.activeWebWallpaperSource {
+                    webThumbnailStore.loadIfNeeded(for: source)
+                }
+            }
             .onChange(of: selectedFitScreenID) { _ in
                 syncFitEditorDraftWithCurrentSelection()
             }
@@ -262,6 +271,9 @@ struct SettingsView: View {
                 syncFitEditorDraftWithCurrentSelection()
                 prepareFitPreviewStillImageIfNeeded()
                 installFitKeyMonitorIfNeeded()
+                for source in model.webWallpaperSources {
+                    webThumbnailStore.loadIfNeeded(for: source)
+                }
             }
             .onDisappear {
                 model.removeEmptyPlaylists()
@@ -351,6 +363,7 @@ struct SettingsView: View {
             WallpaperTabView(title: model.localizedString("壁紙")) {
                 VStack(alignment: .leading, spacing: 12) {
                     wallpaperLibraryPanel
+                    webWallpaperPanel
                     lockScreenWallpaperPanel
                 }
             } playlist: {

@@ -257,7 +257,7 @@ extension WallpaperModel {
         }
         guard registeredVideoPaths.count > 1 else {
             if let currentPath = currentVideoPath {
-                playVideo(url: URL(fileURLWithPath: currentPath))
+                selectRegisteredVideo(path: currentPath, clearsPin: !advancingPlaylist)
             }
             return
         }
@@ -274,7 +274,7 @@ extension WallpaperModel {
         }
         guard registeredVideoPaths.count > 1 else {
             if let currentPath = currentVideoPath {
-                playVideo(url: URL(fileURLWithPath: currentPath))
+                selectRegisteredVideo(path: currentPath, clearsPin: true)
             }
             return
         }
@@ -375,6 +375,14 @@ extension WallpaperModel {
             removeRegisteredVideo(path: trimmed)
             return
         }
+        if wallpaperKind == .web {
+            stopWebWallpaper()
+            wallpaperKind = .video
+            currentWebWallpaperID = nil
+            webWallpaperLoadState = .idle
+            UserDefaults.standard.set(WallpaperKind.video.rawValue, forKey: "wallpaperKind")
+            UserDefaults.standard.removeObject(forKey: "currentWebWallpaperID")
+        }
         let previousPath = currentVideoPath
         if clearsPin, pinCurrentVideo, previousPath != trimmed {
             clearPinCurrentVideo()
@@ -385,6 +393,7 @@ extension WallpaperModel {
         currentVideoIndex = registeredVideoPaths.firstIndex(of: trimmed)
         UserDefaults.standard.set(trimmed, forKey: "videoPath")
         refreshPlayerPresentations()
+        scheduleWindowRebuild(delay: 0.05)
         playVideo(url: URL(fileURLWithPath: trimmed))
         persistPlaylistState()
     }

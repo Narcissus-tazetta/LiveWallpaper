@@ -19,6 +19,7 @@ extension WallpaperModel {
         }
         audioEnabled = enabled
         applyAudioSettings()
+        applyWebAudioSettings()
         UserDefaults.standard.set(enabled, forKey: "audioEnabled")
     }
 
@@ -127,6 +128,11 @@ extension WallpaperModel {
 
     func refreshPlaybackState() {
         scheduleWindowRebuild(delay: 0.05)
+        if isWebWallpaperActive {
+            webWallpaperLoadState = .loading
+            evaluateForegroundCoverageState()
+            return
+        }
         if let currentPath = currentVideoPath,
            FileManager.default.fileExists(atPath: currentPath)
         {
@@ -430,6 +436,9 @@ extension WallpaperModel {
                 return
             }
             pendingPlaybackReconfiguration = false
+            if isWebWallpaperActive {
+                return
+            }
             if let currentPath = currentVideoPath {
                 playVideo(url: URL(fileURLWithPath: currentPath))
             }

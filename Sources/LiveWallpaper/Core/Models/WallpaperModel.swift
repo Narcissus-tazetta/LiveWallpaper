@@ -50,6 +50,7 @@ final class WallpaperModel: ObservableObject {
 
     var windows: [NSWindow] = []
     var playerViews: [PlayerView] = []
+    var webPlayerViews: [WebPlayerView] = []
     var sharedPlayer: AVQueuePlayer?
     var sharedLooper: AVPlayerLooper?
     var pendingPlaybackReconfiguration: Bool = false
@@ -116,6 +117,11 @@ final class WallpaperModel: ObservableObject {
     @Published var persistenceFailureMessage: String?
     @Published var desktopIconsFailureMessage: String?
 
+    @Published var wallpaperKind: WallpaperKind = .video
+    @Published var webWallpaperSources: [WebWallpaperSource] = []
+    @Published var currentWebWallpaperID: UUID?
+    @Published var webWallpaperLoadState: WebWallpaperLoadState = .idle
+    @Published var webWallpaperErrorMessage: String?
     @Published var playlists: [WallpaperPlaylist] = []
     @Published var selectedPlaylistID: UUID?
     @Published var currentVideoPath: String?
@@ -195,7 +201,9 @@ final class WallpaperModel: ObservableObject {
         LocalizationManager.setLanguage(effectiveAppLanguageCode)
         refreshAccessibilityTrustForCoverage()
         rebuildWindows()
-        if let savedPath: String = currentVideoPath {
+        if isWebWallpaperActive {
+            webWallpaperLoadState = .loading
+        } else if let savedPath: String = currentVideoPath {
             playVideo(url: URL(fileURLWithPath: savedPath))
         }
         screenChangeObserver = NotificationCenter.default.addObserver(

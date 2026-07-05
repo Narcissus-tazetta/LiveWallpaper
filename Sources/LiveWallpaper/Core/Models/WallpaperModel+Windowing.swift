@@ -109,7 +109,7 @@ extension WallpaperModel {
         }
     }
 
-    private func displayIDForWindow(at index: Int) -> String {
+    func displayIDForWindow(at index: Int) -> String {
         if index < windows.count {
             let window = windows[index]
             if let displayID = displayIDByWindow[ObjectIdentifier(window)] {
@@ -127,6 +127,10 @@ extension WallpaperModel {
     }
 
     func applySuspensionStateToPlayers() {
+        if isWebWallpaperActive {
+            applyWebSuspensionState()
+            return
+        }
         guard let player = sharedPlayer else {
             return
         }
@@ -259,6 +263,14 @@ extension WallpaperModel {
     }
 
     func rebuildWindows() {
+        if isWebWallpaperActive {
+            rebuildWebWindows()
+            return
+        }
+        rebuildVideoWindows()
+    }
+
+    private func rebuildVideoWindows() {
         let screens: [NSScreen] = targetScreens()
         let player = ensureSharedPlayer()
 
@@ -304,38 +316,122 @@ extension WallpaperModel {
         }
 
         let obsoleteWindows = windows.filter { !reusedWindowIDs.contains(ObjectIdentifier($0)) }
-        for window in obsoleteWindows {
-            prepareWindowForRetire(window)
-            window.orderOut(nil)
-        }
-        retireWindows(obsoleteWindows)
+        retireObsoleteWindows(obsoleteWindows)
 
         windows = nextWindows
         playerViews = nextPlayerViews
+        webPlayerViews = []
 
-        let validDisplayIDs = Set(screens.map { displayIDString(for: $0) })
-        suspendedDisplayIDs = suspendedDisplayIDs.intersection(validDisplayIDs)
+        syncSuspendedDisplays(for: screens)
         applySuspensionStateToPlayers()
 
         lastScreenSignatures = screenSignatures(for: screens)
     }
 
-    private func makeWallpaperWindow(
+    private func rebuildWebWindows() {
+        let screens: [NSScreen] = targetScreens()
+
+        var reusableByDisplayID: [String: (window: NSWindow, webView: WebPlayerView)] = [:]
+        for index in windows.indices where index < webPlayerViews.count {
+            let displayID = displayIDForWindow(at: index)
+            if reusableByDisplayID[displayID] == nil {
+                reusableByDisplayID[displayID] = (windows[index], webPlayerViews[index])
+            }
+        }
+
+        var nextWindows: [NSWindow] = []
+        var nextWebPlayerViews: [WebPlayerView] = []
+        var reusedWindowIDs: Set<ObjectIdentifier> = []
+
+        for screen in screens {
+            let displayID = displayIDString(for: screen)
+            let reusedPair = reusableByDisplayID[displayID]
+            let pair = reusedPair ?? makeWallpaperWebWindow(for: screen)
+            let window = pair.window
+            let webView = pair.webView
+
+            applyWindowOptions(window)
+            window.ignoresMouseEvents = clickThrough
+            if window.frame != screen.frame {
+                window.setFrame(screen.frame, display: true)
+            }
+            if window.contentView !== webView {
+                window.contentView = webView
+            }
+            if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedPair != nil) {
+                reassertWallpaperOrdering(window)
+            }
+
+            displayIDByWindow[ObjectIdentifier(window)] = displayID
+            reusedWindowIDs.insert(ObjectIdentifier(window))
+            nextWindows.append(window)
+            nextWebPlayerViews.append(webView)
+        }
+
+        let obsoleteWindows = windows.filter { !reusedWindowIDs.contains(ObjectIdentifier($0)) }
+        retireObsoleteWindows(obsoleteWindows)
+
+        windows = nextWindows
+        webPlayerViews = nextWebPlayerViews
+        playerViews = []
+
+        syncSuspendedDisplays(for: screens)
+        applyWebSuspensionState()
+
+        lastScreenSignatures = screenSignatures(for: screens)
+
+        if let source = activeWebWallpaperSource {
+            loadWebWallpaper(source: source)
+        }
+    }
+
+    private func retireObsoleteWindows(_ obsoleteWindows: [NSWindow]) {
+        for window in obsoleteWindows {
+            prepareWindowForRetire(window)
+            window.orderOut(nil)
+        }
+        retireWindows(obsoleteWindows)
+    }
+
+    private func syncSuspendedDisplays(for screens: [NSScreen]) {
+        let validDisplayIDs = Set(screens.map { displayIDString(for: $0) })
+        suspendedDisplayIDs = suspendedDisplayIDs.intersection(validDisplayIDs)
+    }
+
+    private func makeBorderlessWallpaperWindow(
         for screen: NSScreen,
-        player: AVQueuePlayer
-    ) -> (window: NSWindow, playerView: PlayerView) {
-        let frame: NSRect = screen.frame
+        opaqueBackground: Bool
+    ) -> NSWindow {
+        let frame = screen.frame
         let window = NSWindow(
             contentRect: frame,
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
-
-        window.backgroundColor = .clear
-        window.isOpaque = false
+        window.backgroundColor = opaqueBackground ? .black : .clear
+        window.isOpaque = opaqueBackground
         window.hasShadow = false
         window.setFrame(frame, display: true)
+        return window
+    }
+
+    private func makeWallpaperWebWindow(for screen: NSScreen) -> (window: NSWindow, webView: WebPlayerView) {
+        let frame = screen.frame
+        let window = makeBorderlessWallpaperWindow(for: screen, opaqueBackground: true)
+
+        let webView = WebPlayerView(frame: CGRect(origin: .zero, size: frame.size))
+        webView.autoresizingMask = [.width, .height]
+        window.contentView = webView
+        return (window, webView)
+    }
+
+    private func makeWallpaperWindow(
+        for screen: NSScreen,
+        player: AVQueuePlayer
+    ) -> (window: NSWindow, playerView: PlayerView) {
+        let frame = screen.frame
+        let window = makeBorderlessWallpaperWindow(for: screen, opaqueBackground: false)
 
         let playerView = PlayerView(frame: CGRect(origin: .zero, size: frame.size))
         playerView.autoresizingMask = [.width, .height]
@@ -349,6 +445,8 @@ extension WallpaperModel {
         if let playerView = window.contentView as? PlayerView {
             presentationCacheByPlayerView.removeValue(forKey: ObjectIdentifier(playerView))
             playerView.playerLayer.player = nil
+        } else if let webView = window.contentView as? WebPlayerView {
+            webView.tearDown()
         }
         window.contentView = nil
     }
@@ -414,7 +512,12 @@ extension WallpaperModel {
                 if window.frame != screen.frame {
                     window.setFrame(screen.frame, display: true)
                 }
-                if index < playerViews.count {
+                if isWebWallpaperActive, index < webPlayerViews.count {
+                    let webView = webPlayerViews[index]
+                    if window.contentView !== webView {
+                        window.contentView = webView
+                    }
+                } else if index < playerViews.count {
                     let playerView = playerViews[index]
                     applyPlayerPresentation(to: playerView, screen: screen)
                     if playerView.playerLayer.player !== sharedPlayer {
@@ -429,7 +532,11 @@ extension WallpaperModel {
                 reassertWallpaperOrdering(window)
             }
         }
-        applySuspensionStateToPlayers()
+        if isWebWallpaperActive {
+            applyWebSuspensionState()
+        } else {
+            applySuspensionStateToPlayers()
+        }
     }
 
     private func reassertWallpaperOrdering(_ window: NSWindow) {
@@ -477,7 +584,11 @@ extension WallpaperModel {
 
     func shouldRefreshWindowsForActiveSpace() -> Bool {
         let screens = targetScreens()
-        if windows.count != screens.count || playerViews.count != screens.count {
+        if windows.count != screens.count
+            || (isWebWallpaperActive
+                ? webPlayerViews.count != screens.count
+                : playerViews.count != screens.count)
+        {
             return true
         }
         let signatures = screenSignatures(for: screens)

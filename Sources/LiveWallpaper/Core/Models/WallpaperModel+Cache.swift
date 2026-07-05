@@ -53,6 +53,7 @@ extension WallpaperModel {
             )
             wallpaperPresentationByPath.removeAll()
             UserDefaults.standard.removeObject(forKey: wallpaperPresentationStorageKey)
+            clearWebWallpaperState()
             stopAllPlayers()
             currentVideoPath = nil
             currentVideoIndex = nil

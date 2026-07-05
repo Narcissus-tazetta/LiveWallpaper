@@ -48,6 +48,9 @@ extension SettingsView {
     }
 
     func currentWallpaperSummaryText() -> String {
+        if model.isWebWallpaperActive, let source = model.activeWebWallpaperSource {
+            return source.displayName
+        }
         guard let currentPath = model.currentVideoPath else {
             return model.allRegisteredVideoPaths.isEmpty
                 ? model.localizedString("未登録")
@@ -144,10 +147,21 @@ extension SettingsView {
 
     @ViewBuilder
     var desktopWallpaperPreview: some View {
-        wallpaperPreviewThumbnail(
-            image: currentWallpaperPreviewImage(),
-            accessibilityLabel: model.localizedString("現在の壁紙プレビュー")
-        )
+        if model.isWebWallpaperActive, let source = model.activeWebWallpaperSource {
+            WebWallpaperThumbnailView(
+                source: source,
+                isActive: true,
+                thumbnailStore: webThumbnailStore,
+                width: 88,
+                height: 50
+            )
+            .accessibilityLabel(model.localizedString("現在の壁紙プレビュー"))
+        } else {
+            wallpaperPreviewThumbnail(
+                image: currentWallpaperPreviewImage(),
+                accessibilityLabel: model.localizedString("現在の壁紙プレビュー")
+            )
+        }
     }
 
     @ViewBuilder

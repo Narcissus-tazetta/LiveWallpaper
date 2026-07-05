@@ -145,6 +145,7 @@ extension WallpaperModel {
             currentVideoIndex = nil
         }
         restoreLockScreenVideoPath()
+        restoreWebWallpaperState()
         if let data = UserDefaults.standard.data(forKey: wallpaperPresentationStorageKey),
            let decoded = try? JSONDecoder().decode(
                [String: [String: WallpaperPresentation]].self,
