@@ -22,6 +22,14 @@
 "拡大" = "Doldur";
 "全体" = "Sığdır";
 "再生の軽量モード（省電力）" = "Hafif oynatma modu (enerji tasarrufu)";
+"作業中は壁紙の再生を自動停止" = "Çalışırken duvar kağıdını otomatik duraklat";
+"停止判定" = "Duraklatma algılama";
+"前面アプリ" = "Ön plandaki uygulama";
+"画面を覆う時" = "Ekranı kapladığında";
+"Screen Recording権限を使わず、他のアプリが前面にある間は対象ディスプレイの再生を止めます。" = "Ekran Kaydı izni olmadan, başka uygulamalar ön plandayken hedef ekrandaki oynatmayı duraklatır.";
+"アクセシビリティ権限がある場合、前面ウィンドウが画面を大きく覆う時だけ停止します。判定できない時は安全側として停止します。" = "Erişilebilirlik izniyle yalnızca ön pencere ekranı büyük ölçüde kapladığında duraklatır. Algılanamadığında güvenlik için duraklatır.";
+"精密な停止判定にはアクセシビリティ権限が必要です。許可されるまでは安全側として前面アプリがある画面を停止します。" = "Hassas duraklatma algılama için Erişilebilirlik izni gerekir. İzin verilene kadar ön planda uygulama olan ekranlar güvenlik için duraklatılır.";
+"アクセシビリティ許可を開く" = "Erişilebilirlik iznini aç";
 "他のアプリが前面にあるとき再生を停止" = "Başka bir uygulama öndeyken oynatmayı duraklat";
 "停止対象から除外するアプリ" = "Duraklatma dışında tutulan uygulamalar";
 "アプリを選択して追加" = "Eklenecek uygulamayı seç";

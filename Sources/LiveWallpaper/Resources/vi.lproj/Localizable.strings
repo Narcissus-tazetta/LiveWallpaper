@@ -22,6 +22,14 @@
 "拡大" = "Lấp đầy";
 "全体" = "Vừa màn hình";
 "再生の軽量モード（省電力）" = "Chế độ phát nhẹ (tiết kiệm điện)";
+"作業中は壁紙の再生を自動停止" = "Tự động tạm dừng hình nền khi đang làm việc";
+"停止判定" = "Điều kiện tạm dừng";
+"前面アプリ" = "Ứng dụng phía trước";
+"画面を覆う時" = "Khi che màn hình";
+"Screen Recording権限を使わず、他のアプリが前面にある間は対象ディスプレイの再生を止めます。" = "Không cần quyền Ghi màn hình, tạm dừng phát trên màn hình đích khi ứng dụng khác ở phía trước.";
+"アクセシビリティ権限がある場合、前面ウィンドウが画面を大きく覆う時だけ停止します。判定できない時は安全側として停止します。" = "Khi có quyền Trợ năng, chỉ tạm dừng khi cửa sổ phía trước che phần lớn màn hình. Khi không thể xác định, tạm dừng để an toàn.";
+"精密な停止判定にはアクセシビリティ権限が必要です。許可されるまでは安全側として前面アプリがある画面を停止します。" = "Phát hiện tạm dừng chính xác cần quyền Trợ năng. Cho đến khi được cấp, các màn hình có ứng dụng phía trước sẽ tạm dừng để an toàn.";
+"アクセシビリティ許可を開く" = "Mở quyền Trợ năng";
 "他のアプリが前面にあるとき再生を停止" = "Tạm dừng phát khi ứng dụng khác ở phía trước";
 "停止対象から除外するアプリ" = "Ứng dụng loại trừ khỏi tạm dừng";
 "アプリを選択して追加" = "Chọn ứng dụng để thêm";
