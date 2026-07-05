@@ -12,15 +12,18 @@ extension SettingsView {
                     .foregroundColor(.secondary)
             }
 
+            Picker("", selection: $wallpaperAssignmentTarget) {
+                Text(model.localizedString("デスクトップ")).tag(WallpaperAssignmentTarget.desktop)
+                if model.lockScreenSyncService.isSupported {
+                    Text(model.localizedString("ロック画面")).tag(WallpaperAssignmentTarget.lockScreen)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
             HStack(spacing: 12) {
-                Text(
-                    model.currentVideoPath.map { model.registeredVideoDisplayName(
-                        for: $0
-                    ) } ?? model.localizedString("(選択なし)")
-                )
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                assignedWallpaperSelectionLabel()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) {
                     Button(model.localizedString("壁紙を共有")) {
                         isWallpaperShareSheetPresented = true
@@ -52,7 +55,8 @@ extension SettingsView {
                                 wallpaperCard(
                                     path: path,
                                     cardWidth: layout.1,
-                                    canDragToPlaylist: true
+                                    canDragToPlaylist: true,
+                                    assignmentTarget: wallpaperAssignmentTarget
                                 )
                             }
                         }
@@ -68,5 +72,29 @@ extension SettingsView {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.secondary.opacity(0.08))
         )
+    }
+
+    @ViewBuilder
+    func assignedWallpaperSelectionLabel() -> some View {
+        let prefix = wallpaperAssignmentTarget == .desktop
+            ? model.localizedString("デスクトップ")
+            : model.localizedString("ロック画面")
+        let selectedPath = wallpaperAssignmentTarget == .desktop
+            ? model.currentVideoPath
+            : model.lockScreenVideoPath
+        let name = selectedPath.map { model.registeredVideoDisplayName(for: $0) }
+            ?? model.localizedString("(選択なし)")
+
+        HStack(spacing: 6) {
+            Text("\(prefix):")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text(name)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
     }
 }

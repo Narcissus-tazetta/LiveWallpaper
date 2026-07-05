@@ -14,6 +14,18 @@ extension AppDelegate {
         window.center()
         window.setContentSize(NSSize(width: 760, height: 460))
         window.isReleasedWhenClosed = false
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else {
+                    return
+                }
+                self.wallpaperModel.scheduleActiveSpaceWindowRefresh()
+            }
+        }
         settingsWindowController = NSWindowController(window: window)
         settingsKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
             [weak self] event in

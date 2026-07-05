@@ -275,45 +275,38 @@ extension WallpaperModel {
     }
 
     private func handleActiveSpaceDidChange() {
-        guard suspendWhenOtherAppFullScreen, currentVideoPath != nil else {
-            scheduleForegroundCoverageEvaluation()
-            return
-        }
-
+        NSLog(
+            "[SpaceTransition] detected at=%.3f",
+            CFAbsoluteTimeGetCurrent()
+        )
+        beginActiveSpaceTransitionLock(reason: "coverage-active-space")
         activeSpaceTransitionWorkItem?.cancel()
-        scheduleActiveSpaceWindowRefresh()
-        scheduleActiveSpaceCoverageEvaluations()
+        activeSpaceCoverageWorkItems.forEach { $0.cancel() }
+        activeSpaceCoverageWorkItems.removeAll()
 
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else {
                 return
             }
             activeSpaceTransitionWorkItem = nil
+            NSLog(
+                "[SpaceTransition] settling at=%.3f",
+                CFAbsoluteTimeGetCurrent()
+            )
+            NSLog("[SpaceTransition] skip-window-refresh active-space-policy")
+
+            guard suspendWhenOtherAppFullScreen, currentVideoPath != nil else {
+                scheduleForegroundCoverageEvaluation()
+                return
+            }
+            if suspendDetectionMode == .preciseWindowCoverage {
+                updateAXObserverForFrontmostApplication()
+            }
             lastCoverageEvaluationAt = CFAbsoluteTimeGetCurrent()
-            scheduleActiveSpaceWindowRefresh()
+            evaluateForegroundCoverageState()
         }
         activeSpaceTransitionWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9, execute: workItem)
-    }
-
-    private func scheduleActiveSpaceCoverageEvaluations() {
-        activeSpaceCoverageWorkItems.forEach { $0.cancel() }
-        activeSpaceCoverageWorkItems.removeAll()
-
-        for delay in [0.0, 0.15, 0.45, 0.9] {
-            let workItem = DispatchWorkItem { [weak self] in
-                guard let self else {
-                    return
-                }
-                if suspendDetectionMode == .preciseWindowCoverage {
-                    updateAXObserverForFrontmostApplication()
-                }
-                lastCoverageEvaluationAt = CFAbsoluteTimeGetCurrent()
-                evaluateForegroundCoverageState()
-            }
-            activeSpaceCoverageWorkItems.append(workItem)
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
-        }
     }
 
     func evaluateForegroundCoverageState() {
@@ -342,20 +335,26 @@ extension WallpaperModel {
         let app = frontmostAppStateForCoverageEvaluation()
         let targetIDs = Set(targetScreens().map { displayIDString(for: $0) })
 
-        guard suspendDetectionMode == .preciseWindowCoverage, let app else {
+        guard let app else {
             return ForegroundCoverageSnapshot(
-                app: app,
+                app: nil,
                 targetDisplayIDs: targetIDs,
                 axProbe: .unavailable,
                 cgProbe: .unavailable
             )
         }
 
+        let cgProbe = cgCoverageProbe(for: app)
+        let axProbe: ForegroundCoverageProbe =
+            suspendDetectionMode == .preciseWindowCoverage
+            ? axCoverageProbe(for: app)
+            : .unavailable
+
         return ForegroundCoverageSnapshot(
             app: app,
             targetDisplayIDs: targetIDs,
-            axProbe: axCoverageProbe(for: app),
-            cgProbe: cgCoverageProbe(for: app)
+            axProbe: axProbe,
+            cgProbe: cgProbe
         )
     }
 
@@ -466,7 +465,7 @@ extension WallpaperModel {
             return .uncertain
         }
         guard !windows.isEmpty else {
-            return app.isFinder ? .clear : .uncertain
+            return .clear
         }
 
         let covered = ForegroundCoverageGeometry.coveredDisplayIDs(

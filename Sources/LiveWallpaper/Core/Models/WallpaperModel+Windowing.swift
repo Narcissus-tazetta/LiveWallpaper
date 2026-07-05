@@ -4,6 +4,43 @@ import Foundation
 
 @MainActor
 extension WallpaperModel {
+    enum WindowRefreshReason: String {
+        case activeSpaceTransition
+        case finderRestart
+    }
+
+    private static let windowRefreshTimestampFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    static func refreshDelays(for reason: WindowRefreshReason) -> [TimeInterval] {
+        switch reason {
+        case .activeSpaceTransition:
+            return [0.0]
+        case .finderRestart:
+            return [0.1, 0.35, 0.8, 1.6, 3.0]
+        }
+    }
+
+    static func allowsWindowReorder(for reason: WindowRefreshReason) -> Bool {
+        switch reason {
+        case .activeSpaceTransition:
+            return false
+        case .finderRestart:
+            return true
+        }
+    }
+
+    static func shouldReassertOrderingOnRebuild(isReusedWindow: Bool) -> Bool {
+        !isReusedWindow
+    }
+
+    private static func windowRefreshTimestamp() -> String {
+        windowRefreshTimestampFormatter.string(from: Date())
+    }
+
     func setClickThrough(_ enabled: Bool) {
         guard clickThrough != enabled else {
             return
@@ -99,20 +136,110 @@ extension WallpaperModel {
             return
         }
         let displayIDs = (0 ..< displayCount).map { displayIDForWindow(at: $0) }
+        let allSuspended = displayIDs.allSatisfy { suspendedDisplayIDs.contains($0) }
+
+        if allSuspended {
+            for index in playerViews.indices {
+                if playerViews[index].playerLayer.player !== player {
+                    playerViews[index].playerLayer.player = player
+                }
+            }
+            player.pause()
+            return
+        }
+
         for index in playerViews.indices {
-            let displayID = index < displayIDs
-                .count ? displayIDs[index] : displayIDForWindow(at: index)
-            let shouldDetachPlayer = suspendedDisplayIDs.contains(displayID)
-            let expectedPlayer = shouldDetachPlayer ? nil : player
+            let displayID = index < displayIDs.count
+                ? displayIDs[index]
+                : displayIDForWindow(at: index)
+            let expectedPlayer = suspendedDisplayIDs.contains(displayID) ? nil : player
             if playerViews[index].playerLayer.player !== expectedPlayer {
                 playerViews[index].playerLayer.player = expectedPlayer
             }
         }
-        let allSuspended = displayIDs.allSatisfy { suspendedDisplayIDs.contains($0) }
-        if allSuspended {
-            player.pause()
-        } else {
-            player.play()
+        player.play()
+    }
+
+    func configureWallpaperWindowRefreshMonitoring() {
+        let workspaceCenter = NSWorkspace.shared.notificationCenter
+
+        if let observer = spaceTransitionGuardObserver {
+            workspaceCenter.removeObserver(observer)
+            spaceTransitionGuardObserver = nil
+        }
+        spaceTransitionGuardObserver = workspaceCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.beginActiveSpaceTransitionLock(reason: "workspace-active-space")
+            }
+        }
+
+        finderLaunchObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            MainActor.assumeIsolated {
+                guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                    as? NSRunningApplication,
+                    app.bundleIdentifier == "com.apple.finder"
+                else {
+                    return
+                }
+                NSLog(
+                    "[WindowRefresh] finderLaunchDetected at=%@",
+                    Self.windowRefreshTimestamp()
+                )
+                self?.scheduleFinderRestartWindowRefresh()
+            }
+        }
+    }
+
+    func scheduleFinderRestartWindowRefresh() {
+        scheduleWallpaperWindowRefresh(reason: .finderRestart)
+    }
+
+    func scheduleActiveSpaceWindowRefresh() {
+        scheduleWallpaperWindowRefresh(reason: .activeSpaceTransition)
+    }
+
+    private func scheduleWallpaperWindowRefresh(reason: WindowRefreshReason) {
+        if reason == .activeSpaceTransition, !shouldRefreshWindowsForActiveSpace() {
+            NSLog(
+                "[WindowRefresh] skip reason=%@ unchanged-signature at=%@",
+                reason.rawValue,
+                Self.windowRefreshTimestamp()
+            )
+            return
+        }
+        activeSpaceWindowRefreshWorkItems.forEach { $0.cancel() }
+        activeSpaceWindowRefreshWorkItems.removeAll()
+        let delays = Self.refreshDelays(for: reason)
+        let allowReorder = Self.allowsWindowReorder(for: reason)
+
+        NSLog(
+            "[WindowRefresh] schedule reason=%@ allowReorder=%@ delays=%@ at=%@",
+            reason.rawValue,
+            allowReorder ? "true" : "false",
+            String(describing: delays),
+            Self.windowRefreshTimestamp()
+        )
+
+        for delay in delays {
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self else {
+                    return
+                }
+                refreshWallpaperWindowsForActiveSpace(
+                    allowReorder: allowReorder,
+                    reason: reason
+                )
+            }
+            activeSpaceWindowRefreshWorkItems.append(workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
         }
     }
 
@@ -149,10 +276,8 @@ extension WallpaperModel {
 
         for screen in screens {
             let displayID = displayIDString(for: screen)
-            let pair = reusableByDisplayID[displayID] ?? makeWallpaperWindow(
-                for: screen,
-                player: player
-            )
+            let reusedPair = reusableByDisplayID[displayID]
+            let pair = reusedPair ?? makeWallpaperWindow(for: screen, player: player)
             let window = pair.window
             let playerView = pair.playerView
 
@@ -168,8 +293,9 @@ extension WallpaperModel {
             if window.contentView !== playerView {
                 window.contentView = playerView
             }
-            window.orderBack(nil)
-            window.orderFront(nil)
+            if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedPair != nil) {
+                reassertWallpaperOrdering(window)
+            }
 
             displayIDByWindow[ObjectIdentifier(window)] = displayID
             reusedWindowIDs.insert(ObjectIdentifier(window))
@@ -264,25 +390,20 @@ extension WallpaperModel {
         window.collectionBehavior = behavior
     }
 
-    func scheduleActiveSpaceWindowRefresh() {
-        activeSpaceWindowRefreshWorkItems.forEach { $0.cancel() }
-        activeSpaceWindowRefreshWorkItems.removeAll()
-
-        for delay in [0.03, 0.18, 0.45] {
-            let workItem = DispatchWorkItem { [weak self] in
-                guard let self else {
-                    return
-                }
-                refreshWallpaperWindowsForActiveSpace()
-            }
-            activeSpaceWindowRefreshWorkItems.append(workItem)
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
-        }
-    }
-
-    private func refreshWallpaperWindowsForActiveSpace() {
+    private func refreshWallpaperWindowsForActiveSpace(
+        allowReorder: Bool,
+        reason: WindowRefreshReason
+    ) {
         let screensByID = Dictionary(
             uniqueKeysWithValues: targetScreens().map { (displayIDString(for: $0), $0) }
+        )
+
+        NSLog(
+            "[WindowRefresh] run reason=%@ allowReorder=%@ windowCount=%d at=%@",
+            reason.rawValue,
+            allowReorder ? "true" : "false",
+            windows.count,
+            Self.windowRefreshTimestamp()
         )
 
         for (index, window) in windows.enumerated() {
@@ -304,9 +425,63 @@ extension WallpaperModel {
                     }
                 }
             }
-            window.orderFrontRegardless()
+            if allowReorder {
+                reassertWallpaperOrdering(window)
+            }
         }
         applySuspensionStateToPlayers()
+    }
+
+    private func reassertWallpaperOrdering(_ window: NSWindow) {
+        guard !isActiveSpaceTransitioning else {
+            NSLog(
+                "[WindowRefresh] skip-reorder active-space-transition at=%@",
+                Self.windowRefreshTimestamp()
+            )
+            return
+        }
+        window.orderBack(nil)
+        window.orderFront(nil)
+    }
+
+    func beginActiveSpaceTransitionLock(
+        duration: TimeInterval = 1.2,
+        reason: String
+    ) {
+        activeSpaceTransitionLockWorkItem?.cancel()
+        isActiveSpaceTransitioning = true
+        NSLog(
+            "[SpaceTransition] lock-start reason=%@ duration=%.2f at=%@",
+            reason,
+            duration,
+            Self.windowRefreshTimestamp()
+        )
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else {
+                return
+            }
+            isActiveSpaceTransitioning = false
+            activeSpaceTransitionLockWorkItem = nil
+            NSLog(
+                "[SpaceTransition] lock-end reason=%@ at=%@",
+                reason,
+                Self.windowRefreshTimestamp()
+            )
+        }
+        activeSpaceTransitionLockWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + max(duration, 0.6),
+            execute: workItem
+        )
+    }
+
+    func shouldRefreshWindowsForActiveSpace() -> Bool {
+        let screens = targetScreens()
+        if windows.count != screens.count || playerViews.count != screens.count {
+            return true
+        }
+        let signatures = screenSignatures(for: screens)
+        return signatures != lastScreenSignatures
     }
 
     func scheduleScreenSync() {

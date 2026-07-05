@@ -38,9 +38,27 @@ enum ForegroundCoverageEngine {
 
         switch mode {
         case .frontmostAppPresence:
-            return app.isFinder ? [] : snapshot.targetDisplayIDs
+            return frontmostPresenceSuspendedDisplayIDs(app: app, snapshot: snapshot)
         case .preciseWindowCoverage:
             return preciseSuspendedDisplayIDs(app: app, snapshot: snapshot)
+        }
+    }
+
+    private static func frontmostPresenceSuspendedDisplayIDs(
+        app: ForegroundCoverageAppState,
+        snapshot: ForegroundCoverageSnapshot
+    ) -> Set<String> {
+        if app.isFinder {
+            return []
+        }
+
+        switch snapshot.cgProbe {
+        case .covered(let displayIDs):
+            return displayIDs
+        case .clear:
+            return []
+        case .uncertain, .unavailable:
+            return snapshot.targetDisplayIDs
         }
     }
 

@@ -133,4 +133,11 @@ extension SettingsView {
       set: { model.setLockScreenSyncEnabled($0) }
     )
   }
+
+  var desktopIconsVisibleBinding: Binding<Bool> {
+    Binding(
+      get: { model.desktopIconsVisible },
+      set: { model.setDesktopIconsVisible($0) }
+    )
+  }
 }

@@ -398,6 +398,7 @@ extension WallpaperModel {
             return
         }
         let wasCurrent = currentVideoPath == trimmed
+        let wasLockScreen = lockScreenVideoPath == trimmed
         playlists[selectedIndex].videoPaths.remove(at: index)
         syncActivePlaylistPaths()
         registeredVideoDisplayNames.removeValue(forKey: trimmed)
@@ -410,6 +411,10 @@ extension WallpaperModel {
             playlists.remove(at: selectedIndex)
             ensureSelectedPlaylist()
             syncActivePlaylistPaths()
+        }
+
+        if wasLockScreen {
+            clearLockScreenVideoIfMissing(path: trimmed)
         }
 
         if wasCurrent {

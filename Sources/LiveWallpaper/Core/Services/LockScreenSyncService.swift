@@ -96,8 +96,8 @@ final class LockScreenSyncService {
 
     private let assetURLKey = "url-4K-SDR-240FPS"
     private let preferredBorrowedAerialIDs = [
-        "4C108785-A7BA-422E-9C79-B0129F1D5550", // Tahoe Day
-        "6D6834A4-2F0F-479A-B053-7D4DC5CB8EB7"  // Sequoia Sunrise
+        "4C108785-A7BA-422E-9C79-B0129F1D5550",
+        "6D6834A4-2F0F-479A-B053-7D4DC5CB8EB7"
     ]
     private let wallpaperServiceProcessNames = [
         "WallpaperAgent",
@@ -189,7 +189,6 @@ final class LockScreenSyncService {
         do {
             try restoreWallpaperStoreBackup()
         } catch LockScreenSyncError.backupUnavailable {
-            // A missing Index.plist backup is safe during crash recovery if the Aerial file was restored.
         } catch {
             restoreErrors.append(error)
         }

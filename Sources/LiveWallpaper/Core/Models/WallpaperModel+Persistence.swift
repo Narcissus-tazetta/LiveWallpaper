@@ -20,6 +20,7 @@ extension WallpaperModel {
         {
             desktopLevelOffset = restoredOffset
         }
+        refreshDesktopIconsVisibility()
         useFullScreenAuxiliary =
             UserDefaults.standard.object(forKey: "useFullScreenAuxiliary") as? Bool ?? false
         playlistPlaybackEnabled =
@@ -143,6 +144,7 @@ extension WallpaperModel {
         } else {
             currentVideoIndex = nil
         }
+        restoreLockScreenVideoPath()
         if let data = UserDefaults.standard.data(forKey: wallpaperPresentationStorageKey),
            let decoded = try? JSONDecoder().decode(
                [String: [String: WallpaperPresentation]].self,
@@ -245,14 +247,12 @@ extension WallpaperModel {
             lockScreenSyncStatus = .unsupported
             return
         }
-        guard let currentVideoPath,
-              FileManager.default.fileExists(atPath: currentVideoPath)
-        else {
-            lockScreenSyncStatus = .idle
+        guard let lockScreenPath = effectiveLockScreenVideoPath else {
+            releaseLockScreenBorrowIfNeeded()
             return
         }
 
-        let videoURL = URL(fileURLWithPath: currentVideoPath)
+        let videoURL = URL(fileURLWithPath: lockScreenPath)
         let service = lockScreenSyncService
 
         lockScreenSyncTask?.cancel()
@@ -281,6 +281,28 @@ extension WallpaperModel {
                     self.lockScreenSyncStatus = .failed(error.localizedDescription)
                 }
             }
+        }
+    }
+
+    func releaseLockScreenBorrowIfNeeded() {
+        lockScreenSyncTask?.cancel()
+        lockScreenUnlockResetWorkItem?.cancel()
+        lockScreenUnlockResetWorkItem = nil
+
+        guard lockScreenSyncService.hasActiveLease else {
+            lockScreenSyncStatus = lockScreenSyncEnabled ? .idle : .disabled
+            return
+        }
+
+        lockScreenSyncStatus = .removing
+        do {
+            try lockScreenSyncService.restoreOriginalAerialAndWallpaperStore()
+            lockScreenSyncStatus = lockScreenSyncEnabled ? .idle : .disabled
+        } catch {
+            lockScreenSyncStatus = .failed(error.localizedDescription)
+            NSLog(
+                "[LockScreenSync] Failed to release borrow: \(error.localizedDescription)"
+            )
         }
     }
 

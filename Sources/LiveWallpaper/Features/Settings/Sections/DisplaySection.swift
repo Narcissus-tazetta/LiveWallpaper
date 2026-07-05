@@ -4,84 +4,110 @@ import SwiftUI
 extension SettingsView {
   var displaySettingsSection: some View {
     Section(header: Label(model.localizedString("表示"), systemImage: "display.2")) {
-      HStack(spacing: 16) {
-        Text(model.localizedString("壁紙の表示先"))
-          .frame(width: 130, alignment: .leading)
-        Picker("", selection: displayModeBinding) {
-          Text(model.localizedString("メインのみ")).tag(DisplayMode.mainOnly)
-          Text(model.localizedString("全ディスプレイ")).tag(DisplayMode.allScreens)
+      settingsInsetCard {
+        VStack(alignment: .leading, spacing: 16) {
+          displayChoicePicker(
+            title: model.localizedString("壁紙の表示先"),
+            options: [
+              (model.localizedString("メインのみ"), DisplayMode.mainOnly),
+              (model.localizedString("全ディスプレイ"), DisplayMode.allScreens)
+            ],
+            selection: displayModeBinding
+          )
+
+          displayChoicePicker(
+            title: model.localizedString("動画のフィット"),
+            options: [
+              (model.localizedString("拡大"), VideoFitMode.fill),
+              (model.localizedString("全体"), VideoFitMode.fit)
+            ],
+            selection: globalFitModeBinding
+          )
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 240, alignment: .leading)
       }
 
-      HStack(spacing: 16) {
-        Text(model.localizedString("動画のフィット"))
-          .frame(width: 130, alignment: .leading)
-        Picker("", selection: globalFitModeBinding) {
-          Text(model.localizedString("拡大")).tag(VideoFitMode.fill)
-          Text(model.localizedString("全体")).tag(VideoFitMode.fit)
+      Toggle(isOn: desktopIconsVisibleBinding) {
+        HStack(spacing: 6) {
+          Text(model.localizedString("デスクトップのアイコンを表示"))
+          helpIconButton(for: .desktopIcons)
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 240, alignment: .leading)
       }
+      if expandedHelpTopics.contains(.desktopIcons) {
+        settingsFootnote(
+          model.localizedString(
+            "System Settings の「デスクトップに項目を表示」と同じ設定です。OFF にすると Finder が再起動し、デスクトップ上のファイルとフォルダが非表示になります。"
+          )
+        )
+      }
+      if let message = model.desktopIconsFailureMessage {
+        settingsFootnote(message, color: .orange)
+      }
+
+      settingsCalloutNote(
+        systemImage: "info.circle",
+        text: spaceSwitchingLimitationText()
+      )
 
       Toggle(model.localizedString("再生の軽量モード（省電力）"), isOn: lightweightModeBinding)
       Toggle(model.localizedString("作業中は壁紙の再生を自動停止"), isOn: suspendWhenFullScreenBinding)
 
       if model.suspendWhenOtherAppFullScreen {
         suspendDetectionModeSection
-        suspendExclusionSection
       }
 
       advancedSettingsSection
     }
+    .onAppear {
+      model.refreshDesktopIconsVisibility()
+    }
+  }
+
+  func spaceSwitchingLimitationText() -> String {
+    model.localizedString(
+      "macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。"
+    )
   }
 
   var suspendDetectionModeSection: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 16) {
-        Text(model.localizedString("停止判定"))
-          .font(.caption)
-          .foregroundColor(.secondary)
-          .frame(width: 130, alignment: .leading)
-        Picker("", selection: suspendDetectionModeBinding) {
-          Text(model.localizedString("前面アプリ")).tag(SuspendDetectionMode.frontmostAppPresence)
-          Text(model.localizedString("画面を覆う時")).tag(SuspendDetectionMode.preciseWindowCoverage)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 240, alignment: .leading)
-      }
+    settingsInsetCard {
+      VStack(alignment: .leading, spacing: 12) {
+        displayChoicePicker(
+          title: model.localizedString("停止判定"),
+          options: [
+            (model.localizedString("前面アプリ"), SuspendDetectionMode.frontmostAppPresence),
+            (model.localizedString("画面を覆う時"), SuspendDetectionMode.preciseWindowCoverage)
+          ],
+          selection: suspendDetectionModeBinding,
+          titleFont: .caption,
+          titleColor: .secondary
+        )
 
-      Text(suspendDetectionModeDescription())
-        .font(.caption)
-        .foregroundColor(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        settingsFootnote(suspendDetectionModeDescription())
 
-      if shouldShowAccessibilityCoverageWarning {
-        VStack(alignment: .leading, spacing: 6) {
-          Text(accessibilityCoverageWarningText())
-            .font(.caption)
-            .foregroundColor(.red)
-            .frame(maxWidth: .infinity, alignment: .leading)
-          Button(model.localizedString("アクセシビリティ許可を開く")) {
-            model.requestAccessibilityPermissionForCoverage()
+        if shouldShowAccessibilityCoverageWarning {
+          VStack(alignment: .leading, spacing: 6) {
+            settingsFootnote(accessibilityCoverageWarningText(), color: .red)
+            Button(model.localizedString("アクセシビリティ許可を開く")) {
+              model.requestAccessibilityPermissionForCoverage()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
           }
-          .buttonStyle(.borderedProminent)
-          .controlSize(.small)
         }
+
+        Divider().opacity(0.35)
+
+        suspendExclusionContent
       }
     }
-    .padding(.vertical, 6)
   }
 
   func suspendDetectionModeDescription() -> String {
     switch model.suspendDetectionMode {
     case .frontmostAppPresence:
-      return model.localizedString("Screen Recording権限を使わず、他のアプリが前面にある間は対象ディスプレイの再生を止めます。")
+      return model.localizedString(
+        "前面アプリのウィンドウが画面を覆う時に停止します。Screen Recording 権限がない場合は保守的な判定になります。"
+      )
     case .preciseWindowCoverage:
       return model.localizedString("アクセシビリティ権限がある場合、前面ウィンドウが画面を大きく覆う時だけ停止します。判定できない時は安全側として停止します。")
     }
@@ -97,8 +123,8 @@ extension SettingsView {
     model.localizedString("精密な停止判定にはアクセシビリティ権限が必要です。許可されるまでは安全側として前面アプリがある画面を停止します。")
   }
 
-  var suspendExclusionSection: some View {
-    VStack(alignment: .leading, spacing: 12) {
+  var suspendExclusionContent: some View {
+    VStack(alignment: .leading, spacing: 10) {
       HStack(alignment: .center) {
         Text(model.localizedString("停止対象から除外するアプリ"))
           .font(.caption)
@@ -110,12 +136,9 @@ extension SettingsView {
         .buttonStyle(.bordered)
         .controlSize(.small)
       }
-      .padding(.vertical, 2)
 
       if model.suspendExclusionBundleIDs.isEmpty {
-        Text(model.localizedString("除外アプリは未設定です"))
-          .font(.caption)
-          .foregroundColor(.secondary)
+        settingsFootnote(model.localizedString("除外アプリは未設定です"))
       } else {
         ScrollView(.vertical, showsIndicators: true) {
           VStack(alignment: .leading, spacing: 4) {
@@ -125,10 +148,8 @@ extension SettingsView {
           }
         }
         .frame(maxHeight: 140)
-        .padding(.top, 4)
       }
     }
-    .padding(.vertical, 6)
   }
 
   func suspendExclusionRow(for bundleID: String) -> some View {
@@ -164,6 +185,65 @@ extension SettingsView {
       .tint(.red)
     }
     .padding(.vertical, 2)
+  }
+
+  func settingsInsetCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    content()
+      .padding(12)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(
+        RoundedRectangle(cornerRadius: 10)
+          .fill(Color.secondary.opacity(0.08))
+      )
+  }
+
+  func settingsFootnote(_ text: String, color: Color = .secondary) -> some View {
+    Text(text)
+      .font(.caption)
+      .foregroundColor(color)
+      .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  func settingsCalloutNote(systemImage: String, text: String) -> some View {
+    HStack(alignment: .top, spacing: 8) {
+      Image(systemName: systemImage)
+        .font(.caption)
+        .foregroundColor(.secondary)
+        .padding(.top, 1)
+      Text(text)
+        .font(.caption)
+        .foregroundColor(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(10)
+    .background(
+      RoundedRectangle(cornerRadius: 8)
+        .fill(Color.secondary.opacity(0.06))
+    )
+  }
+
+  func displayChoicePicker<T: Hashable>(
+    title: String,
+    options: [(String, T)],
+    selection: Binding<T>,
+    titleFont: Font = .body,
+    titleColor: Color = .primary
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(title)
+        .font(titleFont)
+        .foregroundColor(titleColor)
+
+      EqualSegmentedControl(
+        options: options,
+        selection: selection,
+        distribution: .fillProportionally
+      )
+      .frame(height: 24)
+      .fixedSize(horizontal: true, vertical: false)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   var advancedSettingsSection: some View {
@@ -242,10 +322,9 @@ extension SettingsView {
         }
       }
       if expandedHelpTopics.contains(.fullScreenAuxiliary) {
-        Text(model.localizedString("フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。"))
-          .font(.caption)
-          .foregroundColor(.secondary)
-          .frame(maxWidth: .infinity, alignment: .leading)
+        settingsFootnote(
+          model.localizedString("フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。")
+        )
       }
     }
     .padding(.top, 6)
@@ -274,15 +353,12 @@ extension SettingsView {
       }
 
       if expandedHelpTopics.contains(.qualityPreset) {
-        Text(
+        settingsFootnote(
           model
             .localizedString(
               "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。"
             )
         )
-        .font(.caption)
-        .foregroundColor(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
   }
@@ -309,13 +385,10 @@ extension SettingsView {
       }
 
       if expandedHelpTopics.contains(.workProfile) {
-        Text(
+        settingsFootnote(
           model
             .localizedString("全体の再生負荷を切り替えます。通常は品質優先、低負荷は安定と省電力を重視、最小は負荷を最小限にして作業優先にします。")
         )
-        .font(.caption)
-        .foregroundColor(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
   }
@@ -342,14 +415,11 @@ extension SettingsView {
       }
 
       if expandedHelpTopics.contains(.frameRate) {
-        Text(
+        settingsFootnote(
           model.localizedString(
             "再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。"
           )
         )
-          .font(.caption)
-          .foregroundColor(.secondary)
-          .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
   }
@@ -377,15 +447,12 @@ extension SettingsView {
       }
 
       if expandedHelpTopics.contains(.decode) {
-        Text(
+        settingsFootnote(
           model
             .localizedString(
               "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。"
             )
         )
-        .font(.caption)
-        .foregroundColor(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
   }
@@ -412,15 +479,12 @@ extension SettingsView {
       }
 
       if expandedHelpTopics.contains(.desktopLevel) {
-        Text(
+        settingsFootnote(
           model
             .localizedString(
               "壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。"
             )
         )
-        .font(.caption)
-        .foregroundColor(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
   }

@@ -7,16 +7,31 @@ extension SettingsView {
         cardWidth: CGFloat,
         canDragToPlaylist: Bool = false,
         switchToWallpaperTabOnSelect: Bool = true,
+        assignmentTarget: WallpaperAssignmentTarget = .desktop,
         isSelected: Bool? = nil,
         onSelect: (() -> Void)? = nil
     ) -> some View {
         let thumbnailWidth = max(cardWidth - 8, 1)
+        let isDesktopAssigned = model.currentVideoPath == path
+        let isLockScreenAssigned = model.lockScreenVideoPath == path
+        let strokeColor = wallpaperCardStrokeColor(
+            path: path,
+            assignmentTarget: assignmentTarget,
+            isDesktopAssigned: isDesktopAssigned,
+            isLockScreenAssigned: isLockScreenAssigned,
+            isSelected: isSelected
+        )
 
         let thumbnailButton = Button {
             if let onSelect {
                 onSelect()
             } else {
-                model.selectRegisteredVideo(path: path)
+                switch assignmentTarget {
+                case .desktop:
+                    model.selectRegisteredVideo(path: path)
+                case .lockScreen:
+                    model.selectLockScreenVideo(path: path)
+                }
                 if switchToWallpaperTabOnSelect {
                     selectedTab = .wallpaper
                 }
@@ -34,10 +49,14 @@ extension SettingsView {
                         .foregroundColor(.secondary)
                 }
 
-                if model.pinCurrentVideo, model.currentVideoPath == path {
-                    VStack {
-                        HStack {
-                            Spacer(minLength: 0)
+                VStack {
+                    HStack(alignment: .top, spacing: 4) {
+                        wallpaperAssignmentBadges(
+                            isDesktopAssigned: isDesktopAssigned,
+                            isLockScreenAssigned: isLockScreenAssigned
+                        )
+                        Spacer(minLength: 0)
+                        if model.pinCurrentVideo, model.currentVideoPath == path {
                             HStack(spacing: 3) {
                                 Image(systemName: "pin.fill")
                                     .font(.system(size: 8, weight: .semibold))
@@ -47,10 +66,11 @@ extension SettingsView {
                             .padding(.horizontal, 5)
                             .padding(.vertical, 3)
                             .background(.ultraThinMaterial, in: Capsule())
-                            .padding(4)
                         }
-                        Spacer(minLength: 0)
                     }
+                    .padding(.top, 12)
+                    .padding(.horizontal, 6)
+                    Spacer(minLength: 0)
                 }
             }
             .frame(width: thumbnailWidth, height: 60)
@@ -138,13 +158,16 @@ extension SettingsView {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(
-                    (isSelected ?? (model.currentVideoPath == path)) ? Color.accentColor : Color
-                        .clear,
-                    lineWidth: 1.5
-                )
+                .stroke(strokeColor, lineWidth: strokeColor == .clear ? 0 : 1.5)
         )
         .contextMenu {
+            Button(model.localizedString("デスクトップに設定")) {
+                model.selectRegisteredVideo(path: path)
+            }
+            Button(model.localizedString("ロック画面に設定")) {
+                model.selectLockScreenVideo(path: path)
+            }
+            .disabled(!model.lockScreenSyncService.isSupported)
             Button(model.localizedString("この壁紙に切り替え")) {
                 model.selectRegisteredVideo(path: path)
             }
@@ -179,6 +202,48 @@ extension SettingsView {
             Button(model.localizedString("登録から削除")) {
                 model.removeRegisteredVideo(path: path)
             }
+        }
+    }
+
+    @ViewBuilder
+    func wallpaperAssignmentBadges(
+        isDesktopAssigned: Bool,
+        isLockScreenAssigned: Bool
+    ) -> some View {
+        HStack(spacing: 4) {
+            if isDesktopAssigned {
+                Image(systemName: "display")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 18, height: 18)
+                    .background(Color.accentColor, in: Circle())
+            }
+            if isLockScreenAssigned {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 18, height: 18)
+                    .background(Color.orange, in: Circle())
+            }
+        }
+        .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
+    }
+
+    func wallpaperCardStrokeColor(
+        path: String,
+        assignmentTarget: WallpaperAssignmentTarget,
+        isDesktopAssigned: Bool,
+        isLockScreenAssigned: Bool,
+        isSelected: Bool?
+    ) -> Color {
+        if let isSelected {
+            return isSelected ? Color.accentColor : .clear
+        }
+        switch assignmentTarget {
+        case .desktop:
+            return isDesktopAssigned ? Color.accentColor : .clear
+        case .lockScreen:
+            return isLockScreenAssigned ? Color.orange : .clear
         }
     }
 }

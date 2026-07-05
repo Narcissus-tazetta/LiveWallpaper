@@ -26,7 +26,7 @@
 "停止判定" = "Điều kiện tạm dừng";
 "前面アプリ" = "Ứng dụng phía trước";
 "画面を覆う時" = "Khi che màn hình";
-"Screen Recording権限を使わず、他のアプリが前面にある間は対象ディスプレイの再生を止めます。" = "Không cần quyền Ghi màn hình, tạm dừng phát trên màn hình đích khi ứng dụng khác ở phía trước.";
+"前面アプリのウィンドウが画面を覆う時に停止します。Screen Recording 権限がない場合は保守的な判定になります。" = "Tạm dừng khi cửa sổ ứng dụng phía trước che màn hình. Nếu không có quyền Ghi màn hình, sẽ dùng cách đánh giá thận trọng hơn.";
 "アクセシビリティ権限がある場合、前面ウィンドウが画面を大きく覆う時だけ停止します。判定できない時は安全側として停止します。" = "Khi có quyền Trợ năng, chỉ tạm dừng khi cửa sổ phía trước che phần lớn màn hình. Khi không thể xác định, tạm dừng để an toàn.";
 "精密な停止判定にはアクセシビリティ権限が必要です。許可されるまでは安全側として前面アプリがある画面を停止します。" = "Phát hiện tạm dừng chính xác cần quyền Trợ năng. Cho đến khi được cấp, các màn hình có ứng dụng phía trước sẽ tạm dừng để an toàn.";
 "アクセシビリティ許可を開く" = "Mở quyền Trợ năng";
@@ -113,6 +113,7 @@
 "プレイリストを削除" = "Xóa danh sách phát";
 "fullScreenAuxiliary を有効化" = "Bật fullScreenAuxiliary";
 "フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。" = "Giúp duy trì hình nền ngay cả trong không gian toàn màn hình. Tùy thuộc vào môi trường, việc hiển thị có thể không ổn định.";
+"macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "Khi chuyển Space trên macOS (Mission Control), hình nền đôi khi có thể chuyển sang Space liền kề. Dễ xảy ra hơn khi chuyển từ Space đang mở app sang Space trống. Quay lại cùng một Space thường sẽ ổn định trở lại.";
 "画質" = "Chất lượng";
 "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。" = "Chọn sự cân bằng giữa chất lượng hình ảnh và mức tiêu thụ điện năng. Chế độ 'Tự động' sẽ tối ưu hóa theo môi trường, 'Tiết kiệm điện' giúp giảm tiêu hao pin và nhiệt độ, 'Chất lượng cao' ưu tiên hiển thị hình ảnh tốt nhất.";
 "動作プロファイル" = "Hồ sơ hiệu năng";
@@ -200,3 +201,16 @@
 "選ぶと macOS の共有シートを開き、動画ファイルを共有できます" = "Chọn hình nền để mở bảng chia sẻ macOS cho tệp video.";
 "選ぶと macOS の共有シートを開き、動画ファイルと .lwpkg を共有できます" = "Chọn hình nền để mở bảng chia sẻ macOS cho tệp video và gói .lwpkg.";
 "共有シートを開けませんでした" = "Không thể mở bảng chia sẻ.";
+"デスクトップのアイコンを表示" = "Hiển thị biểu tượng trên Desktop";
+"System Settings の「デスクトップに項目を表示」と同じ設定です。OFF にすると Finder が再起動し、デスクトップ上のファイルとフォルダが非表示になります。" = "Giống tùy chọn \"Trên Desktop\" trong mục Hiển thị mục của System Settings. Tắt sẽ khởi động lại Finder và ẩn tệp, thư mục trên desktop.";
+"デスクトップのアイコン表示を変更できませんでした。Finder 設定へのアクセスを確認してください。" = "Không thể thay đổi hiển thị biểu tượng desktop. Hãy kiểm tra quyền truy cập cài đặt Finder.";
+"デスクトップ" = "Desktop";
+"ロック画面" = "Màn hình khóa";
+"デスクトップに設定" = "Đặt làm Desktop";
+"ロック画面に設定" = "Đặt làm màn hình khóa";
+"デスクトップと同じにする" = "Dùng giống Desktop";
+"同期オフ" = "Tắt đồng bộ";
+"未設定" = "Chưa đặt";
+"未対応" = "Không hỗ trợ";
+"ロック画面壁紙プレビュー" = "Xem trước hình nền màn hình khóa";
+"オンにすると選択中のロック画面動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "Khi bật, video màn hình khóa đã chọn sẽ được đặt tạm làm hình nền Aerial của hệ thống. Hình nền gốc được khôi phục khi thoát app.";

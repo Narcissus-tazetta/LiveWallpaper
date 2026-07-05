@@ -33,9 +33,11 @@ struct SettingsView: View {
     @State var fitPreviewStillImageInFlight: Set<String> = []
     @State var fitEditorPreviewFrameSize: CGSize = .zero
     @State var isResetSettingsDialogPresented: Bool = false
+    @State var wallpaperAssignmentTarget: WallpaperAssignmentTarget = .desktop
     @State var isWallpaperShareSheetPresented: Bool = false
     @State var keyEventMonitor: Any?
     @State var currentWallpaperPreviewThumbnailPath: String?
+    @State var currentLockScreenPreviewThumbnailPath: String?
     @FocusState var isVolumeInputFocused: Bool
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
@@ -75,20 +77,62 @@ struct SettingsView: View {
 
     var currentStatusSection: some View {
         Section {
-            HStack(alignment: .center, spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(model.localizedString("現在の壁紙")): \(currentWallpaperSummaryText())")
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
+                    statusWallpaperSlot(
+                        title: model.localizedString("デスクトップ"),
+                        systemImage: "display",
+                        summary: currentWallpaperSummaryText(),
+                        preview: { desktopWallpaperPreview }
+                    )
+                    statusWallpaperSlot(
+                        title: model.localizedString("ロック画面"),
+                        systemImage: "lock.fill",
+                        summary: currentLockScreenWallpaperSummaryText(),
+                        preview: { lockScreenWallpaperPreview }
+                    )
+                }
+
+                HStack(spacing: 16) {
                     Text("\(model.localizedString("プレイリスト")): \(currentPlaylistSummaryText())")
                     Text("\(model.localizedString("表示")): \(currentDisplayModeSummaryText())")
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
-
-                Spacer(minLength: 0)
-
-                currentWallpaperPreview
             }
         }
+    }
+
+    func statusWallpaperSlot<Preview: View>(
+        title: String,
+        systemImage: String,
+        summary: String,
+        @ViewBuilder preview: () -> Preview
+    ) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            preview()
+                .frame(width: 88, height: 50)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Label(title, systemImage: systemImage)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                Text(summary)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.secondary.opacity(0.08))
+        )
     }
 
     var body: some View {
@@ -168,8 +212,12 @@ struct SettingsView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 model.refreshAccessibilityTrustForCoverage()
+                model.refreshDesktopIconsVisibility()
             }
             .onChange(of: selectedTab) { tab in
+                if tab == .settings {
+                    model.refreshDesktopIconsVisibility()
+                }
                 if tab == .wallpaperFit {
                     ensureFitEditorScreenSelection()
                     syncFitEditorSelectionWithCurrentVideoIfNeeded()
@@ -179,6 +227,9 @@ struct SettingsView: View {
                 } else {
                     removeFitKeyMonitor()
                 }
+            }
+            .onChange(of: model.lockScreenVideoPath) { _ in
+                requestLockScreenWallpaperThumbnailIfNeeded()
             }
             .onChange(of: model.currentVideoPath) { _ in
                 requestCurrentWallpaperThumbnailIfNeeded()
@@ -202,6 +253,7 @@ struct SettingsView: View {
                 syncVolumeInputWithModel()
                 pruneMissingWallpaperThumbnails()
                 requestCurrentWallpaperThumbnailIfNeeded()
+                requestLockScreenWallpaperThumbnailIfNeeded()
                 model.refreshAccessibilityTrustForCoverage()
                 thumbnailCache.prewarm(paths: Array(model.allRegisteredVideoPaths.prefix(10)))
                 processThumbnailQueue()
@@ -214,6 +266,7 @@ struct SettingsView: View {
             .onDisappear {
                 model.removeEmptyPlaylists()
                 releaseCurrentWallpaperThumbnailVisibility()
+                releaseLockScreenWallpaperThumbnailVisibility()
                 removeFitKeyMonitor()
             }
     }
@@ -296,7 +349,10 @@ struct SettingsView: View {
         switch selectedTab {
         case .wallpaper:
             WallpaperTabView(title: model.localizedString("壁紙")) {
-                wallpaperLibraryPanel
+                VStack(alignment: .leading, spacing: 12) {
+                    wallpaperLibraryPanel
+                    lockScreenWallpaperPanel
+                }
             } playlist: {
                 playlistSettingsPanel
             }

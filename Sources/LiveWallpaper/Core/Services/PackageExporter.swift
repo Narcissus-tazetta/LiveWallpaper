@@ -143,7 +143,6 @@ final class PackageExporter {
         let attrs = try fileManager.attributesOfItem(atPath: videoPath)
         let fileSize = attrs[.size] as? UInt64 ?? 0
 
-        // Keep original bytes (no transcoding) to avoid any quality loss.
         let packagedVideoURL = videosDir.appendingPathComponent("\(videoId).mp4")
         try fileManager.copyItem(atPath: videoPath, toPath: packagedVideoURL.path)
 

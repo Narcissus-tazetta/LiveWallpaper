@@ -12,12 +12,18 @@ extension SettingsView {
         case settings
     }
 
+    enum WallpaperAssignmentTarget: String, CaseIterable, Hashable {
+        case desktop
+        case lockScreen
+    }
+
     enum HelpTopic: Hashable {
         case qualityPreset
         case workProfile
         case frameRate
         case decode
         case desktopLevel
+        case desktopIcons
         case fullScreenAuxiliary
         case videoLoop
     }

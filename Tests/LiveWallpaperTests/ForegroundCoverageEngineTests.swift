@@ -24,6 +24,106 @@ final class ForegroundCoverageEngineTests: XCTestCase {
         XCTAssertTrue(suspended.isEmpty)
     }
 
+    func testFrontmostModeStopsWhenCGReportsCovered() {
+        let snapshot = ForegroundCoverageSnapshot(
+            app: ForegroundCoverageAppState(
+                pid: 200,
+                bundleID: "com.example.editor",
+                isFinder: false
+            ),
+            targetDisplayIDs: targetIDs,
+            axProbe: .unavailable,
+            cgProbe: .covered(["main"])
+        )
+
+        let suspended = ForegroundCoverageEngine.suspendedDisplayIDs(
+            mode: .frontmostAppPresence,
+            snapshot: snapshot
+        )
+
+        XCTAssertEqual(suspended, ["main"])
+    }
+
+    func testFrontmostModeContinuesWhenCGReportsClear() {
+        let snapshot = ForegroundCoverageSnapshot(
+            app: ForegroundCoverageAppState(
+                pid: 200,
+                bundleID: "com.example.editor",
+                isFinder: false
+            ),
+            targetDisplayIDs: targetIDs,
+            axProbe: .unavailable,
+            cgProbe: .clear
+        )
+
+        let suspended = ForegroundCoverageEngine.suspendedDisplayIDs(
+            mode: .frontmostAppPresence,
+            snapshot: snapshot
+        )
+
+        XCTAssertTrue(suspended.isEmpty)
+    }
+
+    func testFrontmostModeFallsBackWhenCGUncertain() {
+        let snapshot = ForegroundCoverageSnapshot(
+            app: ForegroundCoverageAppState(
+                pid: 200,
+                bundleID: "com.example.editor",
+                isFinder: false
+            ),
+            targetDisplayIDs: targetIDs,
+            axProbe: .unavailable,
+            cgProbe: .uncertain
+        )
+
+        let suspended = ForegroundCoverageEngine.suspendedDisplayIDs(
+            mode: .frontmostAppPresence,
+            snapshot: snapshot
+        )
+
+        XCTAssertEqual(suspended, targetIDs)
+    }
+
+    func testFrontmostModeFallsBackWhenCGUnavailable() {
+        let snapshot = ForegroundCoverageSnapshot(
+            app: ForegroundCoverageAppState(
+                pid: 200,
+                bundleID: "com.example.editor",
+                isFinder: false
+            ),
+            targetDisplayIDs: targetIDs,
+            axProbe: .unavailable,
+            cgProbe: .unavailable
+        )
+
+        let suspended = ForegroundCoverageEngine.suspendedDisplayIDs(
+            mode: .frontmostAppPresence,
+            snapshot: snapshot
+        )
+
+        XCTAssertEqual(suspended, targetIDs)
+    }
+
+    func testFrontmostModeContinuesWhenNonFinderHasNoWindows() {
+        let snapshot = ForegroundCoverageSnapshot(
+            app: ForegroundCoverageAppState(
+                pid: 200,
+                bundleID: "com.example.editor",
+                isFinder: false
+            ),
+            targetDisplayIDs: targetIDs,
+            axProbe: .unavailable,
+            cgProbe: .clear
+        )
+
+        let suspended = ForegroundCoverageEngine.suspendedDisplayIDs(
+            mode: .frontmostAppPresence,
+            snapshot: snapshot
+        )
+
+        XCTAssertTrue(suspended.isEmpty)
+    }
+
     func testPreciseModeStopsForFinderWindowCoverage() {
         let snapshot = ForegroundCoverageSnapshot(
             app: ForegroundCoverageAppState(

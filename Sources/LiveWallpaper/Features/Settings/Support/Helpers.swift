@@ -56,6 +56,16 @@ extension SettingsView {
         return model.registeredVideoDisplayName(for: currentPath)
     }
 
+    func currentLockScreenWallpaperSummaryText() -> String {
+        guard model.lockScreenSyncService.isSupported else {
+            return model.localizedString("未対応")
+        }
+        guard let lockScreenPath = model.lockScreenVideoPath else {
+            return model.localizedString("未設定")
+        }
+        return model.registeredVideoDisplayName(for: lockScreenPath)
+    }
+
     func currentPlaylistSummaryText() -> String {
         guard !model.playlists.isEmpty else {
             return model.localizedString("未作成")
@@ -77,6 +87,13 @@ extension SettingsView {
             return nil
         }
         return thumbnailCache.image(for: currentPath)
+    }
+
+    func lockScreenWallpaperPreviewImage() -> NSImage? {
+        guard let lockScreenPath = model.lockScreenVideoPath else {
+            return nil
+        }
+        return thumbnailCache.image(for: lockScreenPath)
     }
 
     func requestCurrentWallpaperThumbnailIfNeeded() {
@@ -102,36 +119,74 @@ extension SettingsView {
         self.currentWallpaperPreviewThumbnailPath = nil
     }
 
-    @ViewBuilder
-    var currentWallpaperPreview: some View {
-        let image = currentWallpaperPreviewImage()
+    func requestLockScreenWallpaperThumbnailIfNeeded() {
+        guard let lockScreenPath = model.lockScreenVideoPath else {
+            releaseLockScreenWallpaperThumbnailVisibility()
+            return
+        }
+        if let previousPath = currentLockScreenPreviewThumbnailPath,
+           previousPath != lockScreenPath
+        {
+            setThumbnailVisibility(path: previousPath, isVisible: false)
+        }
+        currentLockScreenPreviewThumbnailPath = lockScreenPath
+        setThumbnailVisibility(path: lockScreenPath, isVisible: true)
+        requestWallpaperThumbnail(path: lockScreenPath)
+    }
 
+    func releaseLockScreenWallpaperThumbnailVisibility() {
+        guard let currentLockScreenPreviewThumbnailPath else {
+            return
+        }
+        setThumbnailVisibility(path: currentLockScreenPreviewThumbnailPath, isVisible: false)
+        self.currentLockScreenPreviewThumbnailPath = nil
+    }
+
+    @ViewBuilder
+    var desktopWallpaperPreview: some View {
+        wallpaperPreviewThumbnail(
+            image: currentWallpaperPreviewImage(),
+            accessibilityLabel: model.localizedString("現在の壁紙プレビュー")
+        )
+    }
+
+    @ViewBuilder
+    var lockScreenWallpaperPreview: some View {
+        wallpaperPreviewThumbnail(
+            image: lockScreenWallpaperPreviewImage(),
+            accessibilityLabel: model.localizedString("ロック画面壁紙プレビュー")
+        )
+    }
+
+    @ViewBuilder
+    func wallpaperPreviewThumbnail(image: NSImage?, accessibilityLabel: String) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 8)
                 .fill(Color.secondary.opacity(0.08))
 
             if let image {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 122, height: 70)
                     .clipped()
             } else {
-                VStack(spacing: 4) {
-                    Image(systemName: "photo")
-                        .font(.system(size: 18, weight: .medium))
-                    Text(model.localizedString("プレビューなし"))
-                        .font(.caption2)
-                }
-                .foregroundColor(.secondary)
+                Image(systemName: "photo")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.secondary)
             }
         }
-        .frame(width: 122, height: 70)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
         )
-        .accessibilityLabel(model.localizedString("現在の壁紙プレビュー"))
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    @ViewBuilder
+    var currentWallpaperPreview: some View {
+        desktopWallpaperPreview
     }
 
     func toggleHelp(_ topic: HelpTopic) {

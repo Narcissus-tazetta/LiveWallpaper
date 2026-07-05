@@ -22,7 +22,7 @@
 "停止判定" = "Pause detection";
 "前面アプリ" = "Foreground app";
 "画面を覆う時" = "When covering screen";
-"Screen Recording権限を使わず、他のアプリが前面にある間は対象ディスプレイの再生を止めます。" = "Without Screen Recording permission, pauses playback on the affected display while other apps are in the foreground.";
+"前面アプリのウィンドウが画面を覆う時に停止します。Screen Recording 権限がない場合は保守的な判定になります。" = "Pauses when the foreground app's windows cover the display. Without Screen Recording permission, uses a conservative fallback.";
 "アクセシビリティ権限がある場合、前面ウィンドウが画面を大きく覆う時だけ停止します。判定できない時は安全側として停止します。" = "With Accessibility permission, pauses only when foreground windows largely cover the screen. When detection is unavailable, pauses as a precaution.";
 "精密な停止判定にはアクセシビリティ権限が必要です。許可されるまでは安全側として前面アプリがある画面を停止します。" = "Precise pause detection requires Accessibility permission. Until granted, displays with a foreground app are paused as a precaution.";
 "アクセシビリティ許可を開く" = "Open Accessibility permissions";
@@ -148,6 +148,7 @@
 "削除" = "Delete";
 "fullScreenAuxiliary を有効化" = "Enable fullScreenAuxiliary";
 "フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。" = "Keeps the wallpaper visible in fullscreen spaces. Display may be unstable depending on the environment.";
+"macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "When switching macOS Spaces (Mission Control), the wallpaper may occasionally move to an adjacent Space. This is more likely when moving from a Space with an open app to an empty one. Returning to the same Space usually stabilizes it.";
 "画質" = "Quality";
 "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。" = "Choose the balance between quality and power. Automatic adapts to your environment, Power saving reduces battery use and heat, High quality favors visuals.";
 "動作プロファイル" = "Performance Profile";
@@ -228,3 +229,16 @@
 "Aerial動画が未ダウンロードです" = "No Aerial video has been downloaded";
 "同期に失敗しました" = "Sync failed";
 "前回終了時に残ったロック画面設定を自動で元に戻しました。" = "The Lock Screen setting left from the previous run was restored automatically.";
+"デスクトップのアイコンを表示" = "Show Desktop Icons";
+"System Settings の「デスクトップに項目を表示」と同じ設定です。OFF にすると Finder が再起動し、デスクトップ上のファイルとフォルダが非表示になります。" = "Same as \"On Desktop\" under Show Items in System Settings. Turning this off restarts Finder and hides files and folders on the desktop.";
+"デスクトップのアイコン表示を変更できませんでした。Finder 設定へのアクセスを確認してください。" = "Could not change desktop icon visibility. Check access to Finder settings.";
+"デスクトップ" = "Desktop";
+"ロック画面" = "Lock Screen";
+"デスクトップに設定" = "Set as Desktop";
+"ロック画面に設定" = "Set as Lock Screen";
+"デスクトップと同じにする" = "Use Same as Desktop";
+"同期オフ" = "Sync Off";
+"未設定" = "Not Set";
+"未対応" = "Unsupported";
+"ロック画面壁紙プレビュー" = "Lock Screen wallpaper preview";
+"オンにすると選択中のロック画面動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "When enabled, the selected lock screen video is temporarily set as the system Aerial wallpaper. The original wallpaper is restored when the app quits.";

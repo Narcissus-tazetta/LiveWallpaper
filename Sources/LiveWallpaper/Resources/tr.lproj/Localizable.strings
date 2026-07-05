@@ -26,7 +26,7 @@
 "停止判定" = "Duraklatma algılama";
 "前面アプリ" = "Ön plandaki uygulama";
 "画面を覆う時" = "Ekranı kapladığında";
-"Screen Recording権限を使わず、他のアプリが前面にある間は対象ディスプレイの再生を止めます。" = "Ekran Kaydı izni olmadan, başka uygulamalar ön plandayken hedef ekrandaki oynatmayı duraklatır.";
+"前面アプリのウィンドウが画面を覆う時に停止します。Screen Recording 権限がない場合は保守的な判定になります。" = "Ön plandaki uygulamanın pencereleri ekranı kapladığında duraklatır. Ekran Kaydı izni yoksa daha muhafazakâr bir değerlendirme kullanılır.";
 "アクセシビリティ権限がある場合、前面ウィンドウが画面を大きく覆う時だけ停止します。判定できない時は安全側として停止します。" = "Erişilebilirlik izniyle yalnızca ön pencere ekranı büyük ölçüde kapladığında duraklatır. Algılanamadığında güvenlik için duraklatır.";
 "精密な停止判定にはアクセシビリティ権限が必要です。許可されるまでは安全側として前面アプリがある画面を停止します。" = "Hassas duraklatma algılama için Erişilebilirlik izni gerekir. İzin verilene kadar ön planda uygulama olan ekranlar güvenlik için duraklatılır.";
 "アクセシビリティ許可を開く" = "Erişilebilirlik iznini aç";
@@ -113,6 +113,7 @@
 "プレイリストを削除" = "Oynatma listesini sil";
 "fullScreenAuxiliary を有効化" = "fullScreenAuxiliary etkinleştir";
 "フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。" = "Tam ekran alanlarında duvar kağıdını korumayı kolaylaştırır. Ortama bağlı olarak görüntü kararsız olabilir.";
+"macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "macOS Space (Mission Control) değiştirirken duvar kağıdı nadiren komşu bir Space'e geçebilir. Açık uygulamalı bir Space'ten boş bir Space'e geçerken daha sık görülür. Aynı Space'e geri dönmek genellikle sorunu giderir.";
 "画質" = "Kalite";
 "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。" = "Kalite ile güç tüketimi arasındaki dengeyi seçin. Otomatik ortama göre optimize eder, güç tasarrufu pil ve ısınmayı azaltır, yüksek kalite görseli önceler.";
 "動作プロファイル" = "Performans Profili";
@@ -200,3 +201,16 @@
 "選ぶと macOS の共有シートを開き、動画ファイルを共有できます" = "Video dosyası için macOS paylaşım sayfasını açmak üzere bir duvar kağıdı seçin.";
 "選ぶと macOS の共有シートを開き、動画ファイルと .lwpkg を共有できます" = "Video dosyası ve .lwpkg paketi için macOS paylaşım sayfasını açmak üzere bir duvar kağıdı seçin.";
 "共有シートを開けませんでした" = "Paylaşım sayfası açılamadı.";
+"デスクトップのアイコンを表示" = "Masaüstü simgelerini göster";
+"System Settings の「デスクトップに項目を表示」と同じ設定です。OFF にすると Finder が再起動し、デスクトップ上のファイルとフォルダが非表示になります。" = "System Settings'teki \"Masaüstünde\" seçeneğiyle aynıdır. Kapatıldığında Finder yeniden başlar ve masaüstündeki dosya ve klasörler gizlenir.";
+"デスクトップのアイコン表示を変更できませんでした。Finder 設定へのアクセスを確認してください。" = "Masaüstü simge görünürlüğü değiştirilemedi. Finder ayarlarına erişimi kontrol edin.";
+"デスクトップ" = "Masaüstü";
+"ロック画面" = "Kilit Ekranı";
+"デスクトップに設定" = "Masaüstüne ayarla";
+"ロック画面に設定" = "Kilit ekranına ayarla";
+"デスクトップと同じにする" = "Masaüstüyle aynı yap";
+"同期オフ" = "Senkron kapalı";
+"未設定" = "Ayarlanmadı";
+"未対応" = "Desteklenmiyor";
+"ロック画面壁紙プレビュー" = "Kilit ekranı duvar kağıdı önizlemesi";
+"オンにすると選択中のロック画面動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "Açıldığında seçili kilit ekranı videosu geçici olarak sistem Aerial duvar kağıdı olarak ayarlanır. Uygulama kapanınca önceki duvar kağıdına döner.";

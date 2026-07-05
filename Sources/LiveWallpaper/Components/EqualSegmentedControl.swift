@@ -4,6 +4,7 @@ import SwiftUI
 struct EqualSegmentedControl<T: Hashable>: NSViewRepresentable {
     let options: [(label: String, value: T)]
     @Binding var selection: T
+    var distribution: NSSegmentedControl.Distribution = .fillEqually
 
     func makeNSView(context: Context) -> NSSegmentedControl {
         let control = NSSegmentedControl(
@@ -12,12 +13,13 @@ struct EqualSegmentedControl<T: Hashable>: NSViewRepresentable {
             target: context.coordinator,
             action: #selector(Coordinator.segmentChanged(_:))
         )
-        control.segmentDistribution = .fillEqually
+        control.segmentDistribution = distribution
         updateSelection(control)
         return control
     }
 
     func updateNSView(_ nsView: NSSegmentedControl, context _: Context) {
+        nsView.segmentDistribution = distribution
         updateSelection(nsView)
     }
 

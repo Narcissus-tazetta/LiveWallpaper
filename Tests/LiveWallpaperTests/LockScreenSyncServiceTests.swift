@@ -98,7 +98,6 @@ final class LockScreenSyncServiceTests: XCTestCase {
             _ = try await service.sync(videoURL: sourceVideoURL)
             XCTFail("Expected noDownloadedAerials")
         } catch LockScreenSyncError.noDownloadedAerials {
-            // Expected.
         }
     }
 

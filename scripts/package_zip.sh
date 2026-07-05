@@ -8,14 +8,6 @@ BUILD_NUMBER="${2:-1}"
 SPARKLE_APPCAST_URL="${SPARKLE_APPCAST_URL:-https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml}"
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-}"
 ARCH_MODE="${ARCH_MODE:-universal}"
-SIGNING_MODE="${SIGNING_MODE:-adhoc}"
-APP_SIGN_IDENTITY="${APP_SIGN_IDENTITY:-}"
-DMG_SIGN_IDENTITY="${DMG_SIGN_IDENTITY:-$APP_SIGN_IDENTITY}"
-NOTARIZE="${NOTARIZE:-false}"
-NOTARYTOOL_PROFILE="${NOTARYTOOL_PROFILE:-}"
-APPLE_API_KEY_ID="${APPLE_API_KEY_ID:-}"
-APPLE_API_ISSUER_ID="${APPLE_API_ISSUER_ID:-}"
-APPLE_API_PRIVATE_KEY="${APPLE_API_PRIVATE_KEY:-}"
 CREATE_DMG="${CREATE_DMG:-true}"
 CREATE_DMG_COMMAND="${CREATE_DMG_COMMAND:-create-dmg}"
 
@@ -73,68 +65,9 @@ raise SystemExit(1)
 PY
 }
 
-normalize_private_key_for_notary() {
-  local raw="$1"
-  if [[ "$raw" == *"BEGIN PRIVATE KEY"* ]] || [[ "$raw" == *"BEGIN EC PRIVATE KEY"* ]]; then
-    printf '%s' "$raw" | sed $'s/\\\\n/\\\n/g'
-  else
-    printf '%s' "$raw"
-  fi
-}
-
-submit_for_notarization() {
-  local target_path="$1"
-  if [[ "$NOTARIZE" != "true" ]]; then
-    return 0
-  fi
-
-  if [[ -n "$NOTARYTOOL_PROFILE" ]]; then
-    xcrun notarytool submit "$target_path" --keychain-profile "$NOTARYTOOL_PROFILE" --wait
-    return 0
-  fi
-
-  if [[ -z "$APPLE_API_KEY_ID" ]] || [[ -z "$APPLE_API_ISSUER_ID" ]] || [[ -z "$APPLE_API_PRIVATE_KEY" ]]; then
-    echo "Notarization requires NOTARYTOOL_PROFILE or APPLE_API_KEY_ID + APPLE_API_ISSUER_ID + APPLE_API_PRIVATE_KEY" >&2
-    exit 1
-  fi
-
-  local key_file="$DIST_DIR/AuthKey_${APPLE_API_KEY_ID}.p8"
-  normalize_private_key_for_notary "$APPLE_API_PRIVATE_KEY" > "$key_file"
-  chmod 600 "$key_file"
-
-  xcrun notarytool submit "$target_path" \
-    --key "$key_file" \
-    --key-id "$APPLE_API_KEY_ID" \
-    --issuer "$APPLE_API_ISSUER_ID" \
-    --wait
-
-  rm -f "$key_file"
-}
-
 sign_app_bundle() {
-  if [[ "$SIGNING_MODE" == "developerid" ]]; then
-    if [[ -z "$APP_SIGN_IDENTITY" ]]; then
-      echo "SIGNING_MODE=developerid requires APP_SIGN_IDENTITY" >&2
-      exit 1
-    fi
-    xattr -cr "$APP_DIR"
-    codesign --force --deep --timestamp --options runtime --sign "$APP_SIGN_IDENTITY" "$APP_DIR"
-    codesign --verify --deep --strict --verbose=2 "$APP_DIR"
-  else
-    codesign --force --deep --sign - "$APP_DIR"
-    codesign --verify --deep --verbose=2 "$APP_DIR"
-  fi
-}
-
-sign_dmg_file() {
-  if [[ "$SIGNING_MODE" != "developerid" ]]; then
-    return 0
-  fi
-  if [[ -z "$DMG_SIGN_IDENTITY" ]]; then
-    return 0
-  fi
-  codesign --force --timestamp --sign "$DMG_SIGN_IDENTITY" "$DMG_PATH"
-  codesign --verify --verbose=2 "$DMG_PATH"
+  codesign --force --deep --sign - "$APP_DIR"
+  codesign --verify --deep --verbose=2 "$APP_DIR"
 }
 
 create_polished_dmg() {
@@ -157,7 +90,7 @@ create_polished_dmg() {
 mkdir -p "$DIST_DIR"
 
 cd "$ROOT_DIR"
-echo "[1/5] Building release binary..."
+echo "[1/6] Building release binary..."
 if [[ "$ARCH_MODE" == "universal" ]]; then
   swift build -c release --arch arm64
   swift build -c release --arch x86_64
@@ -207,7 +140,7 @@ fi
 
 SPARKLE_PUBLIC_ED_KEY="$(normalize_and_validate_sparkle_public_key "$SPARKLE_PUBLIC_ED_KEY")"
 
-echo "[2/5] Creating .app bundle..."
+echo "[2/6] Creating .app bundle..."
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp -f "$EXEC_PATH" "$APP_DIR/Contents/MacOS/$APP_NAME"
@@ -265,23 +198,15 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-echo "[3/7] Signing app bundle..."
+echo "[3/6] Ad-hoc signing app bundle..."
 sign_app_bundle
 
-if [[ "$NOTARIZE" == "true" ]]; then
-  echo "[4/7] Notarizing app bundle..."
-  submit_for_notarization "$APP_DIR"
-  xcrun stapler staple "$APP_DIR"
-else
-  echo "[4/7] Skipping notarization"
-fi
-
-echo "[5/7] Creating zip..."
+echo "[4/6] Creating zip..."
 rm -f "$ZIP_PATH"
 ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ZIP_PATH"
 
 if [[ "$CREATE_DMG" == "true" ]]; then
-  echo "[6/7] Creating dmg..."
+  echo "[5/6] Creating dmg..."
   rm -f "$DMG_PATH"
 
   STAGE_DIR="$DIST_DIR/dmg-stage"
@@ -307,17 +232,11 @@ if [[ "$CREATE_DMG" == "true" ]]; then
 
   # Clean up staging
   rm -rf "$STAGE_DIR"
-
-  sign_dmg_file
-  if [[ "$NOTARIZE" == "true" ]]; then
-    submit_for_notarization "$DMG_PATH"
-    xcrun stapler staple "$DMG_PATH"
-  fi
 else
-  echo "[6/7] Skipping dmg creation"
+  echo "[5/6] Skipping dmg creation"
 fi
 
-echo "[7/7] Done"
+echo "[6/6] Done"
 echo "App: $APP_DIR"
 echo "Zip: $ZIP_PATH"
 ls -lh "$ZIP_PATH"

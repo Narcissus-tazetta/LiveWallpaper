@@ -54,6 +54,7 @@ final class WallpaperModel: ObservableObject {
     var sharedLooper: AVPlayerLooper?
     var pendingPlaybackReconfiguration: Bool = false
     var screenChangeObserver: NSObjectProtocol?
+    var finderLaunchObserver: NSObjectProtocol?
     var screenChangeWorkItem: DispatchWorkItem?
     var windowRebuildWorkItem: DispatchWorkItem?
     var windowOptionsWorkItem: DispatchWorkItem?
@@ -65,6 +66,7 @@ final class WallpaperModel: ObservableObject {
     var lastScreenSignatures: [ScreenSignature] = []
     var frontmostAppObserver: NSObjectProtocol?
     var activeSpaceObserver: NSObjectProtocol?
+    var spaceTransitionGuardObserver: NSObjectProtocol?
     var playerItemEndObserver: NSObjectProtocol?
     var axCoverageObserver: ForegroundCoverageAXObserver?
     var suspendedDisplayIDs: Set<String> = []
@@ -73,6 +75,8 @@ final class WallpaperModel: ObservableObject {
     var autoFrameRateBufferAdjustment: TimeInterval = 0
     var coverageEvaluationWorkItem: DispatchWorkItem?
     var activeSpaceTransitionWorkItem: DispatchWorkItem?
+    var isActiveSpaceTransitioning: Bool = false
+    var activeSpaceTransitionLockWorkItem: DispatchWorkItem?
     var coverageEvaluationGeneration: UInt64 = 0
     var statePersistWorkItem: DispatchWorkItem?
     var lockScreenUnlockResetWorkItem: DispatchWorkItem?
@@ -80,6 +84,7 @@ final class WallpaperModel: ObservableObject {
     var lastCoverageEvaluationAt: CFAbsoluteTime = 0
     let playbackEnvironment: PlaybackEnvironment
     let lockScreenSyncService: LockScreenSyncService = .init()
+    let desktopIconsService: DesktopIconsService = .init()
     var lockScreenSyncTask: Task<Void, Never>?
     var videoAspectRatioByPath: [String: Double] = [:]
     var loadingVideoAspectRatioPaths: Set<String> = []
@@ -102,16 +107,19 @@ final class WallpaperModel: ObservableObject {
     @Published var pinCurrentVideo: Bool = false
     @Published var currentVideoIndex: Int?
     @Published var desktopLevelOffset: DesktopLevelOffset = .zero
+    @Published var desktopIconsVisible: Bool = true
     @Published var useFullScreenAuxiliary: Bool = false
     @Published var suspendWhenOtherAppFullScreen: Bool = false
     @Published var suspendDetectionMode: SuspendDetectionMode = .frontmostAppPresence
     @Published var accessibilityTrustedForCoverage: Bool = false
     @Published var suspendExclusionBundleIDs: [String] = []
     @Published var persistenceFailureMessage: String?
+    @Published var desktopIconsFailureMessage: String?
 
     @Published var playlists: [WallpaperPlaylist] = []
     @Published var selectedPlaylistID: UUID?
     @Published var currentVideoPath: String?
+    @Published var lockScreenVideoPath: String?
     @Published var registeredVideoPaths: [String] = []
     @Published var registeredVideoDisplayNames: [String: String] = [:]
     @Published var launchAtLoginEnabled: Bool = false
@@ -199,6 +207,7 @@ final class WallpaperModel: ObservableObject {
                 self?.scheduleScreenSync()
             }
         }
+        configureWallpaperWindowRefreshMonitoring()
         configureForegroundCoverageMonitoring()
         evaluateForegroundCoverageState()
         startAutoFrameRateMonitoring()
@@ -222,6 +231,13 @@ final class WallpaperModel: ObservableObject {
         if let observer: any NSObjectProtocol = screenChangeObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let observer = finderLaunchObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        if let observer = spaceTransitionGuardObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        activeSpaceTransitionLockWorkItem?.cancel()
         if let observer = frontmostAppObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
