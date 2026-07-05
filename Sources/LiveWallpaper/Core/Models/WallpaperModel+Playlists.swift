@@ -375,13 +375,17 @@ extension WallpaperModel {
             removeRegisteredVideo(path: trimmed)
             return
         }
-        if wallpaperKind == .web {
-            stopWebWallpaper()
+        let switchedFromWeb = wallpaperKind == .web
+        if switchedFromWeb {
             wallpaperKind = .video
             currentWebWallpaperID = nil
             webWallpaperLoadState = .idle
+            webPlayerViews.removeAll()
             UserDefaults.standard.set(WallpaperKind.video.rawValue, forKey: "wallpaperKind")
             UserDefaults.standard.removeObject(forKey: "currentWebWallpaperID")
+            windowRetireWorkItem?.cancel()
+            retiredWindows.removeAll()
+            rebuildWindows()
         }
         let previousPath = currentVideoPath
         if clearsPin, pinCurrentVideo, previousPath != trimmed {
@@ -393,7 +397,9 @@ extension WallpaperModel {
         currentVideoIndex = registeredVideoPaths.firstIndex(of: trimmed)
         UserDefaults.standard.set(trimmed, forKey: "videoPath")
         refreshPlayerPresentations()
-        scheduleWindowRebuild(delay: 0.05)
+        if !switchedFromWeb {
+            scheduleWindowRebuild(delay: 0.05)
+        }
         playVideo(url: URL(fileURLWithPath: trimmed))
         persistPlaylistState()
     }

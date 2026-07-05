@@ -128,14 +128,8 @@ final class WebPlayerView: NSView {
 
     func tearDown() {
         invalidatePendingWork()
-        scriptMessageHandler.owner = nil
-        navigationDelegate.owner = nil
         onLoadStateChanged = nil
-        webView.navigationDelegate = nil
         webView.stopLoading()
-        webView.configuration.userContentController.removeScriptMessageHandler(
-            forName: Self.scriptMessageName
-        )
         currentURL = nil
         currentRequest = nil
         awaitsEmbedPlayerReady = false

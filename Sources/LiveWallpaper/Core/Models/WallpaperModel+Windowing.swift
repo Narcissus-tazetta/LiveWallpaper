@@ -274,11 +274,11 @@ extension WallpaperModel {
         let screens: [NSScreen] = targetScreens()
         let player = ensureSharedPlayer()
 
-        var reusableByDisplayID: [String: (window: NSWindow, playerView: PlayerView)] = [:]
-        for index in windows.indices where index < playerViews.count {
+        var reusableByDisplayID: [String: NSWindow] = [:]
+        for index in windows.indices {
             let displayID = displayIDForWindow(at: index)
             if reusableByDisplayID[displayID] == nil {
-                reusableByDisplayID[displayID] = (windows[index], playerViews[index])
+                reusableByDisplayID[displayID] = windows[index]
             }
         }
 
@@ -288,10 +288,16 @@ extension WallpaperModel {
 
         for screen in screens {
             let displayID = displayIDString(for: screen)
-            let reusedPair = reusableByDisplayID[displayID]
-            let pair = reusedPair ?? makeWallpaperWindow(for: screen, player: player)
-            let window = pair.window
-            let playerView = pair.playerView
+            let reusedWindow = reusableByDisplayID[displayID]
+            let window = reusedWindow ?? makeBorderlessWallpaperWindow(for: screen, opaqueBackground: false)
+            let playerView: PlayerView = {
+                if let existing = window.contentView as? PlayerView {
+                    return existing
+                }
+                let view = PlayerView(frame: CGRect(origin: .zero, size: screen.frame.size))
+                view.autoresizingMask = [.width, .height]
+                return view
+            }()
 
             applyWindowOptions(window)
             window.ignoresMouseEvents = clickThrough
@@ -305,7 +311,7 @@ extension WallpaperModel {
             if window.contentView !== playerView {
                 window.contentView = playerView
             }
-            if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedPair != nil) {
+            if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedWindow != nil) {
                 reassertWallpaperOrdering(window)
             }
 
@@ -331,11 +337,11 @@ extension WallpaperModel {
     private func rebuildWebWindows() {
         let screens: [NSScreen] = targetScreens()
 
-        var reusableByDisplayID: [String: (window: NSWindow, webView: WebPlayerView)] = [:]
-        for index in windows.indices where index < webPlayerViews.count {
+        var reusableByDisplayID: [String: NSWindow] = [:]
+        for index in windows.indices {
             let displayID = displayIDForWindow(at: index)
             if reusableByDisplayID[displayID] == nil {
-                reusableByDisplayID[displayID] = (windows[index], webPlayerViews[index])
+                reusableByDisplayID[displayID] = windows[index]
             }
         }
 
@@ -345,10 +351,16 @@ extension WallpaperModel {
 
         for screen in screens {
             let displayID = displayIDString(for: screen)
-            let reusedPair = reusableByDisplayID[displayID]
-            let pair = reusedPair ?? makeWallpaperWebWindow(for: screen)
-            let window = pair.window
-            let webView = pair.webView
+            let reusedWindow = reusableByDisplayID[displayID]
+            let window = reusedWindow ?? makeBorderlessWallpaperWindow(for: screen, opaqueBackground: true)
+            let webView: WebPlayerView = {
+                if let existing = window.contentView as? WebPlayerView {
+                    return existing
+                }
+                let view = WebPlayerView(frame: CGRect(origin: .zero, size: screen.frame.size))
+                view.autoresizingMask = [.width, .height]
+                return view
+            }()
 
             applyWindowOptions(window)
             window.ignoresMouseEvents = clickThrough
@@ -358,7 +370,7 @@ extension WallpaperModel {
             if window.contentView !== webView {
                 window.contentView = webView
             }
-            if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedPair != nil) {
+            if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedWindow != nil) {
                 reassertWallpaperOrdering(window)
             }
 
@@ -386,10 +398,6 @@ extension WallpaperModel {
     }
 
     private func retireObsoleteWindows(_ obsoleteWindows: [NSWindow]) {
-        for window in obsoleteWindows {
-            prepareWindowForRetire(window)
-            window.orderOut(nil)
-        }
         retireWindows(obsoleteWindows)
     }
 
@@ -412,6 +420,7 @@ extension WallpaperModel {
         window.backgroundColor = opaqueBackground ? .black : .clear
         window.isOpaque = opaqueBackground
         window.hasShadow = false
+        window.animationBehavior = .none
         window.setFrame(frame, display: true)
         return window
     }
@@ -455,25 +464,10 @@ extension WallpaperModel {
         guard !windowsToRetire.isEmpty else {
             return
         }
-
-        retiredWindows.append(contentsOf: windowsToRetire)
-        windowRetireWorkItem?.cancel()
-
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self else {
-                return
-            }
-
-            let targets = retiredWindows
-            retiredWindows.removeAll()
-            for window in targets {
-                prepareWindowForRetire(window)
-                window.close()
-            }
+        for window in windowsToRetire {
+            prepareWindowForRetire(window)
+            window.close()
         }
-
-        windowRetireWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: workItem)
     }
 
     private func applyWindowOptions(_ window: NSWindow) {
@@ -547,7 +541,6 @@ extension WallpaperModel {
             )
             return
         }
-        window.orderBack(nil)
         window.orderFront(nil)
     }
 
