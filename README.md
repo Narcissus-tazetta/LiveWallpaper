@@ -39,6 +39,21 @@ LiveWallpaperは、お気に入りの動画をMacのデスクトップ壁紙に�
 
 ## インストールと起動について
 
+### Homebrew（推奨）
+
+```bash
+brew install --cask narcissus-tazetta/tap/livewallpaper
+```
+
+更新する場合:
+
+```bash
+brew update
+brew upgrade --cask livewallpaper
+```
+
+### 手動インストール
+
 1. [Releases](../../releases) ページから、最新の `LiveWallpaper-macos-vX.Y.Z.dmg` をダウンロードします。
 2. DMGを開き、`LiveWallpaper.app` を **「アプリケーション」フォルダ** に移動してください。
 3. すでにインストール済みの場合は、同名アプリを置き換えてください。

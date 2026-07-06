@@ -95,6 +95,12 @@ jobs:
                   chmod +x scripts/generate_release_notes.sh
                   ./scripts/generate_release_notes.sh "${{ inputs.version }}" "dist/release-notes.md"
 
+            - name: Generate Homebrew cask
+              run: |
+                  chmod +x scripts/generate_homebrew_cask.sh
+                  ZIP_PATH="dist/LiveWallpaper-macos-v${{ inputs.version }}.zip"
+                  ./scripts/generate_homebrew_cask.sh "${{ inputs.version }}" "$ZIP_PATH"
+
             - name: Create release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -109,6 +115,14 @@ jobs:
                     "v${{ inputs.version }}" $ASSETS \
                     --title "v${{ inputs.version }}" \
                     --notes-file "dist/release-notes.md"
+
+            - name: Publish Homebrew tap
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+              run: |
+                  chmod +x scripts/publish_homebrew_tap.sh
+                  ./scripts/publish_homebrew_tap.sh
 
             - name: Commit appcast
               run: |

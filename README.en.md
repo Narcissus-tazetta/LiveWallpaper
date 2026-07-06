@@ -39,6 +39,21 @@ It is designed to reduce system load (battery and CPU usage) while you are worki
 
 ## Install And Launch
 
+### Homebrew (recommended)
+
+```bash
+brew install --cask narcissus-tazetta/tap/livewallpaper
+```
+
+To update:
+
+```bash
+brew update
+brew upgrade --cask livewallpaper
+```
+
+### Manual install
+
 1. Download the latest `LiveWallpaper-macos-vX.Y.Z.dmg` from the [Releases](../../releases) page.
 2. Open the DMG and move `LiveWallpaper.app` to your **Applications** folder.
 3. If it is already installed, replace the existing app.
