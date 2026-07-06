@@ -110,6 +110,8 @@ final class WallpaperModel: ObservableObject {
     @Published var desktopLevelOffset: DesktopLevelOffset = .zero
     @Published var desktopIconsVisible: Bool = true
     @Published var useFullScreenAuxiliary: Bool = false
+    @Published var menuBarOpaqueEnabled: Bool = false
+    @Published var menuBarAutoHideDetected: Bool = false
     @Published var suspendWhenOtherAppFullScreen: Bool = false
     @Published var suspendDetectionMode: SuspendDetectionMode = .frontmostAppPresence
     @Published var accessibilityTrustedForCoverage: Bool = false

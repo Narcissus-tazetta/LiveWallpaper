@@ -106,6 +106,13 @@ extension SettingsView {
     )
   }
 
+  var menuBarOpaqueBinding: Binding<Bool> {
+    Binding(
+      get: { model.menuBarOpaqueEnabled },
+      set: { model.setMenuBarOpaqueEnabled($0) }
+    )
+  }
+
   var autoFrameRateBinding: Binding<Bool> {
     Binding(
       get: { model.autoFrameRateEnabled },

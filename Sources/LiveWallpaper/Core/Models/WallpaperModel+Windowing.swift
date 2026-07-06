@@ -265,9 +265,10 @@ extension WallpaperModel {
     func rebuildWindows() {
         if isWebWallpaperActive {
             rebuildWebWindows()
-            return
+        } else {
+            rebuildVideoWindows()
         }
-        rebuildVideoWindows()
+        applyMenuBarMaskState()
     }
 
     private func rebuildVideoWindows() {
@@ -531,6 +532,7 @@ extension WallpaperModel {
         } else {
             applySuspensionStateToPlayers()
         }
+        applyMenuBarMaskState()
     }
 
     private func reassertWallpaperOrdering(_ window: NSWindow) {

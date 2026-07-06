@@ -148,6 +148,9 @@
 "削除" = "Delete";
 "fullScreenAuxiliary を有効化" = "Enable fullScreenAuxiliary";
 "フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。" = "Keeps the wallpaper visible in fullscreen spaces. Display may be unstable depending on the environment.";
+"メニューバーを不透明にする" = "Make menu bar opaque";
+"メニューバーの裏側に不透明な帯を重ねて、壁紙が透けて見えないようにします。システムのメニューバー自体を直接変更するものではないため、環境によっては完全に一致した見た目にならない場合があります。" = "Overlays an opaque strip behind the menu bar so the wallpaper doesn't show through it. This doesn't modify the system menu bar itself, so the appearance may not match perfectly in every environment.";
+"メニューバーの自動的に表示/非表示がONのため、この設定は使用できません。" = "This setting is unavailable while \"Automatically hide and show the menu bar\" is on.";
 "macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "When switching macOS Spaces (Mission Control), the wallpaper may occasionally move to an adjacent Space. This is more likely when moving from a Space with an open app to an empty one. Returning to the same Space usually stabilizes it.";
 "画質" = "Quality";
 "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。" = "Choose the balance between quality and power. Automatic adapts to your environment, Power saving reduces battery use and heat, High quality favors visuals.";

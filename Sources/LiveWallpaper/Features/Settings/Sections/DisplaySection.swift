@@ -55,10 +55,32 @@ extension SettingsView {
         suspendDetectionModeSection
       }
 
+      Toggle(isOn: menuBarOpaqueBinding) {
+        HStack(spacing: 6) {
+          Text(model.localizedString("メニューバーを不透明にする"))
+          helpIconButton(for: .menuBarOpaque)
+        }
+      }
+      .disabled(model.menuBarAutoHideDetected)
+      if expandedHelpTopics.contains(.menuBarOpaque) {
+        settingsFootnote(
+          model.localizedString(
+            "メニューバーの裏側に不透明な帯を重ねて、壁紙が透けて見えないようにします。システムのメニューバー自体を直接変更するものではないため、環境によっては完全に一致した見た目にならない場合があります。"
+          )
+        )
+      }
+      if model.menuBarAutoHideDetected {
+        settingsFootnote(
+          model.localizedString("メニューバーの自動的に表示/非表示がONのため、この設定は使用できません。"),
+          color: .orange
+        )
+      }
+
       advancedSettingsSection
     }
     .onAppear {
       model.refreshDesktopIconsVisibility()
+      model.refreshMenuBarAutoHideState()
     }
   }
 
@@ -304,187 +326,149 @@ extension SettingsView {
   }
 
   var advancedSettingsContent: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      advancedQualityRow
-      advancedWorkProfileRow
-      advancedFrameRateRow
-      advancedDecodeRow
-      advancedDesktopLevelRow
-
-      Toggle(isOn: autoFrameRateBinding) {
-        Text(model.localizedString("環境に応じて再生負荷を自動調整"))
-      }
-
-      Toggle(isOn: fullScreenAuxiliaryBinding) {
-        HStack(spacing: 6) {
-          Text(model.localizedString("fullScreenAuxiliary を有効化"))
-          helpIconButton(for: .fullScreenAuxiliary)
+    settingsInsetCard {
+      VStack(alignment: .leading, spacing: 14) {
+        advancedSettingRow(
+          title: model.localizedString("画質"),
+          helpTopic: .qualityPreset,
+          helpText: model.localizedString(
+            "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。"
+          )
+        ) {
+          EqualSegmentedControl(
+            options: [
+              (model.localizedString("自動"), QualityPreset.auto),
+              (model.localizedString("省電力"), QualityPreset.efficiency),
+              (model.localizedString("高画質"), QualityPreset.quality)
+            ],
+            selection: qualityPresetBinding
+          )
         }
-      }
-      if expandedHelpTopics.contains(.fullScreenAuxiliary) {
-        settingsFootnote(
-          model.localizedString("フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。")
-        )
+
+        Divider().opacity(0.3)
+
+        advancedSettingRow(
+          title: model.localizedString("動作プロファイル"),
+          helpTopic: .workProfile,
+          helpText: model.localizedString(
+            "全体の再生負荷を切り替えます。通常は品質優先、低負荷は安定と省電力を重視、最小は負荷を最小限にして作業優先にします。"
+          )
+        ) {
+          EqualSegmentedControl(
+            options: [
+              (model.localizedString("通常"), WorkProfile.normal),
+              (model.localizedString("低負荷"), WorkProfile.lowPower),
+              (model.localizedString("最小"), WorkProfile.ultraLight)
+            ],
+            selection: workProfileBinding
+          )
+        }
+
+        Divider().opacity(0.3)
+
+        advancedSettingRow(
+          title: model.localizedString("再生負荷"),
+          helpTopic: .frameRate,
+          helpText: model.localizedString(
+            "再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。"
+          )
+        ) {
+          EqualSegmentedControl(
+            options: [
+              (model.localizedString("制限なし"), FrameRateLimit.off),
+              (model.localizedString("軽量"), FrameRateLimit.fps30),
+              (model.localizedString("高負荷"), FrameRateLimit.fps60)
+            ],
+            selection: frameRateLimitBinding
+          )
+        }
+
+        Divider().opacity(0.3)
+
+        advancedSettingRow(
+          title: model.localizedString("デコード"),
+          helpTopic: .decode,
+          helpText: model.localizedString(
+            "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。"
+          )
+        ) {
+          EqualSegmentedControl(
+            options: [
+              (model.localizedString("自動"), DecodeMode.automatic),
+              (model.localizedString("標準"), DecodeMode.balanced),
+              (model.localizedString("省電"), DecodeMode.efficiency)
+            ],
+            selection: decodeModeBinding
+          )
+        }
+
+        Divider().opacity(0.3)
+
+        advancedSettingRow(
+          title: model.localizedString("デスクトップレベル"),
+          helpTopic: .desktopLevel,
+          helpText: model.localizedString(
+            "壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。"
+          )
+        ) {
+          EqualSegmentedControl(
+            options: [
+              ("-1", DesktopLevelOffset.minusOne),
+              ("0", DesktopLevelOffset.zero),
+              ("+1", DesktopLevelOffset.plusOne)
+            ],
+            selection: desktopLevelOffsetBinding
+          )
+        }
+
+        Divider().opacity(0.3)
+
+        VStack(alignment: .leading, spacing: 10) {
+          Toggle(isOn: autoFrameRateBinding) {
+            Text(model.localizedString("環境に応じて再生負荷を自動調整"))
+          }
+
+          Toggle(isOn: fullScreenAuxiliaryBinding) {
+            HStack(spacing: 6) {
+              Text(model.localizedString("fullScreenAuxiliary を有効化"))
+              helpIconButton(for: .fullScreenAuxiliary)
+            }
+          }
+          if expandedHelpTopics.contains(.fullScreenAuxiliary) {
+            settingsFootnote(
+              model.localizedString("フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。")
+            )
+          }
+        }
       }
     }
     .padding(.top, 6)
-    .padding(.leading, 20)
+    .padding(.leading, 10)
   }
 
-  var advancedQualityRow: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: 24) {
-        HStack {
-          Text(model.localizedString("画質"))
+  func advancedSettingRow<Content: View>(
+    title: String,
+    helpTopic: HelpTopic,
+    helpText: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 16) {
+        HStack(spacing: 4) {
+          Text(title)
             .lineLimit(1)
-          Spacer(minLength: 8)
-          helpIconButton(for: .qualityPreset)
+          helpIconButton(for: helpTopic)
         }
-        .frame(width: 150, alignment: .leading)
+        .frame(width: 140, alignment: .leading)
 
-        Picker("", selection: qualityPresetBinding) {
-          Text(model.localizedString("自動")).tag(QualityPreset.auto)
-          Text(model.localizedString("省電力")).tag(QualityPreset.efficiency)
-          Text(model.localizedString("高画質")).tag(QualityPreset.quality)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 240, alignment: .leading)
+        content()
+          .frame(height: 24)
+
+        Spacer(minLength: 0)
       }
 
-      if expandedHelpTopics.contains(.qualityPreset) {
-        settingsFootnote(
-          model
-            .localizedString(
-              "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。"
-            )
-        )
-      }
-    }
-  }
-
-  var advancedWorkProfileRow: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: 24) {
-        HStack {
-          Text(model.localizedString("動作プロファイル"))
-            .lineLimit(1)
-          Spacer(minLength: 8)
-          helpIconButton(for: .workProfile)
-        }
-        .frame(width: 150, alignment: .leading)
-
-        Picker("", selection: workProfileBinding) {
-          Text(model.localizedString("通常")).tag(WorkProfile.normal)
-          Text(model.localizedString("低負荷")).tag(WorkProfile.lowPower)
-          Text(model.localizedString("最小")).tag(WorkProfile.ultraLight)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 240, alignment: .leading)
-      }
-
-      if expandedHelpTopics.contains(.workProfile) {
-        settingsFootnote(
-          model
-            .localizedString("全体の再生負荷を切り替えます。通常は品質優先、低負荷は安定と省電力を重視、最小は負荷を最小限にして作業優先にします。")
-        )
-      }
-    }
-  }
-
-  var advancedFrameRateRow: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: 24) {
-        HStack {
-          Text(model.localizedString("再生負荷"))
-            .lineLimit(1)
-          Spacer(minLength: 8)
-          helpIconButton(for: .frameRate)
-        }
-        .frame(width: 150, alignment: .leading)
-
-        Picker("", selection: frameRateLimitBinding) {
-          Text(model.localizedString("制限なし")).tag(FrameRateLimit.off)
-          Text(model.localizedString("軽量")).tag(FrameRateLimit.fps30)
-          Text(model.localizedString("高負荷")).tag(FrameRateLimit.fps60)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 240, alignment: .leading)
-      }
-
-      if expandedHelpTopics.contains(.frameRate) {
-        settingsFootnote(
-          model.localizedString(
-            "再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。"
-          )
-        )
-      }
-    }
-  }
-
-  var advancedDecodeRow: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: 24) {
-        HStack {
-          Text(model.localizedString("デコード"))
-            .lineLimit(1)
-          Spacer(minLength: 8)
-          helpIconButton(for: .decode)
-        }
-        .frame(width: 150, alignment: .leading)
-
-        EqualSegmentedControl(
-          options: [
-            (model.localizedString("自動"), DecodeMode.automatic),
-            (model.localizedString("標準"), DecodeMode.balanced),
-            (model.localizedString("省電"), DecodeMode.efficiency)
-          ],
-          selection: decodeModeBinding
-        )
-        .frame(width: 240, height: 24, alignment: .leading)
-      }
-
-      if expandedHelpTopics.contains(.decode) {
-        settingsFootnote(
-          model
-            .localizedString(
-              "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。"
-            )
-        )
-      }
-    }
-  }
-
-  var advancedDesktopLevelRow: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: 24) {
-        HStack {
-          Text(model.localizedString("デスクトップレベル"))
-            .lineLimit(1)
-          Spacer(minLength: 8)
-          helpIconButton(for: .desktopLevel)
-        }
-        .frame(width: 150, alignment: .leading)
-
-        Picker("", selection: desktopLevelOffsetBinding) {
-          Text("-1").tag(DesktopLevelOffset.minusOne)
-          Text("0").tag(DesktopLevelOffset.zero)
-          Text("+1").tag(DesktopLevelOffset.plusOne)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(width: 240, alignment: .leading)
-      }
-
-      if expandedHelpTopics.contains(.desktopLevel) {
-        settingsFootnote(
-          model
-            .localizedString(
-              "壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。"
-            )
-        )
+      if expandedHelpTopics.contains(helpTopic) {
+        settingsFootnote(helpText)
       }
     }
   }

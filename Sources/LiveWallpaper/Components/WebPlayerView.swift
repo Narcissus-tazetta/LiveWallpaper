@@ -34,6 +34,32 @@ final class WebPlayerView: NSView {
     private var awaitsEmbedPlayerReady = false
     private var playerReadyTimeoutWorkItem: DispatchWorkItem?
     private var loadGeneration: UInt64 = 0
+    private var suspensionGeneration: UInt64 = 0
+    private lazy var freezeImageView: NSImageView = {
+        let imageView = NSImageView(frame: bounds)
+        imageView.autoresizingMask = [.width, .height]
+        imageView.imageScaling = .scaleAxesIndependently
+        imageView.isHidden = true
+        return imageView
+    }()
+    private lazy var menuBarMaskView: NSVisualEffectView = {
+        let view = NSVisualEffectView()
+        view.material = .titlebar
+        view.blendingMode = .withinWindow
+        view.state = .active
+        view.isHidden = true
+        return view
+    }()
+
+    var menuBarMaskHeight: CGFloat = 0 {
+        didSet {
+            guard menuBarMaskHeight != oldValue else {
+                return
+            }
+            menuBarMaskView.isHidden = menuBarMaskHeight <= 0
+            layoutMenuBarMask()
+        }
+    }
 
     var currentURL: URL?
     var onLoadStateChanged: ((WebWallpaperLoadState) -> Void)?
@@ -71,6 +97,11 @@ final class WebPlayerView: NSView {
 
     func load(request: WebWallpaperPlaybackRequest, audioEnabled: Bool) {
         invalidatePendingWork()
+        // Only invalidate any in-flight suspend snapshot (it would belong to the page being
+        // replaced); don't force visibility here. rebuildWebWindows() calls
+        // applyWebSuspensionState() right before this, so whatever hidden/frozen state that
+        // just established for a still-suspended display must survive the reload untouched.
+        suspensionGeneration &+= 1
         webView.stopLoading()
         currentRequest = request
         currentLayoutMode = request.layoutMode
@@ -106,7 +137,26 @@ final class WebPlayerView: NSView {
     }
 
     func setSuspended(_ suspended: Bool) {
-        webView.isHidden = suspended
+        suspensionGeneration &+= 1
+        let generation = suspensionGeneration
+
+        if suspended {
+            // Freeze on a snapshot instead of just hiding the webview: hiding alone would
+            // expose the window's opaque black backing layer whenever the coverage heuristic
+            // suspends without the screen actually being covered (see WallpaperModel+Coverage).
+            webView.takeSnapshot(with: nil) { [weak self] image, _ in
+                guard let self, self.suspensionGeneration == generation, let image else {
+                    return
+                }
+                self.freezeImageView.image = image
+                self.freezeImageView.isHidden = false
+                self.webView.isHidden = true
+            }
+        } else {
+            webView.isHidden = false
+            freezeImageView.isHidden = true
+        }
+
         let embedScript = suspended
             ? "typeof pauseWallpaperPlayback==='function'&&pauseWallpaperPlayback();"
             : "typeof resumeWallpaperPlayback==='function'&&resumeWallpaperPlayback();"
@@ -250,11 +300,25 @@ final class WebPlayerView: NSView {
         webView.autoresizingMask = [.width, .height]
         addSubview(webView)
         webView.frame = bounds
+        addSubview(freezeImageView)
+        freezeImageView.frame = bounds
+        addSubview(menuBarMaskView, positioned: .above, relativeTo: nil)
     }
 
     override func layout() {
         super.layout()
         webView.frame = bounds
+        freezeImageView.frame = bounds
+        layoutMenuBarMask()
+    }
+
+    private func layoutMenuBarMask() {
+        menuBarMaskView.frame = CGRect(
+            x: 0,
+            y: bounds.height - menuBarMaskHeight,
+            width: bounds.width,
+            height: menuBarMaskHeight
+        )
     }
 
     private static func installUserScripts(on contentController: WKUserContentController) {

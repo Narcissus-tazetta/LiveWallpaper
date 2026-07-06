@@ -26,5 +26,6 @@ extension SettingsView {
         case desktopIcons
         case fullScreenAuxiliary
         case videoLoop
+        case menuBarOpaque
     }
 }

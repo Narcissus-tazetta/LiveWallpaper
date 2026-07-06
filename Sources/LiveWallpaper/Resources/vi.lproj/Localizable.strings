@@ -113,6 +113,9 @@
 "プレイリストを削除" = "Xóa danh sách phát";
 "fullScreenAuxiliary を有効化" = "Bật fullScreenAuxiliary";
 "フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。" = "Giúp duy trì hình nền ngay cả trong không gian toàn màn hình. Tùy thuộc vào môi trường, việc hiển thị có thể không ổn định.";
+"メニューバーを不透明にする" = "Làm cho thanh menu không trong suốt";
+"メニューバーの裏側に不透明な帯を重ねて、壁紙が透けて見えないようにします。システムのメニューバー自体を直接変更するものではないため、環境によっては完全に一致した見た目にならない場合があります。" = "Đặt một dải màu không trong suốt phía sau thanh menu để hình nền không hiện xuyên qua. Tính năng này không thay đổi trực tiếp thanh menu của hệ thống nên giao diện có thể không khớp hoàn toàn tùy môi trường.";
+"メニューバーの自動的に表示/非表示がONのため、この設定は使用できません。" = "Cài đặt này không khả dụng khi \"Tự động ẩn/hiện thanh menu\" đang bật.";
 "macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "Khi chuyển Space trên macOS (Mission Control), hình nền đôi khi có thể chuyển sang Space liền kề. Dễ xảy ra hơn khi chuyển từ Space đang mở app sang Space trống. Quay lại cùng một Space thường sẽ ổn định trở lại.";
 "画質" = "Chất lượng";
 "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。" = "Chọn sự cân bằng giữa chất lượng hình ảnh và mức tiêu thụ điện năng. Chế độ 'Tự động' sẽ tối ưu hóa theo môi trường, 'Tiết kiệm điện' giúp giảm tiêu hao pin và nhiệt độ, 'Chất lượng cao' ưu tiên hiển thị hình ảnh tốt nhất.";

@@ -23,6 +23,8 @@ extension WallpaperModel {
         refreshDesktopIconsVisibility()
         useFullScreenAuxiliary =
             UserDefaults.standard.object(forKey: "useFullScreenAuxiliary") as? Bool ?? false
+        menuBarOpaqueEnabled =
+            UserDefaults.standard.object(forKey: "menuBarOpaqueEnabled") as? Bool ?? false
         playlistPlaybackEnabled =
             UserDefaults.standard.object(forKey: "playlistPlaybackEnabled") as? Bool ?? false
         shufflePlaybackEnabled =

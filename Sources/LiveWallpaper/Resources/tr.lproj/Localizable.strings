@@ -113,6 +113,9 @@
 "プレイリストを削除" = "Oynatma listesini sil";
 "fullScreenAuxiliary を有効化" = "fullScreenAuxiliary etkinleştir";
 "フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。" = "Tam ekran alanlarında duvar kağıdını korumayı kolaylaştırır. Ortama bağlı olarak görüntü kararsız olabilir.";
+"メニューバーを不透明にする" = "Menü çubuğunu opak yap";
+"メニューバーの裏側に不透明な帯を重ねて、壁紙が透けて見えないようにします。システムのメニューバー自体を直接変更するものではないため、環境によっては完全に一致した見た目にならない場合があります。" = "Duvar kağıdının görünmemesi için menü çubuğunun arkasına opak bir şerit yerleştirir. Sistemin menü çubuğunu doğrudan değiştirmediği için görünüm bazı ortamlarda tam olarak eşleşmeyebilir.";
+"メニューバーの自動的に表示/非表示がONのため、この設定は使用できません。" = "\"Menü çubuğunu otomatik gizle ve göster\" açık olduğundan bu ayar kullanılamıyor.";
 "macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "macOS Space (Mission Control) değiştirirken duvar kağıdı nadiren komşu bir Space'e geçebilir. Açık uygulamalı bir Space'ten boş bir Space'e geçerken daha sık görülür. Aynı Space'e geri dönmek genellikle sorunu giderir.";
 "画質" = "Kalite";
 "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。" = "Kalite ile güç tüketimi arasındaki dengeyi seçin. Otomatik ortama göre optimize eder, güç tasarrufu pil ve ısınmayı azaltır, yüksek kalite görseli önceler.";
