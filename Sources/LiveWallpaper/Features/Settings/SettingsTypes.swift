@@ -27,5 +27,7 @@ extension SettingsView {
         case fullScreenAuxiliary
         case videoLoop
         case menuBarOpaque
+        case suspendHighSensitivity
+        case suspendFrontmostOnly
     }
 }

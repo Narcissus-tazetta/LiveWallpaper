@@ -143,25 +143,54 @@ extension WallpaperModel {
         let allSuspended = displayIDs.allSatisfy { suspendedDisplayIDs.contains($0) }
 
         if allSuspended {
-            for index in playerViews.indices {
-                if playerViews[index].playerLayer.player !== player {
-                    playerViews[index].playerLayer.player = player
-                }
+            // Pausing AVPlayerLayer isn't reliable on its own here: it can drop
+            // to its backgroundColor (see applyPlayerPresentation) instead of
+            // holding the last composited frame. Detach the live player and show
+            // a captured still instead, exactly like the web wallpaper already
+            // freezes on a snapshot before hiding (WebPlayerView.setSuspended).
+            let freezeImage = captureCurrentVideoFrame(from: player)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            for view in playerViews {
+                view.playerLayer.player = nil
+                view.playerLayer.contents = freezeImage
             }
+            CATransaction.commit()
             player.pause()
             return
         }
 
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         for index in playerViews.indices {
             let displayID = index < displayIDs.count
                 ? displayIDs[index]
                 : displayIDForWindow(at: index)
             let expectedPlayer = suspendedDisplayIDs.contains(displayID) ? nil : player
             if playerViews[index].playerLayer.player !== expectedPlayer {
+                if expectedPlayer != nil {
+                    playerViews[index].playerLayer.contents = nil
+                }
                 playerViews[index].playerLayer.player = expectedPlayer
             }
         }
+        CATransaction.commit()
         player.play()
+    }
+
+    /// Synchronously decodes the frame at the player's current time directly
+    /// from the asset file, independent of the live AVPlayerLayer's rendering
+    /// state (which is what we can't rely on while paused/detached).
+    private func captureCurrentVideoFrame(from player: AVPlayer) -> CGImage? {
+        guard let path = currentVideoPath else {
+            return nil
+        }
+        let asset = AVURLAsset(url: URL(fileURLWithPath: path))
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        return try? generator.copyCGImage(at: player.currentTime(), actualTime: nil)
     }
 
     func configureWallpaperWindowRefreshMonitoring() {

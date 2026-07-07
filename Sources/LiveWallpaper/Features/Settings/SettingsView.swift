@@ -215,8 +215,8 @@ struct SettingsView: View {
                 thumbnailCache.clear()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                model.refreshAccessibilityTrustForCoverage()
                 model.refreshDesktopIconsVisibility()
+                model.refreshScreenRecordingTrustForCoverage()
             }
             .onChange(of: selectedTab) { tab in
                 if tab == .settings {
@@ -263,7 +263,7 @@ struct SettingsView: View {
                 pruneMissingWallpaperThumbnails()
                 requestCurrentWallpaperThumbnailIfNeeded()
                 requestLockScreenWallpaperThumbnailIfNeeded()
-                model.refreshAccessibilityTrustForCoverage()
+                model.refreshScreenRecordingTrustForCoverage()
                 thumbnailCache.prewarm(paths: Array(model.allRegisteredVideoPaths.prefix(10)))
                 processThumbnailQueue()
                 ensureFitEditorScreenSelection()

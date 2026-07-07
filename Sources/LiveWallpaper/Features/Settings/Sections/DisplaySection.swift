@@ -52,7 +52,7 @@ extension SettingsView {
       Toggle(model.localizedString("作業中は壁紙の再生を自動停止"), isOn: suspendWhenFullScreenBinding)
 
       if model.suspendWhenOtherAppFullScreen {
-        suspendDetectionModeSection
+        suspendExclusionSection
       }
 
       Toggle(isOn: menuBarOpaqueBinding) {
@@ -90,27 +90,47 @@ extension SettingsView {
     )
   }
 
-  var suspendDetectionModeSection: some View {
+  var suspendExclusionSection: some View {
     settingsInsetCard {
       VStack(alignment: .leading, spacing: 12) {
-        displayChoicePicker(
-          title: model.localizedString("停止判定"),
-          options: [
-            (model.localizedString("前面アプリ"), SuspendDetectionMode.frontmostAppPresence),
-            (model.localizedString("画面を覆う時"), SuspendDetectionMode.preciseWindowCoverage)
-          ],
-          selection: suspendDetectionModeBinding,
-          titleFont: .caption,
-          titleColor: .secondary
+        settingsFootnote(
+          model.localizedString(
+            "他のアプリのウィンドウで壁紙の画面が完全に隠れている間、再生を停止します。権限の許可は不要です。"
+          )
         )
 
-        settingsFootnote(suspendDetectionModeDescription())
+        Toggle(isOn: suspendFrontmostOnlyBinding) {
+          HStack(spacing: 6) {
+            Text(model.localizedString("他のアプリが前面にあるとき再生を停止"))
+            helpIconButton(for: .suspendFrontmostOnly)
+          }
+        }
+        if expandedHelpTopics.contains(.suspendFrontmostOnly) {
+          settingsFootnote(
+            model.localizedString(
+              "壁紙が隠れているかどうかに関わらず、他のアプリを選択している（前面にある）間は再生を停止します。"
+            )
+          )
+        }
 
-        if shouldShowAccessibilityCoverageWarning {
+        Toggle(isOn: suspendHighSensitivityBinding) {
+          HStack(spacing: 6) {
+            Text(model.localizedString("ウィンドウ被覆検出"))
+            helpIconButton(for: .suspendHighSensitivity)
+          }
+        }
+        if expandedHelpTopics.contains(.suspendHighSensitivity) {
+          settingsFootnote(
+            model.localizedString(
+              "メニューバーの帯などで壁紙がわずかに透けて見えていても、他のアプリのウィンドウが画面の大部分を覆っていれば停止します。画面収録の権限が必要です。"
+            )
+          )
+        }
+        if shouldShowScreenRecordingCoverageWarning {
           VStack(alignment: .leading, spacing: 6) {
-            settingsFootnote(accessibilityCoverageWarningText(), color: .red)
-            Button(model.localizedString("アクセシビリティ許可を開く")) {
-              model.requestAccessibilityPermissionForCoverage()
+            settingsFootnote(screenRecordingCoverageWarningText(), color: .red)
+            Button(model.localizedString("画面収録の許可を開く")) {
+              model.requestScreenRecordingPermissionForCoverage()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
@@ -124,25 +144,14 @@ extension SettingsView {
     }
   }
 
-  func suspendDetectionModeDescription() -> String {
-    switch model.suspendDetectionMode {
-    case .frontmostAppPresence:
-      return model.localizedString(
-        "前面アプリのウィンドウが画面を覆う時に停止します。Screen Recording 権限がない場合は保守的な判定になります。"
-      )
-    case .preciseWindowCoverage:
-      return model.localizedString("アクセシビリティ権限がある場合、前面ウィンドウが画面を大きく覆う時だけ停止します。判定できない時は安全側として停止します。")
-    }
-  }
-
-  var shouldShowAccessibilityCoverageWarning: Bool {
+  var shouldShowScreenRecordingCoverageWarning: Bool {
     model.suspendWhenOtherAppFullScreen
-      && model.suspendDetectionMode == .preciseWindowCoverage
-      && !model.accessibilityTrustedForCoverage
+      && model.suspendHighSensitivityEnabled
+      && !model.screenRecordingTrustedForCoverage
   }
 
-  func accessibilityCoverageWarningText() -> String {
-    model.localizedString("精密な停止判定にはアクセシビリティ権限が必要です。許可されるまでは安全側として前面アプリがある画面を停止します。")
+  func screenRecordingCoverageWarningText() -> String {
+    model.localizedString("ウィンドウ被覆検出には画面収録の許可が必要です。許可されるまでは通常モードと同じ判定になります。")
   }
 
   var suspendExclusionContent: some View {

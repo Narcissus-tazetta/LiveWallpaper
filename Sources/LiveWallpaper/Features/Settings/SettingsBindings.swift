@@ -57,10 +57,17 @@ extension SettingsView {
     )
   }
 
-  var suspendDetectionModeBinding: Binding<SuspendDetectionMode> {
+  var suspendHighSensitivityBinding: Binding<Bool> {
     Binding(
-      get: { model.suspendDetectionMode },
-      set: { model.setSuspendDetectionMode($0) }
+      get: { model.suspendHighSensitivityEnabled },
+      set: { _ = model.setSuspendHighSensitivityEnabled($0) }
+    )
+  }
+
+  var suspendFrontmostOnlyBinding: Binding<Bool> {
+    Binding(
+      get: { model.suspendWhenOtherAppFrontmost },
+      set: { _ = model.setSuspendWhenOtherAppFrontmost($0) }
     )
   }
 

@@ -63,26 +63,22 @@ final class WallpaperModel: ObservableObject {
     var retiredWindows: [NSWindow] = []
     var displayIDByWindow: [ObjectIdentifier: String] = [:]
     var activeSpaceWindowRefreshWorkItems: [DispatchWorkItem] = []
-    var activeSpaceCoverageWorkItems: [DispatchWorkItem] = []
     var lastScreenSignatures: [ScreenSignature] = []
     var frontmostAppObserver: NSObjectProtocol?
-    var activeSpaceObserver: NSObjectProtocol?
+    var windowOcclusionObserver: NSObjectProtocol?
     var spaceTransitionGuardObserver: NSObjectProtocol?
     var playerItemEndObserver: NSObjectProtocol?
-    var axCoverageObserver: ForegroundCoverageAXObserver?
     var suspendedDisplayIDs: Set<String> = []
     var autoFrameRateTimer: Timer?
     var autoFrameRateBitRateFactor: Double = 1.0
     var autoFrameRateBufferAdjustment: TimeInterval = 0
     var coverageEvaluationWorkItem: DispatchWorkItem?
-    var activeSpaceTransitionWorkItem: DispatchWorkItem?
+    var pendingSuspendConfirmationWorkItem: DispatchWorkItem?
     var isActiveSpaceTransitioning: Bool = false
     var activeSpaceTransitionLockWorkItem: DispatchWorkItem?
-    var coverageEvaluationGeneration: UInt64 = 0
     var statePersistWorkItem: DispatchWorkItem?
     var lockScreenUnlockResetWorkItem: DispatchWorkItem?
     var persistenceFailureCount: Int = 0
-    var lastCoverageEvaluationAt: CFAbsoluteTime = 0
     let playbackEnvironment: PlaybackEnvironment
     let lockScreenSyncService: LockScreenSyncService = .init()
     let desktopIconsService: DesktopIconsService = .init()
@@ -113,8 +109,9 @@ final class WallpaperModel: ObservableObject {
     @Published var menuBarOpaqueEnabled: Bool = false
     @Published var menuBarAutoHideDetected: Bool = false
     @Published var suspendWhenOtherAppFullScreen: Bool = false
-    @Published var suspendDetectionMode: SuspendDetectionMode = .frontmostAppPresence
-    @Published var accessibilityTrustedForCoverage: Bool = false
+    @Published var suspendHighSensitivityEnabled: Bool = false
+    @Published var suspendWhenOtherAppFrontmost: Bool = false
+    @Published var screenRecordingTrustedForCoverage: Bool = false
     @Published var suspendExclusionBundleIDs: [String] = []
     @Published var persistenceFailureMessage: String?
     @Published var desktopIconsFailureMessage: String?
@@ -201,7 +198,6 @@ final class WallpaperModel: ObservableObject {
         restoreState()
         recoverStaleLockScreenSyncOnLaunchIfNeeded()
         LocalizationManager.setLanguage(effectiveAppLanguageCode)
-        refreshAccessibilityTrustForCoverage()
         rebuildWindows()
         if isWebWallpaperActive {
             webWallpaperLoadState = .loading
@@ -219,7 +215,6 @@ final class WallpaperModel: ObservableObject {
         }
         configureWallpaperWindowRefreshMonitoring()
         configureForegroundCoverageMonitoring()
-        evaluateForegroundCoverageState()
         startAutoFrameRateMonitoring()
     }
 
@@ -230,10 +225,7 @@ final class WallpaperModel: ObservableObject {
         windowRetireWorkItem?.cancel()
         activeSpaceWindowRefreshWorkItems.forEach { $0.cancel() }
         activeSpaceWindowRefreshWorkItems.removeAll()
-        activeSpaceCoverageWorkItems.forEach { $0.cancel() }
-        activeSpaceCoverageWorkItems.removeAll()
         coverageEvaluationWorkItem?.cancel()
-        activeSpaceTransitionWorkItem?.cancel()
         statePersistWorkItem?.cancel()
         lockScreenUnlockResetWorkItem?.cancel()
         lockScreenSyncTask?.cancel()
@@ -251,16 +243,14 @@ final class WallpaperModel: ObservableObject {
         if let observer = frontmostAppObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
-        if let observer = activeSpaceObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        if let observer = windowOcclusionObserver {
+            NotificationCenter.default.removeObserver(observer)
         }
         if let observer: any NSObjectProtocol = playerItemEndObserver {
             NotificationCenter.default.removeObserver(observer)
         }
         autoFrameRateTimer?.invalidate()
         autoFrameRateTimer = nil
-        axCoverageObserver?.detach()
-        axCoverageObserver = nil
     }
 
     func currentAppVersion() -> String {

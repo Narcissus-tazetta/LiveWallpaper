@@ -66,13 +66,10 @@ extension WallpaperModel {
         applyLightweightSettings()
         suspendWhenOtherAppFullScreen =
             UserDefaults.standard.object(forKey: "suspendWhenOtherAppFullScreen") as? Bool ?? false
-        if let detectionModeValue = UserDefaults.standard.string(
-            forKey: "suspendDetectionMode"
-        ),
-            let restoredDetectionMode = SuspendDetectionMode(rawValue: detectionModeValue)
-        {
-            suspendDetectionMode = restoredDetectionMode
-        }
+        suspendHighSensitivityEnabled =
+            UserDefaults.standard.object(forKey: "suspendHighSensitivityEnabled") as? Bool ?? false
+        suspendWhenOtherAppFrontmost =
+            UserDefaults.standard.object(forKey: "suspendWhenOtherAppFrontmost") as? Bool ?? false
         if let savedExclusions = UserDefaults.standard.stringArray(
             forKey: "suspendExclusionBundleIDs"
         ) {
@@ -494,7 +491,8 @@ extension WallpaperModel {
         setAdvancedSharingEnabled(false)
         setLockScreenSyncEnabled(false)
         _ = setSuspendWhenOtherAppFullScreen(false)
-        setSuspendDetectionMode(.frontmostAppPresence)
+        _ = setSuspendHighSensitivityEnabled(false)
+        _ = setSuspendWhenOtherAppFrontmost(false)
         suspendExclusionBundleIDs = []
         UserDefaults.standard.removeObject(forKey: "suspendExclusionBundleIDs")
         startAutoFrameRateMonitoring()
