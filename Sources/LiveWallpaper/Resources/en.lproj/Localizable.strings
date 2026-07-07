@@ -27,8 +27,12 @@
 "画面収録の許可を開く" = "Open Screen Recording permissions";
 "他のアプリが前面にあるとき再生を停止" = "Pause playback when other apps are frontmost";
 "停止対象から除外するアプリ" = "Apps excluded from pause";
-"アプリを選択して追加" = "Choose app to add";
+"アプリを追加" = "Add app";
 "除外アプリは未設定です" = "No excluded apps set.";
+"起動中のアプリから選択" = "Choose from running apps";
+"検索" = "Search";
+"一致するアプリがありません" = "No matching apps";
+"Finderから他のアプリを選択…" = "Choose another app in Finder…";
 "詳細設定" = "Advanced settings";
 "自動" = "Automatic";
 "省電力" = "Power saving";

@@ -31,8 +31,12 @@
 "画面収録の許可を開く" = "Mở quyền Ghi màn hình";
 "他のアプリが前面にあるとき再生を停止" = "Tạm dừng phát khi ứng dụng khác ở phía trước";
 "停止対象から除外するアプリ" = "Ứng dụng loại trừ khỏi tạm dừng";
-"アプリを選択して追加" = "Chọn ứng dụng để thêm";
+"アプリを追加" = "Thêm ứng dụng";
 "除外アプリは未設定です" = "Chưa đặt ứng dụng loại trừ";
+"起動中のアプリから選択" = "Chọn từ ứng dụng đang chạy";
+"検索" = "Tìm kiếm";
+"一致するアプリがありません" = "Không có ứng dụng phù hợp";
+"Finderから他のアプリを選択…" = "Chọn ứng dụng khác trong Finder…";
 "削除" = "Xóa";
 "詳細設定" = "Cài đặt nâng cao";
 "自動" = "Tự động";

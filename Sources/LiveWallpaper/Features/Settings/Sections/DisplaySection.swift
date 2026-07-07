@@ -161,11 +161,15 @@ extension SettingsView {
           .font(.caption)
           .foregroundColor(.secondary)
         Spacer()
-        Button(model.localizedString("アプリを選択して追加")) {
-          selectAppForSuspendExclusion()
+        Button(model.localizedString("アプリを追加")) {
+          suspendExclusionAppPickerSearchText = ""
+          isSuspendExclusionAppPickerPresented = true
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
+        .popover(isPresented: $isSuspendExclusionAppPickerPresented, arrowEdge: .bottom) {
+          suspendExclusionAppPickerPopover
+        }
       }
 
       if model.suspendExclusionBundleIDs.isEmpty {
@@ -216,6 +220,80 @@ extension SettingsView {
       .tint(.red)
     }
     .padding(.vertical, 2)
+  }
+
+  var runningAppExclusionCandidates: [NSRunningApplication] {
+    let excluded = Set(model.suspendExclusionBundleIDs)
+    return NSWorkspace.shared.runningApplications
+      .filter { $0.activationPolicy == .regular }
+      .filter { app in
+        guard let bundleID = app.bundleIdentifier, bundleID != Bundle.main.bundleIdentifier else {
+          return false
+        }
+        return !excluded.contains(model.normalizeBundleID(bundleID))
+      }
+      .filter { app in
+        suspendExclusionAppPickerSearchText.isEmpty
+          || (app.localizedName ?? "").localizedCaseInsensitiveContains(
+            suspendExclusionAppPickerSearchText)
+      }
+      .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
+  }
+
+  var suspendExclusionAppPickerPopover: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(model.localizedString("起動中のアプリから選択"))
+        .font(.caption)
+        .foregroundColor(.secondary)
+
+      TextField(model.localizedString("検索"), text: $suspendExclusionAppPickerSearchText)
+        .textFieldStyle(.roundedBorder)
+
+      let candidates = runningAppExclusionCandidates
+      if candidates.isEmpty {
+        settingsFootnote(model.localizedString("一致するアプリがありません"))
+          .frame(width: 260)
+      } else {
+        ScrollView(.vertical, showsIndicators: true) {
+          VStack(alignment: .leading, spacing: 2) {
+            ForEach(candidates, id: \.processIdentifier) { app in
+              Button {
+                if let bundleID = app.bundleIdentifier {
+                  model.addSuspendExclusionBundleID(bundleID)
+                }
+              } label: {
+                HStack(spacing: 8) {
+                  if let icon = app.icon {
+                    Image(nsImage: icon)
+                      .resizable()
+                      .frame(width: 20, height: 20)
+                  }
+                  Text(app.localizedName ?? app.bundleIdentifier ?? "")
+                    .lineLimit(1)
+                  Spacer()
+                }
+                .contentShape(Rectangle())
+                .padding(.vertical, 3)
+                .padding(.horizontal, 4)
+              }
+              .buttonStyle(.plain)
+            }
+          }
+        }
+        .frame(maxHeight: 220)
+        .frame(width: 260)
+      }
+
+      Divider()
+
+      Button(model.localizedString("Finderから他のアプリを選択…")) {
+        isSuspendExclusionAppPickerPresented = false
+        selectAppForSuspendExclusion()
+      }
+      .buttonStyle(.link)
+      .controlSize(.small)
+    }
+    .padding(12)
   }
 
   func settingsInsetCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {

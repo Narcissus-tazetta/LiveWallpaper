@@ -37,6 +37,8 @@ struct SettingsView: View {
     @State var isResetSettingsDialogPresented: Bool = false
     @State var wallpaperAssignmentTarget: WallpaperAssignmentTarget = .desktop
     @State var isWallpaperShareSheetPresented: Bool = false
+    @State var isSuspendExclusionAppPickerPresented: Bool = false
+    @State var suspendExclusionAppPickerSearchText: String = ""
     @State var keyEventMonitor: Any?
     @State var currentWallpaperPreviewThumbnailPath: String?
     @State var currentLockScreenPreviewThumbnailPath: String?

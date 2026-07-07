@@ -31,8 +31,12 @@
 "画面収録の許可を開く" = "Ekran Kaydı iznini aç";
 "他のアプリが前面にあるとき再生を停止" = "Başka bir uygulama öndeyken oynatmayı duraklat";
 "停止対象から除外するアプリ" = "Duraklatma dışında tutulan uygulamalar";
-"アプリを選択して追加" = "Eklenecek uygulamayı seç";
+"アプリを追加" = "Uygulama ekle";
 "除外アプリは未設定です" = "Hariç tutulan uygulama ayarlanmadı.";
+"起動中のアプリから選択" = "Çalışan uygulamalardan seç";
+"検索" = "Ara";
+"一致するアプリがありません" = "Eşleşen uygulama yok";
+"Finderから他のアプリを選択…" = "Finder'da başka bir uygulama seç…";
 "削除" = "Sil";
 "詳細設定" = "Gelişmiş ayarlar";
 "自動" = "Otomatik";
