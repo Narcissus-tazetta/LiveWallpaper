@@ -192,6 +192,8 @@
 "保存先フォルダへのアクセスに失敗した可能性があります。" = "The app may not have access to the storage folder.";
 "固定はアプリ再起動まで有効です。" = "Pinning stays active until the app restarts.";
 "環境に応じて再生負荷を自動調整" = "Automatically adjust playback load for current conditions";
+"バッテリー残量に応じて画質を自動調整" = "Automatically adjust quality based on battery level";
+"バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "When running on battery and charge drops to 10% or below, playback load is automatically reduced to save power.";
 "再生負荷" = "Playback load";
 "再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。" = "Choose a playback load preset. This adjusts internal bitrate only; display resolution does not change.";
 "軽量" = "Light";

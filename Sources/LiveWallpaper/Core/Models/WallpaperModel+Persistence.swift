@@ -45,6 +45,8 @@ extension WallpaperModel {
         }
         autoFrameRateEnabled =
             UserDefaults.standard.object(forKey: "autoFrameRateEnabled") as? Bool ?? true
+        batteryAwareQualityEnabled =
+            UserDefaults.standard.object(forKey: "batteryAwareQualityEnabled") as? Bool ?? true
         if UserDefaults.standard.object(forKey: "audioVolume") != nil {
             audioVolume = min(max(UserDefaults.standard.float(forKey: "audioVolume"), 0), 1)
         } else {
@@ -486,6 +488,7 @@ extension WallpaperModel {
         setVideoLoopEnabled(true)
         clearPinCurrentVideo()
         setAutoFrameRateEnabled(true)
+        setBatteryAwareQualityEnabled(true)
         setDesktopLevelOffset(.zero)
         setFullScreenAuxiliary(false)
         setAdvancedSharingEnabled(false)

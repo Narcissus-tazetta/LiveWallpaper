@@ -4,11 +4,17 @@ extension SettingsView {
     static var fitPreviewPathExistsCache: [String: Bool] = [:]
 
     func fitPreviewPathExists(_ path: String) -> Bool {
-        if let cached = Self.fitPreviewPathExistsCache[path] {
-            return cached
+        if Self.fitPreviewPathExistsCache[path] == true {
+            return true
         }
         let exists = FileManager.default.fileExists(atPath: path)
-        Self.fitPreviewPathExistsCache[path] = exists
+        // Only cache positive hits. A missing file may reappear at the same path
+        // (restore/replace), and caching false would leave the preview blank.
+        if exists {
+            Self.fitPreviewPathExistsCache[path] = true
+        } else {
+            Self.fitPreviewPathExistsCache.removeValue(forKey: path)
+        }
         return exists
     }
 

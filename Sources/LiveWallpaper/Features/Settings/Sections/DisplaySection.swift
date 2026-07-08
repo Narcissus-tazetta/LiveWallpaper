@@ -554,6 +554,18 @@ extension SettingsView {
             Text(model.localizedString("環境に応じて再生負荷を自動調整"))
           }
 
+          Toggle(isOn: batteryAwareQualityBinding) {
+            HStack(spacing: 6) {
+              Text(model.localizedString("バッテリー残量に応じて画質を自動調整"))
+              helpIconButton(for: .batteryAwareQuality)
+            }
+          }
+          if expandedHelpTopics.contains(.batteryAwareQuality) {
+            settingsFootnote(
+              model.localizedString("バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。")
+            )
+          }
+
           Toggle(isOn: fullScreenAuxiliaryBinding) {
             HStack(spacing: 6) {
               Text(model.localizedString("fullScreenAuxiliary を有効化"))

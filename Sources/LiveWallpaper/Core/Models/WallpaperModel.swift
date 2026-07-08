@@ -73,6 +73,10 @@ final class WallpaperModel: ObservableObject {
     var lastCapturedFreezeFrameVideoPath: String?
     var lastCapturedFreezeFrameTime: CMTime?
     var lastCapturedFreezeFrameImage: CGImage?
+    var deepSuspendWorkItem: DispatchWorkItem?
+    var isDeepSuspended: Bool = false
+    var isDeepResuming: Bool = false
+    let deepSuspendDelay: TimeInterval = 10
     var autoFrameRateTimer: Timer?
     var autoFrameRateBitRateFactor: Double = 1.0
     var autoFrameRateBufferAdjustment: TimeInterval = 0
@@ -104,6 +108,7 @@ final class WallpaperModel: ObservableObject {
     @Published var qualityPreset: QualityPreset = .auto
     @Published var workProfile: WorkProfile = .normal
     @Published var autoFrameRateEnabled: Bool = true
+    @Published var batteryAwareQualityEnabled: Bool = true
     @Published var playlistPlaybackEnabled: Bool = false
     @Published var shufflePlaybackEnabled: Bool = false
     @Published var videoLoopEnabled: Bool = true

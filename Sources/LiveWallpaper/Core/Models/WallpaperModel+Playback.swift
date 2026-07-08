@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import IOKit.ps
 
 @MainActor
 extension WallpaperModel {
@@ -75,6 +76,15 @@ extension WallpaperModel {
         }
         autoFrameRateEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "autoFrameRateEnabled")
+        startAutoFrameRateMonitoring()
+    }
+
+    func setBatteryAwareQualityEnabled(_ enabled: Bool) {
+        guard batteryAwareQualityEnabled != enabled else {
+            return
+        }
+        batteryAwareQualityEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "batteryAwareQualityEnabled")
         startAutoFrameRateMonitoring()
     }
 
@@ -218,6 +228,15 @@ extension WallpaperModel {
         // the previous item instead of the new one.
         sharedLooper?.disableLooping()
         sharedLooper = nil
+        // Any real teardown/rebuild resets deep-suspend bookkeeping. The deep-
+        // suspend timer itself calls stopAllPlayers() and then re-sets
+        // isDeepSuspended = true afterward, so clearing it here is correct.
+        deepSuspendWorkItem?.cancel()
+        deepSuspendWorkItem = nil
+        isDeepSuspended = false
+        // A rebuild supersedes any in-flight deep-resume: the stale resume's
+        // readiness/seek callbacks must not act on the newly-built item.
+        isDeepResuming = false
     }
 
     func applyLightweightSettings() {
@@ -387,6 +406,18 @@ extension WallpaperModel {
     }
 
     func playVideo(url: URL) {
+        installPlayerItem(url: url, attach: true)
+    }
+
+    /// Builds and installs a fresh AVPlayerItem for `url` on the shared player.
+    ///
+    /// With `attach: true` (the normal path) this reproduces the original
+    /// `playVideo` behavior exactly: the shared player is attached to every
+    /// layer and suspension/coverage state is re-applied. With `attach: false`
+    /// (used by deep-suspend resume) the item is built in the background without
+    /// touching the layers, so the freeze frame stays visible until the caller
+    /// decides the item is ready and performs the attach itself.
+    func installPlayerItem(url: URL, attach: Bool) {
         let effectiveDecode = resolvedDecodeMode()
         let asset = AVURLAsset(
             url: url,
@@ -398,7 +429,9 @@ extension WallpaperModel {
         stopAllPlayers()
 
         let player = ensureSharedPlayer()
-        attachSharedPlayerToAllViews()
+        if attach {
+            attachSharedPlayerToAllViews()
+        }
 
         let item = AVPlayerItem(asset: asset)
         item.preferredPeakBitRate = profile.bitRate
@@ -412,8 +445,10 @@ extension WallpaperModel {
             sharedLooper = nil
         }
         applyAudioSettings()
-        applySuspensionStateToPlayers()
-        evaluateForegroundCoverageState()
+        if attach {
+            applySuspensionStateToPlayers()
+            evaluateForegroundCoverageState()
+        }
     }
 
     @discardableResult
@@ -452,7 +487,7 @@ extension WallpaperModel {
         autoFrameRateTimer?.invalidate()
         autoFrameRateTimer = nil
         evaluateAutoFrameRatePolicy()
-        guard autoFrameRateEnabled else {
+        guard autoFrameRateEnabled || batteryAwareQualityEnabled else {
             return
         }
         autoFrameRateTimer = Timer.scheduledTimer(withTimeInterval: 12.0, repeats: true) {
@@ -473,7 +508,7 @@ extension WallpaperModel {
             return
         }
 
-        guard autoFrameRateEnabled else {
+        guard autoFrameRateEnabled || batteryAwareQualityEnabled else {
             if autoFrameRateBitRateFactor != 1.0 || autoFrameRateBufferAdjustment != 0 {
                 autoFrameRateBitRateFactor = 1.0
                 autoFrameRateBufferAdjustment = 0
@@ -482,33 +517,42 @@ extension WallpaperModel {
             return
         }
 
-        let processInfo = ProcessInfo.processInfo
-        let thermalState = processInfo.thermalState
-        let lowPower = processInfo.isLowPowerModeEnabled
-        let displayCount = max(targetScreens().count, 1)
-
         var nextBitRateFactor = 1.0
         var nextBufferAdjustment: TimeInterval = 0
 
-        if lowPower {
-            nextBitRateFactor *= 0.82
-            nextBufferAdjustment -= 0.25
+        if autoFrameRateEnabled {
+            let processInfo = ProcessInfo.processInfo
+            let thermalState = processInfo.thermalState
+            let lowPower = processInfo.isLowPowerModeEnabled
+            let displayCount = max(targetScreens().count, 1)
+
+            if lowPower {
+                nextBitRateFactor *= 0.82
+                nextBufferAdjustment -= 0.25
+            }
+
+            if displayCount >= 2 {
+                nextBitRateFactor *= 0.88
+                nextBufferAdjustment -= 0.15
+            }
+
+            switch thermalState {
+            case .serious:
+                nextBitRateFactor *= 0.8
+                nextBufferAdjustment -= 0.2
+            case .critical:
+                nextBitRateFactor *= 0.65
+                nextBufferAdjustment -= 0.3
+            default:
+                break
+            }
         }
 
-        if displayCount >= 2 {
-            nextBitRateFactor *= 0.88
-            nextBufferAdjustment -= 0.15
-        }
-
-        switch thermalState {
-        case .serious:
-            nextBitRateFactor *= 0.8
-            nextBufferAdjustment -= 0.2
-        case .critical:
-            nextBitRateFactor *= 0.65
+        if batteryAwareQualityEnabled,
+            let battery = Self.currentBatteryInfo(), battery.onBatteryPower, battery.percentage <= 10
+        {
+            nextBitRateFactor *= 0.6
             nextBufferAdjustment -= 0.3
-        default:
-            break
         }
 
         nextBitRateFactor = min(max(nextBitRateFactor, 0.55), 1.0)
@@ -523,5 +567,28 @@ extension WallpaperModel {
         autoFrameRateBitRateFactor = nextBitRateFactor
         autoFrameRateBufferAdjustment = nextBufferAdjustment
         applyDynamicPlaybackProfile()
+    }
+
+    private static func currentBatteryInfo() -> (percentage: Int, onBatteryPower: Bool)? {
+        guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+            let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef]
+        else {
+            return nil
+        }
+        for source in sources {
+            guard
+                let description = IOPSGetPowerSourceDescription(snapshot, source)?
+                    .takeUnretainedValue() as? [String: Any],
+                let currentCapacity = description[kIOPSCurrentCapacityKey] as? Int,
+                let maxCapacity = description[kIOPSMaxCapacityKey] as? Int,
+                maxCapacity > 0
+            else {
+                continue
+            }
+            let percentage = Int((Double(currentCapacity) / Double(maxCapacity)) * 100)
+            let onBattery = description[kIOPSPowerSourceStateKey] as? String == kIOPSBatteryPowerValue
+            return (percentage, onBattery)
+        }
+        return nil
     }
 }

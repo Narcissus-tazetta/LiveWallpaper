@@ -17,15 +17,10 @@ enum AppLocalization {
     }
 
     static func localizedString(_ key: String, languageCode: String) -> String {
-        NSLog("[AppLocalization] lookup key='\(key)' lang='\(languageCode)'")
         guard languageCode != "ja" else { return key }
-        let bundle = resolveBundle(for: languageCode)
-        guard let bundle else {
-            NSLog("[AppLocalization] bundle not found for lang=\(languageCode)")
+        guard let bundle = resolveBundle(for: languageCode) else {
             return key
         }
-        let result = bundle.localizedString(forKey: key, value: key, table: "Localizable")
-        NSLog("[AppLocalization] result='\(result)' for key='\(key)' lang='\(languageCode)'")
-        return result
+        return bundle.localizedString(forKey: key, value: key, table: "Localizable")
     }
 }

@@ -127,6 +127,13 @@ extension SettingsView {
     )
   }
 
+  var batteryAwareQualityBinding: Binding<Bool> {
+    Binding(
+      get: { model.batteryAwareQualityEnabled },
+      set: { model.setBatteryAwareQualityEnabled($0) }
+    )
+  }
+
   var autoUpdateBinding: Binding<Bool> {
     Binding(
       get: { UserDefaults.standard.bool(forKey: "autoUpdateEnabled") },

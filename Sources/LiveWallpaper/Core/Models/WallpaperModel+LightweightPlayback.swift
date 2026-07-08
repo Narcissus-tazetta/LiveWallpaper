@@ -45,6 +45,14 @@ extension WallpaperModel {
             switch result {
             case .ready(let proxyURL):
                 self.lightweightProxyState = .ready
+                // If the wallpaper is deep-suspended, the video is torn down and
+                // not playing — don't rebuild it now just to swap to the proxy.
+                // Resume from deep suspend re-resolves the URL (picking up this
+                // freshly-cached proxy) via resolvedPlaybackURL, so the swap
+                // happens naturally when the wallpaper comes back.
+                guard !self.isDeepSuspended else {
+                    return
+                }
                 let resumeTime = self.sharedPlayer?.currentTime() ?? .zero
                 self.playVideo(url: proxyURL)
                 self.restorePlaybackPositionAfterProxySwap(resumeTime)

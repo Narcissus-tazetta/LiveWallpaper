@@ -42,7 +42,6 @@ final class DiskThumbnailCache: ObservableObject {
   var inMemoryImages: [String: NSImage] = [:]
   var inMemoryLastAccess: [String: TimeInterval] = [:]
   var visibleRefCounts: [String: Int] = [:]
-  var visibleStateByPath: [String: Bool] = [:]
   var pendingQueue: [String] = []
   var inFlight: Set<String> = []
   var inFlightReads: Set<String> = []
@@ -78,19 +77,15 @@ final class DiskThumbnailCache: ObservableObject {
     ensureInitialized()
 
     if isVisible {
-      if visibleStateByPath[path] == true {
-        return
+      let previous = visibleRefCounts[path, default: 0]
+      visibleRefCounts[path] = previous + 1
+      // Only kick generation on the first holder; later retainers share the same path.
+      if previous == 0 {
+        request(path: path)
       }
-      visibleStateByPath[path] = true
-      visibleRefCounts[path, default: 0] += 1
-      request(path: path)
       return
     }
 
-    guard visibleStateByPath[path] == true else {
-      return
-    }
-    visibleStateByPath.removeValue(forKey: path)
     guard let count = visibleRefCounts[path] else {
       return
     }
@@ -185,7 +180,6 @@ final class DiskThumbnailCache: ObservableObject {
     inMemoryImages = inMemoryImages.filter { validPaths.contains($0.key) }
     inMemoryLastAccess = inMemoryLastAccess.filter { validPaths.contains($0.key) }
     visibleRefCounts = visibleRefCounts.filter { validPaths.contains($0.key) }
-    visibleStateByPath = visibleStateByPath.filter { validPaths.contains($0.key) }
     pendingQueue = pendingQueue.filter { validPaths.contains($0) }
     inFlight = inFlight.filter { validPaths.contains($0) }
 
@@ -222,7 +216,6 @@ final class DiskThumbnailCache: ObservableObject {
     inMemoryImages.removeAll()
     inMemoryLastAccess.removeAll()
     visibleRefCounts.removeAll()
-    visibleStateByPath.removeAll()
     pendingQueue.removeAll()
     inFlight.removeAll()
     inFlightReads.removeAll()

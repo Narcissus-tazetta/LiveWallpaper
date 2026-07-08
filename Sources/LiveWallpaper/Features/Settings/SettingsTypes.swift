@@ -25,6 +25,7 @@ extension SettingsView {
         case desktopLevel
         case desktopIcons
         case fullScreenAuxiliary
+        case batteryAwareQuality
         case videoLoop
         case menuBarOpaque
         case suspendHighSensitivity
