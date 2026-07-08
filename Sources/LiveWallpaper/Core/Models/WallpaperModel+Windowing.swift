@@ -96,8 +96,11 @@ extension WallpaperModel {
     }
 
     func availableDisplayScreens() -> [DisplayScreenInfo] {
+        if let cachedDisplayScreens {
+            return cachedDisplayScreens
+        }
         let screens = NSScreen.screens
-        return screens.enumerated().map { index, screen in
+        let result = screens.enumerated().map { index, screen in
             let screenID = displayIDString(for: screen)
             let isMain = (NSScreen.main == screen)
             let screenLabel = localizedString("画面")
@@ -107,6 +110,8 @@ extension WallpaperModel {
                 : "\(screenLabel)\(index + 1)"
             return DisplayScreenInfo(id: screenID, name: name, frame: screen.frame)
         }
+        cachedDisplayScreens = result
+        return result
     }
 
     func displayIDForWindow(at index: Int) -> String {
@@ -148,7 +153,31 @@ extension WallpaperModel {
             // holding the last composited frame. Detach the live player and show
             // a captured still instead, exactly like the web wallpaper already
             // freezes on a snapshot before hiding (WebPlayerView.setSuspended).
-            let freezeImage = captureCurrentVideoFrame(from: player)
+            //
+            // This function is also called from hot paths unrelated to a real
+            // suspend/resume transition (every playVideo, window rebuilds), so
+            // while already suspended it can re-run with nothing to actually
+            // capture. captureCurrentVideoFrame(from:) is a pure function of
+            // (currentVideoPath, player.currentTime()) — the same file at the
+            // same timestamp always decodes to the same pixels — so a redundant
+            // decode is skipped when both match the last capture; only the
+            // decode itself is skipped, the detach/apply-contents step below
+            // still always runs (playVideo reattaches the live player before
+            // calling this, so skipping that would flash the layer's background
+            // color).
+            let capturedTime = player.currentTime()
+            let freezeImage: CGImage?
+            if lastCapturedFreezeFrameVideoPath == currentVideoPath,
+               lastCapturedFreezeFrameTime == capturedTime,
+               let cachedImage = lastCapturedFreezeFrameImage
+            {
+                freezeImage = cachedImage
+            } else {
+                freezeImage = captureCurrentVideoFrame(from: player)
+                lastCapturedFreezeFrameVideoPath = currentVideoPath
+                lastCapturedFreezeFrameTime = capturedTime
+                lastCapturedFreezeFrameImage = freezeImage
+            }
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             for view in playerViews {
@@ -181,6 +210,11 @@ extension WallpaperModel {
     /// Synchronously decodes the frame at the player's current time directly
     /// from the asset file, independent of the live AVPlayerLayer's rendering
     /// state (which is what we can't rely on while paused/detached).
+    ///
+    /// Intentionally reads from `currentVideoPath` (the original file) rather than
+    /// going through `resolvedPlaybackURL(for:)` — even when lightweight mode is
+    /// swapped to a proxy, a single still-frame decode here is cheap and this
+    /// keeps the freeze-frame at full source quality.
     private func captureCurrentVideoFrame(from player: AVPlayer) -> CGImage? {
         guard let path = currentVideoPath else {
             return nil
@@ -620,6 +654,7 @@ extension WallpaperModel {
     }
 
     func scheduleScreenSync() {
+        cachedDisplayScreens = nil
         screenChangeWorkItem?.cancel()
 
         let workItem = DispatchWorkItem { [weak self] in

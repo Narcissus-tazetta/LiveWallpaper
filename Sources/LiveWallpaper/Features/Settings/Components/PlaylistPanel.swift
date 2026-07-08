@@ -7,6 +7,7 @@ extension SettingsView {
             HStack {
                 Label(model.localizedString("プレイリスト・設定"), systemImage: "list.bullet.rectangle")
                     .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
                 Spacer(minLength: 0)
                 Text(model.playlistCapacityText)
                     .font(.caption)
@@ -177,8 +178,8 @@ extension SettingsView {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(
-                    isPlaylistSectionDropTargeted ? Color.accentColor : Color.clear,
-                    lineWidth: 2
+                    isPlaylistSectionDropTargeted ? Color.accentColor : Color.accentColor.opacity(0.35),
+                    lineWidth: isPlaylistSectionDropTargeted ? 2 : 1.5
                 )
         )
         .onDrop(of: [UTType.text], isTargeted: $isPlaylistSectionDropTargeted) { providers in

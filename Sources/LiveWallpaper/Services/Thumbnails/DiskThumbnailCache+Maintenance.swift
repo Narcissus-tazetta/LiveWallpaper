@@ -65,7 +65,7 @@ extension DiskThumbnailCache {
       pendingQueue.remove(at: index)
     }
     inFlight.remove(path)
-    visiblePaths.remove(path)
+    visibleRefCounts.removeValue(forKey: path)
     persistMetadata()
   }
 
@@ -76,7 +76,7 @@ extension DiskThumbnailCache {
 
     let removeCount = inMemoryImages.count - maxInMemoryCount
     let removable = inMemoryLastAccess.keys
-      .filter { !visiblePaths.contains($0) }
+      .filter { !isPathVisible($0) }
       .sorted {
         (inMemoryLastAccess[$0] ?? .leastNormalMagnitude)
           < (inMemoryLastAccess[$1] ?? .leastNormalMagnitude)
@@ -155,7 +155,7 @@ extension DiskThumbnailCache {
             self.pendingQueue.remove(at: index)
           }
           self.inFlight.remove(path)
-          self.visiblePaths.remove(path)
+          self.visibleRefCounts.removeValue(forKey: path)
           removedAny = true
         }
         guard removedAny else {

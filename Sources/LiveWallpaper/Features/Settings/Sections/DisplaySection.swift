@@ -21,7 +21,11 @@ extension SettingsView {
               (model.localizedString("拡大"), VideoFitMode.fill),
               (model.localizedString("全体"), VideoFitMode.fit)
             ],
-            selection: globalFitModeBinding
+            selection: globalFitModeBinding,
+            helpTopic: .globalFitMode,
+            helpText: model.localizedString(
+              "この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です"
+            )
           )
         }
       }
@@ -49,6 +53,15 @@ extension SettingsView {
       )
 
       Toggle(model.localizedString("再生の軽量モード（省電力）"), isOn: lightweightModeBinding)
+      if model.lightweightProxyState == .generating {
+        settingsFootnote(model.localizedString("軽量版を生成中..."))
+      }
+      if model.lightweightProxyState == .failed {
+        settingsFootnote(
+          model.localizedString("軽量版の生成に失敗しました。元の画質で再生しています。"),
+          color: .orange
+        )
+      }
       Toggle(model.localizedString("作業中は壁紙の再生を自動停止"), isOn: suspendWhenFullScreenBinding)
 
       if model.suspendWhenOtherAppFullScreen {
@@ -187,10 +200,25 @@ extension SettingsView {
     }
   }
 
-  func suspendExclusionRow(for bundleID: String) -> some View {
+  private static var suspendExclusionAppMetadataCache: [String: (name: String, icon: NSImage?, isResolved: Bool)] = [:]
+
+  func suspendExclusionAppMetadata(for bundleID: String) -> (name: String, icon: NSImage?, isResolved: Bool) {
+    if let cached = Self.suspendExclusionAppMetadataCache[bundleID] {
+      return cached
+    }
     let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
     let appName = appURL.map { $0.deletingPathExtension().lastPathComponent } ?? bundleID
     let appIcon = appURL.map { NSWorkspace.shared.icon(forFile: $0.path) }
+    let metadata = (name: appName, icon: appIcon, isResolved: appURL != nil)
+    Self.suspendExclusionAppMetadataCache[bundleID] = metadata
+    return metadata
+  }
+
+  func suspendExclusionRow(for bundleID: String) -> some View {
+    let metadata = suspendExclusionAppMetadata(for: bundleID)
+    let appName = metadata.name
+    let appIcon = metadata.icon
+    let isResolved = metadata.isResolved
 
     return HStack(spacing: 10) {
       if let icon = appIcon {
@@ -202,7 +230,7 @@ extension SettingsView {
         Text(appName)
           .lineLimit(1)
           .truncationMode(.tail)
-        if appURL != nil {
+        if isResolved {
           Text(bundleID)
             .font(.caption2)
             .foregroundColor(.secondary)
@@ -337,12 +365,19 @@ extension SettingsView {
     options: [(String, T)],
     selection: Binding<T>,
     titleFont: Font = .body,
-    titleColor: Color = .primary
+    titleColor: Color = .primary,
+    helpTopic: HelpTopic? = nil,
+    helpText: String? = nil
   ) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text(title)
-        .font(titleFont)
-        .foregroundColor(titleColor)
+      HStack(spacing: 4) {
+        Text(title)
+          .font(titleFont)
+          .foregroundColor(titleColor)
+        if let helpTopic {
+          helpIconButton(for: helpTopic)
+        }
+      }
 
       EqualSegmentedControl(
         options: options,
@@ -351,6 +386,10 @@ extension SettingsView {
       )
       .frame(height: 24)
       .fixedSize(horizontal: true, vertical: false)
+
+      if let helpTopic, let helpText, expandedHelpTopics.contains(helpTopic) {
+        settingsFootnote(helpText)
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }

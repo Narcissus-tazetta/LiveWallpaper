@@ -6,7 +6,7 @@ struct WallpaperTabView<Library: View, Playlist: View>: View {
     @ViewBuilder let playlist: Playlist
 
     var body: some View {
-        Section(header: Label(title, systemImage: "photo.on.rectangle")) {
+        Section {
             library
             playlist
         }

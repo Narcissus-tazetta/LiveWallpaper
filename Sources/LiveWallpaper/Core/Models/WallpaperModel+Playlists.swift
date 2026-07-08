@@ -400,7 +400,7 @@ extension WallpaperModel {
         if !switchedFromWeb {
             scheduleWindowRebuild(delay: 0.05)
         }
-        playVideo(url: URL(fileURLWithPath: trimmed))
+        playRegisteredVideo(path: trimmed)
         persistPlaylistState()
     }
 

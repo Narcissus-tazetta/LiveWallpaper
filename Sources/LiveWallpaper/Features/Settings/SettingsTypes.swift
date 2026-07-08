@@ -29,5 +29,7 @@ extension SettingsView {
         case menuBarOpaque
         case suspendHighSensitivity
         case suspendFrontmostOnly
+        case globalFitMode
+        case perVideoFitMode
     }
 }

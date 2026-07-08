@@ -32,8 +32,14 @@ struct SettingsView: View {
     @State var isFitEditorInteractionEnabled: Bool = false
     @State var fitPreviewMode: FitPreviewMode = .still
     @State var fitPreviewStillImages: [String: NSImage] = [:]
+    @State var fitPreviewStillImageOrder: [String] = []
     @State var fitPreviewStillImageInFlight: Set<String> = []
+    @State var fitPreviewStillImageTasks: [String: Task<Void, Never>] = [:]
+    @State var fitPreviewStillImageGeneration: [String: UUID] = [:]
     @State var fitEditorPreviewFrameSize: CGSize = .zero
+    @State var fitEditorNormalizeThrottleWorkItem: DispatchWorkItem?
+    @State var fitEditorLastNormalizeAt: Date = .distantPast
+    @State var fitEditorNormalizeGeneration: Int = 0
     @State var isResetSettingsDialogPresented: Bool = false
     @State var wallpaperAssignmentTarget: WallpaperAssignmentTarget = .desktop
     @State var isWallpaperShareSheetPresented: Bool = false
@@ -145,7 +151,9 @@ struct SettingsView: View {
         let form = Form {
             tabBarSection
 
-            currentStatusSection
+            if selectedTab == .wallpaper {
+                currentStatusSection
+            }
 
             tabContentSection
 
@@ -273,9 +281,6 @@ struct SettingsView: View {
                 syncFitEditorDraftWithCurrentSelection()
                 prepareFitPreviewStillImageIfNeeded()
                 installFitKeyMonitorIfNeeded()
-                for source in model.webWallpaperSources {
-                    webThumbnailStore.loadIfNeeded(for: source)
-                }
             }
             .onDisappear {
                 model.removeEmptyPlaylists()
@@ -404,9 +409,16 @@ struct SettingsView: View {
 
     private var footerSection: some View {
         Section {
-            Text("©︎Narcissus-tazetta 2026  •  v\(model.currentAppVersion())")
+            footerCreditText
                 .foregroundColor(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
         }
+    }
+
+    private var footerCreditText: Text {
+        var authorName = AttributedString("Narcissus-tazetta")
+        authorName.link = URL(string: "https://github.com/Narcissus-tazetta/LiveWallpaper")
+        authorName.foregroundColor = .secondary
+        return Text("©︎") + Text(authorName) + Text(" 2026  •  v\(model.currentAppVersion())")
     }
 }

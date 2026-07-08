@@ -19,6 +19,7 @@ extension SettingsView {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusable(false)
     }
 
     func compactToggle(_ title: String, isOn: Binding<Bool>) -> some View {

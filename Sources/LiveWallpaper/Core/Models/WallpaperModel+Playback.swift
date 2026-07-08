@@ -39,7 +39,7 @@ extension WallpaperModel {
         }
         frameRateLimit = limit
         UserDefaults.standard.set(limit.rawValue, forKey: "frameRateLimit")
-        reapplyPlaybackForCurrentVideoIfNeeded()
+        applyDynamicPlaybackProfile()
     }
 
     func setDecodeMode(_ mode: DecodeMode) {
@@ -57,7 +57,7 @@ extension WallpaperModel {
         }
         workProfile = profile
         UserDefaults.standard.set(profile.rawValue, forKey: "workProfile")
-        reapplyPlaybackForCurrentVideoIfNeeded()
+        applyDynamicPlaybackProfile()
     }
 
     func setQualityPreset(_ preset: QualityPreset) {
@@ -66,7 +66,7 @@ extension WallpaperModel {
         }
         qualityPreset = preset
         UserDefaults.standard.set(preset.rawValue, forKey: "qualityPreset")
-        requestPlaybackReconfiguration()
+        applyDynamicPlaybackProfile()
     }
 
     func setAutoFrameRateEnabled(_ enabled: Bool) {
@@ -136,7 +136,7 @@ extension WallpaperModel {
         if let currentPath = currentVideoPath,
            FileManager.default.fileExists(atPath: currentPath)
         {
-            playVideo(url: URL(fileURLWithPath: currentPath))
+            playRegisteredVideo(path: currentPath)
             return
         }
         stopAllPlayers()
@@ -210,11 +210,14 @@ extension WallpaperModel {
             player.pause()
             player.removeAllItems()
         }
+        // AVPlayerLooper must be explicitly disabled before its last strong
+        // reference is dropped — otherwise it can leave the shared AVQueuePlayer
+        // in an inconsistent state where the old (still-looping) item lingers
+        // alongside whatever gets inserted next, so a subsequent video swap
+        // (e.g. lightweight-mode proxy <-> original) can silently keep playing
+        // the previous item instead of the new one.
+        sharedLooper?.disableLooping()
         sharedLooper = nil
-    }
-
-    private func reapplyPlaybackForCurrentVideoIfNeeded() {
-        requestPlaybackReconfiguration()
     }
 
     func applyLightweightSettings() {
@@ -440,7 +443,7 @@ extension WallpaperModel {
                 return
             }
             if let currentPath = currentVideoPath {
-                playVideo(url: URL(fileURLWithPath: currentPath))
+                playRegisteredVideo(path: currentPath)
             }
         }
     }

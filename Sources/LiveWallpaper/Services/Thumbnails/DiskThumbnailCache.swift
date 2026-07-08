@@ -41,7 +41,8 @@ final class DiskThumbnailCache: ObservableObject {
 
   var inMemoryImages: [String: NSImage] = [:]
   var inMemoryLastAccess: [String: TimeInterval] = [:]
-  var visiblePaths: Set<String> = []
+  var visibleRefCounts: [String: Int] = [:]
+  var visibleStateByPath: [String: Bool] = [:]
   var pendingQueue: [String] = []
   var inFlight: Set<String> = []
   var inFlightReads: Set<String> = []
@@ -77,15 +78,34 @@ final class DiskThumbnailCache: ObservableObject {
     ensureInitialized()
 
     if isVisible {
-      visiblePaths.insert(path)
+      if visibleStateByPath[path] == true {
+        return
+      }
+      visibleStateByPath[path] = true
+      visibleRefCounts[path, default: 0] += 1
       request(path: path)
       return
     }
 
-    visiblePaths.remove(path)
-    if let index = pendingQueue.firstIndex(of: path) {
-      pendingQueue.remove(at: index)
+    guard visibleStateByPath[path] == true else {
+      return
     }
+    visibleStateByPath.removeValue(forKey: path)
+    guard let count = visibleRefCounts[path] else {
+      return
+    }
+    if count <= 1 {
+      visibleRefCounts.removeValue(forKey: path)
+      if let index = pendingQueue.firstIndex(of: path) {
+        pendingQueue.remove(at: index)
+      }
+    } else {
+      visibleRefCounts[path] = count - 1
+    }
+  }
+
+  func isPathVisible(_ path: String) -> Bool {
+    (visibleRefCounts[path] ?? 0) > 0
   }
 
   func request(path: String) {
@@ -125,7 +145,7 @@ final class DiskThumbnailCache: ObservableObject {
 
     while inFlight.count < maxConcurrentGenerations, !pendingQueue.isEmpty {
       let path = pendingQueue.removeFirst()
-      guard visiblePaths.contains(path) else {
+      guard isPathVisible(path) else {
         continue
       }
       guard inMemoryImages[path] == nil else {
@@ -164,7 +184,8 @@ final class DiskThumbnailCache: ObservableObject {
 
     inMemoryImages = inMemoryImages.filter { validPaths.contains($0.key) }
     inMemoryLastAccess = inMemoryLastAccess.filter { validPaths.contains($0.key) }
-    visiblePaths = visiblePaths.filter { validPaths.contains($0) }
+    visibleRefCounts = visibleRefCounts.filter { validPaths.contains($0.key) }
+    visibleStateByPath = visibleStateByPath.filter { validPaths.contains($0.key) }
     pendingQueue = pendingQueue.filter { validPaths.contains($0) }
     inFlight = inFlight.filter { validPaths.contains($0) }
 
@@ -200,7 +221,8 @@ final class DiskThumbnailCache: ObservableObject {
     metadata = .init(version: Self.metadataVersion, entries: [:])
     inMemoryImages.removeAll()
     inMemoryLastAccess.removeAll()
-    visiblePaths.removeAll()
+    visibleRefCounts.removeAll()
+    visibleStateByPath.removeAll()
     pendingQueue.removeAll()
     inFlight.removeAll()
     inFlightReads.removeAll()

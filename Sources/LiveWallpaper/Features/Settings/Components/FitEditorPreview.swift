@@ -1,6 +1,17 @@
 import SwiftUI
 
 extension SettingsView {
+    static var fitPreviewPathExistsCache: [String: Bool] = [:]
+
+    func fitPreviewPathExists(_ path: String) -> Bool {
+        if let cached = Self.fitPreviewPathExistsCache[path] {
+            return cached
+        }
+        let exists = FileManager.default.fileExists(atPath: path)
+        Self.fitPreviewPathExistsCache[path] = exists
+        return exists
+    }
+
     func wallpaperFitPreview(path: String, screenID: String) -> some View {
         GeometryReader { geo in
             let canvasSize = geo.size
@@ -23,7 +34,7 @@ extension SettingsView {
                 RoundedRectangle(cornerRadius: 14)
                     .fill(Color.black.opacity(0.72))
 
-                if FileManager.default.fileExists(atPath: path) {
+                if fitPreviewPathExists(path) {
                     if fitPreviewMode == .video {
                         WallpaperAVLayerPreview(
                             videoPath: path,
@@ -125,7 +136,7 @@ extension SettingsView {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(minHeight: 240, maxHeight: 300)
+        .frame(minHeight: 320, maxHeight: 460)
     }
 
     var fitEditorScreens: [WallpaperModel.DisplayScreenInfo] {
@@ -189,8 +200,8 @@ extension SettingsView {
     }
 
     func centeredPreviewFrameSize(canvasSize: CGSize, screenID: String) -> CGSize {
-        let maxWidth = max(canvasSize.width * 0.63, 1)
-        let maxHeight = max(canvasSize.height * 0.63, 1)
+        let maxWidth = max(canvasSize.width * 0.94, 1)
+        let maxHeight = max(canvasSize.height * 0.94, 1)
         let aspect = max(screenAspect(for: screenID), 0.2)
 
         var width = maxWidth

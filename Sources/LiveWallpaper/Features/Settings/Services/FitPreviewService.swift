@@ -28,6 +28,9 @@ enum FitPreviewService {
         var bestScore: Double = -1
 
         for time in candidateTimes {
+            if Task.isCancelled {
+                return nil
+            }
             guard let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) else {
                 continue
             }
@@ -49,6 +52,9 @@ enum FitPreviewService {
             CMTime(seconds: 1.0, preferredTimescale: 600)
         ]
         for time in fallbackTimes {
+            if Task.isCancelled {
+                return nil
+            }
             if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
                 return NSImage(
                     cgImage: cgImage,

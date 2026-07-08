@@ -122,7 +122,7 @@ extension WallpaperModel {
                 if let currentPath = currentVideoPath,
                    FileManager.default.fileExists(atPath: currentPath)
                 {
-                    playVideo(url: URL(fileURLWithPath: currentPath))
+                    playRegisteredVideo(path: currentPath)
                 }
             }
         }

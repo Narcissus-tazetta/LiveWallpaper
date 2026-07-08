@@ -6,7 +6,7 @@ struct WallpaperFitTabView<Editor: View, Library: View>: View {
     @ViewBuilder let library: Library
 
     var body: some View {
-        Section(header: Label(title, systemImage: "viewfinder")) {
+        Section {
             editor
             library
         }

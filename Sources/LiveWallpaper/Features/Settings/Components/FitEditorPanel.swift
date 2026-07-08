@@ -54,18 +54,31 @@ extension SettingsView {
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
 
-                HStack(spacing: 12) {
-                    Text(model.localizedString("表示"))
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 12) {
+                        HStack(spacing: 4) {
+                            Text(model.localizedString("表示"))
+                            helpIconButton(for: .perVideoFitMode)
+                        }
                         .frame(width: 72, alignment: .leading)
-                    Spacer(minLength: 0)
-                    EqualSegmentedControl(
-                        options: [
-                            (model.localizedString("拡大"), VideoFitMode.fill),
-                            (model.localizedString("全体"), VideoFitMode.fit)
-                        ],
-                        selection: fitModeBinding(path: path, screenID: screenID)
-                    )
-                    .frame(width: fitEditorSegmentedPickerWidth, height: 24)
+                        Spacer(minLength: 0)
+                        EqualSegmentedControl(
+                            options: [
+                                (model.localizedString("拡大"), VideoFitMode.fill),
+                                (model.localizedString("全体"), VideoFitMode.fit)
+                            ],
+                            selection: fitModeBinding(path: path, screenID: screenID)
+                        )
+                        .frame(width: fitEditorSegmentedPickerWidth, height: 24)
+                    }
+
+                    if expandedHelpTopics.contains(.perVideoFitMode) {
+                        settingsFootnote(
+                            model.localizedString(
+                                "ここで変更すると、この動画・この画面だけの表示方法を上書きします。未設定の場合は設定タブの既定値が使われます"
+                            )
+                        )
+                    }
                 }
 
                 HStack(spacing: 12) {

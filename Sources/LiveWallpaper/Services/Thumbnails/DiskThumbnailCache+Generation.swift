@@ -41,7 +41,7 @@ extension DiskThumbnailCache {
   }
 
   func finishGeneration(path: String, image: NSImage?) {
-    if let image, visiblePaths.contains(path) {
+    if let image, isPathVisible(path) {
       inMemoryImages[path] = image
       touch(path)
       trimInMemoryIfNeeded()

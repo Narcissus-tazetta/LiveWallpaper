@@ -60,6 +60,9 @@ extension WallpaperModel {
         }
     }
 
+    // Lock-screen sync always reads `currentVideoPath` (the original file), never a
+    // lightweight-mode proxy — the lock screen should keep full source quality
+    // regardless of the desktop wallpaper's lightweight setting.
     func applyLockScreenVideoSameAsDesktop() {
         guard let desktopPath = currentVideoPath,
               let validated = Self.validatedVideoPath(desktopPath)

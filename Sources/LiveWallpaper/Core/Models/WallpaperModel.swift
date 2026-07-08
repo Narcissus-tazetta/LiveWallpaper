@@ -64,11 +64,15 @@ final class WallpaperModel: ObservableObject {
     var displayIDByWindow: [ObjectIdentifier: String] = [:]
     var activeSpaceWindowRefreshWorkItems: [DispatchWorkItem] = []
     var lastScreenSignatures: [ScreenSignature] = []
+    var cachedDisplayScreens: [DisplayScreenInfo]?
     var frontmostAppObserver: NSObjectProtocol?
     var windowOcclusionObserver: NSObjectProtocol?
     var spaceTransitionGuardObserver: NSObjectProtocol?
     var playerItemEndObserver: NSObjectProtocol?
     var suspendedDisplayIDs: Set<String> = []
+    var lastCapturedFreezeFrameVideoPath: String?
+    var lastCapturedFreezeFrameTime: CMTime?
+    var lastCapturedFreezeFrameImage: CGImage?
     var autoFrameRateTimer: Timer?
     var autoFrameRateBitRateFactor: Double = 1.0
     var autoFrameRateBufferAdjustment: TimeInterval = 0
@@ -82,6 +86,7 @@ final class WallpaperModel: ObservableObject {
     let playbackEnvironment: PlaybackEnvironment
     let lockScreenSyncService: LockScreenSyncService = .init()
     let desktopIconsService: DesktopIconsService = .init()
+    let lightweightProxyCache: LightweightProxyCache = .init()
     var lockScreenSyncTask: Task<Void, Never>?
     var videoAspectRatioByPath: [String: Double] = [:]
     var loadingVideoAspectRatioPaths: Set<String> = []
@@ -91,6 +96,7 @@ final class WallpaperModel: ObservableObject {
     @Published var displayMode: DisplayMode = .mainOnly
     @Published var fitMode: VideoFitMode = .fill
     @Published var lightweightMode: Bool = false
+    @Published var lightweightProxyState: LightweightProxyCache.ProxyGenerationState = .idle
     @Published var audioEnabled: Bool = false
     @Published var audioVolume: Float = 1.0
     @Published var frameRateLimit: FrameRateLimit = .off
@@ -185,6 +191,7 @@ final class WallpaperModel: ObservableObject {
             return
         }
         appLanguage = language
+        cachedDisplayScreens = nil
         UserDefaults.standard.set(language.rawValue, forKey: "appLanguage")
         LocalizationManager.setLanguage(language.effectiveLanguageCode)
         NSLog(
@@ -202,7 +209,7 @@ final class WallpaperModel: ObservableObject {
         if isWebWallpaperActive {
             webWallpaperLoadState = .loading
         } else if let savedPath: String = currentVideoPath {
-            playVideo(url: URL(fileURLWithPath: savedPath))
+            playRegisteredVideo(path: savedPath)
         }
         screenChangeObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,

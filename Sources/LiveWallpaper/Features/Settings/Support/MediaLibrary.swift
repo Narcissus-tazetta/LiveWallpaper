@@ -18,13 +18,42 @@ extension SettingsView {
     func pruneMissingWallpaperThumbnails() {
         let valid = Set(model.allRegisteredVideoPaths)
         thumbnailCache.prune(validPaths: valid)
+        Self.fitPreviewPathExistsCache = Self.fitPreviewPathExistsCache.filter { valid.contains($0.key) }
         fitPreviewStillImages = fitPreviewStillImages.filter { valid.contains($0.key) }
+        fitPreviewStillImageOrder = fitPreviewStillImageOrder.filter { valid.contains($0) }
         fitPreviewStillImageInFlight = fitPreviewStillImageInFlight.filter { valid.contains($0) }
+        for (path, task) in fitPreviewStillImageTasks where !valid.contains(path) {
+            task.cancel()
+            fitPreviewStillImageTasks.removeValue(forKey: path)
+        }
+        fitPreviewStillImageGeneration = fitPreviewStillImageGeneration.filter { valid.contains($0.key) }
         if let selected = fitEditorSelectedVideoPath, !valid.contains(selected) {
             fitEditorSelectedVideoPath = nil
         }
         if let editingPath = editingWallpaperPath, !valid.contains(editingPath) {
             cancelWallpaperNameEdit()
+        }
+    }
+
+    private var fitPreviewStillImageLimit: Int { 10 }
+
+    func trimFitPreviewStillImagesIfNeeded() {
+        guard fitPreviewStillImageOrder.count > fitPreviewStillImageLimit else {
+            return
+        }
+        let overflow = fitPreviewStillImageOrder.count - fitPreviewStillImageLimit
+        for path in fitPreviewStillImageOrder.prefix(overflow) {
+            fitPreviewStillImages.removeValue(forKey: path)
+        }
+        fitPreviewStillImageOrder.removeFirst(overflow)
+    }
+
+    func cancelFitPreviewStillGeneration(exceptPath: String?) {
+        for (path, task) in fitPreviewStillImageTasks where path != exceptPath {
+            task.cancel()
+            fitPreviewStillImageTasks.removeValue(forKey: path)
+            fitPreviewStillImageInFlight.remove(path)
+            fitPreviewStillImageGeneration.removeValue(forKey: path)
         }
     }
 
@@ -51,6 +80,7 @@ extension SettingsView {
         guard model.allRegisteredVideoPaths.contains(path) else {
             return
         }
+        cancelFitPreviewStillGeneration(exceptPath: path)
         fitEditorSelectedVideoPath = path
         isFitEditorInteractionEnabled = false
         syncFitEditorDraftWithCurrentSelection()
@@ -92,15 +122,30 @@ extension SettingsView {
 
         fitPreviewStillImageInFlight.insert(path)
 
-        Task.detached(priority: .userInitiated) {
+        let generation = UUID()
+        fitPreviewStillImageGeneration[path] = generation
+
+        let task = Task.detached(priority: .userInitiated) {
             let image = await FitPreviewService.generateStillImage(path: path)
             await MainActor.run {
-                if let image {
+                // A newer request for the same path may have superseded this one
+                // (e.g. rapid A -> B -> A selection); only this generation's
+                // completion may mutate the shared in-flight/task bookkeeping.
+                guard fitPreviewStillImageGeneration[path] == generation else {
+                    return
+                }
+                if !Task.isCancelled, let image {
                     fitPreviewStillImages[path] = image
+                    fitPreviewStillImageOrder.removeAll { $0 == path }
+                    fitPreviewStillImageOrder.append(path)
+                    trimFitPreviewStillImagesIfNeeded()
                 }
                 fitPreviewStillImageInFlight.remove(path)
+                fitPreviewStillImageTasks.removeValue(forKey: path)
+                fitPreviewStillImageGeneration.removeValue(forKey: path)
             }
         }
+        fitPreviewStillImageTasks[path] = task
     }
 
     func addToNewPlaylist(path: String) {
@@ -287,6 +332,10 @@ extension SettingsView {
             return
         }
 
+        fitEditorNormalizeThrottleWorkItem?.cancel()
+        fitEditorNormalizeThrottleWorkItem = nil
+        fitEditorNormalizeGeneration &+= 1
+
         fitEditorDraftPath = path
         fitEditorDraftScreenID = screenID
         fitEditorDraftFitMode = fitMode
@@ -299,6 +348,9 @@ extension SettingsView {
         guard !fitEditorDraftPath.isEmpty || !fitEditorDraftScreenID.isEmpty else {
             return
         }
+        fitEditorNormalizeThrottleWorkItem?.cancel()
+        fitEditorNormalizeThrottleWorkItem = nil
+        fitEditorNormalizeGeneration &+= 1
         fitEditorDraftPath = ""
         fitEditorDraftScreenID = ""
         fitEditorDraftFitMode = .fill
@@ -345,32 +397,63 @@ extension SettingsView {
     func setFitEditorDraftFitMode(_ fitMode: VideoFitMode, path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
         fitEditorDraftFitMode = fitMode
-        normalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
     }
 
     func setFitEditorDraftZoom(_ zoom: Double, path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
         fitEditorDraftZoom = min(max(zoom, 1.0), 3.0)
-        normalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
     }
 
     func setFitEditorDraftOffsetX(_ offsetX: Double, path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
         fitEditorDraftOffsetX = WallpaperGeometry.clampOffset(offsetX)
-        normalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
     }
 
     func setFitEditorDraftOffsetY(_ offsetY: Double, path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
         fitEditorDraftOffsetY = WallpaperGeometry.clampOffset(offsetY)
-        normalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
     }
 
     func moveFitEditorDraftOffset(dx: Double, dy: Double, path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
         fitEditorDraftOffsetX = WallpaperGeometry.clampOffset(fitEditorDraftOffsetX + dx)
         fitEditorDraftOffsetY = WallpaperGeometry.clampOffset(fitEditorDraftOffsetY + dy)
-        normalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+    }
+
+    /// wallpaperRenderGeometry の再計算コストを避けるため、正規化は最大60Hzに間引く。
+    /// 直近の呼び出しから間隔が空いていない場合は末尾に1回分だけ予約し、取りこぼしを防ぐ。
+    func throttledNormalizeFitEditorDraftOffsets(path: String, screenID: String) {
+        let minInterval: TimeInterval = 1.0 / 60.0
+        let now = Date()
+        let expectedGeneration = fitEditorNormalizeGeneration
+        if now.timeIntervalSince(fitEditorLastNormalizeAt) >= minInterval {
+            fitEditorNormalizeThrottleWorkItem?.cancel()
+            fitEditorNormalizeThrottleWorkItem = nil
+            fitEditorLastNormalizeAt = now
+            normalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+            return
+        }
+        guard fitEditorNormalizeThrottleWorkItem == nil else {
+            return
+        }
+        let workItem = DispatchWorkItem { [self] in
+            fitEditorNormalizeThrottleWorkItem = nil
+            guard fitEditorNormalizeGeneration == expectedGeneration else {
+                return
+            }
+            guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+                return
+            }
+            fitEditorLastNormalizeAt = Date()
+            normalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        }
+        fitEditorNormalizeThrottleWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + minInterval, execute: workItem)
     }
 
     func updateFitEditorPreviewFrameSize(_ frameSize: CGSize, path: String, screenID: String) {
@@ -429,6 +512,10 @@ extension SettingsView {
 
     func applyFitEditorDraft(path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
+        fitEditorNormalizeThrottleWorkItem?.cancel()
+        fitEditorNormalizeThrottleWorkItem = nil
+        fitEditorLastNormalizeAt = Date()
+        normalizeFitEditorDraftOffsets(path: path, screenID: screenID)
         model.setWallpaperPresentation(
             fitMode: fitEditorDraftFitMode,
             zoom: fitEditorDraftZoom,
