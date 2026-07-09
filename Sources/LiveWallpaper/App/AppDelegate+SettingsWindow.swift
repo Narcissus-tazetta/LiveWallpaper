@@ -11,8 +11,10 @@ extension AppDelegate {
         let hosting = NSHostingController(rootView: root)
         let window = NSWindow(contentViewController: hosting)
         window.title = localized("Live Wallpaper 設定")
+        window.styleMask.insert(.resizable)
+        window.minSize = NSSize(width: 880, height: 460)
         window.center()
-        window.setContentSize(NSSize(width: 760, height: 460))
+        window.setContentSize(NSSize(width: 880, height: 460))
         window.isReleasedWhenClosed = false
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
@@ -96,7 +98,7 @@ extension AppDelegate {
 
     @objc func showOpenPanel() {
         let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
 
@@ -104,8 +106,15 @@ extension AppDelegate {
             panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie]
         }
 
-        if panel.runModal() == .OK, let url: URL = panel.url {
-            Task {
+        guard panel.runModal() == .OK else {
+            return
+        }
+        let urls = panel.urls
+        guard !urls.isEmpty else {
+            return
+        }
+        Task {
+            for url in urls {
                 await wallpaperModel.setVideo(path: url.path)
             }
         }

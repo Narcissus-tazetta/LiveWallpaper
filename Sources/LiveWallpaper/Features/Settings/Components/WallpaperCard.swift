@@ -8,10 +8,12 @@ extension SettingsView {
         canDragToPlaylist: Bool = false,
         switchToWallpaperTabOnSelect: Bool = true,
         assignmentTarget: WallpaperAssignmentTarget = .desktop,
+        showLockScreenButton: Bool = false,
         isSelected: Bool? = nil,
         onSelect: (() -> Void)? = nil
     ) -> some View {
         let thumbnailWidth = max(cardWidth - 8, 1)
+        let thumbnailHeight = (thumbnailWidth * 9 / 16).rounded()
         let isDesktopAssigned = model.currentVideoPath == path
         let isLockScreenAssigned = model.lockScreenVideoPath == path
         let strokeColor = wallpaperCardStrokeColor(
@@ -53,7 +55,8 @@ extension SettingsView {
                     HStack(alignment: .top, spacing: 4) {
                         wallpaperAssignmentBadges(
                             isDesktopAssigned: isDesktopAssigned,
-                            isLockScreenAssigned: isLockScreenAssigned
+                            isLockScreenAssigned: isLockScreenAssigned,
+                            showLockBadge: !showLockScreenButton
                         )
                         Spacer(minLength: 0)
                         if model.pinCurrentVideo, model.currentVideoPath == path {
@@ -68,12 +71,12 @@ extension SettingsView {
                             .background(.ultraThinMaterial, in: Capsule())
                         }
                     }
-                    .padding(.top, 12)
+                    .padding(.top, 6)
                     .padding(.horizontal, 6)
                     Spacer(minLength: 0)
                 }
             }
-            .frame(width: thumbnailWidth, height: 60)
+            .frame(width: thumbnailWidth, height: thumbnailHeight)
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .onAppear {
@@ -130,12 +133,31 @@ extension SettingsView {
                     .buttonStyle(.borderless)
                 }
             } else {
-                HStack(spacing: 2) {
+                HStack(spacing: 4) {
                     Text(model.registeredVideoDisplayName(for: path))
                         .font(.system(size: 9))
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if showLockScreenButton, model.lockScreenSyncService.isSupported {
+                        Button {
+                            model.selectLockScreenVideo(path: path)
+                        } label: {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 18, height: 18)
+                                .background(
+                                    isLockScreenAssigned
+                                        ? Color.orange
+                                        : Color.secondary.opacity(0.45),
+                                    in: Circle()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .help(model.localizedString("ロック画面に設定"))
+                    }
 
                     Button {
                         startWallpaperNameEdit(path: path)
@@ -208,7 +230,8 @@ extension SettingsView {
     @ViewBuilder
     func wallpaperAssignmentBadges(
         isDesktopAssigned: Bool,
-        isLockScreenAssigned: Bool
+        isLockScreenAssigned: Bool,
+        showLockBadge: Bool = true
     ) -> some View {
         HStack(spacing: 4) {
             if isDesktopAssigned {
@@ -218,7 +241,7 @@ extension SettingsView {
                     .frame(width: 18, height: 18)
                     .background(Color.accentColor, in: Circle())
             }
-            if isLockScreenAssigned {
+            if isLockScreenAssigned, showLockBadge {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(.white)

@@ -17,6 +17,12 @@ extension SettingsView {
         case lockScreen
     }
 
+    enum WallpaperLibrarySource: Hashable {
+        case all
+        case playlist(UUID)
+        case web
+    }
+
     enum HelpTopic: Hashable {
         case qualityPreset
         case workProfile

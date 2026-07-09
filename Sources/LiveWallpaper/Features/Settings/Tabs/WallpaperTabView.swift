@@ -1,14 +1,12 @@
 import SwiftUI
 
-struct WallpaperTabView<Library: View, Playlist: View>: View {
+struct WallpaperTabView<Content: View>: View {
     let title: String
-    @ViewBuilder let library: Library
-    @ViewBuilder let playlist: Playlist
+    @ViewBuilder let content: Content
 
     var body: some View {
         Section {
-            library
-            playlist
+            content
         }
     }
 }

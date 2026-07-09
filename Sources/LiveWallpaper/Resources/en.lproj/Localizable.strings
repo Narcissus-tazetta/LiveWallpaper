@@ -126,6 +126,10 @@
 "本" = "items";
 "選択中" = "Selected";
 "壁紙一覧" = "Wallpaper Library";
+"すべての壁紙" = "All Wallpapers";
+"クリックでデスクトップに設定、🔒でロック画面に設定" = "Click to set as desktop, 🔒 to set as lock screen";
+"該当するWeb壁紙がありません" = "No matching web wallpapers";
+"該当する壁紙がありません" = "No matching wallpapers";
 "プレイリスト・設定" = "Playlist Settings";
 "プレイリストはありません。「新規プレイリスト」で作成できます" = "No playlists yet. Create one with \"New Playlist\".";
 "新規プレイリスト" = "New Playlist";
@@ -180,6 +184,7 @@
 "X" = "X";
 "Y" = "Y";
 "1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます" = "1. Press \"Add Video\" to choose a video.\n2. The selected video plays as your wallpaper.";
+"動画ファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "You can also add a video by dragging it onto this window.";
 "壁紙を保存するフォルダを選択してください" = "Choose a folder to save the wallpaper.";
 "静止画" = "Still";
 "設定をリセット" = "Reset Settings";

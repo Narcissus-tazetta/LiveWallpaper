@@ -8,4 +8,8 @@ extension SettingsView {
     var wallpaperLibraryGridMinHeight: CGFloat {
         210
     }
+
+    var wallpaperSidebarWidth: CGFloat {
+        170
+    }
 }

@@ -77,6 +77,10 @@
 "1. 「動画を追加」を押して動画を選ぶ" = "1. Nhấn \"Thêm video\" để chọn video";
 "2. 選んだ動画がそのまま壁紙として再生されます" = "2. Video đã chọn sẽ phát ngay làm hình nền";
 "壁紙一覧" = "Thư viện hình nền";
+"すべての壁紙" = "Tất cả hình nền";
+"クリックでデスクトップに設定、🔒でロック画面に設定" = "Nhấp để đặt làm màn hình nền, 🔒 để đặt màn hình khóa";
+"該当するWeb壁紙がありません" = "Không có hình nền Web phù hợp";
+"該当する壁紙がありません" = "Không có hình nền phù hợp";
 "映像の配置を編集" = "Chỉnh bố trí video";
 "フィットエディタ" = "Trình chỉnh căn khít";
 "動画" = "Video";
@@ -196,6 +200,7 @@
 "高負荷" = "Nặng";
 "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Chọn cách giải mã video. Tự động theo môi trường, Cân bằng ưu tiên mượt, Tiết kiệm pin giảm CPU và điện năng.";
 "1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます" = "1. Nhấn \"Thêm video\" để chọn video.\n2. Video đã chọn sẽ phát ngay làm hình nền.";
+"動画ファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "Bạn cũng có thể thêm video bằng cách kéo và thả vào cửa sổ này.";
 "壁紙を保存するフォルダを選択してください" = "Chọn thư mục để lưu hình nền.";
 "設定を初期化" = "Đặt lại cài đặt";
 "表示・再生に関する設定を初期値へ戻します" = "Khôi phục cài đặt hiển thị và phát lại về mặc định.";

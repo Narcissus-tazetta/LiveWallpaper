@@ -77,6 +77,10 @@
 "1. 「動画を追加」を押して動画を選ぶ" = "1. Video seçmek için \"Video Ekle\"ye basın";
 "2. 選んだ動画がそのまま壁紙として再生されます" = "2. Seçilen video doğrudan duvar kağıdı olarak oynatılır";
 "壁紙一覧" = "Duvar Kağıdı Kitaplığı";
+"すべての壁紙" = "Tüm Duvar Kağıtları";
+"クリックでデスクトップに設定、🔒でロック画面に設定" = "Masaüstü için tıklayın, kilit ekranı için 🔒";
+"該当するWeb壁紙がありません" = "Eşleşen web duvar kağıdı yok";
+"該当する壁紙がありません" = "Eşleşen duvar kağıdı yok";
 "映像の配置を編集" = "Görüntü yerleşimini düzenle";
 "フィットエディタ" = "Sığdırma Düzenleyicisi";
 "動画" = "Video";
@@ -198,6 +202,7 @@
 "高負荷" = "Yüksek";
 "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Video kod çözme yöntemini seçin. Otomatik ortama göre, Dengeli akıcılığı, Güç Tasarrufu CPU ve güç tüketimini azaltır.";
 "1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます" = "1. Video seçmek için \"Video Ekle\"ye basın.\n2. Seçilen video doğrudan duvar kağıdı olarak oynatılır.";
+"動画ファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "Ayrıca bir videoyu bu pencereye sürükleyerek de ekleyebilirsiniz.";
 "壁紙を保存するフォルダを選択してください" = "Duvar kağıdını kaydetmek için bir klasör seçin.";
 "高度な共有を有効にする" = "Gelişmiş paylaşımı etkinleştir";
 "オフのときは動画ファイルだけを書き出します。オンにすると配置情報を含む .lwpkg も一緒に書き出します。" = "Kapalıyken yalnızca video dosyası dışa aktarılır. Açıkken yerleşim bilgilerini içeren bir .lwpkg paketi de dışa aktarılır.";

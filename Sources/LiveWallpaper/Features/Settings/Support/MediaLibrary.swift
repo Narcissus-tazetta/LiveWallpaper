@@ -241,13 +241,6 @@ extension SettingsView {
         )
     }
 
-    func handleDraggedWallpaperDropToSelectedPlaylist(_ providers: [NSItemProvider]) -> Bool {
-        guard let selectedID = model.selectedPlaylistID else {
-            return false
-        }
-        return handleDraggedWallpaperDrop(providers, to: selectedID)
-    }
-
     func handleDraggedWallpaperDrop(_ providers: [NSItemProvider], to playlistID: UUID)
         -> Bool
     {

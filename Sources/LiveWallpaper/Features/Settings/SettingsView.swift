@@ -6,7 +6,6 @@ struct SettingsView: View {
     @ObservedObject var model: WallpaperModel
     @State var selectedTab: SettingsTab = .wallpaper
     @State var isAdvancedExpanded: Bool = false
-    @State var isWebWallpaperExpanded: Bool = false
     @State var volumeInput: String = ""
     @State var expandedHelpTopics: Set<HelpTopic> = []
     @State var hoveredHelpTopic: HelpTopic?
@@ -41,7 +40,8 @@ struct SettingsView: View {
     @State var fitEditorLastNormalizeAt: Date = .distantPast
     @State var fitEditorNormalizeGeneration: Int = 0
     @State var isResetSettingsDialogPresented: Bool = false
-    @State var wallpaperAssignmentTarget: WallpaperAssignmentTarget = .desktop
+    @State var selectedLibrarySource: WallpaperLibrarySource = .all
+    @State var librarySearchText: String = ""
     @State var isWallpaperShareSheetPresented: Bool = false
     @State var isSuspendExclusionAppPickerPresented: Bool = false
     @State var suspendExclusionAppPickerSearchText: String = ""
@@ -52,6 +52,7 @@ struct SettingsView: View {
     @FocusState var isVolumeInputFocused: Bool
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
+    @State var isLibrarySearchFocused: Bool = false
     let wallpaperCardMinimumWidth: CGFloat = 140
     let wallpaperCardMaximumWidth: CGFloat = 220
     let wallpaperGridColumnSpacing: CGFloat = 6
@@ -123,9 +124,9 @@ struct SettingsView: View {
     ) -> some View {
         HStack(alignment: .center, spacing: 10) {
             preview()
-                .frame(width: 88, height: 50)
+                .frame(width: 72, height: 40)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Label(title, systemImage: systemImage)
                     .font(.caption)
                     .fontWeight(.semibold)
@@ -133,13 +134,12 @@ struct SettingsView: View {
                 Text(summary)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(10)
+        .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10)
@@ -171,7 +171,10 @@ struct SettingsView: View {
             .font(.system(size: 14, weight: .medium))
             .tint(.accentColor)
             .formStyle(.grouped)
-            .frame(minWidth: 760, idealWidth: 760, minHeight: 460, idealHeight: 460)
+            .frame(
+                minWidth: 880, idealWidth: 880, maxWidth: .infinity,
+                minHeight: 460, idealHeight: 460, maxHeight: .infinity
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(isDropTargeted ? Color.accentColor : Color.clear, lineWidth: 2)
@@ -196,12 +199,16 @@ struct SettingsView: View {
             }
             .onChange(of: model.playlists) { _ in
                 pruneMissingWallpaperThumbnails()
+                reconcileLibrarySource()
                 guard let editingID = editingPlaylistID else {
                     return
                 }
                 if !model.playlists.contains(where: { $0.id == editingID }) {
                     cancelPlaylistNameEdit()
                 }
+            }
+            .onChange(of: model.selectedPlaylistID) { _ in
+                reconcileLibrarySource()
             }
             .onChange(of: isVolumeInputFocused) { focused in
                 if !focused {
@@ -229,6 +236,7 @@ struct SettingsView: View {
                 model.refreshScreenRecordingTrustForCoverage()
             }
             .onChange(of: selectedTab) { tab in
+                resetLibrarySearchState()
                 if tab == .settings {
                     model.refreshDesktopIconsVisibility()
                 }
@@ -368,13 +376,13 @@ struct SettingsView: View {
         switch selectedTab {
         case .wallpaper:
             WallpaperTabView(title: model.localizedString("壁紙")) {
-                VStack(alignment: .leading, spacing: 12) {
-                    wallpaperLibraryPanel
-                    webWallpaperPanel
-                    lockScreenWallpaperPanel
+                HStack(alignment: .top, spacing: 12) {
+                    wallpaperSourceSidebar
+                    VStack(alignment: .leading, spacing: 12) {
+                        wallpaperContentPane
+                        lockScreenWallpaperPanel
+                    }
                 }
-            } playlist: {
-                playlistSettingsPanel
             }
         case .wallpaperFit:
             WallpaperFitTabView(title: model.localizedString("配置")) {
