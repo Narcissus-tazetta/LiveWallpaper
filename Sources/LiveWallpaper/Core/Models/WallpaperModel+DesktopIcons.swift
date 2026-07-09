@@ -22,8 +22,8 @@ extension WallpaperModel {
             desktopIconsFailureMessage = localizedString(
                 "デスクトップのアイコン表示を変更できませんでした。Finder 設定へのアクセスを確認してください。"
             )
-            NSLog(
-                "[DesktopIcons] failed to set visible=\(visible) error=\(error.localizedDescription)"
+            AppLog.desktopIcons.error(
+                "failed to set visible=\(visible, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
             )
         }
     }

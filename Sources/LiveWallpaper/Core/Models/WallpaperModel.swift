@@ -78,6 +78,8 @@ final class WallpaperModel: ObservableObject {
     var isDeepResuming: Bool = false
     let deepSuspendDelay: TimeInterval = 10
     var autoFrameRateTimer: Timer?
+    var autoFrameRateThermalObserver: NSObjectProtocol?
+    var autoFrameRatePowerStateObserver: NSObjectProtocol?
     var autoFrameRateBitRateFactor: Double = 1.0
     var autoFrameRateBufferAdjustment: TimeInterval = 0
     var coverageEvaluationWorkItem: DispatchWorkItem?
@@ -94,6 +96,7 @@ final class WallpaperModel: ObservableObject {
     var lockScreenSyncTask: Task<Void, Never>?
     var videoAspectRatioByPath: [String: Double] = [:]
     var loadingVideoAspectRatioPaths: Set<String> = []
+    private var cachedAllRegisteredVideoPaths: [String]?
     var presentationCacheByPlayerView: [ObjectIdentifier: PresentationCacheKey] = [:]
 
     @Published var clickThrough: Bool = true
@@ -132,7 +135,11 @@ final class WallpaperModel: ObservableObject {
     @Published var currentWebWallpaperID: UUID?
     @Published var webWallpaperLoadState: WebWallpaperLoadState = .idle
     @Published var webWallpaperErrorMessage: String?
-    @Published var playlists: [WallpaperPlaylist] = []
+    @Published var playlists: [WallpaperPlaylist] = [] {
+        didSet {
+            cachedAllRegisteredVideoPaths = nil
+        }
+    }
     @Published var selectedPlaylistID: UUID?
     @Published var currentVideoPath: String?
     @Published var lockScreenVideoPath: String?
@@ -168,6 +175,9 @@ final class WallpaperModel: ObservableObject {
     }
 
     var allRegisteredVideoPaths: [String] {
+        if let cachedAllRegisteredVideoPaths {
+            return cachedAllRegisteredVideoPaths
+        }
         var seen = Set<String>()
         var result: [String] = []
         for playlist in playlists {
@@ -176,6 +186,7 @@ final class WallpaperModel: ObservableObject {
                 result.append(path)
             }
         }
+        cachedAllRegisteredVideoPaths = result
         return result
     }
 
@@ -199,8 +210,8 @@ final class WallpaperModel: ObservableObject {
         cachedDisplayScreens = nil
         UserDefaults.standard.set(language.rawValue, forKey: "appLanguage")
         LocalizationManager.setLanguage(language.effectiveLanguageCode)
-        NSLog(
-            "[Localization] setAppLanguage -> \(language) effective=\(language.effectiveLanguageCode)"
+        AppLog.localization.debug(
+            "setAppLanguage -> \(String(describing: language), privacy: .public) effective=\(language.effectiveLanguageCode, privacy: .public)"
         )
     }
 
@@ -263,6 +274,12 @@ final class WallpaperModel: ObservableObject {
         }
         autoFrameRateTimer?.invalidate()
         autoFrameRateTimer = nil
+        if let observer = autoFrameRateThermalObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = autoFrameRatePowerStateObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     func currentAppVersion() -> String {

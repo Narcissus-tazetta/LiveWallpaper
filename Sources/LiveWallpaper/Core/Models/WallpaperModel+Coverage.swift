@@ -299,11 +299,8 @@ extension WallpaperModel {
         guard suspendedDisplayIDs != displayIDs else {
             return
         }
-        NSLog(
-            "[Suspend] transition from=%@ to=%@ at=%.3f",
-            String(describing: suspendedDisplayIDs),
-            String(describing: displayIDs),
-            CFAbsoluteTimeGetCurrent()
+        AppLog.suspend.debug(
+            "transition from=\(String(describing: self.suspendedDisplayIDs), privacy: .public) to=\(String(describing: displayIDs), privacy: .public) at=\(CFAbsoluteTimeGetCurrent(), format: .fixed(precision: 3))"
         )
         suspendedDisplayIDs = displayIDs
         applySuspensionStateToPlayers()

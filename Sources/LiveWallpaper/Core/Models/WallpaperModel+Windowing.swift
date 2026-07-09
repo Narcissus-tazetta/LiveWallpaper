@@ -311,8 +311,16 @@ extension WallpaperModel {
         let asset = AVURLAsset(url: URL(fileURLWithPath: path))
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-        generator.requestedTimeToleranceBefore = .zero
-        generator.requestedTimeToleranceAfter = .zero
+        // This runs synchronously on the main thread right as the wallpaper gets
+        // covered, so it must stay cheap. A zero tolerance forces AVFoundation to
+        // decode every frame from the preceding sync sample up to the exact
+        // requested time, which can be a long stall on a long GOP. A ~1s window
+        // lets it snap to the nearest sync sample instead — imperceptible here
+        // since the frozen still is only shown while another app already covers
+        // the screen.
+        let tolerance = CMTime(seconds: 1, preferredTimescale: 600)
+        generator.requestedTimeToleranceBefore = tolerance
+        generator.requestedTimeToleranceAfter = tolerance
         return try? generator.copyCGImage(at: player.currentTime(), actualTime: nil)
     }
 
@@ -345,9 +353,8 @@ extension WallpaperModel {
                 else {
                     return
                 }
-                NSLog(
-                    "[WindowRefresh] finderLaunchDetected at=%@",
-                    Self.windowRefreshTimestamp()
+                AppLog.windowRefresh.debug(
+                    "finderLaunchDetected at=\(Self.windowRefreshTimestamp(), privacy: .public)"
                 )
                 self?.scheduleFinderRestartWindowRefresh()
             }
@@ -364,10 +371,8 @@ extension WallpaperModel {
 
     private func scheduleWallpaperWindowRefresh(reason: WindowRefreshReason) {
         if reason == .activeSpaceTransition, !shouldRefreshWindowsForActiveSpace() {
-            NSLog(
-                "[WindowRefresh] skip reason=%@ unchanged-signature at=%@",
-                reason.rawValue,
-                Self.windowRefreshTimestamp()
+            AppLog.windowRefresh.debug(
+                "skip reason=\(reason.rawValue, privacy: .public) unchanged-signature at=\(Self.windowRefreshTimestamp(), privacy: .public)"
             )
             return
         }
@@ -376,12 +381,8 @@ extension WallpaperModel {
         let delays = Self.refreshDelays(for: reason)
         let allowReorder = Self.allowsWindowReorder(for: reason)
 
-        NSLog(
-            "[WindowRefresh] schedule reason=%@ allowReorder=%@ delays=%@ at=%@",
-            reason.rawValue,
-            allowReorder ? "true" : "false",
-            String(describing: delays),
-            Self.windowRefreshTimestamp()
+        AppLog.windowRefresh.debug(
+            "schedule reason=\(reason.rawValue, privacy: .public) allowReorder=\(allowReorder, privacy: .public) delays=\(String(describing: delays), privacy: .public) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
         )
 
         for delay in delays {
@@ -643,12 +644,8 @@ extension WallpaperModel {
             uniqueKeysWithValues: targetScreens().map { (displayIDString(for: $0), $0) }
         )
 
-        NSLog(
-            "[WindowRefresh] run reason=%@ allowReorder=%@ windowCount=%d at=%@",
-            reason.rawValue,
-            allowReorder ? "true" : "false",
-            windows.count,
-            Self.windowRefreshTimestamp()
+        AppLog.windowRefresh.debug(
+            "run reason=\(reason.rawValue, privacy: .public) allowReorder=\(allowReorder, privacy: .public) windowCount=\(self.windows.count) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
         )
 
         for (index, window) in windows.enumerated() {
@@ -689,9 +686,8 @@ extension WallpaperModel {
 
     private func reassertWallpaperOrdering(_ window: NSWindow) {
         guard !isActiveSpaceTransitioning else {
-            NSLog(
-                "[WindowRefresh] skip-reorder active-space-transition at=%@",
-                Self.windowRefreshTimestamp()
+            AppLog.windowRefresh.debug(
+                "skip-reorder active-space-transition at=\(Self.windowRefreshTimestamp(), privacy: .public)"
             )
             return
         }
@@ -704,11 +700,8 @@ extension WallpaperModel {
     ) {
         activeSpaceTransitionLockWorkItem?.cancel()
         isActiveSpaceTransitioning = true
-        NSLog(
-            "[SpaceTransition] lock-start reason=%@ duration=%.2f at=%@",
-            reason,
-            duration,
-            Self.windowRefreshTimestamp()
+        AppLog.spaceTransition.debug(
+            "lock-start reason=\(reason, privacy: .public) duration=\(duration, format: .fixed(precision: 2)) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
         )
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else {
@@ -716,10 +709,8 @@ extension WallpaperModel {
             }
             isActiveSpaceTransitioning = false
             activeSpaceTransitionLockWorkItem = nil
-            NSLog(
-                "[SpaceTransition] lock-end reason=%@ at=%@",
-                reason,
-                Self.windowRefreshTimestamp()
+            AppLog.spaceTransition.debug(
+                "lock-end reason=\(reason, privacy: .public) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
             )
         }
         activeSpaceTransitionLockWorkItem = workItem

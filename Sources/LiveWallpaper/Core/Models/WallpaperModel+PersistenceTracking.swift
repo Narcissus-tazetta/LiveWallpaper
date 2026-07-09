@@ -17,7 +17,7 @@ extension WallpaperModel {
 
     func recordPersistenceFailure(key: String, error: Error) {
         persistenceFailureCount += 1
-        NSLog("[Persistence] failed key=\(key) error=\(error.localizedDescription)")
+        AppLog.persistence.error("failed key=\(key, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
         guard persistenceFailureCount >= persistenceFailureThreshold else {
             return
         }

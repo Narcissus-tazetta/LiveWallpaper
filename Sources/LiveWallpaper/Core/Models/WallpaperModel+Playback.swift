@@ -486,16 +486,52 @@ extension WallpaperModel {
     func startAutoFrameRateMonitoring() {
         autoFrameRateTimer?.invalidate()
         autoFrameRateTimer = nil
+        if let observer = autoFrameRateThermalObserver {
+            NotificationCenter.default.removeObserver(observer)
+            autoFrameRateThermalObserver = nil
+        }
+        if let observer = autoFrameRatePowerStateObserver {
+            NotificationCenter.default.removeObserver(observer)
+            autoFrameRatePowerStateObserver = nil
+        }
         evaluateAutoFrameRatePolicy()
         guard autoFrameRateEnabled || batteryAwareQualityEnabled else {
             return
         }
-        autoFrameRateTimer = Timer.scheduledTimer(withTimeInterval: 12.0, repeats: true) {
+
+        // Thermal state and low-power-mode both post their own change
+        // notifications, so those two signals react instantly instead of
+        // waiting on a poll. The timer below only remains as a coarse
+        // fallback to pick up battery-percentage drift and multi-display
+        // changes between notifications, so it can be far less frequent
+        // (and coalesced via `tolerance`) than the old fixed 12s poll.
+        autoFrameRateThermalObserver = NotificationCenter.default.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.evaluateAutoFrameRatePolicy()
+            }
+        }
+        autoFrameRatePowerStateObserver = NotificationCenter.default.addObserver(
+            forName: .NSProcessInfoPowerStateDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.evaluateAutoFrameRatePolicy()
+            }
+        }
+
+        let timer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) {
             [weak self] _ in
             MainActor.assumeIsolated {
                 self?.evaluateAutoFrameRatePolicy()
             }
         }
+        timer.tolerance = 15.0
+        autoFrameRateTimer = timer
     }
 
     private func evaluateAutoFrameRatePolicy() {

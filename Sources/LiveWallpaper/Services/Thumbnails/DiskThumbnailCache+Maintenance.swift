@@ -196,7 +196,7 @@ extension DiskThumbnailCache {
 
     let snapshot = metadata
     guard let metadataURL = Self.metadataFileURL() else {
-      NSLog("[ThumbnailCache] metadata path unavailable")
+      AppLog.thumbnailCache.error("metadata path unavailable")
       return
     }
     ioQueue.async {
@@ -204,7 +204,7 @@ extension DiskThumbnailCache {
         let data = try JSONEncoder().encode(snapshot)
         try data.write(to: metadataURL, options: .atomic)
       } catch {
-        NSLog("[ThumbnailCache] metadata flush failed error=\(error.localizedDescription)")
+        AppLog.thumbnailCache.error("metadata flush failed error=\(error.localizedDescription, privacy: .public)")
       }
     }
   }
@@ -219,7 +219,7 @@ extension DiskThumbnailCache {
 
     let snapshot = metadata
     guard let metadataURL = Self.metadataFileURL() else {
-      NSLog("[ThumbnailCache] metadata path unavailable")
+      AppLog.thumbnailCache.error("metadata path unavailable")
       return
     }
     ioQueue.sync {
@@ -227,7 +227,7 @@ extension DiskThumbnailCache {
         let data = try JSONEncoder().encode(snapshot)
         try data.write(to: metadataURL, options: .atomic)
       } catch {
-        NSLog("[ThumbnailCache] metadata flush failed error=\(error.localizedDescription)")
+        AppLog.thumbnailCache.error("metadata flush failed error=\(error.localizedDescription, privacy: .public)")
       }
     }
   }

@@ -49,8 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.applicationIconImage = appIconImage()
         LocalizationManager.swizzle()
         LocalizationManager.setLanguage(wallpaperModel.effectiveAppLanguageCode)
-        NSLog(
-            "[AppDelegate] Bundle.main.resourceURL=\(String(describing: Bundle.main.resourceURL))"
+        AppLog.appDelegate.debug(
+            "Bundle.main.resourceURL=\(String(describing: Bundle.main.resourceURL), privacy: .public)"
         )
         setupStatusBar()
         setupSettingsWindow()

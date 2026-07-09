@@ -96,12 +96,12 @@ extension AppDelegate {
 
   func verifyUpdatePrerequisites() {
     let bundlePath: String = bundleURL().path
-    NSLog("[Sparkle] Bundle path: \(bundlePath)")
+    AppLog.sparkle.debug("Bundle path: \(bundlePath, privacy: .public)")
     let issues = currentUpdateEnvironmentIssues()
     if !issues.isEmpty {
       for issue in issues {
-        NSLog(
-          "[Sparkle] Update prerequisite issue: \(updateEnvironmentIssueDescription(issue))"
+        AppLog.sparkle.notice(
+          "Update prerequisite issue: \(self.updateEnvironmentIssueDescription(issue), privacy: .public)"
         )
       }
       DispatchQueue.main.async {

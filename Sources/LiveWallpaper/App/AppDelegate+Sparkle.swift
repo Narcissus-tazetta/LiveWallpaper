@@ -5,14 +5,14 @@
     extension AppDelegate {
         func setupSparkleUpdater() {
             guard let publicEDKey = Self.sparklePublicEDKeyValue(), !publicEDKey.isEmpty else {
-                NSLog("[Sparkle] publicEDKey is empty")
+                AppLog.sparkle.error("publicEDKey is empty")
                 return
             }
             guard let feedURL = Self.sparkleFeedURLValue(), !feedURL.isEmpty else {
-                NSLog("[Sparkle] feedURL is empty")
+                AppLog.sparkle.error("feedURL is empty")
                 return
             }
-            NSLog("[Sparkle] feedURL=\(feedURL)")
+            AppLog.sparkle.debug("feedURL=\(feedURL, privacy: .public)")
 
             let updaterController = SPUStandardUpdaterController(
                 startingUpdater: false,
@@ -30,12 +30,12 @@
             do {
                 try updater.start()
                 sparkleStarted = true
-                NSLog("[Sparkle] updater.start() succeeded")
+                AppLog.sparkle.debug("updater.start() succeeded")
                 if canUseAutomaticUpdates {
                     updater.checkForUpdatesInBackground()
-                    NSLog("[Sparkle] checkForUpdatesInBackground() requested")
+                    AppLog.sparkle.debug("checkForUpdatesInBackground() requested")
                 } else {
-                    NSLog("[Sparkle] automatic updates are disabled due to update prerequisites")
+                    AppLog.sparkle.debug("automatic updates are disabled due to update prerequisites")
                 }
             } catch {
                 Self.reportSparkleError(error)
@@ -51,7 +51,7 @@
         }
 
         nonisolated static func reportSparkleError(_ error: Error) {
-            NSLog("[Sparkle] \(error.localizedDescription)")
+            AppLog.sparkle.error("\(error.localizedDescription, privacy: .public)")
         }
 
         nonisolated static func sparkleFeedURLValue() -> String? {
@@ -88,10 +88,10 @@
             settingsWindowController?.showWindow(nil)
             settingsWindowController?.window?.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
-            NSLog("[Sparkle] manual checkForUpdates() requested")
+            AppLog.sparkle.debug("manual checkForUpdates() requested")
             manualUpdateCheckPending = true
             guard let updater = updaterController?.updater else {
-                NSLog("[Sparkle] updaterController is nil")
+                AppLog.sparkle.error("updaterController is nil")
                 manualUpdateCheckPending = false
                 return
             }
@@ -100,7 +100,7 @@
                 do {
                     try updater.start()
                     sparkleStarted = true
-                    NSLog("[Sparkle] updater.start() succeeded from manual check")
+                    AppLog.sparkle.debug("updater.start() succeeded from manual check")
                 } catch {
                     Self.reportSparkleError(error)
                     manualUpdateCheckPending = false

@@ -302,8 +302,8 @@ extension WallpaperModel {
             lockScreenSyncStatus = lockScreenSyncEnabled ? .idle : .disabled
         } catch {
             lockScreenSyncStatus = .failed(error.localizedDescription)
-            NSLog(
-                "[LockScreenSync] Failed to release borrow: \(error.localizedDescription)"
+            AppLog.lockScreenSync.error(
+                "Failed to release borrow: \(error.localizedDescription, privacy: .public)"
             )
         }
     }
@@ -468,7 +468,9 @@ extension WallpaperModel {
             lockScreenSyncStatus = .restored
         } catch {
             lockScreenSyncStatus = .failed(error.localizedDescription)
-            NSLog("[LockScreenSync] Failed to restore before exit: \(error.localizedDescription)")
+            AppLog.lockScreenSync.error(
+                "Failed to restore before exit: \(error.localizedDescription, privacy: .public)"
+            )
         }
     }
 
