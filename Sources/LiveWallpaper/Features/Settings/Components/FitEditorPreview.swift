@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 extension SettingsView {
@@ -253,6 +254,13 @@ extension SettingsView {
 
         keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             guard selectedTab == .wallpaperFit else {
+                return event
+            }
+            // A text field (name edit, search, ...) is being edited: let the
+            // arrow keys move the caret/selection instead of panning the
+            // preview. The field editor backing any focused NSTextField or
+            // SwiftUI TextField is an NSTextView, a subclass of NSText.
+            if (event.window ?? NSApp.keyWindow)?.firstResponder is NSText {
                 return event
             }
             guard let path = resolvedFitEditorVideoPath(), !path.isEmpty else {

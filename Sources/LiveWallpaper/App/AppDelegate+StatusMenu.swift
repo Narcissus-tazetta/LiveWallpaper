@@ -7,6 +7,9 @@ extension AppDelegate {
 
         let menu = NSMenu()
         menu.showsStateColumn = false
+        // Without this, AppKit re-enables every item on each menu open,
+        // overriding the isEnabled toggles refreshPlaybackMenuState() sets below.
+        menu.autoenablesItems = false
         let openWallpaperItem = NSMenuItem(
             title: localized("壁紙を開く"),
             action: #selector(openWallpaperTab),

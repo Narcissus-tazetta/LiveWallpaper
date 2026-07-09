@@ -15,11 +15,27 @@ extension SettingsView {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(selectedTab == tab ? Color.accentColor : Color.clear)
                 )
-                .foregroundColor(selectedTab == tab ? Color.white : Color.primary)
+                .foregroundColor(
+                    selectedTab == tab ? selectedTabForegroundColor : Color.primary
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .focusable(false)
+    }
+
+    /// White text on the accent-color fill above reads fine for the default
+    /// blue/purple/red accents, but macOS also offers light accents (Yellow,
+    /// Green) where white loses contrast. Picking black vs. white by the
+    /// accent color's own luminance keeps this readable under every system
+    /// accent color choice instead of assuming it's always dark.
+    private var selectedTabForegroundColor: Color {
+        guard let rgb = NSColor(Color.accentColor).usingColorSpace(.deviceRGB) else {
+            return .white
+        }
+        let luminance =
+            0.299 * rgb.redComponent + 0.587 * rgb.greenComponent + 0.114 * rgb.blueComponent
+        return luminance > 0.6 ? .black : .white
     }
 
     func compactToggle(_ title: String, isOn: Binding<Bool>) -> some View {
@@ -149,12 +165,15 @@ extension SettingsView {
     @ViewBuilder
     var desktopWallpaperPreview: some View {
         if model.isWebWallpaperActive, let source = model.activeWebWallpaperSource {
+            // statusWallpaperSlot constrains this preview to a 72x40 box; the
+            // thumbnail's own width/height must match or it renders larger
+            // than that box and overflows uncropped (no .clipped() here).
             WebWallpaperThumbnailView(
                 source: source,
                 isActive: true,
                 thumbnailStore: webThumbnailStore,
-                width: 88,
-                height: 50
+                width: 72,
+                height: 40
             )
             .accessibilityLabel(model.localizedString("現在の壁紙プレビュー"))
         } else {

@@ -427,6 +427,7 @@ struct SettingsView: View {
         var authorName = AttributedString("Narcissus-tazetta")
         authorName.link = URL(string: "https://github.com/Narcissus-tazetta/LiveWallpaper")
         authorName.foregroundColor = .secondary
-        return Text("©︎") + Text(authorName) + Text(" 2026  •  v\(model.currentAppVersion())")
+        let year = Calendar.current.component(.year, from: Date())
+        return Text("©︎") + Text(authorName) + Text(" \(year)  •  v\(model.currentAppVersion())")
     }
 }

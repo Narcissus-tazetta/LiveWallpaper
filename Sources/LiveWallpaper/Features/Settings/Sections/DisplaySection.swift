@@ -210,7 +210,12 @@ extension SettingsView {
     let appName = appURL.map { $0.deletingPathExtension().lastPathComponent } ?? bundleID
     let appIcon = appURL.map { NSWorkspace.shared.icon(forFile: $0.path) }
     let metadata = (name: appName, icon: appIcon, isResolved: appURL != nil)
-    Self.suspendExclusionAppMetadataCache[bundleID] = metadata
+    // Only cache resolved hits. An unresolved bundle ID may become resolvable
+    // later (the app gets installed after being excluded), so caching a miss
+    // would permanently freeze the row on the bundle-ID fallback.
+    if metadata.isResolved {
+      Self.suspendExclusionAppMetadataCache[bundleID] = metadata
+    }
     return metadata
   }
 

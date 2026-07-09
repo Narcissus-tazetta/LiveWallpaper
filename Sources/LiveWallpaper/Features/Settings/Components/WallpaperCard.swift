@@ -64,7 +64,7 @@ extension SettingsView {
                                 Image(systemName: "pin.fill")
                                     .font(.system(size: 8, weight: .semibold))
                                 Text(model.localizedString("固定中"))
-                                    .font(.system(size: 8, weight: .semibold))
+                                    .font(.system(size: 9, weight: .semibold))
                             }
                             .padding(.horizontal, 5)
                             .padding(.vertical, 3)
@@ -135,7 +135,7 @@ extension SettingsView {
             } else {
                 HStack(spacing: 4) {
                     Text(model.registeredVideoDisplayName(for: path))
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -190,9 +190,6 @@ extension SettingsView {
                 model.selectLockScreenVideo(path: path)
             }
             .disabled(!model.lockScreenSyncService.isSupported)
-            Button(model.localizedString("この壁紙に切り替え")) {
-                model.selectRegisteredVideo(path: path)
-            }
             Menu(model.localizedString("プレイリストに追加…")) {
                 if model.playlists.isEmpty {
                     Button(model.localizedString("新規プレイリストを作成して追加")) {

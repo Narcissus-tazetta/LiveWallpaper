@@ -38,7 +38,7 @@ extension SettingsView {
 
             HStack(spacing: 2) {
                 Text(source.displayName)
-                    .font(.system(size: 9))
+                    .font(.system(size: 10))
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .frame(maxWidth: .infinity, alignment: .leading)

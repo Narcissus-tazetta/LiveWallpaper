@@ -30,6 +30,8 @@ struct LeftDragCaptureView: NSViewRepresentable {
         nsView.coordinator = context.coordinator
         context.coordinator.isEnabled = isEnabled
         context.coordinator.onActivate = onActivate
+        context.coordinator.onDelta = onDelta
+        context.coordinator.onScrollDelta = onScrollDelta
         context.coordinator.currentZoom = currentZoom
         context.coordinator.onZoomChange = onZoomChange
     }

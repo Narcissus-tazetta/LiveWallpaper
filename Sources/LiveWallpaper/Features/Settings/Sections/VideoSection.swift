@@ -15,26 +15,23 @@ extension SettingsView {
           .disabled(!model.audioEnabled)
           .frame(minWidth: 180, maxWidth: .infinity)
 
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-          TextField("", text: $volumeInput)
-            .frame(width: 48)
-            .textFieldStyle(.plain)
-            .font(.system(size: 13, weight: .medium))
-            .multilineTextAlignment(.trailing)
-            .disabled(!model.audioEnabled)
-            .focused($isVolumeInputFocused)
-            .onSubmit { commitVolumeInput() }
-            .onChange(of: volumeInput) { newValue in
-              let filtered = String(newValue.filter(\.isNumber).prefix(3))
-              if filtered != newValue {
-                volumeInput = filtered
-              }
+        TextField("", text: $volumeInput)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+          .multilineTextAlignment(.trailing)
+          .frame(width: 44)
+          .disabled(!model.audioEnabled)
+          .focused($isVolumeInputFocused)
+          .onSubmit { commitVolumeInput() }
+          .onChange(of: volumeInput) { newValue in
+            let filtered = String(newValue.filter(\.isNumber).prefix(3))
+            if filtered != newValue {
+              volumeInput = filtered
             }
+          }
 
-          Text(model.localizedString("%"))
-            .foregroundColor(.secondary)
-            .font(.system(size: 13))
-        }
+        Text(model.localizedString("%"))
+          .foregroundColor(.secondary)
       }
     }
   }
