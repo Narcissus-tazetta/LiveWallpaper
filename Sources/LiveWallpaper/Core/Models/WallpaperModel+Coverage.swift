@@ -12,6 +12,9 @@ extension WallpaperModel {
 
         UserDefaults.standard.set(enabled, forKey: "suspendWhenOtherAppFullScreen")
         suspendWhenOtherAppFullScreen = enabled
+        if enabled, !suspendWhenOtherAppFrontmost {
+            setSuspendWhenOtherAppFrontmost(true)
+        }
         configureForegroundCoverageMonitoring()
         return true
     }
