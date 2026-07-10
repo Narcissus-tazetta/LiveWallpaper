@@ -7,6 +7,13 @@ struct WallpaperRenderGeometry: Equatable {
 }
 
 enum WallpaperGeometry {
+    /// ズームの許容範囲。UI(スライダー・ピンチ)とモデル側の clamp はすべてここを参照する。
+    static let zoomRange: ClosedRange<Double> = 1.0 ... 3.0
+
+    static func clampZoom(_ value: Double) -> Double {
+        min(max(value, zoomRange.lowerBound), zoomRange.upperBound)
+    }
+
     static func clampOffset(_ value: Double) -> Double {
         min(max(value, -1.0), 1.0)
     }

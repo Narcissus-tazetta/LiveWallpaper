@@ -7,7 +7,9 @@ struct LeftDragCaptureView: NSViewRepresentable {
     var onDelta: (CGSize) -> Void
     var onScrollDelta: ((CGSize) -> Void)?
     var currentZoom: (() -> Double)?
-    var onZoomChange: ((Double) -> Void)?
+    /// ズーム変更。anchor はビュー中心を原点とした y 下向きの座標で、
+    /// カーソル中心ズームの支点として使う(nil は中心ズーム)。
+    var onZoomChange: ((Double, CGPoint?) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -42,7 +44,7 @@ struct LeftDragCaptureView: NSViewRepresentable {
         var onDelta: (CGSize) -> Void
         var onScrollDelta: ((CGSize) -> Void)?
         var currentZoom: (() -> Double)?
-        var onZoomChange: ((Double) -> Void)?
+        var onZoomChange: ((Double, CGPoint?) -> Void)?
         var lastGestureMagnification: CGFloat = 0
 
         init(
@@ -51,7 +53,7 @@ struct LeftDragCaptureView: NSViewRepresentable {
             onDelta: @escaping (CGSize) -> Void,
             onScrollDelta: ((CGSize) -> Void)? = nil,
             currentZoom: (() -> Double)? = nil,
-            onZoomChange: ((Double) -> Void)? = nil
+            onZoomChange: ((Double, CGPoint?) -> Void)? = nil
         ) {
             self.isEnabled = isEnabled
             self.onActivate = onActivate
@@ -73,6 +75,15 @@ struct LeftDragCaptureView: NSViewRepresentable {
             onScrollDelta?(delta)
         }
 
+        func zoomBy(multiplier: Double, at anchor: CGPoint?) {
+            guard isEnabled else {
+                return
+            }
+            let current = currentZoom?() ?? 1.0
+            let next = WallpaperGeometry.clampZoom(current * multiplier)
+            onZoomChange?(next, anchor)
+        }
+
         func handleMagnification(_ gesture: NSMagnificationGestureRecognizer) {
             guard isEnabled else {
                 lastGestureMagnification = 0
@@ -85,13 +96,25 @@ struct LeftDragCaptureView: NSViewRepresentable {
             case .changed:
                 let delta = gesture.magnification - lastGestureMagnification
                 lastGestureMagnification = gesture.magnification
-                let current = currentZoom?() ?? 1.0
                 let multiplier = max(0.2, 1.0 + Double(delta))
-                let nextZoom = min(max(current * multiplier, 1.0), 3.0)
-                onZoomChange?(nextZoom)
+                let anchor = gesture.view.map { view in
+                    zoomAnchor(for: gesture.location(in: view), in: view)
+                }
+                zoomBy(multiplier: multiplier, at: anchor)
             default:
                 lastGestureMagnification = 0
             }
+        }
+
+        /// ビュー座標(非フリップ・左下原点)を「中心原点・y 下向き」へ変換する。
+        /// プレビューの translation と同じ座標系に合わせるため。
+        func zoomAnchor(for location: CGPoint, in view: NSView) -> CGPoint {
+            CGPoint(
+                x: location.x - view.bounds.midX,
+                y: view.isFlipped
+                    ? location.y - view.bounds.midY
+                    : view.bounds.midY - location.y
+            )
         }
     }
 }
@@ -126,7 +149,7 @@ final class LeftDragCaptureNSView: NSView {
     }
 
     override func scrollWheel(with event: NSEvent) {
-        guard coordinator?.isEnabled == true else {
+        guard let coordinator, coordinator.isEnabled else {
             nextResponder?.scrollWheel(with: event)
             return
         }
@@ -139,12 +162,24 @@ final class LeftDragCaptureNSView: NSView {
             deltaY *= 10
         }
 
+        if event.modifierFlags.contains(.option) {
+            // Option+スクロールはズーム。「上へスクロール=ズームイン」に統一する。
+            var zoomDelta = deltaY
+            if event.isDirectionInvertedFromDevice {
+                zoomDelta *= -1
+            }
+            let location = convert(event.locationInWindow, from: nil)
+            let anchor = coordinator.zoomAnchor(for: location, in: self)
+            coordinator.zoomBy(multiplier: pow(1.003, Double(zoomDelta)), at: anchor)
+            return
+        }
+
         if !event.isDirectionInvertedFromDevice {
             deltaX *= -1
             deltaY *= -1
         }
 
-        coordinator?.handleScrollDelta(CGSize(width: deltaX, height: deltaY))
+        coordinator.handleScrollDelta(CGSize(width: deltaX, height: deltaY))
     }
 
     override func mouseDown(with event: NSEvent) {

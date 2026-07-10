@@ -1,22 +1,37 @@
 import AppKit
 import SwiftUI
 
+/// 矢印キーの keyCode(HIToolbox の kVK_* 相当)。
+private enum FitArrowKeyCode {
+    static let left: UInt16 = 123
+    static let right: UInt16 = 124
+    static let down: UInt16 = 125
+    static let up: UInt16 = 126
+}
+
 extension SettingsView {
     static var fitPreviewPathExistsCache: [String: Bool] = [:]
 
     func fitPreviewPathExists(_ path: String) -> Bool {
-        if Self.fitPreviewPathExistsCache[path] == true {
-            return true
+        // 欠損も含めてキャッシュする。プレビュー本体は毎ドラッグフレームで再評価される
+        // ため、ここで毎回 stat を叩くと欠損ファイル表示中の負荷が跳ね上がる。
+        if let cached = Self.fitPreviewPathExistsCache[path] {
+            return cached
         }
         let exists = FileManager.default.fileExists(atPath: path)
-        // Only cache positive hits. A missing file may reappear at the same path
-        // (restore/replace), and caching false would leave the preview blank.
-        if exists {
-            Self.fitPreviewPathExistsCache[path] = true
-        } else {
+        Self.fitPreviewPathExistsCache[path] = exists
+        return exists
+    }
+
+    /// 欠損キャッシュはファイル復活(復元・差し替え)を検出できないため、
+    /// 動画の選択時とタブ表示時に該当エントリを破棄して再確認させる。
+    func invalidateFitPreviewPathExistsCache(path: String?) {
+        guard let path else {
+            return
+        }
+        if Self.fitPreviewPathExistsCache[path] == false {
             Self.fitPreviewPathExistsCache.removeValue(forKey: path)
         }
-        return exists
     }
 
     func wallpaperFitPreview(path: String, screenID: String) -> some View {
@@ -108,8 +123,13 @@ extension SettingsView {
                     currentZoom: {
                         fitEditorZoom(path: path, screenID: screenID)
                     },
-                    onZoomChange: { zoom in
-                        setFitEditorDraftZoom(zoom, path: path, screenID: screenID)
+                    onZoomChange: { zoom, anchor in
+                        setFitEditorDraftZoom(
+                            zoom,
+                            anchor: anchor,
+                            path: path,
+                            screenID: screenID
+                        )
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -122,6 +142,21 @@ extension SettingsView {
                         .onTapGesture {
                             isFitEditorInteractionEnabled = true
                         }
+
+                    VStack {
+                        Spacer(minLength: 0)
+                        Label(
+                            model.localizedString("クリックして編集を開始"),
+                            systemImage: "cursorarrow.rays"
+                        )
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.92))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(Color.black.opacity(0.5)))
+                        .padding(.bottom, 14)
+                    }
+                    .allowsHitTesting(false)
                 }
             }
             .compositingGroup()
@@ -271,16 +306,16 @@ extension SettingsView {
             let screenID = resolvedFitScreenID()
 
             switch event.keyCode {
-            case 123:
+            case FitArrowKeyCode.left:
                 moveFitEditorDraftOffset(dx: -step, dy: 0, path: path, screenID: screenID)
                 return nil
-            case 124:
+            case FitArrowKeyCode.right:
                 moveFitEditorDraftOffset(dx: step, dy: 0, path: path, screenID: screenID)
                 return nil
-            case 125:
+            case FitArrowKeyCode.down:
                 moveFitEditorDraftOffset(dx: 0, dy: step, path: path, screenID: screenID)
                 return nil
-            case 126:
+            case FitArrowKeyCode.up:
                 moveFitEditorDraftOffset(dx: 0, dy: -step, path: path, screenID: screenID)
                 return nil
             default:

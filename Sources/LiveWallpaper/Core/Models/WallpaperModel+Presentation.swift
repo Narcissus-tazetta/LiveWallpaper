@@ -150,6 +150,7 @@ extension WallpaperModel {
             }
 
             let ratio: Double
+            var naturalPixelSize: CGSize?
             do {
                 let asset = AVURLAsset(url: url)
                 let tracks = try await asset.loadTracks(withMediaType: .video)
@@ -160,6 +161,7 @@ extension WallpaperModel {
                     let width = Double(max(abs(transformed.width), 1))
                     let height = Double(max(abs(transformed.height), 1))
                     ratio = width / height
+                    naturalPixelSize = CGSize(width: width.rounded(), height: height.rounded())
                 } else {
                     ratio = 16.0 / 9.0
                 }
@@ -168,6 +170,9 @@ extension WallpaperModel {
             }
 
             videoAspectRatioByPath[path] = ratio
+            if let naturalPixelSize {
+                videoNaturalSizeByPath[path] = naturalPixelSize
+            }
             loadingVideoAspectRatioPaths.remove(path)
             refreshPlayerPresentations()
         }
@@ -270,7 +275,7 @@ extension WallpaperModel {
     ) {
         var current = presentation(for: path, screenID: screenID)
         current.fitMode = fitMode
-        current.zoom = min(max(zoom, 1.0), 3.0)
+        current.zoom = WallpaperGeometry.clampZoom(zoom)
         let clamped = clampedOffset(
             x: offsetX,
             y: offsetY,
@@ -300,7 +305,7 @@ extension WallpaperModel {
 
     func setWallpaperZoom(_ zoom: Double, path: String, screenID: String) {
         var current = presentation(for: path, screenID: screenID)
-        current.zoom = min(max(zoom, 1.0), 3.0)
+        current.zoom = WallpaperGeometry.clampZoom(zoom)
         let clamped = clampedOffset(
             x: current.offsetX,
             y: current.offsetY,
@@ -339,6 +344,56 @@ extension WallpaperModel {
 
     func resetWallpaperPresentation(path: String, screenID: String) {
         updatePresentation(defaultPresentation(), for: path, screenID: screenID)
+    }
+
+    func hasWallpaperPresentationOverride(path: String, screenID: String) -> Bool {
+        wallpaperPresentationByPath[path]?[screenID] != nil
+    }
+
+    /// この動画・この画面の個別設定を削除して既定値に従わせる。
+    /// resetWallpaperPresentation と違い既定値のスナップショットを残さないため、
+    /// 後から設定タブの既定フィットを変えてもこの動画に反映される。
+    func clearWallpaperPresentation(path: String, screenID: String) {
+        guard var pathMap = wallpaperPresentationByPath[path],
+              pathMap.removeValue(forKey: screenID) != nil
+        else {
+            return
+        }
+        if pathMap.isEmpty {
+            wallpaperPresentationByPath.removeValue(forKey: path)
+        } else {
+            wallpaperPresentationByPath[path] = pathMap
+        }
+        persistWallpaperPresentationState()
+        refreshPlayerPresentations()
+    }
+
+    /// 指定画面の設定を、接続中のすべての画面へコピーする。
+    func applyWallpaperPresentationToAllScreens(path: String, fromScreenID screenID: String) {
+        let source = presentation(for: path, screenID: screenID)
+        var pathMap = wallpaperPresentationByPath[path] ?? [:]
+        for screen in availableDisplayScreens() {
+            pathMap[screen.id] = source
+        }
+        pathMap[screenID] = source
+        wallpaperPresentationByPath[path] = pathMap
+        persistWallpaperPresentationState()
+        refreshPlayerPresentations()
+    }
+
+    func videoNaturalSize(for path: String) -> CGSize? {
+        videoNaturalSizeByPath[path]
+    }
+
+    func screenPixelSize(screenID: String) -> CGSize? {
+        guard let screen = screenForID(screenID) else {
+            return nil
+        }
+        let scale = screen.backingScaleFactor
+        return CGSize(
+            width: (screen.frame.width * scale).rounded(),
+            height: (screen.frame.height * scale).rounded()
+        )
     }
 
     func commitWallpaperPresentation(path: String, screenID: String) {

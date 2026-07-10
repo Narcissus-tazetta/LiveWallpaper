@@ -94,7 +94,10 @@ final class WallpaperModel: ObservableObject {
     let desktopIconsService: DesktopIconsService = .init()
     let lightweightProxyCache: LightweightProxyCache = .init()
     var lockScreenSyncTask: Task<Void, Never>?
-    var videoAspectRatioByPath: [String: Double] = [:]
+    // フィット編集のプレビューが非同期ロード完了後に再描画されるよう @Published にしている。
+    // (16:9 フォールバックで描画された後、実際のアスペクト比で描き直すため)
+    @Published var videoAspectRatioByPath: [String: Double] = [:]
+    @Published var videoNaturalSizeByPath: [String: CGSize] = [:]
     var loadingVideoAspectRatioPaths: Set<String> = []
     var presentationCacheByPlayerView: [ObjectIdentifier: PresentationCacheKey] = [:]
 

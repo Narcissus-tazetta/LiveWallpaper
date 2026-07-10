@@ -81,6 +81,7 @@ extension SettingsView {
             return
         }
         cancelFitPreviewStillGeneration(exceptPath: path)
+        invalidateFitPreviewPathExistsCache(path: path)
         fitEditorSelectedVideoPath = path
         isFitEditorInteractionEnabled = false
         syncFitEditorDraftWithCurrentSelection()
@@ -259,112 +260,163 @@ extension SettingsView {
     }
 
     func loadFitEditorDraft(path: String, screenID: String) {
-        let fitMode = model.wallpaperFitMode(path: path, screenID: screenID)
-        let zoom = model.wallpaperZoom(path: path, screenID: screenID)
-        let offsetX = model.wallpaperOffsetX(path: path, screenID: screenID)
-        let offsetY = model.wallpaperOffsetY(path: path, screenID: screenID)
+        let draft = FitEditorDraft(
+            path: path,
+            screenID: screenID,
+            fitMode: model.wallpaperFitMode(path: path, screenID: screenID),
+            zoom: model.wallpaperZoom(path: path, screenID: screenID),
+            offsetX: model.wallpaperOffsetX(path: path, screenID: screenID),
+            offsetY: model.wallpaperOffsetY(path: path, screenID: screenID)
+        )
 
-        guard fitEditorDraftPath != path
-            || fitEditorDraftScreenID != screenID
-            || fitEditorDraftFitMode != fitMode
-            || fitEditorDraftZoom != zoom
-            || fitEditorDraftOffsetX != offsetX
-            || fitEditorDraftOffsetY != offsetY
-        else {
+        guard fitEditorDraft != draft else {
             return
         }
 
-        fitEditorNormalizeThrottleWorkItem?.cancel()
-        fitEditorNormalizeThrottleWorkItem = nil
-        fitEditorNormalizeGeneration &+= 1
-
-        fitEditorDraftPath = path
-        fitEditorDraftScreenID = screenID
-        fitEditorDraftFitMode = fitMode
-        fitEditorDraftZoom = zoom
-        fitEditorDraftOffsetX = offsetX
-        fitEditorDraftOffsetY = offsetY
+        cancelFitEditorDeferredWork()
+        fitEditorDraft = draft
     }
 
     func clearFitEditorDraft() {
-        guard !fitEditorDraftPath.isEmpty || !fitEditorDraftScreenID.isEmpty else {
+        guard fitEditorDraft.isActive else {
             return
         }
+        cancelFitEditorDeferredWork()
+        fitEditorDraft = FitEditorDraft()
+    }
+
+    /// ドラフトの切り替え時に、旧ドラフト宛の遅延処理(正規化・リアルタイム反映)を破棄する。
+    private func cancelFitEditorDeferredWork() {
         fitEditorNormalizeThrottleWorkItem?.cancel()
         fitEditorNormalizeThrottleWorkItem = nil
         fitEditorNormalizeGeneration &+= 1
-        fitEditorDraftPath = ""
-        fitEditorDraftScreenID = ""
-        fitEditorDraftFitMode = .fill
-        fitEditorDraftZoom = 1.0
-        fitEditorDraftOffsetX = 0.0
-        fitEditorDraftOffsetY = 0.0
+        fitEditorLiveApplyWorkItem?.cancel()
+        fitEditorLiveApplyWorkItem = nil
     }
 
     func ensureFitEditorDraft(path: String, screenID: String) {
-        if fitEditorDraftPath == path, fitEditorDraftScreenID == screenID {
+        if fitEditorDraft.matches(path: path, screenID: screenID) {
             return
         }
         loadFitEditorDraft(path: path, screenID: screenID)
     }
 
     func fitEditorFitMode(path: String, screenID: String) -> VideoFitMode {
-        guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+        guard fitEditorDraft.matches(path: path, screenID: screenID) else {
             return model.wallpaperFitMode(path: path, screenID: screenID)
         }
-        return fitEditorDraftFitMode
+        return fitEditorDraft.fitMode
     }
 
     func fitEditorZoom(path: String, screenID: String) -> Double {
-        guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+        guard fitEditorDraft.matches(path: path, screenID: screenID) else {
             return model.wallpaperZoom(path: path, screenID: screenID)
         }
-        return fitEditorDraftZoom
+        return fitEditorDraft.zoom
     }
 
     func fitEditorOffsetX(path: String, screenID: String) -> Double {
-        guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+        guard fitEditorDraft.matches(path: path, screenID: screenID) else {
             return model.wallpaperOffsetX(path: path, screenID: screenID)
         }
-        return fitEditorDraftOffsetX
+        return fitEditorDraft.offsetX
     }
 
     func fitEditorOffsetY(path: String, screenID: String) -> Double {
-        guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+        guard fitEditorDraft.matches(path: path, screenID: screenID) else {
             return model.wallpaperOffsetY(path: path, screenID: screenID)
         }
-        return fitEditorDraftOffsetY
+        return fitEditorDraft.offsetY
+    }
+
+    func isFitEditorDraftDirty(path: String, screenID: String) -> Bool {
+        guard fitEditorDraft.matches(path: path, screenID: screenID) else {
+            return false
+        }
+        return fitEditorDraft.fitMode != model.wallpaperFitMode(path: path, screenID: screenID)
+            || fitEditorDraft.zoom != model.wallpaperZoom(path: path, screenID: screenID)
+            || fitEditorDraft.offsetX != model.wallpaperOffsetX(path: path, screenID: screenID)
+            || fitEditorDraft.offsetY != model.wallpaperOffsetY(path: path, screenID: screenID)
+    }
+
+    /// ドラフト変更後の共通処理。オフセット正規化と、有効時のリアルタイム反映を予約する。
+    private func fitEditorDraftDidChange(path: String, screenID: String) {
+        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        scheduleFitEditorLiveApplyIfNeeded(path: path, screenID: screenID)
     }
 
     func setFitEditorDraftFitMode(_ fitMode: VideoFitMode, path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
-        fitEditorDraftFitMode = fitMode
-        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        fitEditorDraft.fitMode = fitMode
+        fitEditorDraftDidChange(path: path, screenID: screenID)
     }
 
-    func setFitEditorDraftZoom(_ zoom: Double, path: String, screenID: String) {
+    /// anchor はプレビューキャンバス中心を原点とした y 下向きの座標。
+    /// 指定するとその点直下のコンテンツを保ったままズームする(カーソル中心ズーム)。
+    func setFitEditorDraftZoom(
+        _ zoom: Double,
+        anchor: CGPoint? = nil,
+        path: String,
+        screenID: String
+    ) {
         ensureFitEditorDraft(path: path, screenID: screenID)
-        fitEditorDraftZoom = min(max(zoom, 1.0), 3.0)
-        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        let newZoom = WallpaperGeometry.clampZoom(zoom)
+        if let anchor, newZoom != fitEditorDraft.zoom {
+            let container = resolvedFitEditorConstraintFrameSize(screenID: screenID)
+            let before = model.wallpaperRenderGeometry(
+                path: path,
+                screenID: screenID,
+                containerSize: container,
+                fitMode: fitEditorDraft.fitMode,
+                zoom: fitEditorDraft.zoom,
+                offsetX: fitEditorDraft.offsetX,
+                offsetY: fitEditorDraft.offsetY
+            )
+            let after = model.wallpaperRenderGeometry(
+                path: path,
+                screenID: screenID,
+                containerSize: container,
+                fitMode: fitEditorDraft.fitMode,
+                zoom: newZoom,
+                offsetX: fitEditorDraft.offsetX,
+                offsetY: fitEditorDraft.offsetY
+            )
+            let contentX = (Double(anchor.x) - Double(before.translation.width))
+                / max(Double(before.renderedSize.width), 1)
+            let contentY = (Double(anchor.y) - Double(before.translation.height))
+                / max(Double(before.renderedSize.height), 1)
+            let translationX = Double(anchor.x) - contentX * Double(after.renderedSize.width)
+            let translationY = Double(anchor.y) - contentY * Double(after.renderedSize.height)
+            fitEditorDraft.offsetX = normalizedOffset(
+                translation: translationX,
+                maxPan: Double(after.maxPan.width)
+            )
+            fitEditorDraft.offsetY = normalizedOffset(
+                translation: translationY,
+                maxPan: Double(after.maxPan.height)
+            )
+        }
+        fitEditorDraft.zoom = newZoom
+        fitEditorDraftDidChange(path: path, screenID: screenID)
     }
 
     func setFitEditorDraftOffsetX(_ offsetX: Double, path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
-        fitEditorDraftOffsetX = WallpaperGeometry.clampOffset(offsetX)
-        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        fitEditorDraft.offsetX = WallpaperGeometry.clampOffset(offsetX)
+        fitEditorDraftDidChange(path: path, screenID: screenID)
     }
 
     func setFitEditorDraftOffsetY(_ offsetY: Double, path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
-        fitEditorDraftOffsetY = WallpaperGeometry.clampOffset(offsetY)
-        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        fitEditorDraft.offsetY = WallpaperGeometry.clampOffset(offsetY)
+        fitEditorDraftDidChange(path: path, screenID: screenID)
     }
 
     func moveFitEditorDraftOffset(dx: Double, dy: Double, path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
-        fitEditorDraftOffsetX = WallpaperGeometry.clampOffset(fitEditorDraftOffsetX + dx)
-        fitEditorDraftOffsetY = WallpaperGeometry.clampOffset(fitEditorDraftOffsetY + dy)
-        throttledNormalizeFitEditorDraftOffsets(path: path, screenID: screenID)
+        fitEditorDraft.offsetX = WallpaperGeometry.clampOffset(fitEditorDraft.offsetX + dx)
+        fitEditorDraft.offsetY = WallpaperGeometry.clampOffset(fitEditorDraft.offsetY + dy)
+        fitEditorDraftDidChange(path: path, screenID: screenID)
     }
 
     /// wallpaperRenderGeometry の再計算コストを避けるため、正規化は最大60Hzに間引く。
@@ -388,7 +440,7 @@ extension SettingsView {
             guard fitEditorNormalizeGeneration == expectedGeneration else {
                 return
             }
-            guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+            guard fitEditorDraft.matches(path: path, screenID: screenID) else {
                 return
             }
             fitEditorLastNormalizeAt = Date()
@@ -403,7 +455,7 @@ extension SettingsView {
             return
         }
         fitEditorPreviewFrameSize = frameSize
-        guard fitEditorDraftPath == path, fitEditorDraftScreenID == screenID else {
+        guard fitEditorDraft.matches(path: path, screenID: screenID) else {
             return
         }
         normalizeFitEditorDraftOffsets(path: path, screenID: screenID)
@@ -417,17 +469,17 @@ extension SettingsView {
             path: path,
             screenID: screenID,
             containerSize: constraintFrame,
-            fitMode: fitEditorDraftFitMode,
-            zoom: fitEditorDraftZoom,
-            offsetX: fitEditorDraftOffsetX,
-            offsetY: fitEditorDraftOffsetY
+            fitMode: fitEditorDraft.fitMode,
+            zoom: fitEditorDraft.zoom,
+            offsetX: fitEditorDraft.offsetX,
+            offsetY: fitEditorDraft.offsetY
         )
 
-        fitEditorDraftOffsetX = normalizedOffset(
+        fitEditorDraft.offsetX = normalizedOffset(
             translation: Double(geometry.translation.width),
             maxPan: Double(geometry.maxPan.width)
         )
-        fitEditorDraftOffsetY = normalizedOffset(
+        fitEditorDraft.offsetY = normalizedOffset(
             translation: Double(geometry.translation.height),
             maxPan: Double(geometry.maxPan.height)
         )
@@ -452,28 +504,94 @@ extension SettingsView {
         return WallpaperGeometry.clampOffset(clampedTranslation / maxPan)
     }
 
-    func applyFitEditorDraft(path: String, screenID: String) {
+    func applyFitEditorDraft(path: String, screenID: String, showFeedback: Bool = true) {
         ensureFitEditorDraft(path: path, screenID: screenID)
         fitEditorNormalizeThrottleWorkItem?.cancel()
         fitEditorNormalizeThrottleWorkItem = nil
         fitEditorLastNormalizeAt = Date()
         normalizeFitEditorDraftOffsets(path: path, screenID: screenID)
         model.setWallpaperPresentation(
-            fitMode: fitEditorDraftFitMode,
-            zoom: fitEditorDraftZoom,
-            offsetX: fitEditorDraftOffsetX,
-            offsetY: fitEditorDraftOffsetY,
+            fitMode: fitEditorDraft.fitMode,
+            zoom: fitEditorDraft.zoom,
+            offsetX: fitEditorDraft.offsetX,
+            offsetY: fitEditorDraft.offsetY,
             path: path,
             screenID: screenID
         )
         loadFitEditorDraft(path: path, screenID: screenID)
+        if showFeedback {
+            showFitEditorSavedFeedback()
+        }
     }
 
     func resetFitEditorDraft(path: String, screenID: String) {
         ensureFitEditorDraft(path: path, screenID: screenID)
-        fitEditorDraftFitMode = model.fitMode
-        fitEditorDraftZoom = 1.0
-        fitEditorDraftOffsetX = 0.0
-        fitEditorDraftOffsetY = 0.0
+        fitEditorDraft.fitMode = model.fitMode
+        fitEditorDraft.zoom = 1.0
+        fitEditorDraft.offsetX = 0.0
+        fitEditorDraft.offsetY = 0.0
+        fitEditorDraftDidChange(path: path, screenID: screenID)
+    }
+
+    /// 未保存の編集を破棄して、保存済みの値へ戻す。
+    func discardFitEditorDraftChanges(path: String, screenID: String) {
+        loadFitEditorDraft(path: path, screenID: screenID)
+    }
+
+    /// 個別設定を削除して既定値へ戻し、ドラフトも同期する。
+    func clearFitEditorOverride(path: String, screenID: String) {
+        model.clearWallpaperPresentation(path: path, screenID: screenID)
+        loadFitEditorDraft(path: path, screenID: screenID)
+        showFitEditorSavedFeedback()
+    }
+
+    /// 現在のドラフトを保存したうえで、すべての画面へ同じ設定をコピーする。
+    func applyFitEditorDraftToAllScreens(path: String, screenID: String) {
+        applyFitEditorDraft(path: path, screenID: screenID, showFeedback: false)
+        model.applyWallpaperPresentationToAllScreens(path: path, fromScreenID: screenID)
+        showFitEditorSavedFeedback()
+    }
+
+    func setFitEditorLiveApplyEnabled(_ enabled: Bool, path: String, screenID: String) {
+        fitEditorLiveApplyEnabled = enabled
+        guard enabled else {
+            fitEditorLiveApplyWorkItem?.cancel()
+            fitEditorLiveApplyWorkItem = nil
+            return
+        }
+        if isFitEditorDraftDirty(path: path, screenID: screenID) {
+            applyFitEditorDraft(path: path, screenID: screenID, showFeedback: false)
+        }
+    }
+
+    /// リアルタイム反映。連続操作(ドラッグ・スライダー)中の書き込み連打を避けるため 250ms デバウンスする。
+    func scheduleFitEditorLiveApplyIfNeeded(path: String, screenID: String) {
+        guard fitEditorLiveApplyEnabled else {
+            return
+        }
+        fitEditorLiveApplyWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [self] in
+            fitEditorLiveApplyWorkItem = nil
+            guard fitEditorLiveApplyEnabled else {
+                return
+            }
+            guard fitEditorDraft.matches(path: path, screenID: screenID) else {
+                return
+            }
+            applyFitEditorDraft(path: path, screenID: screenID, showFeedback: false)
+        }
+        fitEditorLiveApplyWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
+    }
+
+    func showFitEditorSavedFeedback() {
+        fitEditorSavedFeedbackWorkItem?.cancel()
+        fitEditorShowsSavedFeedback = true
+        let workItem = DispatchWorkItem { [self] in
+            fitEditorSavedFeedbackWorkItem = nil
+            fitEditorShowsSavedFeedback = false
+        }
+        fitEditorSavedFeedbackWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8, execute: workItem)
     }
 }

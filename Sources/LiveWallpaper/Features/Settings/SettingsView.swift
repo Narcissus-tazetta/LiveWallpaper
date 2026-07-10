@@ -18,13 +18,12 @@ struct SettingsView: View {
     @State var isDropTargeted: Bool = false
     @State var selectedAssignmentTarget: WallpaperAssignmentTarget = .desktop
     @State var selectedFitScreenID: String = ""
-    @State var fitEditorDraftPath: String = ""
-    @State var fitEditorDraftScreenID: String = ""
-    @State var fitEditorDraftFitMode: VideoFitMode = .fill
-    @State var fitEditorDraftZoom: Double = 1.0
-    @State var fitEditorDraftOffsetX: Double = 0.0
-    @State var fitEditorDraftOffsetY: Double = 0.0
+    @State var fitEditorDraft: FitEditorDraft = .init()
     @State var fitEditorSelectedVideoPath: String?
+    @State var fitEditorLiveApplyEnabled: Bool = false
+    @State var fitEditorLiveApplyWorkItem: DispatchWorkItem?
+    @State var fitEditorShowsSavedFeedback: Bool = false
+    @State var fitEditorSavedFeedbackWorkItem: DispatchWorkItem?
     @State var isFitEditorInteractionEnabled: Bool = false
     @State var fitPreviewMode: FitPreviewMode = .still
     @State var fitPreviewStillImages: [String: NSImage] = [:]
@@ -173,6 +172,7 @@ struct SettingsView: View {
                     ensureFitEditorScreenSelection()
                     syncFitEditorSelectionWithCurrentVideoIfNeeded()
                     syncFitEditorDraftWithCurrentSelection()
+                    invalidateFitPreviewPathExistsCache(path: resolvedFitEditorVideoPath())
                     isFitEditorInteractionEnabled = false
                     installFitKeyMonitorIfNeeded()
                 } else {

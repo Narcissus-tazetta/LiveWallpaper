@@ -31,7 +31,7 @@ enum FitPreviewService {
             if Task.isCancelled {
                 return nil
             }
-            guard let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) else {
+            guard let cgImage = try? await generator.image(at: time).image else {
                 continue
             }
             let score = ThumbnailImageScorer.score(cgImage)
@@ -55,7 +55,7 @@ enum FitPreviewService {
             if Task.isCancelled {
                 return nil
             }
-            if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
+            if let cgImage = try? await generator.image(at: time).image {
                 return NSImage(
                     cgImage: cgImage,
                     size: NSSize(width: cgImage.width, height: cgImage.height)
