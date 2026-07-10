@@ -12,9 +12,9 @@ extension AppDelegate {
         let window = NSWindow(contentViewController: hosting)
         window.title = localized("Live Wallpaper 設定")
         window.styleMask.insert(.resizable)
-        window.minSize = NSSize(width: 880, height: 460)
+        window.minSize = NSSize(width: 880, height: 540)
         window.center()
-        window.setContentSize(NSSize(width: 880, height: 460))
+        window.setContentSize(NSSize(width: 880, height: 540))
         window.isReleasedWhenClosed = false
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,

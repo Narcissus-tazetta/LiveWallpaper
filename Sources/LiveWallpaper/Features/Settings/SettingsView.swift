@@ -15,11 +15,8 @@ struct SettingsView: View {
     @State var editingPlaylistNameInput: String = ""
     @State var editingWallpaperPath: String?
     @State var editingWallpaperNameInput: String = ""
-    @State var pendingDroppedVideoURL: URL?
     @State var isDropTargeted: Bool = false
-    @State var isDropPlaylistDialogPresented: Bool = false
-    @State var hoveredPlaylistDropTargetID: UUID?
-    @State var isPlaylistSectionDropTargeted: Bool = false
+    @State var selectedAssignmentTarget: WallpaperAssignmentTarget = .desktop
     @State var selectedFitScreenID: String = ""
     @State var fitEditorDraftPath: String = ""
     @State var fitEditorDraftScreenID: String = ""
@@ -40,7 +37,6 @@ struct SettingsView: View {
     @State var fitEditorLastNormalizeAt: Date = .distantPast
     @State var fitEditorNormalizeGeneration: Int = 0
     @State var isResetSettingsDialogPresented: Bool = false
-    @State var selectedLibrarySource: WallpaperLibrarySource = .all
     @State var librarySearchText: String = ""
     @State var isWallpaperShareSheetPresented: Bool = false
     @State var isSuspendExclusionAppPickerPresented: Bool = false
@@ -84,76 +80,9 @@ struct SettingsView: View {
         return (columns, cardWidth)
     }
 
-    private var pendingDroppedVideoName: String {
-        pendingDroppedVideoURL?.lastPathComponent ?? ""
-    }
-
-    var currentStatusSection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 10) {
-                    statusWallpaperSlot(
-                        title: model.localizedString("デスクトップ"),
-                        systemImage: "display",
-                        summary: currentWallpaperSummaryText(),
-                        preview: { desktopWallpaperPreview }
-                    )
-                    statusWallpaperSlot(
-                        title: model.localizedString("ロック画面"),
-                        systemImage: "lock.fill",
-                        summary: currentLockScreenWallpaperSummaryText(),
-                        preview: { lockScreenWallpaperPreview }
-                    )
-                }
-
-                HStack(spacing: 16) {
-                    Text("\(model.localizedString("プレイリスト")): \(currentPlaylistSummaryText())")
-                    Text("\(model.localizedString("表示")): \(currentDisplayModeSummaryText())")
-                }
-                .font(.caption)
-                .foregroundColor(.secondary)
-            }
-        }
-    }
-
-    func statusWallpaperSlot<Preview: View>(
-        title: String,
-        systemImage: String,
-        summary: String,
-        @ViewBuilder preview: () -> Preview
-    ) -> some View {
-        HStack(alignment: .center, spacing: 10) {
-            preview()
-                .frame(width: 72, height: 40)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Label(title, systemImage: systemImage)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                Text(summary)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.secondary.opacity(0.08))
-        )
-    }
-
     var body: some View {
         let form = Form {
             tabBarSection
-
-            if selectedTab == .wallpaper {
-                currentStatusSection
-            }
 
             tabContentSection
 
@@ -173,7 +102,7 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .frame(
                 minWidth: 880, idealWidth: 880, maxWidth: .infinity,
-                minHeight: 460, idealHeight: 460, maxHeight: .infinity
+                minHeight: 540, idealHeight: 540, maxHeight: .infinity
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -182,6 +111,7 @@ struct SettingsView: View {
             .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
                 handleDroppedVideoProviders(providers)
             }
+            .background(InitialFocusSink().frame(width: 0, height: 0))
     }
 
     private func applyNotificationAndChangeModifiers<V: View>(_ view: V) -> some View {
@@ -199,7 +129,6 @@ struct SettingsView: View {
             }
             .onChange(of: model.playlists) { _ in
                 pruneMissingWallpaperThumbnails()
-                reconcileLibrarySource()
                 guard let editingID = editingPlaylistID else {
                     return
                 }
@@ -208,7 +137,7 @@ struct SettingsView: View {
                 }
             }
             .onChange(of: model.selectedPlaylistID) { _ in
-                reconcileLibrarySource()
+                resetLibrarySearchState()
             }
             .onChange(of: isVolumeInputFocused) { focused in
                 if !focused {
@@ -291,7 +220,6 @@ struct SettingsView: View {
                 installFitKeyMonitorIfNeeded()
             }
             .onDisappear {
-                model.removeEmptyPlaylists()
                 releaseCurrentWallpaperThumbnailVisibility()
                 releaseLockScreenWallpaperThumbnailVisibility()
                 removeFitKeyMonitor()
@@ -302,30 +230,6 @@ struct SettingsView: View {
         view
             .sheet(isPresented: $isWallpaperShareSheetPresented) {
                 shareWallpaperPickerSheet
-            }
-            .confirmationDialog(
-                model.localizedString("追加先プレイリスト"),
-                isPresented: $isDropPlaylistDialogPresented,
-                titleVisibility: .visible
-            ) {
-                ForEach(model.playlists) { playlist in
-                    Button(playlist.name) {
-                        Task {
-                            await applyDroppedVideo(to: playlist.id)
-                        }
-                    }
-                }
-                Button(model.localizedString("新規プレイリストを作成して追加")) {
-                    Task {
-                        await applyDroppedVideo(to: nil)
-                    }
-                }
-                .disabled(!model.canAddPlaylist)
-                Button(model.localizedString("キャンセル"), role: .cancel) {
-                    pendingDroppedVideoURL = nil
-                }
-            } message: {
-                Text(pendingDroppedVideoName)
             }
             .confirmationDialog(
                 model.localizedString("設定を初期化"),
@@ -376,11 +280,11 @@ struct SettingsView: View {
         switch selectedTab {
         case .wallpaper:
             WallpaperTabView(title: model.localizedString("壁紙")) {
-                HStack(alignment: .top, spacing: 12) {
-                    wallpaperSourceSidebar
-                    VStack(alignment: .leading, spacing: 12) {
-                        wallpaperContentPane
-                        lockScreenWallpaperPanel
+                VStack(alignment: .leading, spacing: 12) {
+                    wallpaperTargetTabBar
+                    wallpaperContentPane
+                    if model.webWallpaperFeatureEnabled {
+                        webWallpaperPane
                     }
                 }
             }
@@ -403,6 +307,7 @@ struct SettingsView: View {
                     }
                     videoSettingsSection
                     shareSettingsSection
+                    webWallpaperSettingsSection
                     displaySettingsSection
                     languageSettingsSection
                     cacheSettingsSection
@@ -427,7 +332,7 @@ struct SettingsView: View {
         var authorName = AttributedString("Narcissus-tazetta")
         authorName.link = URL(string: "https://github.com/Narcissus-tazetta/LiveWallpaper")
         authorName.foregroundColor = .secondary
-        let year = Calendar.current.component(.year, from: Date())
+        let year = String(Calendar.current.component(.year, from: Date()))
         return Text("©︎") + Text(authorName) + Text(" \(year)  •  v\(model.currentAppVersion())")
     }
 }

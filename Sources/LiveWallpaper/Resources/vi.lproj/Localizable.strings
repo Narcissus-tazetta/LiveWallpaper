@@ -239,3 +239,8 @@
 "クリップボードから貼り付け" = "Dán từ clipboard";
 "YouTubeのURLは動画のみの表示に自動変換されます" = "URL YouTube sẽ tự động chuyển sang chế độ chỉ phát video.";
 "※ いま動作確認できているのは YouTube だけです。ほかのサイトも試せますが、表示できない場合があります" = "Hiện chỉ xác nhận YouTube hoạt động ổn. Bạn vẫn có thể thử site khác, nhưng có thể không hiển thị được.";
+"チェックでこのプレイリストに追加・解除" = "Đánh dấu để thêm vào hoặc xóa khỏi danh sách phát này";
+"プレイリストから外す…" = "Xóa khỏi danh sách phát…";
+"チェックした動画がこのプレイリストで再生されます" = "Video được đánh dấu sẽ phát trong danh sách phát này";
+"Web壁紙機能を有効にする" = "Bật tính năng hình nền Web";
+"オンにすると壁紙タブにWeb壁紙セクションが表示されます。実験的な機能です。" = "Khi bật, mục Hình nền Web sẽ hiển thị trong thẻ Hình nền. Đây là tính năng thử nghiệm.";

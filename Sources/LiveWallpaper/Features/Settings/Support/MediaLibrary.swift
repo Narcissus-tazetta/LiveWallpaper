@@ -189,6 +189,8 @@ extension SettingsView {
         return true
     }
 
+    /// ドロップされた動画をそのままライブラリへ登録して再生する。
+    /// プレイリスト選択中はそのプレイリストにも追加される(setVideoの挙動に従う)。
     func prepareDroppedVideo(_ url: URL) {
         let fileURL = url.isFileURL ? url : URL(fileURLWithPath: url.path)
         guard fileURL.isFileURL else {
@@ -198,68 +200,15 @@ extension SettingsView {
         guard let type = UTType(filenameExtension: ext), type.conforms(to: .movie) else {
             return
         }
-        pendingDroppedVideoURL = fileURL
-        isDropPlaylistDialogPresented = true
-    }
-
-    func applyDroppedVideo(to playlistID: UUID?) async {
-        guard let droppedURL = pendingDroppedVideoURL else {
-            return
-        }
-
-        let targetPlaylistID: UUID
-        if let playlistID {
-            targetPlaylistID = playlistID
-        } else {
-            guard let created = model.createPlaylist() else {
-                pendingDroppedVideoURL = nil
-                return
-            }
-            targetPlaylistID = created
-        }
-
-        if await model.addVideo(
-            path: droppedURL.path,
-            to: targetPlaylistID,
-            activateAfterAdding: true
-        ) {
+        Task { @MainActor in
+            await model.setVideo(path: fileURL.path)
             selectedTab = .wallpaper
         }
-        pendingDroppedVideoURL = nil
     }
 
-    func playlistDropTargetBinding(for playlistID: UUID) -> Binding<Bool> {
-        Binding(
-            get: { hoveredPlaylistDropTargetID == playlistID },
-            set: { isTargeted in
-                if isTargeted {
-                    hoveredPlaylistDropTargetID = playlistID
-                } else if hoveredPlaylistDropTargetID == playlistID {
-                    hoveredPlaylistDropTargetID = nil
-                }
-            }
-        )
-    }
-
-    func handleDraggedWallpaperDrop(_ providers: [NSItemProvider], to playlistID: UUID)
-        -> Bool
-    {
-        guard let provider = providers.first(where: { $0.canLoadObject(ofClass: NSString.self) })
-        else {
-            return false
-        }
-
-        provider.loadObject(ofClass: NSString.self) { object, _ in
-            guard let text = object as? NSString else {
-                return
-            }
-            let path = text as String
-            DispatchQueue.main.async {
-                _ = model.addRegisteredVideo(path: path, to: playlistID)
-                hoveredPlaylistDropTargetID = nil
-            }
-        }
-        return true
+    func resetLibrarySearchState() {
+        librarySearchText = ""
+        isLibrarySearchFocused = false
     }
 
     func startWallpaperNameEdit(path: String) {

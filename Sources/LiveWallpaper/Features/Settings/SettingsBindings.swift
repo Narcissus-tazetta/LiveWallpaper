@@ -141,6 +141,13 @@ extension SettingsView {
     )
   }
 
+  var webWallpaperFeatureBinding: Binding<Bool> {
+    Binding(
+      get: { model.webWallpaperFeatureEnabled },
+      set: { model.setWebWallpaperFeatureEnabled($0) }
+    )
+  }
+
   var advancedSharingBinding: Binding<Bool> {
     Binding(
       get: { model.advancedSharingEnabled },

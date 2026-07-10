@@ -6,7 +6,7 @@ extension SettingsView {
     }
 
     var wallpaperLibraryGridMinHeight: CGFloat {
-        210
+        260
     }
 
     var wallpaperSidebarWidth: CGFloat {

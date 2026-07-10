@@ -90,20 +90,9 @@ extension WallpaperModel {
                 }
                 return cleaned
             }
-            .filter { !$0.videoPaths.isEmpty }
-        } else {
-            let savedPaths = UserDefaults.standard.stringArray(forKey: "registeredVideoPaths") ?? []
-            let cleaned = savedPaths.filter { FileManager.default.fileExists(atPath: $0) }
-            if !cleaned.isEmpty {
-                playlists = [
-                    WallpaperPlaylist(
-                        id: UUID(),
-                        name: "\(localizedString("プレイリスト"))1",
-                        videoPaths: cleaned
-                    )
-                ]
-            }
         }
+
+        restoreLibraryVideoPaths()
 
         if let savedPlaylistID = UserDefaults.standard.string(forKey: "selectedPlaylistID"),
            let uuid = UUID(uuidString: savedPlaylistID),
@@ -111,12 +100,12 @@ extension WallpaperModel {
         {
             selectedPlaylistID = uuid
         } else {
-            selectedPlaylistID = playlists.first?.id
+            selectedPlaylistID = nil
         }
 
         syncActivePlaylistPaths()
 
-        let allPaths = Set(playlists.flatMap(\.videoPaths))
+        let allPaths = Set(libraryVideoPaths)
         if let savedDisplayNames = UserDefaults.standard.dictionary(
             forKey: "registeredVideoDisplayNames"
         )
@@ -128,12 +117,8 @@ extension WallpaperModel {
         }
         if let savedPath: String = UserDefaults.standard.string(forKey: "videoPath"),
            FileManager.default.fileExists(atPath: savedPath),
-           let playlistContainingPath =
-           playlists
-               .first(where: { $0.videoPaths.contains(savedPath) })
+           libraryVideoPaths.contains(savedPath)
         {
-            selectedPlaylistID = playlistContainingPath.id
-            syncActivePlaylistPaths()
             currentVideoPath = savedPath
         } else {
             currentVideoPath = registeredVideoPaths.first
@@ -147,6 +132,18 @@ extension WallpaperModel {
         }
         restoreLockScreenVideoPath()
         restoreWebWallpaperState()
+        if let storedWebFeature =
+            UserDefaults.standard.object(forKey: "webWallpaperFeatureEnabled") as? Bool
+        {
+            webWallpaperFeatureEnabled = storedWebFeature
+        } else {
+            // 初回移行: 既にWeb壁紙を使っているユーザーから機能が消えて見えないよう、
+            // 登録済みソースがある場合のみ自動でONにする。
+            webWallpaperFeatureEnabled = !webWallpaperSources.isEmpty
+            UserDefaults.standard.set(
+                webWallpaperFeatureEnabled, forKey: "webWallpaperFeatureEnabled"
+            )
+        }
         if let data = UserDefaults.standard.data(forKey: wallpaperPresentationStorageKey),
            let decoded = try? JSONDecoder().decode(
                [String: [String: WallpaperPresentation]].self,
@@ -156,6 +153,34 @@ extension WallpaperModel {
             wallpaperPresentationByPath = decoded.filter { allPaths.contains($0.key) }
         }
         persistPlaylistStateImmediately()
+    }
+
+    /// ライブラリを復元する。旧バージョン(ライブラリ未分離)のデータは
+    /// プレイリストの合算 + 旧 registeredVideoPaths キーから移行する。
+    private func restoreLibraryVideoPaths() {
+        var restored: [String]
+        if let savedLibrary = UserDefaults.standard.stringArray(forKey: "libraryVideoPaths") {
+            restored = savedLibrary.filter { FileManager.default.fileExists(atPath: $0) }
+        } else {
+            let legacyPaths =
+                UserDefaults.standard.stringArray(forKey: "registeredVideoPaths") ?? []
+            restored = []
+            var seen = Set<String>()
+            for path in playlists.flatMap(\.videoPaths) + legacyPaths
+                where !seen.contains(path) && FileManager.default.fileExists(atPath: path)
+            {
+                seen.insert(path)
+                restored.append(path)
+            }
+        }
+
+        // 不変条件: プレイリストが参照するパスは必ずライブラリに含まれる
+        var known = Set(restored)
+        for path in playlists.flatMap(\.videoPaths) where !known.contains(path) {
+            known.insert(path)
+            restored.append(path)
+        }
+        libraryVideoPaths = restored
     }
 
     private func restorePlaybackSettingState() {
@@ -182,7 +207,7 @@ extension WallpaperModel {
     }
 
     func pruneDisplayNamesForExistingPaths() {
-        let validPaths = Set(playlists.flatMap(\.videoPaths))
+        let validPaths = Set(libraryVideoPaths)
         registeredVideoDisplayNames =
             registeredVideoDisplayNames
                 .filter { validPaths.contains($0.key) }
@@ -193,7 +218,7 @@ extension WallpaperModel {
     }
 
     func pruneWallpaperPresentationsForExistingPaths() {
-        let validPaths = Set(playlists.flatMap(\.videoPaths))
+        let validPaths = Set(libraryVideoPaths)
         let pruned = wallpaperPresentationByPath.filter { validPaths.contains($0.key) }
         if pruned != wallpaperPresentationByPath {
             wallpaperPresentationByPath = pruned
@@ -215,6 +240,24 @@ extension WallpaperModel {
         }
         advancedSharingEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "advancedSharingEnabled")
+    }
+
+    func setWebWallpaperFeatureEnabled(_ enabled: Bool) {
+        guard webWallpaperFeatureEnabled != enabled else {
+            return
+        }
+        webWallpaperFeatureEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "webWallpaperFeatureEnabled")
+
+        // 機能を隠すとWeb壁紙を切り替える手段がなくなるため、表示中なら動画へ戻す。
+        // 戻せる動画が1本もない場合だけ再生を維持する。
+        if !enabled, isWebWallpaperActive {
+            if let fallback = currentVideoPath ?? registeredVideoPaths.first
+                ?? libraryVideoPaths.first
+            {
+                selectRegisteredVideo(path: fallback)
+            }
+        }
     }
 
     func setLockScreenSyncEnabled(_ enabled: Bool) {

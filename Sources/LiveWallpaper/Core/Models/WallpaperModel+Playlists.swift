@@ -2,41 +2,6 @@ import Foundation
 
 @MainActor
 extension WallpaperModel {
-    func removeEmptyPlaylists() {
-        let nonEmpty = playlists.filter { !$0.videoPaths.isEmpty }
-        guard nonEmpty.count != playlists.count else {
-            return
-        }
-
-        playlists = nonEmpty
-        ensureSelectedPlaylist()
-        syncActivePlaylistPaths()
-
-        let validPaths = Set(playlists.flatMap(\.videoPaths))
-        if let currentPath = currentVideoPath,
-           !validPaths.contains(currentPath)
-        {
-            if let firstPath = registeredVideoPaths.first {
-                selectRegisteredVideo(path: firstPath)
-                return
-            }
-            stopAllPlayers()
-            currentVideoPath = nil
-            currentVideoIndex = nil
-            UserDefaults.standard.removeObject(forKey: "videoPath")
-        } else if let currentPath = currentVideoPath,
-                  let index = registeredVideoPaths.firstIndex(of: currentPath)
-        {
-            currentVideoIndex = index
-        } else {
-            currentVideoPath = registeredVideoPaths.first
-            currentVideoIndex = currentVideoPath.flatMap { registeredVideoPaths.firstIndex(of: $0) }
-        }
-
-        pruneDisplayNamesForExistingPaths()
-        persistPlaylistState()
-    }
-
     func isSelectedPlaylist(_ playlistID: UUID) -> Bool {
         selectedPlaylistID == playlistID
     }
@@ -71,10 +36,6 @@ extension WallpaperModel {
             : cleaned
         let playlist = WallpaperPlaylist(id: UUID(), name: playlistName, videoPaths: [])
         playlists.append(playlist)
-        if selectedPlaylistID == nil {
-            selectedPlaylistID = playlist.id
-            syncActivePlaylistPaths()
-        }
         persistPlaylistState()
         return playlist.id
     }
@@ -87,6 +48,7 @@ extension WallpaperModel {
         return playlists[index].videoPaths.contains(trimmed)
     }
 
+    /// プレイリストへ参照を追加する。動画本体はライブラリに登録される。
     @discardableResult
     func addRegisteredVideo(path: String, to playlistID: UUID) -> Bool {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -99,14 +61,69 @@ extension WallpaperModel {
         guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else {
             return false
         }
+        addVideoPathToLibrary(trimmed)
         if !playlists[index].videoPaths.contains(trimmed) {
             playlists[index].videoPaths.append(trimmed)
         }
         if selectedPlaylistID == playlistID {
             syncActivePlaylistPaths()
-            if let currentPath = currentVideoPath {
-                currentVideoIndex = registeredVideoPaths.firstIndex(of: currentPath)
-            }
+            refreshCurrentVideoIndex()
+        }
+        persistPlaylistState()
+        return true
+    }
+
+    /// プレイリストから参照だけを外す。ライブラリ・他プレイリストには影響しない。
+    /// 再生中の動画を外した場合も再生は継続する(次送りでキュー先頭へ戻る)。
+    @discardableResult
+    func removeVideo(path: String, fromPlaylist playlistID: UUID) -> Bool {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let playlistIndex = playlists.firstIndex(where: { $0.id == playlistID }) else {
+            return false
+        }
+        guard let pathIndex = playlists[playlistIndex].videoPaths.firstIndex(of: trimmed) else {
+            return false
+        }
+        playlists[playlistIndex].videoPaths.remove(at: pathIndex)
+        if selectedPlaylistID == playlistID {
+            syncActivePlaylistPaths()
+            refreshCurrentVideoIndex()
+        }
+        persistPlaylistState()
+        return true
+    }
+
+    /// ライブラリへ動画パスを登録する(未登録の場合のみ)。プレイリストには追加しない。
+    @discardableResult
+    func addVideoPathToLibrary(
+        _ path: String,
+        preferredDisplayName: String? = nil
+    ) -> Bool {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return false
+        }
+        guard FileManager.default.fileExists(atPath: trimmed) else {
+            return false
+        }
+
+        if !libraryVideoPaths.contains(trimmed) {
+            libraryVideoPaths.append(trimmed)
+        }
+
+        if let preferredDisplayName,
+           !preferredDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           registeredVideoDisplayNames[trimmed] == nil
+        {
+            registeredVideoDisplayNames[trimmed] = preferredDisplayName
+            UserDefaults.standard.set(
+                registeredVideoDisplayNames,
+                forKey: "registeredVideoDisplayNames"
+            )
+        }
+
+        if selectedPlaylistID == nil {
+            syncActivePlaylistPaths()
         }
         persistPlaylistState()
         return true
@@ -157,42 +174,26 @@ extension WallpaperModel {
         return true
     }
 
+    /// プレイリストを削除する。中の動画はライブラリに残る。
     func removePlaylist(_ playlistID: UUID) {
         guard let removeIndex = playlists.firstIndex(where: { $0.id == playlistID }) else {
             return
         }
-        let removedPaths = Set(playlists[removeIndex].videoPaths)
-        let removedCurrent = removedPaths.contains(currentVideoPath ?? "")
-
         playlists.remove(at: removeIndex)
-        ensureSelectedPlaylist()
-        syncActivePlaylistPaths()
-
-        if removedCurrent {
-            if let firstPath = registeredVideoPaths.first {
-                selectRegisteredVideo(path: firstPath)
-            } else {
-                stopAllPlayers()
-                currentVideoPath = nil
-                currentVideoIndex = nil
-                UserDefaults.standard.removeObject(forKey: "videoPath")
-            }
-        } else if let currentPath = currentVideoPath,
-                  let existingIndex = registeredVideoPaths.firstIndex(of: currentPath)
-        {
-            currentVideoIndex = existingIndex
-        } else {
-            currentVideoPath = registeredVideoPaths.first
-            currentVideoIndex = currentVideoPath.flatMap { registeredVideoPaths.firstIndex(of: $0) }
+        if selectedPlaylistID == playlistID {
+            selectedPlaylistID = nil
         }
-
-        pruneDisplayNamesForExistingPaths()
+        syncActivePlaylistPaths()
+        refreshCurrentVideoIndex()
         persistPlaylistState()
     }
 
-    func selectPlaylist(_ playlistID: UUID) {
-        guard playlists.contains(where: { $0.id == playlistID }) else {
-            return
+    /// 再生対象を切り替える。nil は「すべての壁紙(ライブラリ全体)」。
+    func selectPlaylist(_ playlistID: UUID?) {
+        if let playlistID {
+            guard playlists.contains(where: { $0.id == playlistID }) else {
+                return
+            }
         }
         let playlistChanged = selectedPlaylistID != playlistID
         selectedPlaylistID = playlistID
@@ -211,6 +212,13 @@ extension WallpaperModel {
 
         if let firstPath = registeredVideoPaths.first {
             selectRegisteredVideo(path: firstPath)
+        } else if let currentPath = currentVideoPath,
+                  libraryVideoPaths.contains(currentPath)
+        {
+            // 空のプレイリストに切り替えた場合。再生中の動画はキュー外だが
+            // 壁紙を突然消すより再生継続の方が安全なのでそのままにする。
+            currentVideoIndex = nil
+            persistPlaylistState()
         } else {
             stopAllPlayers()
             currentVideoPath = nil
@@ -301,6 +309,8 @@ extension WallpaperModel {
         return (baseIndex - 1 + registeredVideoPaths.count) % registeredVideoPaths.count
     }
 
+    /// 新しい動画を取り込んでライブラリへ登録し、壁紙として再生する。
+    /// プレイリスト選択中はそのプレイリストにも追加される。
     func setVideo(path: String) async {
         let trimmed: String = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -311,15 +321,15 @@ extension WallpaperModel {
             return
         }
 
-        ensureSelectedPlaylist()
-
-        if registeredVideoPaths.contains(sourceURL.path) {
+        if libraryVideoPaths.contains(sourceURL.path) {
+            addCurrentPathToSelectedPlaylistIfNeeded(sourceURL.path)
             selectRegisteredVideo(path: sourceURL.path)
             return
         }
 
         if let cacheDirectory = cacheDirectoryURL(), sourceURL.path.hasPrefix(cacheDirectory.path) {
-            addVideoPathToSelectedPlaylist(sourceURL.path)
+            addVideoPathToLibrary(sourceURL.path)
+            addCurrentPathToSelectedPlaylistIfNeeded(sourceURL.path)
             selectRegisteredVideo(path: sourceURL.path)
             return
         }
@@ -328,11 +338,19 @@ extension WallpaperModel {
             return
         }
 
-        addVideoPathToSelectedPlaylist(
+        addVideoPathToLibrary(
             localURL.path,
             preferredDisplayName: sourceURL.lastPathComponent
         )
+        addCurrentPathToSelectedPlaylistIfNeeded(localURL.path)
         selectRegisteredVideo(path: localURL.path)
+    }
+
+    private func addCurrentPathToSelectedPlaylistIfNeeded(_ path: String) {
+        guard let selectedPlaylistID else {
+            return
+        }
+        _ = addRegisteredVideo(path: path, to: selectedPlaylistID)
     }
 
     func registeredVideoDisplayName(for path: String) -> String {
@@ -345,7 +363,7 @@ extension WallpaperModel {
 
     func setRegisteredVideoDisplayName(_ displayName: String, for path: String) {
         let trimmedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard registeredVideoPaths.contains(trimmedPath) else {
+        guard libraryVideoPaths.contains(trimmedPath) else {
             return
         }
 
@@ -391,8 +409,7 @@ extension WallpaperModel {
         if clearsPin, pinCurrentVideo, previousPath != trimmed {
             clearPinCurrentVideo()
         }
-        addVideoPathToSelectedPlaylist(trimmed)
-        syncActivePlaylistPaths()
+        addVideoPathToLibrary(trimmed)
         currentVideoPath = trimmed
         currentVideoIndex = registeredVideoPaths.firstIndex(of: trimmed)
         UserDefaults.standard.set(trimmed, forKey: "videoPath")
@@ -404,17 +421,20 @@ extension WallpaperModel {
         persistPlaylistState()
     }
 
+    /// ライブラリから完全に削除する。すべてのプレイリスト・表示名・配置設定からも除去される。
     func removeRegisteredVideo(path: String) {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let selectedIndex = selectedPlaylistIndex() else {
+        guard let libraryIndex = libraryVideoPaths.firstIndex(of: trimmed) else {
             return
         }
-        guard let index = playlists[selectedIndex].videoPaths.firstIndex(of: trimmed) else {
-            return
-        }
+        let queueIndexBeforeRemoval = registeredVideoPaths.firstIndex(of: trimmed)
         let wasCurrent = currentVideoPath == trimmed
         let wasLockScreen = lockScreenVideoPath == trimmed
-        playlists[selectedIndex].videoPaths.remove(at: index)
+
+        libraryVideoPaths.remove(at: libraryIndex)
+        for index in playlists.indices {
+            playlists[index].videoPaths.removeAll { $0 == trimmed }
+        }
         syncActivePlaylistPaths()
         registeredVideoDisplayNames.removeValue(forKey: trimmed)
         UserDefaults.standard.set(
@@ -422,19 +442,16 @@ extension WallpaperModel {
             forKey: "registeredVideoDisplayNames"
         )
 
-        if playlists[selectedIndex].videoPaths.isEmpty {
-            playlists.remove(at: selectedIndex)
-            ensureSelectedPlaylist()
-            syncActivePlaylistPaths()
-        }
-
         if wasLockScreen {
             clearLockScreenVideoIfMissing(path: trimmed)
         }
 
         if wasCurrent {
             if !registeredVideoPaths.isEmpty {
-                let nextIndex = min(index, registeredVideoPaths.count - 1)
+                let nextIndex = min(
+                    queueIndexBeforeRemoval ?? 0,
+                    registeredVideoPaths.count - 1
+                )
                 selectRegisteredVideo(path: registeredVideoPaths[nextIndex])
             } else {
                 stopAllPlayers()
@@ -446,6 +463,11 @@ extension WallpaperModel {
             return
         }
 
+        refreshCurrentVideoIndex()
+        persistPlaylistState()
+    }
+
+    private func refreshCurrentVideoIndex() {
         if let currentPath = currentVideoPath,
            let existingIndex = registeredVideoPaths.firstIndex(of: currentPath)
         {
@@ -453,70 +475,26 @@ extension WallpaperModel {
         } else {
             currentVideoIndex = nil
         }
-        persistPlaylistState()
     }
 
-    private func addVideoPathToSelectedPlaylist(
-        _ path: String,
-        preferredDisplayName: String? = nil
-    ) {
-        guard !path.isEmpty else {
-            return
-        }
-        guard FileManager.default.fileExists(atPath: path) else {
-            return
-        }
-
-        if playlists.isEmpty {
-            playlists = [WallpaperPlaylist(id: UUID(), name: "プレイリスト1", videoPaths: [])]
-            selectedPlaylistID = playlists.first?.id
-        }
-        ensureSelectedPlaylist()
-        guard let index = selectedPlaylistIndex() else {
-            return
-        }
-
-        if !playlists[index].videoPaths.contains(path) {
-            playlists[index].videoPaths.append(path)
-        }
-
-        if let preferredDisplayName,
-           !preferredDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-           registeredVideoDisplayNames[path] == nil
-        {
-            registeredVideoDisplayNames[path] = preferredDisplayName
-            UserDefaults.standard.set(
-                registeredVideoDisplayNames,
-                forKey: "registeredVideoDisplayNames"
-            )
-        }
-
-        syncActivePlaylistPaths()
-        persistPlaylistState()
-    }
-
-    private func selectedPlaylistIndex() -> Int? {
-        guard let selectedPlaylistID else {
-            return nil
-        }
-        return playlists.firstIndex(where: { $0.id == selectedPlaylistID })
-    }
-
+    /// 選択中プレイリストが削除済みなら「すべて(nil)」へ戻す。
     func ensureSelectedPlaylist() {
         if let selectedPlaylistID,
-           playlists.contains(where: { $0.id == selectedPlaylistID })
+           !playlists.contains(where: { $0.id == selectedPlaylistID })
         {
-            return
+            self.selectedPlaylistID = nil
         }
-        selectedPlaylistID = playlists.first?.id
     }
 
+    /// 再生キューを更新する。プレイリスト選択中はその中身、未選択ならライブラリ全体。
     func syncActivePlaylistPaths() {
         ensureSelectedPlaylist()
-        if let index = selectedPlaylistIndex() {
+        if let selectedPlaylistID,
+           let index = playlists.firstIndex(where: { $0.id == selectedPlaylistID })
+        {
             registeredVideoPaths = playlists[index].videoPaths
         } else {
-            registeredVideoPaths = []
+            registeredVideoPaths = libraryVideoPaths
         }
         pruneWallpaperPresentationsForExistingPaths()
         normalizePlaybackConstraints()

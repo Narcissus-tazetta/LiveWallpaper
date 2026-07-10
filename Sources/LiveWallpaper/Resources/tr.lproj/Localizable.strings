@@ -239,3 +239,8 @@
 "クリップボードから貼り付け" = "Panodan yapıştır";
 "YouTubeのURLは動画のみの表示に自動変換されます" = "YouTube URL'leri otomatik olarak yalnızca video oynatımına dönüştürülür.";
 "※ いま動作確認できているのは YouTube だけです。ほかのサイトも試せますが、表示できない場合があります" = "Şimdilik yalnızca YouTube'nun çalıştığı doğrulandı. Başka siteleri de deneyebilirsiniz, ancak görüntülenmeyebilir.";
+"チェックでこのプレイリストに追加・解除" = "Bu oynatma listesine eklemek veya çıkarmak için işaretleyin";
+"プレイリストから外す…" = "Oynatma listesinden çıkar…";
+"チェックした動画がこのプレイリストで再生されます" = "İşaretli videolar bu oynatma listesinde oynatılır";
+"Web壁紙機能を有効にする" = "Web duvar kağıdı özelliğini etkinleştir";
+"オンにすると壁紙タブにWeb壁紙セクションが表示されます。実験的な機能です。" = "Açıldığında Duvar Kağıdı sekmesinde Web duvar kağıdı bölümü görünür. Deneysel bir özelliktir.";

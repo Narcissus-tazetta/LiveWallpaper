@@ -269,3 +269,8 @@
 "クリップボードから貼り付け" = "Paste from clipboard";
 "YouTubeのURLは動画のみの表示に自動変換されます" = "YouTube URLs are automatically converted to video-only playback.";
 "※ いま動作確認できているのは YouTube だけです。ほかのサイトも試せますが、表示できない場合があります" = "So far, only YouTube has been verified to work. You can try other sites, but they may not display correctly.";
+"チェックでこのプレイリストに追加・解除" = "Check to add to or remove from this playlist";
+"プレイリストから外す…" = "Remove from Playlist…";
+"チェックした動画がこのプレイリストで再生されます" = "Checked videos play in this playlist";
+"Web壁紙機能を有効にする" = "Enable web wallpaper feature";
+"オンにすると壁紙タブにWeb壁紙セクションが表示されます。実験的な機能です。" = "When on, a Web Wallpaper section appears in the Wallpaper tab. This is an experimental feature.";

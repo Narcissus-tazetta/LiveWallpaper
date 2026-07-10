@@ -12,15 +12,11 @@ extension SettingsView {
         case settings
     }
 
+    /// 壁紙の設定先。将来「サブディスプレイ」タブを足す場合はここに case を追加し、
+    /// availableAssignmentTargets に並べるだけでタブが増える。
     enum WallpaperAssignmentTarget: String, CaseIterable, Hashable {
         case desktop
         case lockScreen
-    }
-
-    enum WallpaperLibrarySource: Hashable {
-        case all
-        case playlist(UUID)
-        case web
     }
 
     enum HelpTopic: Hashable {

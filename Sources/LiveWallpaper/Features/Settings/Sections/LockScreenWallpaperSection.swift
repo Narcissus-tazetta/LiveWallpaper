@@ -1,26 +1,6 @@
 import SwiftUI
 
 extension SettingsView {
-  var lockScreenWallpaperPanel: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Label(model.localizedString("ロック画面"), systemImage: "lock.display")
-        .font(.system(size: 13, weight: .semibold))
-
-      if !model.lockScreenSyncService.isSupported {
-        Text(model.localizedString("macOS 26 以降で利用できます"))
-          .font(.caption)
-          .foregroundColor(.secondary)
-      } else {
-        lockScreenSyncControls
-      }
-    }
-    .padding(12)
-    .background(
-      RoundedRectangle(cornerRadius: 12)
-        .fill(Color.secondary.opacity(0.08))
-    )
-  }
-
   var lockScreenSyncControls: some View {
     VStack(alignment: .leading, spacing: 10) {
       Toggle(model.localizedString("ロック画面用にシステム壁紙を一時設定"), isOn: lockScreenSyncBinding)

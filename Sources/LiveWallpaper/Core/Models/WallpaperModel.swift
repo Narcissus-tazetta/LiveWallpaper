@@ -96,7 +96,6 @@ final class WallpaperModel: ObservableObject {
     var lockScreenSyncTask: Task<Void, Never>?
     var videoAspectRatioByPath: [String: Double] = [:]
     var loadingVideoAspectRatioPaths: Set<String> = []
-    private var cachedAllRegisteredVideoPaths: [String]?
     var presentationCacheByPlayerView: [ObjectIdentifier: PresentationCacheKey] = [:]
 
     @Published var clickThrough: Bool = true
@@ -132,14 +131,13 @@ final class WallpaperModel: ObservableObject {
 
     @Published var wallpaperKind: WallpaperKind = .video
     @Published var webWallpaperSources: [WebWallpaperSource] = []
+    @Published var webWallpaperFeatureEnabled: Bool = false
     @Published var currentWebWallpaperID: UUID?
     @Published var webWallpaperLoadState: WebWallpaperLoadState = .idle
     @Published var webWallpaperErrorMessage: String?
-    @Published var playlists: [WallpaperPlaylist] = [] {
-        didSet {
-            cachedAllRegisteredVideoPaths = nil
-        }
-    }
+    /// 登録済み動画の本体。プレイリストはここへの参照のみを持つ。
+    @Published var libraryVideoPaths: [String] = []
+    @Published var playlists: [WallpaperPlaylist] = []
     @Published var selectedPlaylistID: UUID?
     @Published var currentVideoPath: String?
     @Published var lockScreenVideoPath: String?
@@ -153,10 +151,6 @@ final class WallpaperModel: ObservableObject {
     @Published var wallpaperPresentationByPath:
         [String: [String: WallpaperPresentation]] = [:]
 
-    var visiblePlaylists: [WallpaperPlaylist] {
-        playlists.filter { !$0.videoPaths.isEmpty }
-    }
-
     var canAddPlaylist: Bool {
         playlists.count < maxPlaylistCount
     }
@@ -169,25 +163,13 @@ final class WallpaperModel: ObservableObject {
         guard let selectedID = selectedPlaylistID,
               let playlist = playlists.first(where: { $0.id == selectedID })
         else {
-            return localizedString("プレイリスト")
+            return localizedString("すべての壁紙")
         }
         return playlist.name
     }
 
     var allRegisteredVideoPaths: [String] {
-        if let cachedAllRegisteredVideoPaths {
-            return cachedAllRegisteredVideoPaths
-        }
-        var seen = Set<String>()
-        var result: [String] = []
-        for playlist in playlists {
-            for path in playlist.videoPaths where !seen.contains(path) {
-                seen.insert(path)
-                result.append(path)
-            }
-        }
-        cachedAllRegisteredVideoPaths = result
-        return result
+        libraryVideoPaths
     }
 
     var appLocale: Locale {

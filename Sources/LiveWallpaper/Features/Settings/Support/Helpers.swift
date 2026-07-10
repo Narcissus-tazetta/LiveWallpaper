@@ -86,13 +86,6 @@ extension SettingsView {
         return model.registeredVideoDisplayName(for: lockScreenPath)
     }
 
-    func currentPlaylistSummaryText() -> String {
-        guard !model.playlists.isEmpty else {
-            return model.localizedString("未作成")
-        }
-        return model.selectedPlaylistName
-    }
-
     func currentDisplayModeSummaryText() -> String {
         switch model.displayMode {
         case .mainOnly:

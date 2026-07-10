@@ -74,6 +74,7 @@ final class PackageImporter {
                 duplicateResolution: duplicateResolution
             ) {
                 importedVideoPaths[video.id] = videoPath
+                model.addVideoPathToLibrary(videoPath)
 
                 for (screenId, pres) in video.presentations {
                     let fitMode = VideoFitMode(rawValue: pres.fitMode) ?? .fill

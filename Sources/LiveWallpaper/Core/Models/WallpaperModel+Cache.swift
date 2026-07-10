@@ -44,7 +44,9 @@ extension WallpaperModel {
             }
             playlists.removeAll()
             selectedPlaylistID = nil
+            libraryVideoPaths.removeAll()
             registeredVideoPaths.removeAll()
+            UserDefaults.standard.removeObject(forKey: "libraryVideoPaths")
             UserDefaults.standard.removeObject(forKey: "registeredVideoPaths")
             registeredVideoDisplayNames.removeAll()
             UserDefaults.standard.set(

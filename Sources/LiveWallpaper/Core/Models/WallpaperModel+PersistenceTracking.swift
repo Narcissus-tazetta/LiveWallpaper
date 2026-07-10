@@ -45,7 +45,9 @@ extension WallpaperModel {
         do {
             let playlistData = try JSONEncoder().encode(playlists)
             UserDefaults.standard.set(playlistData, forKey: "playlistsData")
-            UserDefaults.standard.set(registeredVideoPaths, forKey: "registeredVideoPaths")
+            UserDefaults.standard.set(libraryVideoPaths, forKey: "libraryVideoPaths")
+            // 旧バージョンへ戻した場合の移行元として、旧キーにもライブラリ全体を書いておく
+            UserDefaults.standard.set(libraryVideoPaths, forKey: "registeredVideoPaths")
             UserDefaults.standard.set(selectedPlaylistID?.uuidString, forKey: "selectedPlaylistID")
             let presentationData = try JSONEncoder().encode(wallpaperPresentationByPath)
             UserDefaults.standard.set(presentationData, forKey: wallpaperPresentationStorageKey)

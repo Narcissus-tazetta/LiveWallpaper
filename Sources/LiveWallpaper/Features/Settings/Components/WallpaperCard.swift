@@ -5,10 +5,9 @@ extension SettingsView {
     func wallpaperCard(
         path: String,
         cardWidth: CGFloat,
-        canDragToPlaylist: Bool = false,
         switchToWallpaperTabOnSelect: Bool = true,
         assignmentTarget: WallpaperAssignmentTarget = .desktop,
-        showLockScreenButton: Bool = false,
+        playlistEditingID: UUID? = nil,
         isSelected: Bool? = nil,
         onSelect: (() -> Void)? = nil
     ) -> some View {
@@ -55,8 +54,7 @@ extension SettingsView {
                     HStack(alignment: .top, spacing: 4) {
                         wallpaperAssignmentBadges(
                             isDesktopAssigned: isDesktopAssigned,
-                            isLockScreenAssigned: isLockScreenAssigned,
-                            showLockBadge: !showLockScreenButton
+                            isLockScreenAssigned: isLockScreenAssigned
                         )
                         Spacer(minLength: 0)
                         if model.pinCurrentVideo, model.currentVideoPath == path {
@@ -89,16 +87,7 @@ extension SettingsView {
         .buttonStyle(.plain)
 
         return VStack(alignment: .leading, spacing: 8) {
-            Group {
-                if canDragToPlaylist {
-                    thumbnailButton
-                        .onDrag {
-                            NSItemProvider(object: path as NSString)
-                        }
-                } else {
-                    thumbnailButton
-                }
-            }
+            thumbnailButton
 
             if editingWallpaperPath == path {
                 HStack(spacing: 4) {
@@ -140,23 +129,8 @@ extension SettingsView {
                         .truncationMode(.middle)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    if showLockScreenButton, model.lockScreenSyncService.isSupported {
-                        Button {
-                            model.selectLockScreenVideo(path: path)
-                        } label: {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 18, height: 18)
-                                .background(
-                                    isLockScreenAssigned
-                                        ? Color.orange
-                                        : Color.secondary.opacity(0.45),
-                                    in: Circle()
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .help(model.localizedString("ロック画面に設定"))
+                    if let playlistEditingID {
+                        playlistMembershipCheckbox(path: path, playlistID: playlistEditingID)
                     }
 
                     Button {
@@ -210,6 +184,15 @@ extension SettingsView {
                     .disabled(!model.canAddPlaylist)
                 }
             }
+            if playlistsContainingVideo(path: path).isEmpty == false {
+                Menu(model.localizedString("プレイリストから外す…")) {
+                    ForEach(playlistsContainingVideo(path: path)) { playlist in
+                        Button(playlist.name) {
+                            _ = model.removeVideo(path: path, fromPlaylist: playlist.id)
+                        }
+                    }
+                }
+            }
             Divider()
             Button(model.localizedString("共有…")) {
                 beginShareWallpaperSelection(path: path)
@@ -224,11 +207,35 @@ extension SettingsView {
         }
     }
 
+    private func playlistsContainingVideo(path: String) -> [WallpaperPlaylist] {
+        model.playlists.filter { $0.videoPaths.contains(path) }
+    }
+
+    /// プレイリスト編集中に名前行へ出すチェックボックス。ON=そのプレイリストに含まれる。
+    private func playlistMembershipCheckbox(path: String, playlistID: UUID) -> some View {
+        Toggle(
+            "",
+            isOn: Binding(
+                get: { model.playlistContainsVideo(playlistID, path: path) },
+                set: { isOn in
+                    if isOn {
+                        _ = model.addRegisteredVideo(path: path, to: playlistID)
+                    } else {
+                        _ = model.removeVideo(path: path, fromPlaylist: playlistID)
+                    }
+                }
+            )
+        )
+        .toggleStyle(.checkbox)
+        .labelsHidden()
+        .controlSize(.small)
+        .help(model.localizedString("チェックでこのプレイリストに追加・解除"))
+    }
+
     @ViewBuilder
     func wallpaperAssignmentBadges(
         isDesktopAssigned: Bool,
-        isLockScreenAssigned: Bool,
-        showLockBadge: Bool = true
+        isLockScreenAssigned: Bool
     ) -> some View {
         HStack(spacing: 4) {
             if isDesktopAssigned {
@@ -238,7 +245,7 @@ extension SettingsView {
                     .frame(width: 18, height: 18)
                     .background(Color.accentColor, in: Circle())
             }
-            if isLockScreenAssigned, showLockBadge {
+            if isLockScreenAssigned {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(.white)
