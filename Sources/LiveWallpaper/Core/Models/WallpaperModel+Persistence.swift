@@ -144,6 +144,11 @@ extension WallpaperModel {
                 webWallpaperFeatureEnabled, forKey: "webWallpaperFeatureEnabled"
             )
         }
+        // webWallpaperFeatureEnabled が確定した後に再同期する。syncActivePlaylistPaths()は
+        // これより前(restoreWebWallpaperState()内)でも呼べるが、その時点ではまだ
+        // webWallpaperFeatureEnabledがデフォルト値(false)のままで、Web壁紙が
+        // 再生キュー(registeredWebWallpaperIDs)に反映されずに固定されてしまう。
+        syncActivePlaylistPaths()
         if let data = UserDefaults.standard.data(forKey: wallpaperPresentationStorageKey),
            let decoded = try? JSONDecoder().decode(
                [String: [String: WallpaperPresentation]].self,
@@ -248,6 +253,7 @@ extension WallpaperModel {
         }
         webWallpaperFeatureEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "webWallpaperFeatureEnabled")
+        syncActivePlaylistPaths()
 
         // 機能を隠すとWeb壁紙を切り替える手段がなくなるため、表示中なら動画へ戻す。
         // 戻せる動画が1本もない場合だけ再生を維持する。

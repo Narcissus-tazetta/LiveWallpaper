@@ -46,6 +46,7 @@ extension WallpaperModel {
             selectedPlaylistID = nil
             libraryVideoPaths.removeAll()
             registeredVideoPaths.removeAll()
+            registeredWebWallpaperIDs.removeAll()
             UserDefaults.standard.removeObject(forKey: "libraryVideoPaths")
             UserDefaults.standard.removeObject(forKey: "registeredVideoPaths")
             registeredVideoDisplayNames.removeAll()

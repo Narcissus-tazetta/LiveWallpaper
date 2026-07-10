@@ -8,7 +8,7 @@ extension SettingsView {
                 isOn: webWallpaperFeatureBinding
             )
 
-            Text(model.localizedString("オンにすると壁紙タブにWeb壁紙セクションが表示されます。実験的な機能です。"))
+            Text(model.localizedString("オンにすると壁紙タブの一覧にWeb壁紙を追加できるようになります。実験的な機能です。"))
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -18,6 +18,7 @@ extension SettingsView {
         do {
             _ = try model.addWebWallpaper(urlString: webURLInput)
             webURLInput = ""
+            isWebWallpaperURLPopoverPresented = false
         } catch {
             if let urlError = error as? WebWallpaperURLError {
                 model.webWallpaperErrorMessage = model.localizedString(

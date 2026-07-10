@@ -13,7 +13,9 @@ extension SettingsView {
     ) -> some View {
         let thumbnailWidth = max(cardWidth - 8, 1)
         let thumbnailHeight = (thumbnailWidth * 9 / 16).rounded()
-        let isDesktopAssigned = model.currentVideoPath == path
+        // currentVideoPath はWeb壁紙へ切り替えた後もフォールバック用に保持され続けるため、
+        // Web壁紙が実際に表示中のときは動画側を「デスクトップに設定中」として扱わない。
+        let isDesktopAssigned = model.currentVideoPath == path && !model.isWebWallpaperActive
         let isLockScreenAssigned = model.lockScreenVideoPath == path
         let strokeColor = wallpaperCardStrokeColor(
             path: path,
@@ -57,7 +59,7 @@ extension SettingsView {
                             isLockScreenAssigned: isLockScreenAssigned
                         )
                         Spacer(minLength: 0)
-                        if model.pinCurrentVideo, model.currentVideoPath == path {
+                        if model.pinCurrentVideo, isDesktopAssigned {
                             HStack(spacing: 3) {
                                 Image(systemName: "pin.fill")
                                     .font(.system(size: 8, weight: .semibold))
@@ -164,35 +166,12 @@ extension SettingsView {
                 model.selectLockScreenVideo(path: path)
             }
             .disabled(!model.lockScreenSyncService.isSupported)
-            Menu(model.localizedString("プレイリストに追加…")) {
-                if model.playlists.isEmpty {
-                    Button(model.localizedString("新規プレイリストを作成して追加")) {
-                        addToNewPlaylist(path: path)
-                    }
-                    .disabled(!model.canAddPlaylist)
-                } else {
-                    ForEach(model.playlists) { playlist in
-                        Button(playlist.name) {
-                            _ = model.addRegisteredVideo(path: path, to: playlist.id)
-                        }
-                        .disabled(model.playlistContainsVideo(playlist.id, path: path))
-                    }
-                    Divider()
-                    Button(model.localizedString("新規プレイリストを作成して追加")) {
-                        addToNewPlaylist(path: path)
-                    }
-                    .disabled(!model.canAddPlaylist)
-                }
-            }
-            if playlistsContainingVideo(path: path).isEmpty == false {
-                Menu(model.localizedString("プレイリストから外す…")) {
-                    ForEach(playlistsContainingVideo(path: path)) { playlist in
-                        Button(playlist.name) {
-                            _ = model.removeVideo(path: path, fromPlaylist: playlist.id)
-                        }
-                    }
-                }
-            }
+            playlistMembershipMenus(
+                isContained: { model.playlistContainsVideo($0.id, path: path) },
+                add: { playlistID in _ = model.addRegisteredVideo(path: path, to: playlistID) },
+                remove: { playlistID in _ = model.removeVideo(path: path, fromPlaylist: playlistID) },
+                addToNewPlaylist: { addToNewPlaylist(path: path) }
+            )
             Divider()
             Button(model.localizedString("共有…")) {
                 beginShareWallpaperSelection(path: path)
@@ -207,29 +186,18 @@ extension SettingsView {
         }
     }
 
-    private func playlistsContainingVideo(path: String) -> [WallpaperPlaylist] {
-        model.playlists.filter { $0.videoPaths.contains(path) }
-    }
-
     /// プレイリスト編集中に名前行へ出すチェックボックス。ON=そのプレイリストに含まれる。
     private func playlistMembershipCheckbox(path: String, playlistID: UUID) -> some View {
-        Toggle(
-            "",
-            isOn: Binding(
-                get: { model.playlistContainsVideo(playlistID, path: path) },
-                set: { isOn in
-                    if isOn {
-                        _ = model.addRegisteredVideo(path: path, to: playlistID)
-                    } else {
-                        _ = model.removeVideo(path: path, fromPlaylist: playlistID)
-                    }
+        membershipCheckbox(
+            isOn: { model.playlistContainsVideo(playlistID, path: path) },
+            setOn: { isOn in
+                if isOn {
+                    _ = model.addRegisteredVideo(path: path, to: playlistID)
+                } else {
+                    _ = model.removeVideo(path: path, fromPlaylist: playlistID)
                 }
-            )
+            }
         )
-        .toggleStyle(.checkbox)
-        .labelsHidden()
-        .controlSize(.small)
-        .help(model.localizedString("チェックでこのプレイリストに追加・解除"))
     }
 
     @ViewBuilder

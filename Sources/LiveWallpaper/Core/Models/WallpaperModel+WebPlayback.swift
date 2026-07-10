@@ -79,6 +79,9 @@ extension WallpaperModel {
         }
         webWallpaperSources.append(source)
         webWallpaperErrorMessage = nil
+        if selectedPlaylistID == nil {
+            syncActivePlaylistPaths()
+        }
         selectWebWallpaper(id: source.id)
         persistWebWallpaperState()
         return source
@@ -107,6 +110,8 @@ extension WallpaperModel {
         }
         let wasActive = currentWebWallpaperID == id
         webWallpaperSources.remove(at: index)
+        pruneWebWallpaperIDsFromPlaylists()
+        syncActivePlaylistPaths()
 
         if wasActive {
             if let next = webWallpaperSources.first {
@@ -224,6 +229,13 @@ extension WallpaperModel {
             }
         }
 
+        // 不変条件: プレイリストが参照するWeb壁紙は必ず webWallpaperSources に存在する
+        pruneWebWallpaperIDsFromPlaylists()
+        // registeredWebWallpaperIDs の再同期(syncActivePlaylistPaths)は呼び出し元の
+        // restore() に任せる。ここではまだ webWallpaperFeatureEnabled が
+        // UserDefaults から復元されていない(デフォルト値のまま)ため、
+        // ここで呼ぶと再生キューへWeb壁紙が反映されないまま固定されてしまう。
+
         if let savedID = UserDefaults.standard.string(forKey: "currentWebWallpaperID"),
            let uuid = UUID(uuidString: savedID),
            webWallpaperSources.contains(where: { $0.id == uuid })
@@ -241,9 +253,27 @@ extension WallpaperModel {
         schedulePersistedStateFlush()
     }
 
+    /// 不変条件の維持: プレイリストが参照するWeb壁紙は必ず webWallpaperSources に存在する。
+    /// 変更があった場合のみ persistPlaylistState() を呼ぶため、呼び出し側の実行順序に依存しない。
+    private func pruneWebWallpaperIDsFromPlaylists() {
+        let validIDs = Set(webWallpaperSources.map(\.id))
+        var didPrune = false
+        for index in playlists.indices {
+            let originalCount = playlists[index].webWallpaperIDs.count
+            playlists[index].webWallpaperIDs.removeAll { !validIDs.contains($0) }
+            if playlists[index].webWallpaperIDs.count != originalCount {
+                didPrune = true
+            }
+        }
+        if didPrune {
+            persistPlaylistState()
+        }
+    }
+
     func clearWebWallpaperState() {
         stopWebWallpaper()
         webWallpaperSources.removeAll()
+        pruneWebWallpaperIDsFromPlaylists()
         currentWebWallpaperID = nil
         wallpaperKind = .video
         webWallpaperLoadState = .idle

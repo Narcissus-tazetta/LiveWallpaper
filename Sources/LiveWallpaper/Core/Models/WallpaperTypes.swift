@@ -1,6 +1,14 @@
+import Foundation
+
 enum WallpaperKind: String, Codable {
     case video
     case web
+}
+
+/// 次へ/前へ送りの再生キューに乗る1エントリ。動画・Web壁紙どちらも表す。
+enum WallpaperPlaybackEntry: Equatable {
+    case video(String)
+    case web(UUID)
 }
 
 enum DisplayMode: String {

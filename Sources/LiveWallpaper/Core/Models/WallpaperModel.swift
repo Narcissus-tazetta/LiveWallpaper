@@ -145,6 +145,9 @@ final class WallpaperModel: ObservableObject {
     @Published var currentVideoPath: String?
     @Published var lockScreenVideoPath: String?
     @Published var registeredVideoPaths: [String] = []
+    /// 選択中プレイリスト(または未選択時はライブラリ全体)に属するWeb壁紙。
+    /// 次へ/前へ送りの対象になる点で registeredVideoPaths のWeb壁紙版。
+    @Published var registeredWebWallpaperIDs: [UUID] = []
     @Published var registeredVideoDisplayNames: [String: String] = [:]
     @Published var launchAtLoginEnabled: Bool = false
     @Published var appLanguage: AppLanguage = .automatic

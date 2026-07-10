@@ -44,9 +44,13 @@ struct SettingsView: View {
     @State var currentWallpaperPreviewThumbnailPath: String?
     @State var currentLockScreenPreviewThumbnailPath: String?
     @State var webURLInput: String = ""
+    @State var isWebWallpaperURLPopoverPresented: Bool = false
+    @State var editingWebWallpaperID: UUID?
+    @State var editingWebWallpaperNameInput: String = ""
     @FocusState var isVolumeInputFocused: Bool
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
+    @FocusState var focusedWebWallpaperID: UUID?
     @State var isLibrarySearchFocused: Bool = false
     let wallpaperCardMinimumWidth: CGFloat = 140
     let wallpaperCardMaximumWidth: CGFloat = 220
@@ -117,6 +121,11 @@ struct SettingsView: View {
         view
             .onChange(of: model.webWallpaperSources) { sources in
                 webThumbnailStore.prune(validSourceIDs: Set(sources.map(\.id)))
+                if let editingID = editingWebWallpaperID,
+                   !sources.contains(where: { $0.id == editingID })
+                {
+                    cancelWebWallpaperNameEdit()
+                }
             }
             .onChange(of: model.audioVolume) { _ in
                 if !isVolumeInputFocused {
@@ -283,9 +292,6 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     wallpaperTargetTabBar
                     wallpaperContentPane
-                    if model.webWallpaperFeatureEnabled {
-                        webWallpaperPane
-                    }
                 }
             }
         case .wallpaperFit:

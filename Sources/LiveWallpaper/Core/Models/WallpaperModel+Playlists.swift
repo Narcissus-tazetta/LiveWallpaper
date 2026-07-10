@@ -40,12 +40,56 @@ extension WallpaperModel {
         return playlist.id
     }
 
-    func playlistContainsVideo(_ playlistID: UUID, path: String) -> Bool {
+    /// プレイリストの特定の配列(videoPaths/webWallpaperIDs)に値が含まれるか調べる汎用ヘルパー。
+    private func playlistArray<T: Equatable>(
+        _ playlistID: UUID,
+        keyPath: KeyPath<WallpaperPlaylist, [T]>,
+        contains value: T
+    ) -> Bool {
         guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else {
             return false
         }
+        return playlists[index][keyPath: keyPath].contains(value)
+    }
+
+    /// プレイリストの特定の配列へ値を追加する汎用ヘルパー。既に含まれていれば何もしない。
+    @discardableResult
+    private func addToPlaylistArray<T: Equatable>(
+        _ value: T,
+        to playlistID: UUID,
+        keyPath: WritableKeyPath<WallpaperPlaylist, [T]>
+    ) -> Bool {
+        guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else {
+            return false
+        }
+        if !playlists[index][keyPath: keyPath].contains(value) {
+            playlists[index][keyPath: keyPath].append(value)
+        }
+        persistPlaylistState()
+        return true
+    }
+
+    /// プレイリストの特定の配列から値を外す汎用ヘルパー。
+    @discardableResult
+    private func removeFromPlaylistArray<T: Equatable>(
+        _ value: T,
+        fromPlaylist playlistID: UUID,
+        keyPath: WritableKeyPath<WallpaperPlaylist, [T]>
+    ) -> Bool {
+        guard let playlistIndex = playlists.firstIndex(where: { $0.id == playlistID }) else {
+            return false
+        }
+        guard let valueIndex = playlists[playlistIndex][keyPath: keyPath].firstIndex(of: value) else {
+            return false
+        }
+        playlists[playlistIndex][keyPath: keyPath].remove(at: valueIndex)
+        persistPlaylistState()
+        return true
+    }
+
+    func playlistContainsVideo(_ playlistID: UUID, path: String) -> Bool {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        return playlists[index].videoPaths.contains(trimmed)
+        return playlistArray(playlistID, keyPath: \.videoPaths, contains: trimmed)
     }
 
     /// プレイリストへ参照を追加する。動画本体はライブラリに登録される。
@@ -58,19 +102,16 @@ extension WallpaperModel {
         guard FileManager.default.fileExists(atPath: trimmed) else {
             return false
         }
-        guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else {
+        guard playlists.contains(where: { $0.id == playlistID }) else {
             return false
         }
         addVideoPathToLibrary(trimmed)
-        if !playlists[index].videoPaths.contains(trimmed) {
-            playlists[index].videoPaths.append(trimmed)
-        }
-        if selectedPlaylistID == playlistID {
+        let added = addToPlaylistArray(trimmed, to: playlistID, keyPath: \.videoPaths)
+        if added, selectedPlaylistID == playlistID {
             syncActivePlaylistPaths()
             refreshCurrentVideoIndex()
         }
-        persistPlaylistState()
-        return true
+        return added
     }
 
     /// プレイリストから参照だけを外す。ライブラリ・他プレイリストには影響しない。
@@ -78,19 +119,39 @@ extension WallpaperModel {
     @discardableResult
     func removeVideo(path: String, fromPlaylist playlistID: UUID) -> Bool {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let playlistIndex = playlists.firstIndex(where: { $0.id == playlistID }) else {
-            return false
-        }
-        guard let pathIndex = playlists[playlistIndex].videoPaths.firstIndex(of: trimmed) else {
-            return false
-        }
-        playlists[playlistIndex].videoPaths.remove(at: pathIndex)
-        if selectedPlaylistID == playlistID {
+        let removed = removeFromPlaylistArray(trimmed, fromPlaylist: playlistID, keyPath: \.videoPaths)
+        if removed, selectedPlaylistID == playlistID {
             syncActivePlaylistPaths()
             refreshCurrentVideoIndex()
         }
-        persistPlaylistState()
-        return true
+        return removed
+    }
+
+    func playlistContainsWebWallpaper(_ playlistID: UUID, sourceID: UUID) -> Bool {
+        playlistArray(playlistID, keyPath: \.webWallpaperIDs, contains: sourceID)
+    }
+
+    /// プレイリストへWeb壁紙の参照を追加する。Web壁紙本体は webWallpaperSources で管理される。
+    @discardableResult
+    func addWebWallpaper(sourceID: UUID, to playlistID: UUID) -> Bool {
+        guard webWallpaperSources.contains(where: { $0.id == sourceID }) else {
+            return false
+        }
+        let added = addToPlaylistArray(sourceID, to: playlistID, keyPath: \.webWallpaperIDs)
+        if added, selectedPlaylistID == playlistID {
+            syncActivePlaylistPaths()
+        }
+        return added
+    }
+
+    /// プレイリストからWeb壁紙の参照だけを外す。webWallpaperSources には影響しない。
+    @discardableResult
+    func removeWebWallpaper(sourceID: UUID, fromPlaylist playlistID: UUID) -> Bool {
+        let removed = removeFromPlaylistArray(sourceID, fromPlaylist: playlistID, keyPath: \.webWallpaperIDs)
+        if removed, selectedPlaylistID == playlistID {
+            syncActivePlaylistPaths()
+        }
+        return removed
     }
 
     /// ライブラリへ動画パスを登録する(未登録の場合のみ)。プレイリストには追加しない。
@@ -202,16 +263,16 @@ extension WallpaperModel {
         }
         syncActivePlaylistPaths()
 
-        if let currentPath = currentVideoPath,
-           registeredVideoPaths.contains(currentPath)
-        {
-            currentVideoIndex = registeredVideoPaths.firstIndex(of: currentPath)
+        if let current = currentPlaybackEntry, registeredPlaybackEntries.contains(current) {
+            if case .video(let path) = current {
+                currentVideoIndex = registeredVideoPaths.firstIndex(of: path)
+            }
             persistPlaylistState()
             return
         }
 
-        if let firstPath = registeredVideoPaths.first {
-            selectRegisteredVideo(path: firstPath)
+        if let firstEntry = registeredPlaybackEntries.first {
+            selectPlaybackEntry(firstEntry, clearsPin: true)
         } else if let currentPath = currentVideoPath,
                   libraryVideoPaths.contains(currentPath)
         {
@@ -219,12 +280,13 @@ extension WallpaperModel {
             // 壁紙を突然消すより再生継続の方が安全なのでそのままにする。
             currentVideoIndex = nil
             persistPlaylistState()
+        } else if isWebWallpaperActive {
+            // 空のプレイリストに切り替えた場合。再生中のWeb壁紙はキュー外だが
+            // 壁紙を突然消すより再生継続の方が安全なのでそのままにする。
+            persistPlaylistState()
         } else {
             stopAllPlayers()
-            currentVideoPath = nil
-            currentVideoIndex = nil
-            UserDefaults.standard.removeObject(forKey: "videoPath")
-            persistPlaylistState()
+            clearCurrentVideoReference()
         }
     }
 
@@ -259,44 +321,81 @@ extension WallpaperModel {
         return false
     }
 
+    /// 選択中プレイリスト(または未選択時はライブラリ全体)の再生キュー。
+    /// 動画が先、Web壁紙が後の順で並ぶ(一覧のグリッド表示と同じ順序)。
+    var registeredPlaybackEntries: [WallpaperPlaybackEntry] {
+        registeredVideoPaths.map { .video($0) } + registeredWebWallpaperIDs.map { .web($0) }
+    }
+
+    /// 現在再生中のエントリ。動画・Web壁紙のどちらが再生中かに応じて切り替わる。
+    var currentPlaybackEntry: WallpaperPlaybackEntry? {
+        if wallpaperKind == .web, let currentWebWallpaperID {
+            return .web(currentWebWallpaperID)
+        }
+        if let currentVideoPath {
+            return .video(currentVideoPath)
+        }
+        return nil
+    }
+
+    /// 再生キュー内での現在位置。UIの「N / M」表示に使う。
+    var currentPlaybackIndex: Int? {
+        guard let currentPlaybackEntry else {
+            return nil
+        }
+        return registeredPlaybackEntries.firstIndex(of: currentPlaybackEntry)
+    }
+
+    private func selectPlaybackEntry(_ entry: WallpaperPlaybackEntry, clearsPin: Bool) {
+        switch entry {
+        case .video(let path):
+            selectRegisteredVideo(path: path, clearsPin: clearsPin)
+        case .web(let id):
+            let isSameEntry = wallpaperKind == .web && currentWebWallpaperID == id
+            if clearsPin, pinCurrentVideo, !isSameEntry {
+                clearPinCurrentVideo()
+            }
+            selectWebWallpaper(id: id)
+        }
+    }
+
     func playNextVideo(advancingPlaylist: Bool = false) {
-        guard !registeredVideoPaths.isEmpty else {
+        let entries = registeredPlaybackEntries
+        guard !entries.isEmpty else {
             return
         }
-        guard registeredVideoPaths.count > 1 else {
-            if let currentPath = currentVideoPath {
-                selectRegisteredVideo(path: currentPath, clearsPin: !advancingPlaylist)
+        guard entries.count > 1 else {
+            if let entry = entries.first {
+                selectPlaybackEntry(entry, clearsPin: !advancingPlaylist)
             }
             return
         }
-        let nextIndex = resolvedNextIndex(forward: true)
-        selectRegisteredVideo(
-            path: registeredVideoPaths[nextIndex],
-            clearsPin: !advancingPlaylist
-        )
+        let nextIndex = resolvedNextIndex(in: entries, forward: true)
+        selectPlaybackEntry(entries[nextIndex], clearsPin: !advancingPlaylist)
     }
 
     func playPreviousVideo() {
-        guard !registeredVideoPaths.isEmpty else {
+        let entries = registeredPlaybackEntries
+        guard !entries.isEmpty else {
             return
         }
-        guard registeredVideoPaths.count > 1 else {
-            if let currentPath = currentVideoPath {
-                selectRegisteredVideo(path: currentPath, clearsPin: true)
+        guard entries.count > 1 else {
+            if let entry = entries.first {
+                selectPlaybackEntry(entry, clearsPin: true)
             }
             return
         }
-        let previousIndex = resolvedNextIndex(forward: false)
-        selectRegisteredVideo(path: registeredVideoPaths[previousIndex], clearsPin: true)
+        let previousIndex = resolvedNextIndex(in: entries, forward: false)
+        selectPlaybackEntry(entries[previousIndex], clearsPin: true)
     }
 
-    private func resolvedNextIndex(forward: Bool) -> Int {
-        guard !registeredVideoPaths.isEmpty else {
+    private func resolvedNextIndex(in entries: [WallpaperPlaybackEntry], forward: Bool) -> Int {
+        guard !entries.isEmpty else {
             return 0
         }
-        let baseIndex = currentVideoIndex ?? 0
-        let maxIndex = registeredVideoPaths.count - 1
-        if shufflePlaybackEnabled, registeredVideoPaths.count > 2 {
+        let baseIndex = currentPlaybackEntry.flatMap { entries.firstIndex(of: $0) } ?? 0
+        let maxIndex = entries.count - 1
+        if shufflePlaybackEnabled, entries.count > 2 {
             var candidate = Int.random(in: 0 ... maxIndex)
             while candidate == baseIndex {
                 candidate = Int.random(in: 0 ... maxIndex)
@@ -304,9 +403,9 @@ extension WallpaperModel {
             return candidate
         }
         if forward {
-            return (baseIndex + 1) % registeredVideoPaths.count
+            return (baseIndex + 1) % entries.count
         }
-        return (baseIndex - 1 + registeredVideoPaths.count) % registeredVideoPaths.count
+        return (baseIndex - 1 + entries.count) % entries.count
     }
 
     /// 新しい動画を取り込んでライブラリへ登録し、壁紙として再生する。
@@ -428,7 +527,7 @@ extension WallpaperModel {
             return
         }
         let queueIndexBeforeRemoval = registeredVideoPaths.firstIndex(of: trimmed)
-        let wasCurrent = currentVideoPath == trimmed
+        let wasCurrentVideoPath = currentVideoPath == trimmed
         let wasLockScreen = lockScreenVideoPath == trimmed
 
         libraryVideoPaths.remove(at: libraryIndex)
@@ -446,7 +545,15 @@ extension WallpaperModel {
             clearLockScreenVideoIfMissing(path: trimmed)
         }
 
-        if wasCurrent {
+        // Web壁紙が実際に表示中のときの currentVideoPath は「動画に戻すときの
+        // フォールバック参照」でしかなく、再生には使われていない。削除しても
+        // 表示中のWeb壁紙を中断せず、参照だけ片付ける。
+        if wasCurrentVideoPath, isWebWallpaperActive {
+            clearCurrentVideoReference()
+            return
+        }
+
+        if wasCurrentVideoPath {
             if !registeredVideoPaths.isEmpty {
                 let nextIndex = min(
                     queueIndexBeforeRemoval ?? 0,
@@ -455,15 +562,21 @@ extension WallpaperModel {
                 selectRegisteredVideo(path: registeredVideoPaths[nextIndex])
             } else {
                 stopAllPlayers()
-                currentVideoPath = nil
-                currentVideoIndex = nil
-                UserDefaults.standard.removeObject(forKey: "videoPath")
-                persistPlaylistState()
+                clearCurrentVideoReference()
             }
             return
         }
 
         refreshCurrentVideoIndex()
+        persistPlaylistState()
+    }
+
+    /// currentVideoPath/currentVideoIndex の参照を消して永続化する。
+    /// 再生の停止は呼び出し側の責務(停止すべきかは文脈依存のため)。
+    private func clearCurrentVideoReference() {
+        currentVideoPath = nil
+        currentVideoIndex = nil
+        UserDefaults.standard.removeObject(forKey: "videoPath")
         persistPlaylistState()
     }
 
@@ -493,8 +606,10 @@ extension WallpaperModel {
            let index = playlists.firstIndex(where: { $0.id == selectedPlaylistID })
         {
             registeredVideoPaths = playlists[index].videoPaths
+            registeredWebWallpaperIDs = webWallpaperFeatureEnabled ? playlists[index].webWallpaperIDs : []
         } else {
             registeredVideoPaths = libraryVideoPaths
+            registeredWebWallpaperIDs = webWallpaperFeatureEnabled ? webWallpaperSources.map(\.id) : []
         }
         pruneWallpaperPresentationsForExistingPaths()
         normalizePlaybackConstraints()

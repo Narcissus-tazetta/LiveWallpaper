@@ -212,15 +212,23 @@ extension SettingsView {
         isLibrarySearchFocused = false
     }
 
-    func startWallpaperNameEdit(path: String) {
+    /// 動画名・プレイリスト名・Web壁紙名、いずれかの編集を開始する前に他の編集を閉じる。
+    /// 複数の名前編集フィールドが同時に開いたままになるのを防ぐ。
+    func cancelAllNameEdits() {
         cancelPlaylistNameEdit()
+        cancelWallpaperNameEdit()
+        cancelWebWallpaperNameEdit()
+    }
+
+    func startWallpaperNameEdit(path: String) {
+        cancelAllNameEdits()
         editingWallpaperPath = path
         editingWallpaperNameInput = model.registeredVideoDisplayName(for: path)
         focusedWallpaperPath = path
     }
 
     func startPlaylistNameEdit(playlistID: UUID) {
-        cancelWallpaperNameEdit()
+        cancelAllNameEdits()
         editingPlaylistID = playlistID
         editingPlaylistNameInput = model.playlistName(for: playlistID)
         focusedPlaylistID = playlistID

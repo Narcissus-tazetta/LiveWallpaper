@@ -9,19 +9,22 @@ extension WallpaperModel {
     }
 
     var canPinCurrentVideo: Bool {
-        playlistPlaybackEnabled && registeredVideoPaths.count > 1
+        playlistPlaybackEnabled && registeredPlaybackEntries.count > 1
     }
 
     var isVideoLoopSettingEnabled: Bool {
-        registeredVideoPaths.count > 1 && !playlistPlaybackEnabled
+        registeredPlaybackEntries.count > 1 && !playlistPlaybackEnabled
     }
 
     var effectiveVideoLoopEnabled: Bool {
         isVideoLoopSettingEnabled ? videoLoopEnabled : true
     }
 
+    /// 動画が自然終了したときにループするか、次のエントリ(動画・Web壁紙どちらも
+    /// あり得る)へ進むかの判定。キューの総数で見る必要があるため
+    /// registeredVideoPaths ではなく registeredPlaybackEntries を使う。
     func playbackEndBehavior() -> PlaybackEndBehavior {
-        if registeredVideoPaths.count <= 1 {
+        if registeredPlaybackEntries.count <= 1 {
             return .loopCurrent
         }
         if pinCurrentVideo {

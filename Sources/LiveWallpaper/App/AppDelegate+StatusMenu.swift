@@ -181,6 +181,13 @@ extension AppDelegate {
             }
             .store(in: &cancellables)
 
+        wallpaperModel.$registeredWebWallpaperIDs
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshPlaybackMenuState()
+            }
+            .store(in: &cancellables)
+
         wallpaperModel.$appLanguage
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -271,7 +278,7 @@ extension AppDelegate {
     }
 
     func refreshPlaybackMenuState() {
-        let hasMultipleVideos = wallpaperModel.registeredVideoPaths.count > 1
+        let hasMultipleEntries = wallpaperModel.registeredPlaybackEntries.count > 1
         let playlistEnabled = wallpaperModel.playlistPlaybackEnabled
         let canPin = wallpaperModel.canPinCurrentVideo
 
@@ -282,13 +289,13 @@ extension AppDelegate {
         }
         if let shuffleItem = statusItem?.menu?.item(withTag: MenuTag.shuffleToggle) {
             shuffleItem.isEnabled =
-                playlistEnabled && hasMultipleVideos && !wallpaperModel.pinCurrentVideo
+                playlistEnabled && hasMultipleEntries && !wallpaperModel.pinCurrentVideo
         }
         if let previousItem = statusItem?.menu?.item(withTag: MenuTag.previousVideo) {
-            previousItem.isEnabled = hasMultipleVideos
+            previousItem.isEnabled = hasMultipleEntries
         }
         if let nextItem = statusItem?.menu?.item(withTag: MenuTag.nextVideo) {
-            nextItem.isEnabled = hasMultipleVideos
+            nextItem.isEnabled = hasMultipleEntries
         }
     }
 

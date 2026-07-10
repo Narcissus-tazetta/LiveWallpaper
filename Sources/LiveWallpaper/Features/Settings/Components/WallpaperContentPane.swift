@@ -1,15 +1,29 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+private enum WallpaperListEntry: Identifiable {
+    case video(String)
+    case web(WebWallpaperSource)
+
+    var id: String {
+        switch self {
+        case .video(let path):
+            return "video:\(path)"
+        case .web(let source):
+            return "web:\(source.id.uuidString)"
+        }
+    }
+}
+
 extension SettingsView {
     var wallpaperContentPane: some View {
         VStack(alignment: .leading, spacing: 10) {
             wallpaperContentHeader
             wallpaperActionToolbar
-            wallpaperVideoContent
+            wallpaperListContent
 
             if selectedAssignmentTarget == .desktop,
-               !model.registeredVideoPaths.isEmpty
+               !model.registeredPlaybackEntries.isEmpty
             {
                 playlistPlaybackControls
             }
@@ -27,16 +41,12 @@ extension SettingsView {
         )
     }
 
-    private var isLibrarySearchActive: Bool {
-        !librarySearchQuery.isEmpty
-    }
-
     private var librarySearchQuery: String {
         librarySearchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var displayedItemCount: Int {
-        isLibrarySearchActive ? filteredPaths.count : model.libraryVideoPaths.count
+        mergedListEntries.count
     }
 
     private func matchesLibrarySearch(_ text: String, query: String) -> Bool {
@@ -66,6 +76,14 @@ extension SettingsView {
             matchesLibrarySearch(source.displayName, query: query)
                 || matchesLibrarySearch(source.url.absoluteString, query: query)
         }
+    }
+
+    private var mergedListEntries: [WallpaperListEntry] {
+        let videoEntries = filteredPaths.map { WallpaperListEntry.video($0) }
+        guard model.webWallpaperFeatureEnabled else {
+            return videoEntries
+        }
+        return videoEntries + filteredWebSources.map { WallpaperListEntry.web($0) }
     }
 
     private var wallpaperContentHeader: some View {
@@ -116,6 +134,17 @@ extension SettingsView {
             Text("\(displayedItemCount) \(model.localizedString("本"))")
                 .font(.caption)
                 .foregroundColor(.secondary)
+
+            if model.isWebWallpaperActive {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                    Text(model.localizedString("Web壁紙再生中"))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
         }
     }
 
@@ -136,7 +165,7 @@ extension SettingsView {
 
                     ForEach(model.playlists) { playlist in
                         Label(
-                            "\(playlist.name) (\(playlist.videoPaths.count))",
+                            "\(playlist.name) (\(playlist.videoPaths.count + playlist.webWallpaperIDs.count))",
                             systemImage: "list.bullet.rectangle"
                         )
                         .tag(Optional(playlist.id))
@@ -238,10 +267,12 @@ extension SettingsView {
     }
 
     @ViewBuilder
-    private var wallpaperVideoContent: some View {
-        if model.libraryVideoPaths.isEmpty {
+    private var wallpaperListContent: some View {
+        let hasAnySource = !model.libraryVideoPaths.isEmpty
+            || (model.webWallpaperFeatureEnabled && !model.webWallpaperSources.isEmpty)
+        if !hasAnySource {
             wallpaperEmptyStateText
-        } else if filteredPaths.isEmpty {
+        } else if mergedListEntries.isEmpty {
             Text(model.localizedString("該当する壁紙がありません"))
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -250,18 +281,27 @@ extension SettingsView {
         }
     }
 
+    private var selectedPlaylistSummaryText: String? {
+        guard let selectedID = model.selectedPlaylistID,
+              let playlist = model.playlists.first(where: { $0.id == selectedID })
+        else {
+            return nil
+        }
+        var text = "\(model.localizedString("チェックした動画がこのプレイリストで再生されます")) (\(playlist.videoPaths.count))"
+        if !playlist.webWallpaperIDs.isEmpty {
+            text += " ・ \(model.localizedString("Web壁紙")) \(playlist.webWallpaperIDs.count)"
+        }
+        return text
+    }
+
     private var wallpaperActionToolbar: some View {
         HStack(spacing: 8) {
-            if let selectedID = model.selectedPlaylistID,
-               let playlist = model.playlists.first(where: { $0.id == selectedID })
-            {
-                Text(
-                    "\(model.localizedString("チェックした動画がこのプレイリストで再生されます")) (\(playlist.videoPaths.count))"
-                )
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            if let summaryText = selectedPlaylistSummaryText {
+                Text(summaryText)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
             Spacer(minLength: 8)
             Button(model.localizedString("壁紙を共有")) {
@@ -274,6 +314,63 @@ extension SettingsView {
                 NotificationCenter.default.post(name: .chooseVideo, object: nil)
             }
             .buttonStyle(.borderedProminent)
+
+            if selectedAssignmentTarget == .desktop, model.webWallpaperFeatureEnabled {
+                Button(model.localizedString("Web壁紙を追加")) {
+                    isWebWallpaperURLPopoverPresented = true
+                }
+                .buttonStyle(.bordered)
+                .popover(isPresented: $isWebWallpaperURLPopoverPresented) {
+                    webWallpaperURLInputSection
+                        .padding(16)
+                        .frame(width: 360)
+                }
+            }
+        }
+    }
+
+    var webWallpaperURLInputSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(model.localizedString("WebサイトのURLを入力すると、そのページを壁紙として表示できます"))
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(model.localizedString("※ いま動作確認できているのは YouTube だけです。ほかのサイトも試せますが、表示できない場合があります"))
+                .font(.caption2)
+                .foregroundColor(.secondary.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                PasteableTextField(
+                    text: $webURLInput,
+                    placeholder: model.localizedString("https://example.com"),
+                    onSubmit: submitWebWallpaperURL
+                )
+                .frame(minWidth: 200)
+
+                Button {
+                    if let pasted = PasteboardPaste.readPlainText() {
+                        webURLInput = pasted
+                    }
+                } label: {
+                    Image(systemName: "doc.on.clipboard")
+                }
+                .buttonStyle(.bordered)
+                .help(model.localizedString("クリップボードから貼り付け"))
+
+                Button(model.localizedString("追加")) {
+                    submitWebWallpaperURL()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(webURLInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            if let errorMessage = model.webWallpaperErrorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.orange)
+            }
         }
     }
 
@@ -286,6 +383,11 @@ extension SettingsView {
             Text(model.localizedString("動画ファイルをウィンドウにドラッグ&ドロップして追加することもできます"))
                 .font(.caption2)
                 .foregroundColor(.secondary.opacity(0.85))
+            if model.webWallpaperFeatureEnabled {
+                Text(model.localizedString("「Web壁紙を追加」からWebサイトのURLを壁紙として追加することもできます"))
+                    .font(.caption2)
+                    .foregroundColor(.secondary.opacity(0.85))
+            }
         }
     }
 
@@ -298,13 +400,23 @@ extension SettingsView {
                     alignment: .leading,
                     spacing: wallpaperGridRowSpacing
                 ) {
-                    ForEach(filteredPaths, id: \.self) { path in
-                        wallpaperCard(
-                            path: path,
-                            cardWidth: layout.1,
-                            assignmentTarget: selectedAssignmentTarget,
-                            playlistEditingID: model.selectedPlaylistID
-                        )
+                    ForEach(mergedListEntries) { entry in
+                        switch entry {
+                        case .video(let path):
+                            wallpaperCard(
+                                path: path,
+                                cardWidth: layout.1,
+                                assignmentTarget: selectedAssignmentTarget,
+                                playlistEditingID: model.selectedPlaylistID
+                            )
+                        case .web(let source):
+                            webWallpaperCard(
+                                source: source,
+                                cardWidth: layout.1,
+                                playlistEditingID: model.selectedPlaylistID,
+                                assignmentTarget: selectedAssignmentTarget
+                            )
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -315,7 +427,7 @@ extension SettingsView {
     }
 
     private var playlistPlaybackControls: some View {
-        let registeredCount = model.registeredVideoPaths.count
+        let registeredCount = model.registeredPlaybackEntries.count
         return VStack(alignment: .leading, spacing: 6) {
             Divider()
 
@@ -380,7 +492,7 @@ extension SettingsView {
 
                 Spacer(minLength: 12)
 
-                if let index = model.currentVideoIndex {
+                if let index = model.currentPlaybackIndex {
                     Text("\(index + 1) / \(registeredCount)")
                         .font(.caption)
                         .foregroundColor(.secondary)

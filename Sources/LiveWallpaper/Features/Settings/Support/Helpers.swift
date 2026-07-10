@@ -49,6 +49,60 @@ extension SettingsView {
         .fixedSize(horizontal: true, vertical: false)
     }
 
+    /// プレイリスト編集中に名前行へ出すチェックボックスの汎用実装。ON=そのプレイリストに含まれる。
+    /// 動画カード・Web壁紙カードの両方から、対象に応じたクロージャを渡して使う。
+    func membershipCheckbox(
+        isOn: @escaping () -> Bool,
+        setOn: @escaping (Bool) -> Void
+    ) -> some View {
+        Toggle("", isOn: Binding(get: isOn, set: setOn))
+            .toggleStyle(.checkbox)
+            .labelsHidden()
+            .controlSize(.small)
+            .help(model.localizedString("チェックでこのプレイリストに追加・解除"))
+    }
+
+    /// 「プレイリストに追加…/から外す…」コンテキストメニューの汎用実装。
+    /// 動画カード・Web壁紙カードの両方から、対象に応じたクロージャを渡して使う。
+    @ViewBuilder
+    func playlistMembershipMenus(
+        isContained: @escaping (WallpaperPlaylist) -> Bool,
+        add: @escaping (UUID) -> Void,
+        remove: @escaping (UUID) -> Void,
+        addToNewPlaylist: @escaping () -> Void
+    ) -> some View {
+        Menu(model.localizedString("プレイリストに追加…")) {
+            if model.playlists.isEmpty {
+                Button(model.localizedString("新規プレイリストを作成して追加")) {
+                    addToNewPlaylist()
+                }
+                .disabled(!model.canAddPlaylist)
+            } else {
+                ForEach(model.playlists) { playlist in
+                    Button(playlist.name) {
+                        add(playlist.id)
+                    }
+                    .disabled(isContained(playlist))
+                }
+                Divider()
+                Button(model.localizedString("新規プレイリストを作成して追加")) {
+                    addToNewPlaylist()
+                }
+                .disabled(!model.canAddPlaylist)
+            }
+        }
+        let containingPlaylists = model.playlists.filter(isContained)
+        if !containingPlaylists.isEmpty {
+            Menu(model.localizedString("プレイリストから外す…")) {
+                ForEach(containingPlaylists) { playlist in
+                    Button(playlist.name) {
+                        remove(playlist.id)
+                    }
+                }
+            }
+        }
+    }
+
     func syncVolumeInputWithModel() {
         let percent = Int((model.audioVolume * 100).rounded())
         volumeInput = String(percent)
