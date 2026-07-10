@@ -78,6 +78,8 @@ extension SettingsView {
                                     x: frameGeometry.translation.width,
                                     y: frameGeometry.translation.height
                                 )
+                                .frame(width: canvasSize.width, height: canvasSize.height)
+                                .clipped()
                         } else {
                             ProgressView()
                                 .controlSize(.small)
@@ -159,6 +161,7 @@ extension SettingsView {
                     .allowsHitTesting(false)
                 }
             }
+            .frame(width: canvasSize.width, height: canvasSize.height)
             .compositingGroup()
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .clipped()
