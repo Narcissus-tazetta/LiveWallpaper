@@ -115,12 +115,6 @@ brew upgrade --cask livewallpaper
 - macOS 13.0 (Ventura) 以降
 - ロック画面動画同期: macOS 26 以降
 
-## 既知の制限
-
-- macOS の Space（Mission Control）切り替え時、前面アプリの Space 追従挙動と競合して、まれに意図しない隣接 Space に戻されることがあります（特に「アプリを選択中の Space」から「何もない Space」へ移動する操作で発生しやすいです）。
-- 発生した場合は、もう一度同じ Space へ移動すると安定することがあります。
-- 現在も改善を継続中です。macOS の Space 制御仕様に依存するため、環境差で発生頻度が変わる場合があります。
-
 ## 開発について
 
 Swift / SwiftUI / AppKit で作られています。

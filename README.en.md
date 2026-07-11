@@ -116,12 +116,6 @@ The status bar shows the current desktop and lock screen wallpapers separately.
 - macOS 13.0 (Ventura) or later
 - Lock screen video sync: macOS 26 or later
 
-## Known Limitations
-
-- During macOS Space (Mission Control) switching, the app may occasionally bounce to a neighboring Space due to interaction with foreground-app Space routing. This is more likely when moving from a Space with an active app to an empty Space.
-- If it happens, moving to the same Space again usually stabilizes it.
-- We are continuing to improve this behavior. Because this depends on macOS Space internals, frequency can vary by environment.
-
 ## Development
 
 Built with Swift, SwiftUI, and AppKit.
