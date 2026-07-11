@@ -17,30 +17,16 @@ struct SettingsView: View {
     @State var editingWallpaperNameInput: String = ""
     @State var isDropTargeted: Bool = false
     @State var selectedAssignmentTarget: WallpaperAssignmentTarget = .desktop
-    @State var selectedFitScreenID: String = ""
-    @State var fitEditorDraft: FitEditorDraft = .init()
-    @State var fitEditorSelectedVideoPath: String?
-    @State var fitEditorLiveApplyEnabled: Bool = false
-    @State var fitEditorLiveApplyWorkItem: DispatchWorkItem?
-    @State var fitEditorShowsSavedFeedback: Bool = false
-    @State var fitEditorSavedFeedbackWorkItem: DispatchWorkItem?
-    @State var isFitEditorInteractionEnabled: Bool = false
-    @State var fitPreviewMode: FitPreviewMode = .still
-    @State var fitPreviewStillImages: [String: NSImage] = [:]
-    @State var fitPreviewStillImageOrder: [String] = []
-    @State var fitPreviewStillImageInFlight: Set<String> = []
-    @State var fitPreviewStillImageTasks: [String: Task<Void, Never>] = [:]
-    @State var fitPreviewStillImageGeneration: [String: UUID] = [:]
-    @State var fitEditorPreviewFrameSize: CGSize = .zero
-    @State var fitEditorNormalizeThrottleWorkItem: DispatchWorkItem?
-    @State var fitEditorLastNormalizeAt: Date = .distantPast
-    @State var fitEditorNormalizeGeneration: Int = 0
+    /// 「デスクトップ」タブが共有壁紙ではなく特定ディスプレイの割り当てを
+    /// 表示している場合の画面ID。接続が切れた画面は resolvedDisplayOverrideScreenID
+    /// 側で自動的に無視される。
+    @State var selectedDisplayOverrideScreenID: String?
+    @StateObject var fitEditor: FitEditorController
     @State var isResetSettingsDialogPresented: Bool = false
     @State var librarySearchText: String = ""
     @State var isWallpaperShareSheetPresented: Bool = false
     @State var isSuspendExclusionAppPickerPresented: Bool = false
     @State var suspendExclusionAppPickerSearchText: String = ""
-    @State var keyEventMonitor: Any?
     @State var currentWallpaperPreviewThumbnailPath: String?
     @State var currentLockScreenPreviewThumbnailPath: String?
     @State var webURLInput: String = ""
@@ -52,6 +38,8 @@ struct SettingsView: View {
     @FocusState var focusedWallpaperPath: String?
     @FocusState var focusedWebWallpaperID: UUID?
     @State var isLibrarySearchFocused: Bool = false
+    @State var settingsSearchText: String = ""
+    @State var isSettingsSearchFocused: Bool = false
     let wallpaperCardMinimumWidth: CGFloat = 140
     let wallpaperCardMaximumWidth: CGFloat = 220
     let wallpaperGridColumnSpacing: CGFloat = 6
@@ -61,6 +49,7 @@ struct SettingsView: View {
         self.model = model
         _thumbnailCache = StateObject(wrappedValue: DiskThumbnailCache())
         _webThumbnailStore = StateObject(wrappedValue: WebWallpaperThumbnailStore())
+        _fitEditor = StateObject(wrappedValue: FitEditorController(model: model))
     }
 
     func wallpaperGridLayout(for availableWidth: CGFloat) -> ([GridItem], CGFloat) {
@@ -84,15 +73,28 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        let form = Form {
-            tabBarSection
+        // タブバーはコンテンツの Form とは別の(スクロール無効な)Form として描画する。
+        // 同じ grouped スタイルを使うことで横幅・インセットが本文のセクションと揃い、
+        // かつコンテンツをスクロールしてもタブバーは常に見える。
+        let content = VStack(spacing: 0) {
+            Form {
+                tabBarSection
+            }
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            // grouped Form の上マージン(約20pt) + タブバー行(72pt+行パディング)が
+            // 収まる高さ。小さすぎるとタブバーが下に見切れる。
+            .frame(height: 112)
 
-            tabContentSection
+            Form {
+                tabContentSection
 
-            footerSection
+                footerSection
+            }
+            .formStyle(.grouped)
         }
 
-        let modified1 = applyMainModifiers(form)
+        let modified1 = applyMainModifiers(content)
         let modified2 = applyNotificationAndChangeModifiers(modified1)
         let modified3 = applyLifecycleModifiers(modified2)
         return applyDialogAndSheetModifiers(modified3)
@@ -102,9 +104,8 @@ struct SettingsView: View {
         view
             .font(.system(size: 14, weight: .medium))
             .tint(.accentColor)
-            .formStyle(.grouped)
             .frame(
-                minWidth: 880, idealWidth: 880, maxWidth: .infinity,
+                minWidth: 780, idealWidth: 780, maxWidth: .infinity,
                 minHeight: 540, idealHeight: 540, maxHeight: .infinity
             )
             .overlay(
@@ -174,18 +175,15 @@ struct SettingsView: View {
             }
             .onChange(of: selectedTab) { tab in
                 resetLibrarySearchState()
+                settingsSearchText = ""
+                isSettingsSearchFocused = false
                 if tab == .settings {
                     model.refreshDesktopIconsVisibility()
                 }
                 if tab == .wallpaperFit {
-                    ensureFitEditorScreenSelection()
-                    syncFitEditorSelectionWithCurrentVideoIfNeeded()
-                    syncFitEditorDraftWithCurrentSelection()
-                    invalidateFitPreviewPathExistsCache(path: resolvedFitEditorVideoPath())
-                    isFitEditorInteractionEnabled = false
-                    installFitKeyMonitorIfNeeded()
+                    fitEditor.activate()
                 } else {
-                    removeFitKeyMonitor()
+                    fitEditor.deactivate()
                 }
             }
             .onChange(of: model.lockScreenVideoPath) { _ in
@@ -193,22 +191,12 @@ struct SettingsView: View {
             }
             .onChange(of: model.currentVideoPath) { _ in
                 requestCurrentWallpaperThumbnailIfNeeded()
-                if fitEditorSelectedVideoPath == nil {
-                    syncFitEditorSelectionWithCurrentVideoIfNeeded()
-                }
-                syncFitEditorDraftWithCurrentSelection()
-                prepareFitPreviewStillImageIfNeeded()
+                fitEditor.handleCurrentVideoPathChange()
             }
             .onChange(of: model.currentWebWallpaperID) { _ in
                 if let source = model.activeWebWallpaperSource {
                     webThumbnailStore.loadIfNeeded(for: source)
                 }
-            }
-            .onChange(of: selectedFitScreenID) { _ in
-                syncFitEditorDraftWithCurrentSelection()
-            }
-            .onChange(of: fitPreviewMode) { _ in
-                prepareFitPreviewStillImageIfNeeded()
             }
     }
 
@@ -222,16 +210,14 @@ struct SettingsView: View {
                 model.refreshScreenRecordingTrustForCoverage()
                 thumbnailCache.prewarm(paths: Array(model.allRegisteredVideoPaths.prefix(10)))
                 processThumbnailQueue()
-                ensureFitEditorScreenSelection()
-                syncFitEditorSelectionWithCurrentVideoIfNeeded()
-                syncFitEditorDraftWithCurrentSelection()
-                prepareFitPreviewStillImageIfNeeded()
-                installFitKeyMonitorIfNeeded()
+                if selectedTab == .wallpaperFit {
+                    fitEditor.activate()
+                }
             }
             .onDisappear {
                 releaseCurrentWallpaperThumbnailVisibility()
                 releaseLockScreenWallpaperThumbnailVisibility()
-                removeFitKeyMonitor()
+                fitEditor.deactivate()
             }
     }
 
@@ -274,6 +260,10 @@ struct SettingsView: View {
                     systemImage: "gearshape"
                 )
                 Spacer(minLength: 0)
+
+                if selectedTab == .settings {
+                    settingsSearchField
+                }
             }
             .padding(8)
             .frame(minHeight: 72)
@@ -311,16 +301,40 @@ struct SettingsView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
-                    videoSettingsSection
-                    shareSettingsSection
-                    webWallpaperSettingsSection
-                    displaySettingsSection
-                    languageSettingsSection
-                    cacheSettingsSection
+                    if settingsSectionMatches(.video) {
+                        videoSettingsSection
+                    }
+                    if settingsSectionMatches(.share) {
+                        shareSettingsSection
+                    }
+                    if settingsSectionMatches(.webWallpaper) {
+                        webWallpaperSettingsSection
+                    }
+                    if settingsSectionMatches(.display) {
+                        displaySettingsSection
+                    }
+                    if settingsSectionMatches(.language) {
+                        languageSettingsSection
+                    }
+                    if settingsSectionMatches(.cache) {
+                        cacheSettingsSection
+                    }
                 }
                 Group {
-                    resetSettingsSection
-                    updateSettingsSection
+                    if settingsSectionMatches(.reset) {
+                        resetSettingsSection
+                    }
+                    if settingsSectionMatches(.update) {
+                        updateSettingsSection
+                    }
+                    if isSettingsSearchActive, !anySettingsSectionMatches {
+                        Section {
+                            Text(model.localizedString("該当する設定がありません"))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
                 }
             }
         }

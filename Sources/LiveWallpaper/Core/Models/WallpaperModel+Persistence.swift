@@ -66,6 +66,17 @@ extension WallpaperModel {
             : .disabled
         applyAudioSettings()
         applyLightweightSettings()
+        restoreAutoSwitchInterval()
+        restoreVideoOverrides()
+        restoreScreenPlaylists()
+        if let savedSuspendDisabled = UserDefaults.standard.stringArray(
+            forKey: "suspendDisabledDisplayIDs"
+        ) {
+            // UIでは割り当て済み画面だけがトグル対象なので、対応するオーバーライドが
+            // 残っているエントリだけを引き継ぐ。
+            suspendDisabledDisplayIDs = Set(savedSuspendDisabled)
+                .intersection(videoOverrideByScreenID.keys)
+        }
         suspendWhenOtherAppFullScreen =
             UserDefaults.standard.object(forKey: "suspendWhenOtherAppFullScreen") as? Bool ?? false
         suspendHighSensitivityEnabled =

@@ -534,6 +534,7 @@ extension WallpaperModel {
         for index in playlists.indices {
             playlists[index].videoPaths.removeAll { $0 == trimmed }
         }
+        clearVideoOverrides(forPath: trimmed)
         syncActivePlaylistPaths()
         registeredVideoDisplayNames.removeValue(forKey: trimmed)
         UserDefaults.standard.set(

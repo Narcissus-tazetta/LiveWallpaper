@@ -188,14 +188,15 @@ extension WallpaperModel {
         }
     }
 
-    private func createConfiguredPlayer() -> AVQueuePlayer {
+    /// AVQueuePlayer の基本設定。共有プレイヤーとディスプレイ固定の専用プレイヤー
+    /// の両方から使う(専用プレイヤーは常に `muted: true` で呼ぶ)。
+    func createConfiguredPlayer(muted: Bool) -> AVQueuePlayer {
         let player = AVQueuePlayer()
         player.allowsExternalPlayback = false
         player.preventsDisplaySleepDuringVideoPlayback = false
         player.actionAtItemEnd = .none
         player.automaticallyWaitsToMinimizeStalling = lightweightMode
-        player.isMuted = !audioEnabled
-        player.volume = audioVolume
+        player.isMuted = muted
         return player
     }
 
@@ -203,15 +204,23 @@ extension WallpaperModel {
         if let existing = sharedPlayer {
             return existing
         }
-        let player = createConfiguredPlayer()
+        let player = createConfiguredPlayer(muted: !audioEnabled)
+        player.volume = audioVolume
         sharedPlayer = player
         return player
     }
 
     private func attachSharedPlayerToAllViews() {
         let player = sharedPlayer
-        for view in playerViews where view.playerLayer.player !== player {
-            view.playerLayer.player = player
+        for index in playerViews.indices {
+            // オーバーライド画面は専用プレイヤーを使うため共有プレイヤーを付けない。
+            guard isSharedPlayerDisplay(displayIDForWindow(at: index)) else {
+                continue
+            }
+            let layer = playerViews[index].playerLayer
+            if layer.player !== player {
+                layer.player = player
+            }
         }
     }
 
@@ -241,6 +250,9 @@ extension WallpaperModel {
 
     func applyLightweightSettings() {
         sharedPlayer?.automaticallyWaitsToMinimizeStalling = lightweightMode
+        for player in dedicatedPlayersByScreenID.values {
+            player.automaticallyWaitsToMinimizeStalling = lightweightMode
+        }
     }
 
     func applyAudioSettings() {
@@ -379,7 +391,7 @@ extension WallpaperModel {
         }
     }
 
-    private func resolvePlaybackProfile() -> (bitRate: Double, buffer: TimeInterval) {
+    func resolvePlaybackProfile() -> (bitRate: Double, buffer: TimeInterval) {
         switch resolvedWorkProfile() {
         case .ultraLight:
             return (bitRate: 900_000, buffer: 0.08)
@@ -453,14 +465,21 @@ extension WallpaperModel {
 
     @discardableResult
     private func applyDynamicPlaybackProfile() -> Bool {
-        guard let player = sharedPlayer,
-              let item = player.currentItem
-        else {
+        var targetItems: [AVPlayerItem] = []
+        if let item = sharedPlayer?.currentItem {
+            targetItems.append(item)
+        }
+        targetItems.append(
+            contentsOf: dedicatedPlayersByScreenID.values.compactMap(\.currentItem)
+        )
+        guard !targetItems.isEmpty else {
             return false
         }
         let profile = resolvePlaybackProfile()
-        item.preferredPeakBitRate = profile.bitRate
-        item.preferredForwardBufferDuration = profile.buffer
+        for item in targetItems {
+            item.preferredPeakBitRate = profile.bitRate
+            item.preferredForwardBufferDuration = profile.buffer
+        }
         return true
     }
 

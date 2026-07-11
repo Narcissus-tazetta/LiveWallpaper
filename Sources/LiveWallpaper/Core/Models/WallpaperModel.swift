@@ -78,6 +78,7 @@ final class WallpaperModel: ObservableObject {
     var isDeepResuming: Bool = false
     let deepSuspendDelay: TimeInterval = 10
     var autoFrameRateTimer: Timer?
+    var autoSwitchTimer: Timer?
     var autoFrameRateThermalObserver: NSObjectProtocol?
     var autoFrameRatePowerStateObserver: NSObjectProtocol?
     var autoFrameRateBitRateFactor: Double = 1.0
@@ -117,6 +118,8 @@ final class WallpaperModel: ObservableObject {
     @Published var playlistPlaybackEnabled: Bool = false
     @Published var shufflePlaybackEnabled: Bool = false
     @Published var videoLoopEnabled: Bool = true
+    /// 自動切替の間隔(分)。0 はオフ。
+    @Published var autoSwitchIntervalMinutes: Int = 0
     @Published var pinCurrentVideo: Bool = false
     @Published var currentVideoIndex: Int?
     @Published var desktopLevelOffset: DesktopLevelOffset = .zero
@@ -150,12 +153,25 @@ final class WallpaperModel: ObservableObject {
     @Published var registeredWebWallpaperIDs: [UUID] = []
     @Published var registeredVideoDisplayNames: [String: String] = [:]
     @Published var launchAtLoginEnabled: Bool = false
+    /// Sparkle の自動更新設定。実体は AppDelegate が管理し、UI 表示用にここへ同期される。
+    @Published var autoUpdateEnabled: Bool = true
     @Published var appLanguage: AppLanguage = .automatic
     @Published var advancedSharingEnabled: Bool = false
     @Published var lockScreenSyncEnabled: Bool = false
     @Published var lockScreenSyncStatus: LockScreenSyncStatus = .disabled
     @Published var wallpaperPresentationByPath:
         [String: [String: WallpaperPresentation]] = [:]
+    /// 画面ID → その画面に固定表示する動画パス。空ならオーバーライドなし。
+    @Published var videoOverrideByScreenID: [String: String] = [:]
+    /// 自動停止(作業中の停止など)の対象から除外する画面ID。ここに含まれる画面は
+    /// 他の画面での作業やウィンドウ被覆に関わらず常に再生を続ける。
+    @Published var suspendDisabledDisplayIDs: Set<String> = []
+    /// 画面ID → その画面が従うプレイリストID。未設定ならライブラリ全体を対象にする。
+    @Published var screenPlaylistByScreenID: [String: UUID] = [:]
+    var dedicatedPlayersByScreenID: [String: AVQueuePlayer] = [:]
+    var dedicatedLoopersByScreenID: [String: AVPlayerLooper] = [:]
+    var dedicatedPlayerPathByScreenID: [String: String] = [:]
+    var dedicatedFreezeFrameByScreenID: [String: (path: String, time: CMTime, image: CGImage?)] = [:]
 
     var canAddPlaylist: Bool {
         playlists.count < maxPlaylistCount

@@ -22,8 +22,10 @@ extension SettingsView {
             wallpaperActionToolbar
             wallpaperListContent
 
-            if selectedAssignmentTarget == .desktop,
-               !model.registeredPlaybackEntries.isEmpty
+            if let screenID = activeDisplayOverrideScreenID {
+                displayOverridePlaybackControls(forScreenID: screenID)
+            } else if selectedAssignmentTarget == .desktop,
+                      !model.registeredPlaybackEntries.isEmpty
             {
                 playlistPlaybackControls
             }
@@ -57,11 +59,13 @@ extension SettingsView {
     }
 
     var filteredPaths: [String] {
+        let basePaths = activeDisplayOverrideScreenID.map(model.screenVideoPaths(forScreenID:))
+            ?? model.libraryVideoPaths
         let query = librarySearchQuery
         guard !query.isEmpty else {
-            return model.libraryVideoPaths
+            return basePaths
         }
-        return model.libraryVideoPaths.filter { path in
+        return basePaths.filter { path in
             matchesLibrarySearch(model.registeredVideoDisplayName(for: path), query: query)
                 || matchesLibrarySearch(URL(fileURLWithPath: path).lastPathComponent, query: query)
         }
@@ -80,7 +84,8 @@ extension SettingsView {
 
     private var mergedListEntries: [WallpaperListEntry] {
         let videoEntries = filteredPaths.map { WallpaperListEntry.video($0) }
-        guard model.webWallpaperFeatureEnabled else {
+        // ディスプレイ割り当てはまだ動画のみ対応(専用プレイヤーがWeb壁紙に非対応)。
+        guard model.webWallpaperFeatureEnabled, activeDisplayOverrideScreenID == nil else {
             return videoEntries
         }
         return videoEntries + filteredWebSources.map { WallpaperListEntry.web($0) }
@@ -154,6 +159,8 @@ extension SettingsView {
     private var playlistFilterControl: some View {
         if let editingID = editingPlaylistID {
             playlistInlineNameEditor(playlistID: editingID)
+        } else if let screenID = activeDisplayOverrideScreenID {
+            screenPlaylistFilterControl(forScreenID: screenID)
         } else {
             Menu {
                 Picker("", selection: playlistSelectionBinding) {
@@ -217,6 +224,74 @@ extension SettingsView {
                     .fill(Color.secondary.opacity(0.12))
             )
         }
+    }
+
+    /// 画面割り当てモード用のプレイリスト選択。作成・名前変更・削除は行わず、
+    /// 既存プレイリストへの割り当てまたは「すべての壁紙」への切り替えのみ。
+    private func screenPlaylistFilterControl(forScreenID screenID: String) -> some View {
+        Menu {
+            Picker("", selection: screenPlaylistSelectionBinding(forScreenID: screenID)) {
+                Label(
+                    "\(model.localizedString("すべての壁紙")) (\(model.libraryVideoPaths.count))",
+                    systemImage: "square.grid.2x2"
+                )
+                .tag(UUID?.none)
+
+                ForEach(model.playlists) { playlist in
+                    Label(
+                        "\(playlist.name) (\(playlist.videoPaths.count))",
+                        systemImage: "list.bullet.rectangle"
+                    )
+                    .tag(Optional(playlist.id))
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            HStack(spacing: 6) {
+                Image(
+                    systemName: model.screenPlaylistID(forScreenID: screenID) == nil
+                        ? "square.grid.2x2"
+                        : "list.bullet.rectangle"
+                )
+                .font(.system(size: 11, weight: .semibold))
+                Text(screenPlaylistName(forScreenID: screenID))
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.secondary.opacity(0.12))
+        )
+    }
+
+    private func screenPlaylistSelectionBinding(forScreenID screenID: String) -> Binding<UUID?> {
+        Binding(
+            get: { model.screenPlaylistID(forScreenID: screenID) },
+            set: { model.setScreenPlaylist($0, forScreenID: screenID) }
+        )
+    }
+
+    private func screenPlaylistName(forScreenID screenID: String) -> String {
+        guard let playlistID = model.screenPlaylistID(forScreenID: screenID),
+              let playlist = model.playlists.first(where: { $0.id == playlistID })
+        else {
+            return model.localizedString("すべての壁紙")
+        }
+        return playlist.name
+    }
+
+    private var autoSwitchIntervalBinding: Binding<Int> {
+        Binding(
+            get: { model.autoSwitchIntervalMinutes },
+            set: { model.setAutoSwitchInterval(minutes: $0) }
+        )
     }
 
     private var playlistSelectionBinding: Binding<UUID?> {
@@ -296,7 +371,13 @@ extension SettingsView {
 
     private var wallpaperActionToolbar: some View {
         HStack(spacing: 8) {
-            if let summaryText = selectedPlaylistSummaryText {
+            if activeDisplayOverrideScreenID != nil {
+                Text(model.localizedString("カードをクリックするとこの画面に割り当てられます"))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            } else if let summaryText = selectedPlaylistSummaryText {
                 Text(summaryText)
                     .font(.caption2)
                     .foregroundColor(.secondary)
@@ -315,7 +396,9 @@ extension SettingsView {
             }
             .buttonStyle(.borderedProminent)
 
-            if selectedAssignmentTarget == .desktop, model.webWallpaperFeatureEnabled {
+            if selectedAssignmentTarget == .desktop, activeDisplayOverrideScreenID == nil,
+               model.webWallpaperFeatureEnabled
+            {
                 Button(model.localizedString("Web壁紙を追加")) {
                     isWebWallpaperURLPopoverPresented = true
                 }
@@ -403,12 +486,24 @@ extension SettingsView {
                     ForEach(mergedListEntries) { entry in
                         switch entry {
                         case .video(let path):
-                            wallpaperCard(
-                                path: path,
-                                cardWidth: layout.1,
-                                assignmentTarget: selectedAssignmentTarget,
-                                playlistEditingID: model.selectedPlaylistID
-                            )
+                            if let screenID = activeDisplayOverrideScreenID {
+                                wallpaperCard(
+                                    path: path,
+                                    cardWidth: layout.1,
+                                    switchToWallpaperTabOnSelect: false,
+                                    isSelected: model.videoOverride(forScreenID: screenID) == path,
+                                    onSelect: {
+                                        model.setVideoOverride(path: path, forScreenID: screenID)
+                                    }
+                                )
+                            } else {
+                                wallpaperCard(
+                                    path: path,
+                                    cardWidth: layout.1,
+                                    assignmentTarget: selectedAssignmentTarget,
+                                    playlistEditingID: model.selectedPlaylistID
+                                )
+                            }
                         case .web(let source):
                             webWallpaperCard(
                                 source: source,
@@ -424,6 +519,50 @@ extension SettingsView {
             }
         }
         .frame(minHeight: wallpaperLibraryGridMinHeight, maxHeight: 340)
+    }
+
+    /// 画面割り当てモード用の再生コントロール。専用プレイヤーは常にループする
+    /// 前提のため、共有側にある「ループ再生」「シャッフル」「固定」は持たない。
+    private func displayOverridePlaybackControls(forScreenID screenID: String) -> some View {
+        let paths = model.screenVideoPaths(forScreenID: screenID)
+        let count = paths.count
+        let currentIndex = model.videoOverride(forScreenID: screenID)
+            .flatMap { paths.firstIndex(of: $0) }
+        return VStack(alignment: .leading, spacing: 6) {
+            Divider()
+
+            HStack(spacing: 14) {
+                Text(model.localizedString("この画面専用のプレイリストです"))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Spacer(minLength: 12)
+                if let currentIndex, count > 0 {
+                    Text("\(currentIndex + 1) / \(count)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    model.playPreviousVideo(forScreenID: screenID)
+                } label: {
+                    Label(model.localizedString("前へ"), systemImage: "backward.fill")
+                }
+                .buttonStyle(.bordered)
+                .disabled(count < 2)
+
+                Button {
+                    model.playNextVideo(forScreenID: screenID)
+                } label: {
+                    Label(model.localizedString("次へ"), systemImage: "forward.fill")
+                }
+                .buttonStyle(.bordered)
+                .disabled(count < 2)
+
+                Spacer(minLength: 0)
+            }
+        }
     }
 
     private var playlistPlaybackControls: some View {
@@ -497,6 +636,23 @@ extension SettingsView {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+            }
+
+            HStack(spacing: 8) {
+                Text(model.localizedString("自動で次の壁紙へ"))
+                Picker("", selection: autoSwitchIntervalBinding) {
+                    Text(model.localizedString("オフ")).tag(0)
+                    Text(model.localizedString("5分")).tag(5)
+                    Text(model.localizedString("15分")).tag(15)
+                    Text(model.localizedString("30分")).tag(30)
+                    Text(model.localizedString("1時間")).tag(60)
+                    Text(model.localizedString("3時間")).tag(180)
+                }
+                .labelsHidden()
+                .fixedSize()
+                .disabled(registeredCount < 2 || model.pinCurrentVideo)
+
+                Spacer(minLength: 0)
             }
 
             HStack(spacing: 8) {

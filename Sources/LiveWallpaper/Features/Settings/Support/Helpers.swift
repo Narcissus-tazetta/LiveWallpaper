@@ -21,7 +21,7 @@ extension SettingsView {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .focusable(false)
+        .accessibilityAddTraits(selectedTab == tab ? [.isSelected] : [])
     }
 
     /// White text on the accent-color fill above reads fine for the default

@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         syncLaunchAtLoginState()
         autoUpdateEnabled =
             UserDefaults.standard.object(forKey: "autoUpdateEnabled") as? Bool ?? true
+        wallpaperModel.autoUpdateEnabled = autoUpdateEnabled
         NSApp.applicationIconImage = appIconImage()
         LocalizationManager.swizzle()
         LocalizationManager.setLanguage(wallpaperModel.effectiveAppLanguageCode)

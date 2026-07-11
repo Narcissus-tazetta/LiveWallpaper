@@ -13,10 +13,10 @@ extension SettingsView {
                 Spacer(minLength: 0)
             }
 
-            if let path = resolvedFitEditorVideoPath(),
+            if let path = fitEditor.resolvedVideoPath(),
                !path.isEmpty
             {
-                let screenID = resolvedFitScreenID()
+                let screenID = fitEditor.resolvedScreenID()
                 fitEditorContent(path: path, screenID: screenID)
             } else {
                 Text(model.localizedString("下の壁紙一覧から動画を選択すると、画面ごとにフィット設定を編集できます"))
@@ -33,16 +33,16 @@ extension SettingsView {
 
     @ViewBuilder
     private func fitEditorContent(path: String, screenID: String) -> some View {
-        let fitModeValue = fitEditorFitMode(path: path, screenID: screenID)
-        let zoomValue = fitEditorZoom(path: path, screenID: screenID)
-        let offsetXValue = fitEditorOffsetX(path: path, screenID: screenID)
-        let offsetYValue = fitEditorOffsetY(path: path, screenID: screenID)
-        let isDirty = isFitEditorDraftDirty(path: path, screenID: screenID)
+        let fitModeValue = fitEditor.fitMode(path: path, screenID: screenID)
+        let zoomValue = fitEditor.zoom(path: path, screenID: screenID)
+        let offsetXValue = fitEditor.offsetX(path: path, screenID: screenID)
+        let offsetYValue = fitEditor.offsetY(path: path, screenID: screenID)
+        let isDirty = fitEditor.isDraftDirty(path: path, screenID: screenID)
         let hasOverride = model.hasWallpaperPresentationOverride(path: path, screenID: screenID)
         let panGeometry = model.wallpaperRenderGeometry(
             path: path,
             screenID: screenID,
-            containerSize: resolvedFitEditorConstraintFrameSize(screenID: screenID),
+            containerSize: fitEditor.resolvedConstraintFrameSize(screenID: screenID),
             fitMode: fitModeValue,
             zoom: zoomValue,
             offsetX: offsetXValue,
@@ -57,15 +57,15 @@ extension SettingsView {
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if !fitEditorScreens.isEmpty {
+            if !fitEditor.screens.isEmpty {
                 Picker(
                     "",
                     selection: Binding<String>(
-                        get: { resolvedFitScreenID() },
-                        set: { selectedFitScreenID = $0 }
+                        get: { fitEditor.resolvedScreenID() },
+                        set: { fitEditor.selectScreen($0) }
                     )
                 ) {
-                    ForEach(fitEditorScreens) { screen in
+                    ForEach(fitEditor.screens) { screen in
                         Text(screen.name).tag(screen.id)
                     }
                 }
@@ -107,7 +107,7 @@ extension SettingsView {
                         (model.localizedString("拡大"), VideoFitMode.fill),
                         (model.localizedString("全体"), VideoFitMode.fit)
                     ],
-                    selection: fitModeBinding(path: path, screenID: screenID)
+                    selection: fitEditor.fitModeBinding(path: path, screenID: screenID)
                 )
                 .frame(width: fitEditorSegmentedPickerWidth, height: 24)
             }
@@ -131,7 +131,10 @@ extension SettingsView {
                     (model.localizedString("動画"), FitPreviewMode.video),
                     (model.localizedString("静止画"), FitPreviewMode.still)
                 ],
-                selection: $fitPreviewMode
+                selection: Binding(
+                    get: { fitEditor.previewMode },
+                    set: { fitEditor.setPreviewMode($0) }
+                )
             )
             .frame(width: fitEditorSegmentedPickerWidth, height: 24)
         }
@@ -140,21 +143,21 @@ extension SettingsView {
             Text(model.localizedString("ズーム"))
                 .frame(width: fitEditorRowLabelWidth, alignment: .leading)
             Slider(
-                value: zoomBinding(path: path, screenID: screenID),
+                value: fitEditor.zoomBinding(path: path, screenID: screenID),
                 in: WallpaperGeometry.zoomRange
             )
             fitEditorValueText(String(format: "%.2fx", zoomValue)) {
-                setFitEditorDraftZoom(1.0, path: path, screenID: screenID)
+                fitEditor.setDraftZoom(1.0, path: path, screenID: screenID)
             }
         }
 
         HStack(spacing: 12) {
             Text(model.localizedString("横位置"))
                 .frame(width: fitEditorRowLabelWidth, alignment: .leading)
-            Slider(value: offsetXBinding(path: path, screenID: screenID), in: -1 ... 1)
+            Slider(value: fitEditor.offsetXBinding(path: path, screenID: screenID), in: -1 ... 1)
                 .disabled(!canPanX)
             fitEditorValueText(String(format: "%+.0f%%", offsetXValue * 100)) {
-                setFitEditorDraftOffsetX(0, path: path, screenID: screenID)
+                fitEditor.setDraftOffsetX(0, path: path, screenID: screenID)
             }
         }
         .opacity(canPanX ? 1 : 0.5)
@@ -162,10 +165,10 @@ extension SettingsView {
         HStack(spacing: 12) {
             Text(model.localizedString("縦位置"))
                 .frame(width: fitEditorRowLabelWidth, alignment: .leading)
-            Slider(value: offsetYBinding(path: path, screenID: screenID), in: -1 ... 1)
+            Slider(value: fitEditor.offsetYBinding(path: path, screenID: screenID), in: -1 ... 1)
                 .disabled(!canPanY)
             fitEditorValueText(String(format: "%+.0f%%", offsetYValue * 100)) {
-                setFitEditorDraftOffsetY(0, path: path, screenID: screenID)
+                fitEditor.setDraftOffsetY(0, path: path, screenID: screenID)
             }
         }
         .opacity(canPanY ? 1 : 0.5)
@@ -180,7 +183,7 @@ extension SettingsView {
             .font(.caption)
             .foregroundColor(.secondary)
         Text(
-            fitEditorLiveApplyEnabled
+            fitEditor.liveApplyEnabled
                 ? model.localizedString("変更は自動的に壁紙へ反映されます")
                 : model.localizedString("この画面ではプレビューのみ更新されます。『保存して再適用』で壁紙に反映されます")
         )
@@ -197,8 +200,8 @@ extension SettingsView {
             Toggle(
                 model.localizedString("リアルタイム反映"),
                 isOn: Binding(
-                    get: { fitEditorLiveApplyEnabled },
-                    set: { setFitEditorLiveApplyEnabled($0, path: path, screenID: screenID) }
+                    get: { fitEditor.liveApplyEnabled },
+                    set: { fitEditor.setLiveApplyEnabled($0, path: path, screenID: screenID) }
                 )
             )
             .toggleStyle(.checkbox)
@@ -207,7 +210,7 @@ extension SettingsView {
 
             Spacer(minLength: 0)
 
-            if fitEditorShowsSavedFeedback {
+            if fitEditor.showsSavedFeedback {
                 Label(model.localizedString("反映しました"), systemImage: "checkmark.circle.fill")
                     .font(.caption)
                     .foregroundColor(.green)
@@ -215,19 +218,19 @@ extension SettingsView {
             }
 
             Button(model.localizedString("保存して再適用")) {
-                applyFitEditorDraft(path: path, screenID: screenID)
+                fitEditor.applyDraft(path: path, screenID: screenID)
             }
             .buttonStyle(.borderedProminent)
             .disabled(!isDirty)
 
             Button(model.localizedString("変更を破棄")) {
-                discardFitEditorDraftChanges(path: path, screenID: screenID)
+                fitEditor.discardDraftChanges(path: path, screenID: screenID)
             }
             .buttonStyle(.bordered)
             .disabled(!isDirty)
             .help(model.localizedString("未保存の編集を取り消して、保存済みの状態に戻します"))
         }
-        .animation(.easeInOut(duration: 0.15), value: fitEditorShowsSavedFeedback)
+        .animation(.easeInOut(duration: 0.15), value: fitEditor.showsSavedFeedback)
     }
 
     private func fitEditorSecondaryActions(
@@ -237,21 +240,21 @@ extension SettingsView {
     ) -> some View {
         HStack(spacing: 8) {
             Button(model.localizedString("リセット")) {
-                resetFitEditorDraft(path: path, screenID: screenID)
+                fitEditor.resetDraft(path: path, screenID: screenID)
             }
             .buttonStyle(.bordered)
             .help(model.localizedString("ズームと位置を初期値に戻します（保存するまで壁紙には反映されません）"))
 
             Button(model.localizedString("既定値に従う")) {
-                clearFitEditorOverride(path: path, screenID: screenID)
+                fitEditor.clearOverride(path: path, screenID: screenID)
             }
             .buttonStyle(.bordered)
             .disabled(!hasOverride)
             .help(model.localizedString("この動画・この画面の個別設定を削除して、設定タブの既定値を使います"))
 
-            if fitEditorScreens.count > 1 {
+            if fitEditor.screens.count > 1 {
                 Button(model.localizedString("全ての画面へ適用")) {
-                    applyFitEditorDraftToAllScreens(path: path, screenID: screenID)
+                    fitEditor.applyDraftToAllScreens(path: path, screenID: screenID)
                 }
                 .buttonStyle(.bordered)
                 .help(model.localizedString("現在の編集内容を保存して、接続中のすべての画面へコピーします"))

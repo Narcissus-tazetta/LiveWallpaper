@@ -178,7 +178,9 @@ extension WallpaperModel {
             hasEligibleFrontmostApp: true,
             occludedDisplayIDs: occludedWallpaperDisplayIDs(),
             highSensitivityCoveredDisplayIDs: highSensitivityCoveredDisplayIDs(for: app),
-            frontmostOnlyDisplayIDs: suspendWhenOtherAppFrontmost ? allWallpaperDisplayIDs() : []
+            frontmostOnlyDisplayIDs: suspendWhenOtherAppFrontmost
+                ? frontmostSuspendEligibleDisplayIDs()
+                : []
         )
 
         pendingSuspendConfirmationWorkItem?.cancel()
@@ -219,7 +221,9 @@ extension WallpaperModel {
                 hasEligibleFrontmostApp: true,
                 occludedDisplayIDs: occludedWallpaperDisplayIDs(),
                 highSensitivityCoveredDisplayIDs: highSensitivityCoveredDisplayIDs(for: app),
-                frontmostOnlyDisplayIDs: suspendWhenOtherAppFrontmost ? allWallpaperDisplayIDs() : []
+                frontmostOnlyDisplayIDs: suspendWhenOtherAppFrontmost
+                    ? frontmostSuspendEligibleDisplayIDs()
+                    : []
             )
         )
     }
@@ -294,18 +298,30 @@ extension WallpaperModel {
         return occluded
     }
 
-    private func allWallpaperDisplayIDs() -> Set<String> {
+    func allWallpaperDisplayIDs() -> Set<String> {
         Set(displayIDByWindow.values)
     }
 
+    /// 「他のアプリを使っている間は再生を停止」の対象画面。
+    /// ディスプレイ固定(オーバーライド)しているかどうかに関わらず全画面が対象。
+    /// 個別に自動停止させたくない画面は「自動停止しないディスプレイ」の
+    /// トグル(suspendDisabledDisplayIDs、applyCoveringAppSuspension側で適用)で
+    /// 除外する。
+    private func frontmostSuspendEligibleDisplayIDs() -> Set<String> {
+        allWallpaperDisplayIDs()
+    }
+
     private func applyCoveringAppSuspension(_ displayIDs: Set<String>) {
-        guard suspendedDisplayIDs != displayIDs else {
+        // ユーザーが「自動停止の対象にしない」と選んだ画面は、どの信号(占有・
+        // 高精度検出・前面アプリ)が示していようと常に除外する。
+        let filtered = displayIDs.subtracting(suspendDisabledDisplayIDs)
+        guard suspendedDisplayIDs != filtered else {
             return
         }
         AppLog.suspend.debug(
-            "transition from=\(String(describing: self.suspendedDisplayIDs), privacy: .public) to=\(String(describing: displayIDs), privacy: .public) at=\(CFAbsoluteTimeGetCurrent(), format: .fixed(precision: 3))"
+            "transition from=\(String(describing: self.suspendedDisplayIDs), privacy: .public) to=\(String(describing: filtered), privacy: .public) at=\(CFAbsoluteTimeGetCurrent(), format: .fixed(precision: 3))"
         )
-        suspendedDisplayIDs = displayIDs
+        suspendedDisplayIDs = filtered
         applySuspensionStateToPlayers()
     }
 

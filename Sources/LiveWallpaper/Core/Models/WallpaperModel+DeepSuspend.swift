@@ -10,7 +10,13 @@ extension WallpaperModel {
     func applyFreezeImageToAllViews(_ image: CGImage?) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        for view in playerViews {
+        for index in playerViews.indices {
+            // オーバーライド画面のフリーズは applyDedicatedSuspensionState が
+            // 専用プレイヤーの動画から生成した静止画で行う。
+            guard isSharedPlayerDisplay(displayIDForWindow(at: index)) else {
+                continue
+            }
+            let view = playerViews[index]
             view.playerLayer.player = nil
             view.playerLayer.contents = image
         }
@@ -55,7 +61,13 @@ extension WallpaperModel {
             return
         }
         let displayIDs = (0 ..< displayCount).map { displayIDForWindow(at: $0) }
-        guard displayIDs.allSatisfy({ suspendedDisplayIDs.contains($0) }) else {
+        let sharedDisplayIDs = sharedPlayerDisplayIDs(among: displayIDs)
+        // 共有プレイヤーを使う画面が1つもなければ(全画面オーバーライド中)、
+        // 共有プレイヤーはどこにも見えていないので解放してよい。
+        // applySuspensionStateToPlayers 側の allSuspended 判定と揃えている。
+        let sharedPlayerFullyHidden = sharedDisplayIDs.isEmpty
+            || sharedDisplayIDs.allSatisfy({ suspendedDisplayIDs.contains($0) })
+        guard sharedPlayerFullyHidden else {
             return
         }
         guard currentVideoPath != nil else {

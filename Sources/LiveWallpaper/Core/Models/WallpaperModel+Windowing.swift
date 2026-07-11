@@ -136,6 +136,9 @@ extension WallpaperModel {
             applyWebSuspensionState()
             return
         }
+        // オーバーライド画面の専用プレイヤーは独立に処理し、以降の共有プレイヤー
+        // ロジック(フリーズフレーム・deep suspend)は残りの画面だけを対象にする。
+        applyDedicatedSuspensionState()
         guard let player = sharedPlayer else {
             return
         }
@@ -145,7 +148,13 @@ extension WallpaperModel {
             return
         }
         let displayIDs = (0 ..< displayCount).map { displayIDForWindow(at: $0) }
-        let allSuspended = displayIDs.allSatisfy { suspendedDisplayIDs.contains($0) }
+        let sharedDisplayIDs = sharedPlayerDisplayIDs(among: displayIDs)
+        // 共有プレイヤーを使う画面が1つもない(全画面オーバーライド中)場合も、
+        // 共有プレイヤーはどこにも見えていない=完全に隠れているのと同義に扱う。
+        // そうしないと、もう使われていない共有プレイヤーの重いリソース(deep
+        // suspend による解放)が永久に発火しなくなる。
+        let allSuspended = sharedDisplayIDs.isEmpty
+            || sharedDisplayIDs.allSatisfy { suspendedDisplayIDs.contains($0) }
 
         // A deep-resume is in flight (rebuilding the freed item in the
         // background). Until it finishes, keep showing the freeze frame rather
@@ -227,6 +236,10 @@ extension WallpaperModel {
             let displayID = index < displayIDs.count
                 ? displayIDs[index]
                 : displayIDForWindow(at: index)
+            // オーバーライド画面は applyDedicatedSuspensionState が担当済み。
+            guard isSharedPlayerDisplay(displayID) else {
+                continue
+            }
             let expectedPlayer = suspendedDisplayIDs.contains(displayID) ? nil : player
             let layer = playerViews[index].playerLayer
             guard layer.player !== expectedPlayer else {
@@ -259,7 +272,7 @@ extension WallpaperModel {
     /// frame lands. Re-validated on every tick: a view that got re-suspended or
     /// re-detached meanwhile is dropped from the wait, and if readiness never
     /// reports we still reveal the live player rather than freezing forever.
-    private func clearFreezeStillWhenReady(
+    func clearFreezeStillWhenReady(
         _ views: [PlayerView],
         attemptsRemaining: Int
     ) {
@@ -308,20 +321,7 @@ extension WallpaperModel {
         guard let path = currentVideoPath else {
             return nil
         }
-        let asset = AVURLAsset(url: URL(fileURLWithPath: path))
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        // This runs synchronously on the main thread right as the wallpaper gets
-        // covered, so it must stay cheap. A zero tolerance forces AVFoundation to
-        // decode every frame from the preceding sync sample up to the exact
-        // requested time, which can be a long stall on a long GOP. A ~1s window
-        // lets it snap to the nearest sync sample instead — imperceptible here
-        // since the frozen still is only shown while another app already covers
-        // the screen.
-        let tolerance = CMTime(seconds: 1, preferredTimescale: 600)
-        generator.requestedTimeToleranceBefore = tolerance
-        generator.requestedTimeToleranceAfter = tolerance
-        return try? generator.copyCGImage(at: player.currentTime(), actualTime: nil)
+        return VideoFrameCapture.capture(path: path, time: player.currentTime())
     }
 
     func configureWallpaperWindowRefreshMonitoring() {
@@ -459,7 +459,11 @@ extension WallpaperModel {
                 window.setFrame(screen.frame, display: true)
             }
             applyPlayerPresentation(to: playerView, screen: screen)
-            if playerView.playerLayer.player !== player {
+            // オーバーライド画面への専用プレイヤーの付け替えは、この後の
+            // applySuspensionStateToPlayers に任せる。
+            if isSharedPlayerDisplay(displayID),
+               playerView.playerLayer.player !== player
+            {
                 playerView.playerLayer.player = player
             }
             if window.contentView !== playerView {
@@ -482,6 +486,7 @@ extension WallpaperModel {
         playerViews = nextPlayerViews
         webPlayerViews = []
 
+        pruneDedicatedPlayers(activeDisplayIDs: Set(screens.map { displayIDString(for: $0) }))
         syncSuspendedDisplays(for: screens)
         applySuspensionStateToPlayers()
 
@@ -489,6 +494,8 @@ extension WallpaperModel {
     }
 
     private func rebuildWebWindows() {
+        // Web壁紙は全画面を置き換えるため、専用プレイヤーは全て解放する。
+        stopAllDedicatedPlayers()
         let screens: [NSScreen] = targetScreens()
 
         var reusableByDisplayID: [String: NSWindow] = [:]
@@ -664,7 +671,9 @@ extension WallpaperModel {
                 } else if index < playerViews.count {
                     let playerView = playerViews[index]
                     applyPlayerPresentation(to: playerView, screen: screen)
-                    if playerView.playerLayer.player !== sharedPlayer {
+                    if isSharedPlayerDisplay(displayID),
+                       playerView.playerLayer.player !== sharedPlayer
+                    {
                         playerView.playerLayer.player = sharedPlayer
                     }
                     if window.contentView !== playerView {

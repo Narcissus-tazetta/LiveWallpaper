@@ -23,16 +23,8 @@
 "全体" = "Sığdır";
 "再生の軽量モード（省電力）" = "Hafif oynatma modu (enerji tasarrufu)";
 "作業中は壁紙の再生を自動停止" = "Çalışırken duvar kağıdını otomatik duraklat";
-"他のアプリのウィンドウで壁紙の画面が完全に隠れている間、再生を停止します。権限の許可は不要です。" = "Oynatmayı, başka bir uygulamanın penceresi duvar kağıdının ekranını tamamen kapladığı sürece duraklatır. İzin gerekmez.";
-"壁紙が隠れているかどうかに関わらず、他のアプリを選択している（前面にある）間は再生を停止します。" = "Duvar kağıdını gerçekten kapatmasa bile, başka bir uygulama seçili (önde) olduğunda oynatmayı duraklatır.";
-"ウィンドウ被覆検出" = "Pencere Kaplama Algılaması";
-"メニューバーの帯などで壁紙がわずかに透けて見えていても、他のアプリのウィンドウが画面の大部分を覆っていれば停止します。画面収録の権限が必要です。" = "Duvar kağıdının bir kısmı (ör. menü çubuğunun arkasında) görünmeye devam etse bile, başka bir uygulamanın penceresi ekranın çoğunu kaplıyorsa duraklatır. Ekran Kaydı izni gerektirir.";
-"ウィンドウ被覆検出には画面収録の許可が必要です。許可されるまでは通常モードと同じ判定になります。" = "Pencere Kaplama Algılaması Ekran Kaydı izni gerektirir. İzin verilene kadar normal modla aynı şekilde davranır.";
 "画面収録の許可を開く" = "Ekran Kaydı iznini aç";
-"他のアプリが前面にあるとき再生を停止" = "Başka bir uygulama öndeyken oynatmayı duraklat";
-"停止対象から除外するアプリ" = "Duraklatma dışında tutulan uygulamalar";
 "アプリを追加" = "Uygulama ekle";
-"除外アプリは未設定です" = "Hariç tutulan uygulama ayarlanmadı.";
 "起動中のアプリから選択" = "Çalışan uygulamalardan seç";
 "検索" = "Ara";
 "一致するアプリがありません" = "Eşleşen uygulama yok";
@@ -260,3 +252,43 @@
 "チェックした動画がこのプレイリストで再生されます" = "İşaretli videolar bu oynatma listesinde oynatılır";
 "Web壁紙機能を有効にする" = "Web duvar kağıdı özelliğini etkinleştir";
 "オンにすると壁紙タブにWeb壁紙セクションが表示されます。実験的な機能です。" = "Açıldığında Duvar Kağıdı sekmesinde Web duvar kağıdı bölümü görünür. Deneysel bir özelliktir.";
+
+"設定を検索" = "Ayarlarda ara";
+"該当する設定がありません" = "Eşleşen ayar yok";
+"設定を書き出す…" = "Ayarları Dışa Aktar…";
+"設定を読み込む…" = "Ayarları İçe Aktar…";
+"表示・再生などの設定をJSONファイルとして保存・復元できます。壁紙の動画ファイル自体は含まれません" = "Görüntüleme ve oynatma ayarlarını JSON dosyası olarak kaydedip geri yükleyebilirsiniz. Duvar kağıdı video dosyalarının kendisi dahil değildir";
+"設定を読み込みました" = "Ayarlar içe aktarıldı";
+"設定の読み込みに失敗しました" = "Ayarlar içe aktarılamadı";
+"設定の書き出しに失敗しました" = "Ayarlar dışa aktarılamadı";
+
+"壁紙がほかのアプリのウィンドウで完全に隠れている間は、再生を止めて消費電力を抑えます。権限の許可は不要です。" = "Duvar kağıdı diğer uygulamaların pencereleri tarafından tamamen gizlendiğinde, güç tasarrufu için oynatma duraklatılır. İzin gerekmez.";
+"ほかのアプリを使っている間は再生を停止" = "Diğer uygulamaları kullanırken oynatmayı duraklat";
+"壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。" = "Duvar kağıdının görünür olup olmadığına bakılmaksızın, başka bir uygulama öndeyken oynatma duraklatılır.";
+"画面がほぼ隠れたら停止（高精度）" = "Ekran büyük ölçüde kapandığında duraklat (hassas)";
+"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。" = "Duvar kağıdı az da olsa görünse bile, ekranın büyük bölümü pencerelerle kaplandığında oynatma duraklatılır. Bu algılama için Ekran Kaydı izni gerekir.";
+"高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "Hassas algılama için Ekran Kaydı izni gerekir. İzin verilene kadar standart yöntem kullanılır.";
+"再生を止めないアプリ" = "Oynatmayı hiç duraklatmayan uygulamalar";
+"再生を止めないアプリはまだ登録されていません" = "Henüz hariç tutulan uygulama yok";
+
+"自動で次の壁紙へ" = "Duvar kağıdını otomatik değiştir";
+"オフ" = "Kapalı";
+"5分" = "5 dk";
+"15分" = "15 dk";
+"30分" = "30 dk";
+"1時間" = "1 saat";
+"3時間" = "3 saat";
+
+"ディスプレイに割り当て…" = "Ekrana ata…";
+"すべての割り当てを解除" = "Tüm ekran atamalarını kaldır";
+"設定の管理" = "Ayar Yönetimi";
+
+"自動停止しないディスプレイ" = "Otomatik duraklamayan ekranlar";
+"オンにすると、この画面はメイン画面での作業やウィンドウの被覆に関わらず再生を続けます" = "Açıldığında, bu ekran ana ekrandaki etkinlikten veya pencere kaplamasından bağımsız olarak oynatmaya devam eder";
+
+"デスクトップ（共有）" = "Masaüstü (Paylaşılan)";
+"画面ごとに壁紙を切り替え" = "Ekrana göre duvar kağıdını değiştir";
+
+"この画面専用のプレイリストです" = "Bu, yalnızca bu ekrana özel bir oynatma listesidir";
+
+"カードをクリックするとこの画面に割り当てられます" = "Bir karta tıklayarak bu ekrana atayın";

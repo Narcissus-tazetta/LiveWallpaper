@@ -3,6 +3,9 @@ import ServiceManagement
 import SwiftUI
 
 extension AppDelegate {
+    // 既定幅を 880→780 に変更した際に旧フレームを引き継がないよう名前を更新済み。
+    private static let settingsWindowFrameAutosaveName = "SettingsWindow780"
+
     func setupSettingsWindow() {
         let root = SettingsRootView(model: wallpaperModel).environment(
             \.locale,
@@ -12,9 +15,12 @@ extension AppDelegate {
         let window = NSWindow(contentViewController: hosting)
         window.title = localized("Live Wallpaper 設定")
         window.styleMask.insert(.resizable)
-        window.minSize = NSSize(width: 880, height: 540)
-        window.center()
-        window.setContentSize(NSSize(width: 880, height: 540))
+        window.minSize = NSSize(width: 780, height: 540)
+        window.setContentSize(NSSize(width: 780, height: 540))
+        if !window.setFrameUsingName(Self.settingsWindowFrameAutosaveName) {
+            window.center()
+        }
+        window.setFrameAutosaveName(Self.settingsWindowFrameAutosaveName)
         window.isReleasedWhenClosed = false
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
@@ -42,7 +48,10 @@ extension AppDelegate {
                     }
                 }
                 if characters == "q" {
+                    // 設定ウィンドウ操作中の Cmd+Q は誤ってアプリごと終了しないよう、
+                    // 無反応にするのではなくウィンドウを閉じる操作として扱う。
                     if let win = self?.settingsWindowController?.window, win.isKeyWindow {
+                        win.close()
                         return nil
                     } else {
                         NSApp.terminate(nil)
@@ -210,6 +219,7 @@ extension AppDelegate {
 
     func setAutoUpdateEnabled(_ enabled: Bool) {
         autoUpdateEnabled = enabled
+        wallpaperModel.autoUpdateEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "autoUpdateEnabled")
         #if canImport(Sparkle)
             if let updater = updaterController?.updater {

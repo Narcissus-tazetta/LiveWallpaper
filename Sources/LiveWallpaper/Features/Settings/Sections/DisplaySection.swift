@@ -108,34 +108,34 @@ extension SettingsView {
       VStack(alignment: .leading, spacing: 12) {
         settingsFootnote(
           model.localizedString(
-            "他のアプリのウィンドウで壁紙の画面が完全に隠れている間、再生を停止します。権限の許可は不要です。"
+            "壁紙がほかのアプリのウィンドウで完全に隠れている間は、再生を止めて消費電力を抑えます。権限の許可は不要です。"
           )
         )
 
         Toggle(isOn: suspendFrontmostOnlyBinding) {
           HStack(spacing: 6) {
-            Text(model.localizedString("他のアプリが前面にあるとき再生を停止"))
+            Text(model.localizedString("ほかのアプリを使っている間は再生を停止"))
             helpIconButton(for: .suspendFrontmostOnly)
           }
         }
         if expandedHelpTopics.contains(.suspendFrontmostOnly) {
           settingsFootnote(
             model.localizedString(
-              "壁紙が隠れているかどうかに関わらず、他のアプリを選択している（前面にある）間は再生を停止します。"
+              "壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。"
             )
           )
         }
 
         Toggle(isOn: suspendHighSensitivityBinding) {
           HStack(spacing: 6) {
-            Text(model.localizedString("ウィンドウ被覆検出"))
+            Text(model.localizedString("画面がほぼ隠れたら停止（高精度）"))
             helpIconButton(for: .suspendHighSensitivity)
           }
         }
         if expandedHelpTopics.contains(.suspendHighSensitivity) {
           settingsFootnote(
             model.localizedString(
-              "メニューバーの帯などで壁紙がわずかに透けて見えていても、他のアプリのウィンドウが画面の大部分を覆っていれば停止します。画面収録の権限が必要です。"
+              "壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。"
             )
           )
         }
@@ -150,11 +150,49 @@ extension SettingsView {
           }
         }
 
+        if model.availableDisplayScreens().count > 1 {
+          Divider().opacity(0.35)
+          displaySuspendExclusionContent
+        }
+
         Divider().opacity(0.35)
 
         suspendExclusionContent
       }
     }
+  }
+
+  /// 接続中の画面ごとに、自動停止の対象にするかどうかを切り替えるリスト。
+  var displaySuspendExclusionContent: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(model.localizedString("自動停止しないディスプレイ"))
+        .font(.caption)
+        .foregroundColor(.secondary)
+
+      VStack(alignment: .leading, spacing: 4) {
+        ForEach(model.availableDisplayScreens(), id: \.id) { screen in
+          displaySuspendToggleRow(for: screen)
+        }
+      }
+    }
+  }
+
+  func displaySuspendToggleRow(for screen: WallpaperModel.DisplayScreenInfo) -> some View {
+    Toggle(isOn: suspendDisabledBinding(forScreenID: screen.id)) {
+      Text(screen.name)
+        .lineLimit(1)
+        .truncationMode(.tail)
+    }
+    .toggleStyle(.checkbox)
+    .controlSize(.small)
+    .help(model.localizedString("オンにすると、この画面はメイン画面での作業やウィンドウの被覆に関わらず再生を続けます"))
+  }
+
+  func suspendDisabledBinding(forScreenID screenID: String) -> Binding<Bool> {
+    Binding(
+      get: { model.isSuspendDisabled(forScreenID: screenID) },
+      set: { model.setSuspendDisabled($0, forScreenID: screenID) }
+    )
   }
 
   var shouldShowScreenRecordingCoverageWarning: Bool {
@@ -164,13 +202,13 @@ extension SettingsView {
   }
 
   func screenRecordingCoverageWarningText() -> String {
-    model.localizedString("ウィンドウ被覆検出には画面収録の許可が必要です。許可されるまでは通常モードと同じ判定になります。")
+    model.localizedString("高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。")
   }
 
   var suspendExclusionContent: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(alignment: .center) {
-        Text(model.localizedString("停止対象から除外するアプリ"))
+        Text(model.localizedString("再生を止めないアプリ"))
           .font(.caption)
           .foregroundColor(.secondary)
         Spacer()
@@ -186,7 +224,7 @@ extension SettingsView {
       }
 
       if model.suspendExclusionBundleIDs.isEmpty {
-        settingsFootnote(model.localizedString("除外アプリは未設定です"))
+        settingsFootnote(model.localizedString("再生を止めないアプリはまだ登録されていません"))
       } else {
         ScrollView(.vertical, showsIndicators: true) {
           VStack(alignment: .leading, spacing: 4) {

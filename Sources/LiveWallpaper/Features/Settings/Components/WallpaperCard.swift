@@ -17,6 +17,7 @@ extension SettingsView {
         // Web壁紙が実際に表示中のときは動画側を「デスクトップに設定中」として扱わない。
         let isDesktopAssigned = model.currentVideoPath == path && !model.isWebWallpaperActive
         let isLockScreenAssigned = model.lockScreenVideoPath == path
+        let isDisplayOverrideAssigned = model.videoOverrideByScreenID.values.contains(path)
         let strokeColor = wallpaperCardStrokeColor(
             path: path,
             assignmentTarget: assignmentTarget,
@@ -56,7 +57,8 @@ extension SettingsView {
                     HStack(alignment: .top, spacing: 4) {
                         wallpaperAssignmentBadges(
                             isDesktopAssigned: isDesktopAssigned,
-                            isLockScreenAssigned: isLockScreenAssigned
+                            isLockScreenAssigned: isLockScreenAssigned,
+                            isDisplayOverrideAssigned: isDisplayOverrideAssigned
                         )
                         Spacer(minLength: 0)
                         if model.pinCurrentVideo, isDesktopAssigned {
@@ -166,6 +168,9 @@ extension SettingsView {
                 model.selectLockScreenVideo(path: path)
             }
             .disabled(!model.lockScreenSyncService.isSupported)
+            if model.availableDisplayScreens().count > 1 {
+                displayOverrideMenu(path: path)
+            }
             playlistMembershipMenus(
                 isContained: { model.playlistContainsVideo($0.id, path: path) },
                 add: { playlistID in _ = model.addRegisteredVideo(path: path, to: playlistID) },
@@ -182,6 +187,37 @@ extension SettingsView {
             }
             Button(model.localizedString("登録から削除")) {
                 model.removeRegisteredVideo(path: path)
+            }
+        }
+    }
+
+    /// この動画を特定のディスプレイに固定表示するメニュー。
+    /// 選択で割り当て、割り当て済みの画面を選ぶと解除(トグル)。
+    @ViewBuilder
+    func displayOverrideMenu(path: String) -> some View {
+        Menu(model.localizedString("ディスプレイに割り当て…")) {
+            ForEach(model.availableDisplayScreens()) { screen in
+                Button {
+                    if model.videoOverride(forScreenID: screen.id) == path {
+                        model.setVideoOverride(path: nil, forScreenID: screen.id)
+                    } else {
+                        model.setVideoOverride(path: path, forScreenID: screen.id)
+                    }
+                } label: {
+                    if model.videoOverride(forScreenID: screen.id) == path {
+                        Label(screen.name, systemImage: "checkmark")
+                    } else {
+                        Text(screen.name)
+                    }
+                }
+            }
+            if !model.videoOverrideByScreenID.isEmpty {
+                Divider()
+                Button(model.localizedString("すべての割り当てを解除")) {
+                    for screenID in Array(model.videoOverrideByScreenID.keys) {
+                        model.setVideoOverride(path: nil, forScreenID: screenID)
+                    }
+                }
             }
         }
     }
@@ -203,7 +239,8 @@ extension SettingsView {
     @ViewBuilder
     func wallpaperAssignmentBadges(
         isDesktopAssigned: Bool,
-        isLockScreenAssigned: Bool
+        isLockScreenAssigned: Bool,
+        isDisplayOverrideAssigned: Bool = false
     ) -> some View {
         HStack(spacing: 4) {
             if isDesktopAssigned {
@@ -219,6 +256,13 @@ extension SettingsView {
                     .foregroundStyle(.white)
                     .frame(width: 18, height: 18)
                     .background(Color.orange, in: Circle())
+            }
+            if isDisplayOverrideAssigned {
+                Image(systemName: "rectangle.on.rectangle")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 18, height: 18)
+                    .background(Color.purple, in: Circle())
             }
         }
         .shadow(color: .black.opacity(0.45), radius: 2, y: 1)

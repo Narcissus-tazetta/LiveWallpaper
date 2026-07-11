@@ -17,7 +17,7 @@ extension SettingsView {
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
-                let selectedPath = resolvedFitEditorVideoPath()
+                let selectedPath = fitEditor.resolvedVideoPath()
                 GeometryReader { proxy in
                     let layout = wallpaperGridLayout(for: proxy.size.width)
                     ScrollView {
@@ -33,7 +33,7 @@ extension SettingsView {
                                     switchToWallpaperTabOnSelect: false,
                                     isSelected: selectedPath == path,
                                     onSelect: {
-                                        selectFitEditorVideo(path: path)
+                                        fitEditor.selectVideo(path: path)
                                     }
                                 )
                             }

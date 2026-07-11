@@ -23,16 +23,8 @@
 "全体" = "Vừa màn hình";
 "再生の軽量モード（省電力）" = "Chế độ phát nhẹ (tiết kiệm điện)";
 "作業中は壁紙の再生を自動停止" = "Tự động tạm dừng hình nền khi đang làm việc";
-"他のアプリのウィンドウで壁紙の画面が完全に隠れている間、再生を停止します。権限の許可は不要です。" = "Tạm dừng phát khi cửa sổ của ứng dụng khác che khuất hoàn toàn màn hình hình nền. Không cần quyền truy cập.";
-"壁紙が隠れているかどうかに関わらず、他のアプリを選択している（前面にある）間は再生を停止します。" = "Tạm dừng phát bất cứ khi nào một ứng dụng khác được chọn (ở phía trước), ngay cả khi ứng dụng đó không thực sự che khuất hình nền.";
-"ウィンドウ被覆検出" = "Phát hiện che phủ cửa sổ";
-"メニューバーの帯などで壁紙がわずかに透けて見えていても、他のアプリのウィンドウが画面の大部分を覆っていれば停止します。画面収録の権限が必要です。" = "Vẫn tạm dừng ngay cả khi hình nền còn hiện một chút (ví dụ phía sau thanh menu), miễn là cửa sổ của ứng dụng khác che phần lớn màn hình. Cần quyền Ghi màn hình.";
-"ウィンドウ被覆検出には画面収録の許可が必要です。許可されるまでは通常モードと同じ判定になります。" = "Phát hiện che phủ cửa sổ cần quyền Ghi màn hình. Cho đến khi được cấp, chế độ này hoạt động giống như chế độ thường.";
 "画面収録の許可を開く" = "Mở quyền Ghi màn hình";
-"他のアプリが前面にあるとき再生を停止" = "Tạm dừng phát khi ứng dụng khác ở phía trước";
-"停止対象から除外するアプリ" = "Ứng dụng loại trừ khỏi tạm dừng";
 "アプリを追加" = "Thêm ứng dụng";
-"除外アプリは未設定です" = "Chưa đặt ứng dụng loại trừ";
 "起動中のアプリから選択" = "Chọn từ ứng dụng đang chạy";
 "検索" = "Tìm kiếm";
 "一致するアプリがありません" = "Không có ứng dụng phù hợp";
@@ -260,3 +252,43 @@
 "チェックした動画がこのプレイリストで再生されます" = "Video được đánh dấu sẽ phát trong danh sách phát này";
 "Web壁紙機能を有効にする" = "Bật tính năng hình nền Web";
 "オンにすると壁紙タブにWeb壁紙セクションが表示されます。実験的な機能です。" = "Khi bật, mục Hình nền Web sẽ hiển thị trong thẻ Hình nền. Đây là tính năng thử nghiệm.";
+
+"設定を検索" = "Tìm kiếm cài đặt";
+"該当する設定がありません" = "Không có cài đặt phù hợp";
+"設定を書き出す…" = "Xuất cài đặt…";
+"設定を読み込む…" = "Nhập cài đặt…";
+"表示・再生などの設定をJSONファイルとして保存・復元できます。壁紙の動画ファイル自体は含まれません" = "Có thể lưu và khôi phục các cài đặt hiển thị, phát lại dưới dạng tệp JSON. Không bao gồm chính các tệp video hình nền";
+"設定を読み込みました" = "Đã nhập cài đặt";
+"設定の読み込みに失敗しました" = "Không thể nhập cài đặt";
+"設定の書き出しに失敗しました" = "Không thể xuất cài đặt";
+
+"壁紙がほかのアプリのウィンドウで完全に隠れている間は、再生を止めて消費電力を抑えます。権限の許可は不要です。" = "Khi hình nền bị cửa sổ của ứng dụng khác che khuất hoàn toàn, phát lại sẽ tạm dừng để tiết kiệm điện. Không cần cấp quyền.";
+"ほかのアプリを使っている間は再生を停止" = "Tạm dừng phát khi đang dùng ứng dụng khác";
+"壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。" = "Bất kể hình nền có đang hiển thị hay không, phát lại sẽ tạm dừng khi ứng dụng khác ở phía trước.";
+"画面がほぼ隠れたら停止（高精度）" = "Tạm dừng khi màn hình gần như bị che (chính xác cao)";
+"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。" = "Ngay cả khi hình nền vẫn hơi hiển thị, phát lại sẽ tạm dừng khi phần lớn màn hình bị cửa sổ che phủ. Tính năng này cần quyền Ghi màn hình.";
+"高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "Phát hiện chính xác cao cần quyền Ghi màn hình. Trước khi được cấp quyền, sẽ dùng cách phát hiện thông thường.";
+"再生を止めないアプリ" = "Ứng dụng không bao giờ tạm dừng phát";
+"再生を止めないアプリはまだ登録されていません" = "Chưa có ứng dụng nào bị loại trừ";
+
+"自動で次の壁紙へ" = "Tự động chuyển hình nền";
+"オフ" = "Tắt";
+"5分" = "5 phút";
+"15分" = "15 phút";
+"30分" = "30 phút";
+"1時間" = "1 giờ";
+"3時間" = "3 giờ";
+
+"ディスプレイに割り当て…" = "Gán cho màn hình…";
+"すべての割り当てを解除" = "Bỏ tất cả gán màn hình";
+"設定の管理" = "Quản lý cài đặt";
+
+"自動停止しないディスプレイ" = "Màn hình không tự động tạm dừng";
+"オンにすると、この画面はメイン画面での作業やウィンドウの被覆に関わらず再生を続けます" = "Khi bật, màn hình này sẽ tiếp tục phát bất kể hoạt động trên màn hình chính hay bị cửa sổ che khuất";
+
+"デスクトップ（共有）" = "Màn hình nền (Chia sẻ)";
+"画面ごとに壁紙を切り替え" = "Chuyển hình nền theo màn hình";
+
+"この画面専用のプレイリストです" = "Đây là danh sách phát dành riêng cho màn hình này";
+
+"カードをクリックするとこの画面に割り当てられます" = "Nhấp vào thẻ để gán cho màn hình này";

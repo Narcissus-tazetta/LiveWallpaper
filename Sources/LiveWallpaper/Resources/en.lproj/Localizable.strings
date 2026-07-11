@@ -19,16 +19,8 @@
 "全体" = "Fit";
 "再生の軽量モード（省電力）" = "Lightweight playback mode (power saving)";
 "作業中は壁紙の再生を自動停止" = "Automatically pause wallpaper during work";
-"他のアプリのウィンドウで壁紙の画面が完全に隠れている間、再生を停止します。権限の許可は不要です。" = "Pauses playback while another app's window fully covers the wallpaper's screen. No permission is required.";
-"壁紙が隠れているかどうかに関わらず、他のアプリを選択している（前面にある）間は再生を停止します。" = "Pauses playback whenever another app is selected (frontmost), even if it doesn't actually cover the wallpaper.";
-"ウィンドウ被覆検出" = "Window coverage detection";
-"メニューバーの帯などで壁紙がわずかに透けて見えていても、他のアプリのウィンドウが画面の大部分を覆っていれば停止します。画面収録の権限が必要です。" = "Pauses even if a sliver of the wallpaper still shows through (e.g. behind the menu bar), as long as another app's window covers most of the screen. Requires Screen Recording permission.";
-"ウィンドウ被覆検出には画面収録の許可が必要です。許可されるまでは通常モードと同じ判定になります。" = "Window coverage detection requires Screen Recording permission. Until granted, it behaves the same as normal mode.";
 "画面収録の許可を開く" = "Open Screen Recording permissions";
-"他のアプリが前面にあるとき再生を停止" = "Pause playback when other apps are frontmost";
-"停止対象から除外するアプリ" = "Apps excluded from pause";
 "アプリを追加" = "Add app";
-"除外アプリは未設定です" = "No excluded apps set.";
 "起動中のアプリから選択" = "Choose from running apps";
 "検索" = "Search";
 "一致するアプリがありません" = "No matching apps";
@@ -290,3 +282,43 @@
 "チェックした動画がこのプレイリストで再生されます" = "Checked videos play in this playlist";
 "Web壁紙機能を有効にする" = "Enable web wallpaper feature";
 "オンにすると壁紙タブにWeb壁紙セクションが表示されます。実験的な機能です。" = "When on, a Web Wallpaper section appears in the Wallpaper tab. This is an experimental feature.";
+
+"設定を検索" = "Search settings";
+"該当する設定がありません" = "No matching settings";
+"設定を書き出す…" = "Export Settings…";
+"設定を読み込む…" = "Import Settings…";
+"表示・再生などの設定をJSONファイルとして保存・復元できます。壁紙の動画ファイル自体は含まれません" = "Save and restore display and playback settings as a JSON file. Wallpaper video files themselves are not included";
+"設定を読み込みました" = "Settings imported";
+"設定の読み込みに失敗しました" = "Failed to import settings";
+"設定の書き出しに失敗しました" = "Failed to export settings";
+
+"壁紙がほかのアプリのウィンドウで完全に隠れている間は、再生を止めて消費電力を抑えます。権限の許可は不要です。" = "While the wallpaper is completely hidden behind other apps' windows, playback pauses to save power. No permissions required.";
+"ほかのアプリを使っている間は再生を停止" = "Pause playback while using other apps";
+"壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。" = "Pauses playback whenever another app is in front, regardless of whether the wallpaper is visible.";
+"画面がほぼ隠れたら停止（高精度）" = "Pause when the screen is mostly covered (precise)";
+"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。" = "Even if the wallpaper is slightly visible, playback pauses when windows cover most of the screen. This detection requires Screen Recording permission.";
+"高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "Precise detection requires Screen Recording permission. Until granted, the standard detection method is used.";
+"再生を止めないアプリ" = "Apps that never pause playback";
+"再生を止めないアプリはまだ登録されていません" = "No excluded apps yet";
+
+"自動で次の壁紙へ" = "Auto-advance wallpaper";
+"オフ" = "Off";
+"5分" = "5 min";
+"15分" = "15 min";
+"30分" = "30 min";
+"1時間" = "1 hour";
+"3時間" = "3 hours";
+
+"ディスプレイに割り当て…" = "Assign to Display…";
+"すべての割り当てを解除" = "Clear all display assignments";
+"設定の管理" = "Manage Settings";
+
+"自動停止しないディスプレイ" = "Displays that never auto-pause";
+"オンにすると、この画面はメイン画面での作業やウィンドウの被覆に関わらず再生を続けます" = "When on, this display keeps playing regardless of activity on your main screen or window coverage";
+
+"デスクトップ（共有）" = "Desktop (Shared)";
+"画面ごとに壁紙を切り替え" = "Switch wallpaper per display";
+
+"この画面専用のプレイリストです" = "This is a playlist just for this display";
+
+"カードをクリックするとこの画面に割り当てられます" = "Click a card to assign it to this display";
