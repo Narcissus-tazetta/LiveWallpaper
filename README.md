@@ -3,132 +3,133 @@
 [![macOS](https://img.shields.io/badge/macOS-13.0+-000000.svg?logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-English README: [README.en.md](README.en.md)
+Japanese README: [README.ja.md](README.ja.md)
 
-LiveWallpaperは、お気に入りの動画をMacのデスクトップ壁紙に設定できるアプリです。
-他の作業をしている時のMacの負担（バッテリーやCPUの消費）をなるべく減らせるように、システムに配慮した設計にしています。
+LiveWallpaper lets you set your favorite videos as your Mac desktop wallpaper.
+It is designed to reduce system load (battery and CPU usage) while you are working.
 
-## インストールと起動について
+## Install And Launch
 
-### Homebrew（推奨）
+### Homebrew (recommended)
 
 ```bash
 brew install --cask narcissus-tazetta/tap/livewallpaper
 ```
 
-更新する場合:
+To update:
 
 ```bash
 brew update
 brew upgrade --cask livewallpaper
 ```
 
-### 手動インストール
+### Manual install
 
-1. [Releases](../../releases) ページから、最新の `LiveWallpaper-macos-vX.Y.Z.dmg` をダウンロードします。
-2. DMGを開き、`LiveWallpaper.app` を **「アプリケーション」フォルダ** に移動してください。
-3. すでにインストール済みの場合は、同名アプリを置き換えてください。
+1. Download the latest `LiveWallpaper-macos-vX.Y.Z.dmg` from the [Releases](../../releases) page.
+2. Open the DMG and move `LiveWallpaper.app` to your **Applications** folder.
+3. If it is already installed, replace the existing app.
 
-自動アップデートなどを正常に動かすため、必ずアプリケーションフォルダに入れてから起動してください。
+Always launch from the Applications folder so auto-update and related features work correctly.
 
-更新が失敗した場合は、設定画面の「手動ダウンロード」からReleasesを開き、最新版を再インストールしてください。
+If an update fails, use **Manual Download** in Settings to open Releases and reinstall the latest version.
 
-### 初回起動時の注意点
+### First Launch
 
-このアプリは Apple 公証を受けていない野良配布です。初回起動時に macOS のセキュリティ警告が出る場合があります。
+This app is distributed without Apple notarization. macOS may show a security warning on first launch.
 
-その場合は、以下の手順で起動してください。
+If that happens:
 
-1. **システム設定** を開く
-2. **プライバシーとセキュリティ** → **セキュリティ** へ移動
-3. **「開く」** を押し、**「このまま開く」** でパスワードを入力
-4. まだ開けない場合は、アプリケーションフォルダからもう一度起動
+1. Open **System Settings**
+2. Go to **Privacy & Security** → **Security**
+3. Click **Open Anyway** and confirm with your password
+4. If needed, open the app again from Applications
 
-## 主な機能
+## Features
 
-- **動画を壁紙に**: 手元にある動画ファイル（mp4やmovなど）を壁紙として流せます。
-- **デスクトップとロック画面を別々に設定**: デスクトップ用とロック画面用で、それぞれ別の動画を割り当てられます（ロック画面同期は macOS 26 以降）。
-- **マルチディスプレイ対応**: メイン画面だけ、もしくは接続しているすべての画面に表示するかを選べます。
-- **プレイリスト**: 複数の動画を登録して、順番に再生することができます。
-- **音量調整**: 動画の音量をアプリ内から調整可能です。
-- **デスクトップアイコンの表示切替**: システム設定と同様に、デスクトップ上のアイコン表示／非表示を切り替えられます。
-- **Macのための最適化設定**:
-    - 他のウィンドウが画面を大きく覆った時は、自動で壁紙の再生を一時停止します。
-    - 「このアプリを使っている時だけは一時停止しない」というような除外設定も可能です。
-    - フレームレート（30fps / 60fps / 制限なし）や、Macの負荷に合わせたデコードモードの設定ができます。
-- **多言語対応**: 日本語・英語・繁体字中国語・ベトナム語・トルコ語に対応しています。
-- **自動アップデート**: Sparkleを組み込んでいるので、アプリ内から簡単に最新版へアップデートできます。
+- **Video wallpaper**: Use local video files such as mp4 and mov as your wallpaper.
+- **Separate desktop and lock screen videos**: Assign different videos for desktop live wallpaper and lock screen sync (lock screen sync requires macOS 26 or later).
+- **Multi-display support**: Choose main display only or all connected displays.
+- **Playlists**: Register multiple videos and play them in sequence.
+- **Audio controls**: Adjust wallpaper audio volume from within the app.
+- **Desktop icon visibility**: Show or hide desktop icons, similar to macOS System Settings.
+- **Mac-focused optimization**:
+    - Automatically pauses playback when another app heavily covers the screen.
+    - Supports exclusion rules for apps that should not trigger pause.
+    - Frame rate limits (30fps / 60fps / unlimited) and decode mode settings.
+- **Localization**: Japanese, English, Traditional Chinese, Vietnamese, and Turkish.
+- **Auto updates**: Integrated with Sparkle for in-app updates.
 
 <video src="https://github.com/user-attachments/assets/b5f19e23-928b-4f37-a03b-d229949b905a" width="60%" controls autoplay loop muted></video>
 
-## その他の機能（詳しく）
+## Other Features
 
-- **壁紙の共有・エクスポート**: 設定画面から任意の登録済み壁紙を選んで共有できます。選択すると保存先フォルダを指定して、`.lwpkg`（壁紙パッケージ）と元動画（.mov/.mp4）を出力します。エクスポート時はサムネイルやメタデータ（再生位置・配置情報など）も含まれます。
-- **パッケージのインポート**: 受け取った`.lwpkg`ファイルはアプリ側からインポート可能で、メタデータに基づいてプレゼンテーション設定やプレイリストを復元します。重複した動画の扱い（置換／中止）も選べます。
-- **プレイリストとシャッフル再生**: 複数動画をプレイリスト化して連続再生できます。シャッフル再生や前／次の動画操作、プレイリスト単位の選択が可能です。
-- **配置編集（Fit Editor）**: 各ディスプレイごとの表示モード（フィット／塗りつぶし等）、ズーム、オフセットを編集でき、保存して画面ごとの見え方を固定できます。
-- **ロック画面同期**: ロック画面用の動画を選び、同期を有効にすると macOS のロック画面壁紙として反映されます。デスクトップと同じ動画に戻すこともできます。
-- **表示/出力設定**: メイン画面のみの表示か全ディスプレイに表示するかを選択できます。フレームレート制限やデコードモードの切替でパフォーマンス調整ができます。
-- **自動一時停止と除外設定**: 他ウィンドウが全面に被さった際に自動で再生を一時停止する機能や、特定のアプリを除外して常時再生させる設定があります。
-- **サムネイルキャッシュ**: サムネイルはディスク／メモリでキャッシュされ、高速な一覧表示とプレビューを提供します。
-- **ドラッグ&ドロップとファイル操作**: 動画のドラッグ&ドロップ追加、プレイリストへのドラッグ操作、登録動画の名前編集などに対応しています。
+- **Wallpaper export & sharing**: Export a registered wallpaper as a `.lwpkg` package with the original video, thumbnails, and metadata.
+- **Package import**: Import `.lwpkg` files and restore presentation settings and playlists. Duplicate handling (replace or abort) is supported.
+- **Playlists & shuffle**: Create playlists, shuffle playback, and use previous/next controls.
+- **Fit editor**: Edit per-display fit mode, zoom, and offset, then save per-screen layout.
+- **Lock screen sync**: Choose a lock screen video and apply it to the macOS lock screen when sync is enabled. You can also reset to match the desktop wallpaper.
+- **Display / output options**: Main display only or all displays, with frame rate and decode mode tuning.
+- **Auto-pause & exclusion rules**: Pause when other windows cover the screen, with per-app exclusions.
+- **Thumbnail cache**: Fast library browsing with disk and memory thumbnail caching.
+- **Drag & drop**: Add videos by drag and drop, organize playlists, and rename entries.
 
-## パフォーマンス
+## Performance
 
-「動画を壁紙にすると重い」と思われがちですが、画面が覆われている間の自動一時停止・
-リソース解放や、ハードウェアデコードの活用によって、負荷を低く抑える設計にしています。
+Video wallpapers have a reputation for being heavy. LiveWallpaper is designed to keep
+the load low by auto-pausing and releasing resources whenever the wallpaper is covered,
+and by relying on hardware video decoding.
 
-**実測の目安**（MacBook Air 13インチ・M5・24GBメモリ / フルHD 30fps の動画1本）
+**Rough measurements** (MacBook Air 13-inch, M5, 24 GB RAM / one 1080p 30fps video)
 
-| 状態 | CPU | メモリ | Energy Impact |
+| State | CPU | Memory | Energy Impact |
 | --- | --- | --- | --- |
-| 他ウィンドウで覆われ、再生を停止している間 | ほぼ 0%（ピーク 約16%） | 約 63MB | 最小 |
-| 再生中（可視） | 数%程度 | 約 60〜110MB | Low |
-| 起動直後の一時的なピーク | 〜18% | 〜112MB | — |
+| Covered by other windows, playback paused | ~0% (peak ~16%) | ~63 MB | Minimal |
+| Playing (visible) | a few % | ~60–110 MB | Low |
+| Brief spike right after launch | up to ~18% | up to ~112 MB | — |
 
-> **これはあくまで一例です。** 実際の数値は、動画の解像度・フレームレート・コーデック・
-> 長さ・ファイルサイズ、Macの機種（Apple Silicon / Intel）、接続しているディスプレイの
-> 枚数や解像度、同時に動かしている他のアプリなどによって大きく変わります。
-> 4K動画や高フレームレート、複数ディスプレイへの表示では、上記より高くなります。
+> **These are just examples.** Actual numbers vary a lot depending on the video's
+> resolution, frame rate, codec, length and file size; your Mac (Apple Silicon vs. Intel);
+> the number and resolution of connected displays; and whatever else is running at the
+> time. 4K video, high frame rates, or multiple displays will use more than shown above.
 
-**負荷を抑えている仕組み**
+**How the load is kept low**
 
-- 他のウィンドウで壁紙が完全に隠れると、自動で再生を一時停止します。
-- 覆われた状態が続くと、デコードに使う重いリソースを解放してメモリを節約します
-  （再表示するときは静止画から滑らかに再生へ復帰します）。
-- macOS の App Nap に対応し、非アクティブ時のCPU起床を抑えます。
-- フレームレート（30 / 60fps）やデコードモードを選べるので、Macの負荷に合わせて調整できます。
+- Playback auto-pauses when the wallpaper is fully covered by other windows.
+- If it stays covered, the heavy decoding resources are released to save memory
+  (it resumes smoothly from a still frame when shown again).
+- App Nap is supported, reducing CPU wakes while inactive.
+- Frame rate (30 / 60fps) and decode mode are configurable to match your Mac's headroom.
 
-## 使い方
+## Usage
 
-アプリを起動すると、メニューバーにアイコンが追加されます。
+After launch, an icon appears in the menu bar.
 
-1. メニューバーから **設定** を開く
-2. **壁紙** タブで動画やプレイリストを追加する
-3. ライブラリ上部の **割り当て先** で「デスクトップ」または「ロック画面」を選び、壁紙を割り当てる
-4. ロック画面を使う場合は、ロック画面パネルで同期を有効にして **今すぐ設定** を押す
+1. Open **Settings** from the menu bar
+2. Add videos or playlists from the **Wallpaper** tab
+3. Use the **assignment target** picker (Desktop / Lock Screen) to assign wallpapers
+4. For lock screen, enable sync in the lock screen panel and tap **Apply Now**
 
-ステータスバーでは、現在のデスクトップ壁紙とロック画面壁紙をそれぞれ確認できます。
+The status bar shows the current desktop and lock screen wallpapers separately.
 
-## 動作環境
+## System Requirements
 
-- macOS 13.0 (Ventura) 以降
-- ロック画面動画同期: macOS 26 以降
+- macOS 13.0 (Ventura) or later
+- Lock screen video sync: macOS 26 or later
 
-## 開発について
+## Development
 
-Swift / SwiftUI / AppKit で作られています。
+Built with Swift, SwiftUI, and AppKit.
 
 ```bash
-# 依存関係の解決とビルド
+# Resolve dependencies and build
 swift build -c release
 
-# 配布用 .app / .zip / .dmg の生成（adhoc 署名のみ）
+# Create distributable .app / .zip / .dmg (ad-hoc signing only)
 ./scripts/package_zip.sh 1.0.0 1
 ```
 
-配布パッケージは ad-hoc 署名のみで、Apple 公証や Developer ID 署名は行いません。自動アップデート用の Sparkle appcast 署名（Ed25519）は別途 `scripts/sign_zip.py` で行います。
+Distribution uses ad-hoc signing only; Apple notarization and Developer ID signing are not used. Sparkle appcast signing (Ed25519) is handled separately via `scripts/sign_zip.py`.
 
-## ライセンス
+## License
 
-このプロジェクトは [MIT License](LICENSE) の元で公開しています。
+This project is released under the [MIT License](LICENSE).
