@@ -59,6 +59,8 @@ extension WallpaperModel {
         }
         advancedSharingEnabled =
             UserDefaults.standard.object(forKey: "advancedSharingEnabled") as? Bool ?? false
+        dedicatedPlaybackContinuityEnabled =
+            UserDefaults.standard.object(forKey: "dedicatedPlaybackContinuityEnabled") as? Bool ?? true
         lockScreenSyncEnabled =
             UserDefaults.standard.object(forKey: "lockScreenSyncEnabled") as? Bool ?? false
         lockScreenSyncStatus = lockScreenSyncEnabled
@@ -69,6 +71,7 @@ extension WallpaperModel {
         restoreAutoSwitchInterval()
         restoreVideoOverrides()
         restoreScreenPlaylists()
+        restoreSpaceWallpaperState()
         if let savedSuspendDisabled = UserDefaults.standard.stringArray(
             forKey: "suspendDisabledDisplayIDs"
         ) {
@@ -560,6 +563,10 @@ extension WallpaperModel {
         _ = setSuspendWhenOtherAppFrontmost(false)
         suspendExclusionBundleIDs = []
         UserDefaults.standard.removeObject(forKey: "suspendExclusionBundleIDs")
+        // Space別壁紙は機能トグルのみ既定(OFF)へ戻す。割り当て自体は
+        // ディスプレイ別オーバーライドと同様、リセット対象にしない。
+        setSpaceWallpaperFeatureEnabled(false)
+        setMenuBarSpaceNumberEnabled(false)
         startAutoFrameRateMonitoring()
     }
 }

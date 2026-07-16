@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 extension AppDelegate {
   @objc func openSettings() {
     syncLaunchAtLoginState()
+    refreshSpacesForSettingsUI()
     settingsWindowController?.showWindow(nil)
     NSApp.activate(ignoringOtherApps: true)
     NotificationCenter.default.post(name: .openSettingsTab, object: nil)
@@ -11,6 +12,7 @@ extension AppDelegate {
 
   @objc func openWallpaperTab() {
     syncLaunchAtLoginState()
+    refreshSpacesForSettingsUI()
     settingsWindowController?.showWindow(nil)
     NSApp.activate(ignoringOtherApps: true)
     NotificationCenter.default.post(name: .openWallpaperTab, object: nil)
@@ -18,9 +20,17 @@ extension AppDelegate {
 
   @objc func openWallpaperFitTab() {
     syncLaunchAtLoginState()
+    refreshSpacesForSettingsUI()
     settingsWindowController?.showWindow(nil)
     NSApp.activate(ignoringOtherApps: true)
     NotificationCenter.default.post(name: .openWallpaperFitTab, object: nil)
+  }
+
+  /// 設定UIのデスクトップ一覧・「(現在)」表示をウィンドウ表示時点の状態に更新する。
+  private func refreshSpacesForSettingsUI() {
+    if wallpaperModel.spaceWallpaperFeatureEnabled {
+      wallpaperModel.refreshSpacesSnapshot()
+    }
   }
 
   func setAudioEnabled(_ enabled: Bool) {
@@ -48,6 +58,25 @@ extension AppDelegate {
 
   @objc func toggleShufflePlayback() {
     wallpaperModel.setShufflePlaybackEnabled(!wallpaperModel.shufflePlaybackEnabled)
+  }
+
+  /// 今メインディスプレイに実際に表示されている壁紙を、いま見ているデスクトップ
+  /// (Space)に固定/解除する。メインディスプレイがディスプレイ別/Space別オーバー
+  /// ライドで専用プレイヤー担当になっている場合、共有プレイヤーの currentVideoPath
+  /// は無関係(別の動画)なので、必ず resolvedOverridePath を優先して実際に見えて
+  /// いる動画を取得する。
+  @objc func toggleAssignToCurrentSpace() {
+    guard let uuid = wallpaperModel.currentSpaceUUIDForMainDisplay,
+      let path = wallpaperModel.currentlyVisiblePathForMainDisplay
+    else {
+      return
+    }
+    if wallpaperModel.spaceVideo(forSpaceUUID: uuid) == path {
+      wallpaperModel.setSpaceVideo(path: nil, forSpaceUUID: uuid)
+    } else {
+      wallpaperModel.setSpaceVideo(path: path, forSpaceUUID: uuid)
+    }
+    refreshPlaybackMenuState()
   }
 
   @objc func playPreviousVideo() {

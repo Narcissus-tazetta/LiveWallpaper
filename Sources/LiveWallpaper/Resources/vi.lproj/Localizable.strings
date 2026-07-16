@@ -292,3 +292,20 @@
 "この画面専用のプレイリストです" = "Đây là danh sách phát dành riêng cho màn hình này";
 
 "カードをクリックするとこの画面に割り当てられます" = "Nhấp vào thẻ để gán cho màn hình này";
+
+"デスクトップ（Space）ごとに壁紙を切り替える" = "Chuyển hình nền theo từng desktop (Space)";
+"Mission Control のデスクトップごとに別の壁紙を割り当てられます。割り当ては壁紙タブのデスクトップタブ横のメニュー、または壁紙カードの右クリックから行えます。割り当てのないデスクトップは通常の壁紙を表示します。割り当てた壁紙の音声は再生されません。デスクトップ切り替え直後、壁紙の切り替わりが数百ミリ秒ほど遅れることがあります。これはmacOS側のデスクトップ切替通知が遅れて届くことによるもので、アプリの不具合ではありません。" = "Bạn có thể gán hình nền khác nhau cho từng desktop trong Mission Control. Gán từ menu cạnh tab Desktop trong tab Hình nền, hoặc nhấp chuột phải vào thẻ hình nền. Desktop chưa được gán sẽ hiển thị hình nền thông thường. Hình nền được gán sẽ không phát âm thanh. Ngay sau khi chuyển desktop, hình nền có thể mất vài trăm mili giây để cập nhật theo. Đây là do độ trễ của chính thông báo chuyển desktop từ macOS, không phải lỗi của ứng dụng.";
+"この機能はご利用のmacOSでは利用できません。" = "Tính năng này không khả dụng trên phiên bản macOS của bạn.";
+"デスクトップ%d" = "Desktop %d";
+"仮想デスクトップ" = "Màn hình ảo";
+"現在" = "hiện tại";
+"デスクトップに割り当て…" = "Gán cho Desktop…";
+"デスクトップに割り当て" = "Gán cho desktop";
+"カードをクリックするとこのデスクトップに割り当てられます" = "Nhấp vào thẻ để gán cho desktop này";
+"このデスクトップに固定表示する動画です。未割り当てのデスクトップは通常の壁紙を表示します。" = "Video được cố định hiển thị trên desktop này. Desktop chưa được gán sẽ hiển thị hình nền thông thường.";
+"割り当てを解除" = "Bỏ gán";
+"この動画を現在のデスクトップに割り当て" = "Gán video này cho desktop hiện tại";
+"この動画をデスクトップ%dに割り当て" = "Gán video này cho Desktop %d";
+"メニューバーにデスクトップ番号を表示" = "Hiển thị số desktop trên thanh menu";
+"デスクトップ・画面切替時に再生位置を記憶する" = "Nhớ vị trí phát khi chuyển desktop hoặc màn hình";
+"OFFにすると、切替のたびに動画は常に最初から再生されます。ONでも負荷が高いときは自動的に控えめな動作に切り替わります。" = "Khi tắt, video sẽ luôn phát lại từ đầu mỗi khi chuyển. Ngay cả khi bật, chế độ này cũng tự động giảm tải khi hệ thống bận.";

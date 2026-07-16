@@ -107,6 +107,24 @@ extension SettingsView {
         modelBinding(model.webWallpaperFeatureEnabled) { model.setWebWallpaperFeatureEnabled($0) }
     }
 
+    var spaceWallpaperFeatureBinding: Binding<Bool> {
+        modelBinding(model.spaceWallpaperFeatureEnabled) {
+            model.setSpaceWallpaperFeatureEnabled($0)
+        }
+    }
+
+    var menuBarSpaceNumberBinding: Binding<Bool> {
+        modelBinding(model.menuBarSpaceNumberEnabled) {
+            model.setMenuBarSpaceNumberEnabled($0)
+        }
+    }
+
+    var dedicatedPlaybackContinuityBinding: Binding<Bool> {
+        modelBinding(model.dedicatedPlaybackContinuityEnabled) {
+            model.setDedicatedPlaybackContinuityEnabled($0)
+        }
+    }
+
     var advancedSharingBinding: Binding<Bool> {
         modelBinding(model.advancedSharingEnabled) { model.setAdvancedSharingEnabled($0) }
     }

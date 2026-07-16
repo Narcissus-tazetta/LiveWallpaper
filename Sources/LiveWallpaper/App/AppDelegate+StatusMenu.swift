@@ -63,6 +63,15 @@ extension AppDelegate {
         pinItem.tag = MenuTag.pinCurrentVideoToggle
         menu.addItem(pinItem)
 
+        let assignSpaceItem = NSMenuItem(
+            title: assignToCurrentSpaceMenuTitle(),
+            action: #selector(toggleAssignToCurrentSpace),
+            keyEquivalent: ""
+        )
+        assignSpaceItem.image = assignToCurrentSpaceMenuIcon()
+        assignSpaceItem.tag = MenuTag.assignToCurrentSpace
+        menu.addItem(assignSpaceItem)
+
         let shuffleItem = NSMenuItem(
             title: shuffleMenuTitle(wallpaperModel.shufflePlaybackEnabled),
             action: #selector(toggleShufflePlayback),
@@ -181,6 +190,34 @@ extension AppDelegate {
             }
             .store(in: &cancellables)
 
+        wallpaperModel.$spaceWallpaperFeatureEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshPlaybackMenuState()
+                self?.refreshSpaceNumberBadge()
+            }
+            .store(in: &cancellables)
+
+        wallpaperModel.$videoBySpaceUUID
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshPlaybackMenuState()
+            }
+            .store(in: &cancellables)
+
+        // Space切替(currentSpaceUUIDByDisplayIDの解決完了)に追従して、
+        // 割り当てトグルの状態とデスクトップ番号バッジを更新する。
+        NotificationCenter.default.addObserver(
+            forName: WallpaperModel.activeDesktopSpaceDidResolveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.refreshPlaybackMenuState()
+                self?.refreshSpaceNumberBadge()
+            }
+        }
+
         wallpaperModel.$registeredWebWallpaperIDs
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -218,6 +255,7 @@ extension AppDelegate {
         statusItem?.menu = menu
         refreshPlaybackMenuState()
         refreshLocalizedInterface()
+        refreshSpaceNumberBadge()
     }
 
     func configureStatusIcon() {
@@ -287,6 +325,11 @@ extension AppDelegate {
             pinItem.title = pinCurrentVideoMenuTitle(wallpaperModel.pinCurrentVideo)
             pinItem.image = pinCurrentVideoMenuIcon()
         }
+        if let assignItem = statusItem?.menu?.item(withTag: MenuTag.assignToCurrentSpace) {
+            assignItem.isHidden = !canAssignToCurrentSpace
+            assignItem.title = assignToCurrentSpaceMenuTitle()
+            assignItem.image = assignToCurrentSpaceMenuIcon()
+        }
         if let shuffleItem = statusItem?.menu?.item(withTag: MenuTag.shuffleToggle) {
             shuffleItem.isEnabled =
                 playlistEnabled && hasMultipleEntries && !wallpaperModel.pinCurrentVideo
@@ -321,6 +364,9 @@ extension AppDelegate {
         }
         if let item = menu.item(withTag: MenuTag.pinCurrentVideoToggle) {
             item.title = pinCurrentVideoMenuTitle(wallpaperModel.pinCurrentVideo)
+        }
+        if let item = menu.item(withTag: MenuTag.assignToCurrentSpace) {
+            item.title = assignToCurrentSpaceMenuTitle()
         }
         if let item = menu.item(withTag: MenuTag.shuffleToggle) {
             item.title = shuffleMenuTitle(wallpaperModel.shufflePlaybackEnabled)
@@ -366,6 +412,74 @@ extension AppDelegate {
 
     func pinCurrentVideoMenuTitle(_ enabled: Bool) -> String {
         localized("この動画で固定") + ": " + (enabled ? localized("ON") : localized("OFF"))
+    }
+
+    /// 「この動画を現在のデスクトップに割り当て」を表示できる状態か。
+    /// (Space別壁紙が有効・現在Spaceが判明・メインディスプレイに動画が表示中)
+    var canAssignToCurrentSpace: Bool {
+        wallpaperModel.spaceWallpaperFeatureEnabled
+            && wallpaperModel.isSpaceWallpaperAvailable
+            && wallpaperModel.currentSpaceUUIDForMainDisplay != nil
+            && wallpaperModel.currentlyVisiblePathForMainDisplay != nil
+            && !wallpaperModel.isWebWallpaperActive
+    }
+
+    /// 現在のデスクトップに現在の動画が割り当て済みか(トグルのチェック状態)。
+    var isCurrentVideoAssignedToCurrentSpace: Bool {
+        guard let uuid = wallpaperModel.currentSpaceUUIDForMainDisplay,
+              let path = wallpaperModel.currentlyVisiblePathForMainDisplay
+        else {
+            return false
+        }
+        return wallpaperModel.spaceVideo(forSpaceUUID: uuid) == path
+    }
+
+    func assignToCurrentSpaceMenuTitle() -> String {
+        var title = localized("この動画を現在のデスクトップに割り当て")
+        if let uuid = wallpaperModel.currentSpaceUUIDForMainDisplay,
+           let ordinal = wallpaperModel.desktopOrdinal(forSpaceUUID: uuid)
+        {
+            title = String(format: localized("この動画をデスクトップ%dに割り当て"), ordinal)
+        }
+        return title + ": "
+            + (isCurrentVideoAssignedToCurrentSpace ? localized("ON") : localized("OFF"))
+    }
+
+    func assignToCurrentSpaceMenuIcon() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: isCurrentVideoAssignedToCurrentSpace
+                ? "square.on.square.fill" : "square.on.square",
+            accessibilityDescription: localized("デスクトップに割り当て")
+        )
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        let configured = image?.withSymbolConfiguration(config)
+        configured?.isTemplate = true
+        return configured
+    }
+
+    /// メニューバーアイコンの右に現在のデスクトップ番号を表示する(オプション)。
+    func refreshSpaceNumberBadge() {
+        guard let button = statusItem?.button else {
+            return
+        }
+        guard wallpaperModel.spaceWallpaperFeatureEnabled,
+              wallpaperModel.isSpaceWallpaperAvailable,
+              wallpaperModel.menuBarSpaceNumberEnabled,
+              let uuid = wallpaperModel.currentSpaceUUIDForMainDisplay,
+              let ordinal = wallpaperModel.desktopOrdinal(forSpaceUUID: uuid)
+        else {
+            if statusItem?.length != NSStatusItem.squareLength {
+                statusItem?.length = NSStatusItem.squareLength
+            }
+            if !button.title.isEmpty {
+                button.title = ""
+            }
+            return
+        }
+        statusItem?.length = NSStatusItem.variableLength
+        button.imagePosition = .imageLeft
+        button.font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        button.title = String(ordinal)
     }
 
     func audioMenuIcon(_ enabled: Bool) -> NSImage? {

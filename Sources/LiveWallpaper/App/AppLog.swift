@@ -12,6 +12,7 @@ enum AppLog {
     static let persistence = Logger(subsystem: subsystem, category: "persistence")
     static let windowRefresh = Logger(subsystem: subsystem, category: "windowRefresh")
     static let spaceTransition = Logger(subsystem: subsystem, category: "spaceTransition")
+    static let spaces = Logger(subsystem: subsystem, category: "spaces")
     static let localization = Logger(subsystem: subsystem, category: "localization")
     static let desktopIcons = Logger(subsystem: subsystem, category: "desktopIcons")
     static let lockScreenSync = Logger(subsystem: subsystem, category: "lockScreenSync")
@@ -19,4 +20,5 @@ enum AppLog {
     static let sparkle = Logger(subsystem: subsystem, category: "sparkle")
     static let appDelegate = Logger(subsystem: subsystem, category: "appDelegate")
     static let thumbnailCache = Logger(subsystem: subsystem, category: "thumbnailCache")
+    static let continuity = Logger(subsystem: subsystem, category: "continuity")
 }

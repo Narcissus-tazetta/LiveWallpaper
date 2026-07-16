@@ -331,6 +331,12 @@ extension WallpaperModel {
             workspaceCenter.removeObserver(observer)
             spaceTransitionGuardObserver = nil
         }
+        // Space切替からこの通知が飛んでくるまでにはOS側の遅延があり(Mission
+        // Controlの切替アニメーション後にやや遅れて発火する)、アプリ側では
+        // 検知しようがない。壁紙ウィンドウ自体は .canJoinAllSpaces で全Space
+        // 共通の1枚なので、切替直後にほんの少しラグを感じるのはこの通知待ちが
+        // 支配的要因であり、妥協して受け入れる(ウォームキャッシュ側の改善余地は
+        // ensureDedicatedSlot 側のコメント参照)。
         spaceTransitionGuardObserver = workspaceCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification,
             object: nil,
@@ -338,8 +344,10 @@ extension WallpaperModel {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.beginActiveSpaceTransitionLock(reason: "workspace-active-space")
+                self?.handleActiveSpaceChanged()
             }
         }
+        configureSpaceWakeMonitoring()
 
         finderLaunchObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
@@ -765,6 +773,11 @@ extension WallpaperModel {
             return
         }
 
+        // ディスプレイ構成が変わると CGS のディスプレイ↔Space 対応も変わるため、
+        // ウィンドウ再構築前に現在 Space の解決を取り直す。
+        if spaceWallpaperFeatureEnabled {
+            refreshSpacesSnapshot()
+        }
         rebuildWindows()
     }
 

@@ -292,3 +292,20 @@
 "この画面専用のプレイリストです" = "Bu, yalnızca bu ekrana özel bir oynatma listesidir";
 
 "カードをクリックするとこの画面に割り当てられます" = "Bir karta tıklayarak bu ekrana atayın";
+
+"デスクトップ（Space）ごとに壁紙を切り替える" = "Masaüstü (Space) başına duvar kağıdını değiştir";
+"Mission Control のデスクトップごとに別の壁紙を割り当てられます。割り当ては壁紙タブのデスクトップタブ横のメニュー、または壁紙カードの右クリックから行えます。割り当てのないデスクトップは通常の壁紙を表示します。割り当てた壁紙の音声は再生されません。デスクトップ切り替え直後、壁紙の切り替わりが数百ミリ秒ほど遅れることがあります。これはmacOS側のデスクトップ切替通知が遅れて届くことによるもので、アプリの不具合ではありません。" = "Mission Control'deki her masaüstüne farklı bir duvar kağıdı atayabilirsiniz. Atama, Duvar Kağıdı sekmesindeki masaüstü sekmesinin yanındaki menüden veya bir duvar kağıdı kartına sağ tıklanarak yapılır. Ataması olmayan masaüstleri normal duvar kağıdını gösterir. Atanan duvar kağıtlarında ses çalınmaz. Masaüstü değiştirildikten hemen sonra duvar kağıdının güncellenmesi birkaç yüz milisaniye gecikebilir. Bu, macOS'un kendi masaüstü değişikliği bildiriminin gecikmesinden kaynaklanır, uygulama hatası değildir.";
+"この機能はご利用のmacOSでは利用できません。" = "Bu özellik, kullandığınız macOS sürümünde kullanılamıyor.";
+"デスクトップ%d" = "Masaüstü %d";
+"仮想デスクトップ" = "Sanal Masaüstleri";
+"現在" = "geçerli";
+"デスクトップに割り当て…" = "Masaüstüne Ata…";
+"デスクトップに割り当て" = "Masaüstüne ata";
+"カードをクリックするとこのデスクトップに割り当てられます" = "Bir karta tıklayarak bu masaüstüne atayabilirsiniz";
+"このデスクトップに固定表示する動画です。未割り当てのデスクトップは通常の壁紙を表示します。" = "Bu masaüstünde sabit olarak gösterilen videodur. Ataması olmayan masaüstleri normal duvar kağıdını gösterir.";
+"割り当てを解除" = "Atamayı kaldır";
+"この動画を現在のデスクトップに割り当て" = "Bu videoyu geçerli masaüstüne ata";
+"この動画をデスクトップ%dに割り当て" = "Bu videoyu Masaüstü %d'ye ata";
+"メニューバーにデスクトップ番号を表示" = "Menü çubuğunda masaüstü numarasını göster";
+"デスクトップ・画面切替時に再生位置を記憶する" = "Masaüstü veya ekran değiştirirken oynatma konumunu hatırla";
+"OFFにすると、切替のたびに動画は常に最初から再生されます。ONでも負荷が高いときは自動的に控えめな動作に切り替わります。" = "Kapalıyken, her geçişte oynatma her zaman baştan başlar. Açıkken bile yüksek yük altında otomatik olarak daha ölçülü çalışır.";

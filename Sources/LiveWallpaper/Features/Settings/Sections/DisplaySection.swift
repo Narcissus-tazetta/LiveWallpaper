@@ -52,6 +52,44 @@ extension SettingsView {
         text: spaceSwitchingLimitationText()
       )
 
+      Toggle(isOn: spaceWallpaperFeatureBinding) {
+        HStack(spacing: 6) {
+          Text(model.localizedString("デスクトップ（Space）ごとに壁紙を切り替える"))
+          helpIconButton(for: .spaceWallpaper)
+        }
+      }
+      .disabled(!model.isSpaceWallpaperAvailable)
+      if expandedHelpTopics.contains(.spaceWallpaper) {
+        settingsFootnote(
+          model.localizedString(
+            "Mission Control のデスクトップごとに別の壁紙を割り当てられます。割り当ては壁紙タブのデスクトップタブ横のメニュー、または壁紙カードの右クリックから行えます。割り当てのないデスクトップは通常の壁紙を表示します。割り当てた壁紙の音声は再生されません。デスクトップ切り替え直後、壁紙の切り替わりが数百ミリ秒ほど遅れることがあります。これはmacOS側のデスクトップ切替通知が遅れて届くことによるもので、アプリの不具合ではありません。"
+          )
+        )
+      }
+      if !model.isSpaceWallpaperAvailable {
+        settingsFootnote(
+          model.localizedString("この機能はご利用のmacOSでは利用できません。"),
+          color: .orange
+        )
+      }
+      if model.spaceWallpaperFeatureEnabled, model.isSpaceWallpaperAvailable {
+        Toggle(
+          model.localizedString("メニューバーにデスクトップ番号を表示"),
+          isOn: menuBarSpaceNumberBinding
+        )
+        .padding(.leading, 20)
+      }
+
+      Toggle(
+        model.localizedString("デスクトップ・画面切替時に再生位置を記憶する"),
+        isOn: dedicatedPlaybackContinuityBinding
+      )
+      settingsFootnote(
+        model.localizedString(
+          "OFFにすると、切替のたびに動画は常に最初から再生されます。ONでも負荷が高いときは自動的に控えめな動作に切り替わります。"
+        )
+      )
+
       Toggle(model.localizedString("再生の軽量モード（省電力）"), isOn: lightweightModeBinding)
       if model.lightweightProxyState == .generating {
         settingsFootnote(model.localizedString("軽量版を生成中..."))

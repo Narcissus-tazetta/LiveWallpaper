@@ -39,6 +39,12 @@ struct SettingsSnapshot: Codable {
     var suspendDisabledDisplayIDs: [String]?
     /// 画面ID → その画面が従うプレイリストID(文字列表現)。
     var screenPlaylistByScreenID: [String: String]?
+    /// Space別壁紙機能のオン/オフ。
+    var spaceWallpaperFeatureEnabled: Bool?
+    /// Space uuid → 固定表示する動画パス。別Macでは uuid が一致せず単に不発になる。
+    var videoBySpaceUUID: [String: String]?
+    /// メニューバーのデスクトップ番号表示。
+    var menuBarSpaceNumberEnabled: Bool?
 }
 
 @MainActor
@@ -86,7 +92,10 @@ enum SettingsTransfer {
             wallpaperPresentationByPath: model.wallpaperPresentationByPath,
             videoOverrideByScreenID: model.videoOverrideByScreenID,
             suspendDisabledDisplayIDs: Array(model.suspendDisabledDisplayIDs),
-            screenPlaylistByScreenID: model.screenPlaylistByScreenID.mapValues(\.uuidString)
+            screenPlaylistByScreenID: model.screenPlaylistByScreenID.mapValues(\.uuidString),
+            spaceWallpaperFeatureEnabled: model.spaceWallpaperFeatureEnabled,
+            videoBySpaceUUID: model.videoBySpaceUUID,
+            menuBarSpaceNumberEnabled: model.menuBarSpaceNumberEnabled
         )
     }
 
@@ -203,6 +212,19 @@ enum SettingsTransfer {
             for (screenID, path) in overrides {
                 model.setVideoOverride(path: path, forScreenID: screenID)
             }
+        }
+        if let value = snapshot.spaceWallpaperFeatureEnabled {
+            model.setSpaceWallpaperFeatureEnabled(value)
+        }
+        if let spaceVideos = snapshot.videoBySpaceUUID {
+            // setSpaceVideo 側でファイルの存在確認と永続化が行われる。
+            // 別Macからのインポートでは Space uuid が一致せず単に不発になる。
+            for (uuid, path) in spaceVideos {
+                model.setSpaceVideo(path: path, forSpaceUUID: uuid)
+            }
+        }
+        if let value = snapshot.menuBarSpaceNumberEnabled {
+            model.setMenuBarSpaceNumberEnabled(value)
         }
         if let suspendDisabled = snapshot.suspendDisabledDisplayIDs {
             for screenID in suspendDisabled {

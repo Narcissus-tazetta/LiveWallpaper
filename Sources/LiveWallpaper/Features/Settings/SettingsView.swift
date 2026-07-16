@@ -21,6 +21,11 @@ struct SettingsView: View {
     /// 表示している場合の画面ID。接続が切れた画面は resolvedDisplayOverrideScreenID
     /// 側で自動的に無視される。
     @State var selectedDisplayOverrideScreenID: String?
+    /// 「デスクトップ」タブが特定 Space(仮想デスクトップ)の割り当てを表示して
+    /// いる場合の Space uuid。selectedDisplayOverrideScreenID と排他(スコープ
+    /// Picker がどちらか一方だけを選ばせる)。削除済み Space は
+    /// resolvedSpaceScopeUUID 側で自動的に無視される。
+    @State var selectedSpaceScopeUUID: String?
     @StateObject var fitEditor: FitEditorController
     @State var isResetSettingsDialogPresented: Bool = false
     @State var librarySearchText: String = ""

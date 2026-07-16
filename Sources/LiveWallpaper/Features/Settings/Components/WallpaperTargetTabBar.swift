@@ -38,6 +38,20 @@ extension SettingsView {
         return id
     }
 
+    /// 削除された Space を選択したままにならないよう解決した現在の Space uuid。
+    /// (割り当てデータ自体は保持される。UIスコープの選択だけを解除する)
+    var resolvedSpaceScopeUUID: String? {
+        guard model.spaceWallpaperFeatureEnabled, model.isSpaceWallpaperAvailable,
+              let uuid = selectedSpaceScopeUUID
+        else {
+            return nil
+        }
+        guard model.knownDesktopSpaces.contains(where: { $0.uuid == uuid }) else {
+            return nil
+        }
+        return uuid
+    }
+
     /// 「デスクトップ」タブが特定ディスプレイの割り当てを表示しているか。
     var isDisplayOverrideModeActive: Bool {
         selectedAssignmentTarget == .desktop && resolvedDisplayOverrideScreenID != nil
@@ -55,28 +69,82 @@ extension SettingsView {
         return resolvedDisplayOverrideScreenID
     }
 
-    private var displayScopeBinding: Binding<String?> {
+    /// コンテンツ側が実際に使ってよい Space uuid(activeDisplayOverrideScreenID の
+    /// Space 版)。画面スコープが有効な間は nil。
+    var activeSpaceScopeUUID: String? {
+        guard selectedAssignmentTarget == .desktop,
+              resolvedDisplayOverrideScreenID == nil
+        else {
+            return nil
+        }
+        return resolvedSpaceScopeUUID
+    }
+
+    /// スコープ Picker の選択値。共有(nil)・画面("d:<id>")・Space("s:<uuid>") を
+    /// 1つの Picker で排他選択させるためのエンコード。
+    private var scopeSelectionBinding: Binding<String?> {
         Binding(
-            get: { resolvedDisplayOverrideScreenID },
-            set: {
-                selectedDisplayOverrideScreenID = $0
+            get: {
+                if let screenID = resolvedDisplayOverrideScreenID {
+                    return "d:\(screenID)"
+                }
+                if let uuid = resolvedSpaceScopeUUID {
+                    return "s:\(uuid)"
+                }
+                return nil
+            },
+            set: { value in
+                if let value, value.hasPrefix("d:") {
+                    selectedDisplayOverrideScreenID = String(value.dropFirst(2))
+                    selectedSpaceScopeUUID = nil
+                } else if let value, value.hasPrefix("s:") {
+                    selectedSpaceScopeUUID = String(value.dropFirst(2))
+                    selectedDisplayOverrideScreenID = nil
+                } else {
+                    selectedDisplayOverrideScreenID = nil
+                    selectedSpaceScopeUUID = nil
+                }
                 selectedAssignmentTarget = .desktop
             }
         )
     }
 
-    /// デスクトップタブに埋め込む画面切り替えメニュー。インライン Picker なので
-    /// チェックマークはシステム標準の見た目になる。
+    /// スコープ Picker に Space の選択肢を出すか。
+    private var showsSpaceScopeOptions: Bool {
+        model.spaceWallpaperFeatureEnabled && model.isSpaceWallpaperAvailable
+            && !model.knownDesktopSpaces.isEmpty
+    }
+
+    /// デスクトップタブに埋め込むスコープ切り替えメニュー(共有 / 画面ごと /
+    /// Spaceごと)。インライン Picker なのでチェックマークはシステム標準の見た目。
     private func displayScopePicker(tint: Color) -> some View {
         Menu {
-            Picker("", selection: displayScopeBinding) {
+            Picker("", selection: scopeSelectionBinding) {
                 Label(
                     model.localizedString("デスクトップ（共有）"),
-                    systemImage: "rectangle.on.rectangle"
+                    systemImage: "infinity"
                 )
                 .tag(String?.none)
-                ForEach(model.availableDisplayScreens()) { screen in
-                    Label(screen.name, systemImage: "display").tag(Optional(screen.id))
+
+                let screens = model.availableDisplayScreens()
+                if !screens.isEmpty {
+                    Section(model.localizedString("画面")) {
+                        ForEach(screens) { screen in
+                            Label(screen.name, systemImage: "display")
+                                .tag(Optional("d:\(screen.id)"))
+                        }
+                    }
+                }
+                if showsSpaceScopeOptions {
+                    Section(model.localizedString("仮想デスクトップ")) {
+                        ForEach(model.knownDesktopSpaces) { space in
+                            Label(
+                                desktopSpaceDisplayName(for: space),
+                                systemImage: "macwindow"
+                            )
+                            .tag(Optional("s:\(space.uuid)"))
+                        }
+                    }
                 }
             }
             .pickerStyle(.inline)
@@ -94,11 +162,24 @@ extension SettingsView {
         .help(model.localizedString("画面ごとに壁紙を切り替え"))
     }
 
+    /// 「デスクトップ2 (現在)」のような Space の表示名。
+    func desktopSpaceDisplayName(for space: SpaceInfo) -> String {
+        let base = String(
+            format: model.localizedString("デスクトップ%d"),
+            space.ordinal ?? 0
+        )
+        if space.uuid == model.currentSpaceUUIDForMainDisplay {
+            return "\(base) (\(model.localizedString("現在")))"
+        }
+        return base
+    }
+
     private func targetTabButton(_ target: WallpaperAssignmentTarget) -> some View {
         let isSelected = selectedAssignmentTarget == target
         let tint = targetTint(for: target)
         let showsDisplayPicker =
-            target == .desktop && model.availableDisplayScreens().count > 1
+            target == .desktop
+            && (model.availableDisplayScreens().count > 1 || showsSpaceScopeOptions)
 
         // カード全体を1つの Button にするとシェブロンのメニューと当たり判定が
         // 競合するため、本体(選択)とシェブロン(画面切り替え)を別コントロール
@@ -155,6 +236,11 @@ extension SettingsView {
             if let screenID = resolvedDisplayOverrideScreenID {
                 return screenDisplayName(for: screenID)
             }
+            if let uuid = resolvedSpaceScopeUUID,
+               let space = model.knownDesktopSpaces.first(where: { $0.uuid == uuid })
+            {
+                return desktopSpaceDisplayName(for: space)
+            }
             return model.localizedString("デスクトップ")
         case .lockScreen:
             return model.localizedString("ロック画面")
@@ -164,7 +250,13 @@ extension SettingsView {
     private func targetIconName(for target: WallpaperAssignmentTarget) -> String {
         switch target {
         case .desktop:
-            return resolvedDisplayOverrideScreenID != nil ? "display.2" : "display"
+            if resolvedDisplayOverrideScreenID != nil {
+                return "display.2"
+            }
+            if resolvedSpaceScopeUUID != nil {
+                return "square.on.square"
+            }
+            return "display"
         case .lockScreen:
             return "lock.fill"
         }
@@ -173,7 +265,13 @@ extension SettingsView {
     func targetTint(for target: WallpaperAssignmentTarget) -> Color {
         switch target {
         case .desktop:
-            return resolvedDisplayOverrideScreenID != nil ? .purple : .accentColor
+            if resolvedDisplayOverrideScreenID != nil {
+                return .purple
+            }
+            if resolvedSpaceScopeUUID != nil {
+                return .teal
+            }
+            return .accentColor
         case .lockScreen:
             return .orange
         }
@@ -184,6 +282,12 @@ extension SettingsView {
         case .desktop:
             if let screenID = resolvedDisplayOverrideScreenID {
                 guard let path = model.videoOverride(forScreenID: screenID) else {
+                    return model.localizedString("未設定")
+                }
+                return model.registeredVideoDisplayName(for: path)
+            }
+            if let uuid = resolvedSpaceScopeUUID {
+                guard let path = model.spaceVideo(forSpaceUUID: uuid) else {
                     return model.localizedString("未設定")
                 }
                 return model.registeredVideoDisplayName(for: path)
@@ -200,6 +304,8 @@ extension SettingsView {
         case .desktop:
             if let screenID = resolvedDisplayOverrideScreenID {
                 displayOverrideWallpaperPreview(forScreenID: screenID)
+            } else if let uuid = resolvedSpaceScopeUUID {
+                spaceScopeWallpaperPreview(forSpaceUUID: uuid)
             } else {
                 desktopWallpaperPreview
             }
@@ -215,6 +321,20 @@ extension SettingsView {
     @ViewBuilder
     private func displayOverrideWallpaperPreview(forScreenID screenID: String) -> some View {
         let path = model.videoOverride(forScreenID: screenID)
+        wallpaperPreviewThumbnail(
+            image: path.flatMap { thumbnailCache.image(for: $0) },
+            accessibilityLabel: model.localizedString("現在の壁紙プレビュー")
+        )
+        .onAppear {
+            if let path {
+                requestWallpaperThumbnail(path: path)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func spaceScopeWallpaperPreview(forSpaceUUID uuid: String) -> some View {
+        let path = model.spaceVideo(forSpaceUUID: uuid)
         wallpaperPreviewThumbnail(
             image: path.flatMap { thumbnailCache.image(for: $0) },
             accessibilityLabel: model.localizedString("現在の壁紙プレビュー")

@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let refreshPlayback = 1010
         static let updateMenu = 1011
         static let quitApp = 1012
+        static let assignToCurrentSpace = 1014
     }
 
     func applicationDidFinishLaunching(_: Notification) {

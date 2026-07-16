@@ -168,10 +168,55 @@ final class WallpaperModel: ObservableObject {
     @Published var suspendDisabledDisplayIDs: Set<String> = []
     /// 画面ID → その画面が従うプレイリストID。未設定ならライブラリ全体を対象にする。
     @Published var screenPlaylistByScreenID: [String: UUID] = [:]
-    var dedicatedPlayersByScreenID: [String: AVQueuePlayer] = [:]
-    var dedicatedLoopersByScreenID: [String: AVPlayerLooper] = [:]
-    var dedicatedPlayerPathByScreenID: [String: String] = [:]
+    struct DedicatedPlayerSlot {
+        let player: AVQueuePlayer
+        let looper: AVPlayerLooper
+    }
+    struct ScreenPathKey: Hashable {
+        let screenID: String
+        let path: String
+    }
+    /// screenID -> path -> 生きている専用プレイヤー。「現在」1枠 + 隣接の温存
+    /// (最大2枠)を同じ辞書で保持する。
+    var dedicatedSlotsByScreenID: [String: [String: DedicatedPlayerSlot]] = [:]
+    /// screenID -> 現在レイヤーにアタッチされているパス(温存中の隣接スロットとの区別に使う)。
+    var activeDedicatedPathByScreenID: [String: String] = [:]
     var dedicatedFreezeFrameByScreenID: [String: (path: String, time: CMTime, image: CGImage?)] = [:]
+    /// (screenID, path) -> 直前に破棄したときの再生位置。メモリ上のみで再起動を跨いで
+    /// 永続化しない(Space UUIDはOS再起動で作り直され得るため)。
+    var dedicatedResumeTimeByKey: [ScreenPathKey: CMTime] = [:]
+    /// 挿入順(古い順)。dedicatedResumeTimeByKey の上限刈り込みに使う。
+    var dedicatedResumeTimeInsertionOrder: [ScreenPathKey] = []
+    /// ディスプレイID -> フルスクリーンを除いた Space uuid の並び(Mission Control順)。
+    /// 隣接判定にはディスプレイ単位の順序が必要なため、knownDesktopSpaces
+    /// (全ディスプレイをフラット化したUI表示用の一覧)とは別に保持する。
+    var orderedSpaceUUIDsByDisplayID: [String: [String]] = [:]
+    /// 隣接ウォームキャッシュ再計算のデバウンス用。
+    var dedicatedWarmWindowWorkItem: DispatchWorkItem?
+    /// 専用プレイヤーの隣接ウォームキャッシュ+再生位置記憶を有効にするか。
+    /// OFFなら常にゼロ秒から再生する従来の挙動に戻る。Space別・ディスプレイ別固定の
+    /// どちらの専用プレイヤー切替にも効く。
+    @Published var dedicatedPlaybackContinuityEnabled: Bool = true
+
+    /// Mission Control の Space 一覧を取得する非公開APIブリッジ。
+    /// シンボル解決に失敗した環境では isAvailable = false になり、
+    /// Space別壁紙機能全体が自動的に無効化される。
+    let spacesBridge = CGSSpacesBridge()
+    /// Space(仮想デスクトップ)ごとの壁紙切替を有効にするか。
+    @Published var spaceWallpaperFeatureEnabled: Bool = false
+    /// Space uuid → その Space で固定表示する動画パス。
+    @Published var videoBySpaceUUID: [String: String] = [:]
+    /// UI 表示用の通常デスクトップ一覧(フルスクリーンSpace除外、ordinal付き)。
+    @Published var knownDesktopSpaces: [SpaceInfo] = []
+    /// 画面ID → その画面で現在表示中の Space uuid。フルスクリーンSpace表示中は
+    /// 直前の通常デスクトップの値を保持する(壁紙を差し替えないため)。
+    @Published var currentSpaceUUIDByDisplayID: [String: String] = [:]
+    /// 実行時に非公開APIの取得・パースが連続失敗したときに立てる無効化フラグ。
+    @Published var spaceWallpaperRuntimeUnavailable: Bool = false
+    /// メニューバーアイコンに現在のデスクトップ番号を表示するか。
+    @Published var menuBarSpaceNumberEnabled: Bool = false
+    var spacesSnapshotFailureCount: Int = 0
+    var workspaceWakeObserver: NSObjectProtocol?
 
     var canAddPlaylist: Bool {
         playlists.count < maxPlaylistCount
@@ -264,6 +309,9 @@ final class WallpaperModel: ObservableObject {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
         if let observer = spaceTransitionGuardObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        if let observer = workspaceWakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
         activeSpaceTransitionLockWorkItem?.cancel()

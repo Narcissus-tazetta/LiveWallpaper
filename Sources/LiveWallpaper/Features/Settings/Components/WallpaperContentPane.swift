@@ -24,6 +24,8 @@ extension SettingsView {
 
             if let screenID = activeDisplayOverrideScreenID {
                 displayOverridePlaybackControls(forScreenID: screenID)
+            } else if let spaceUUID = activeSpaceScopeUUID {
+                spaceScopeControls(forSpaceUUID: spaceUUID)
             } else if selectedAssignmentTarget == .desktop,
                       !model.registeredPlaybackEntries.isEmpty
             {
@@ -84,8 +86,11 @@ extension SettingsView {
 
     private var mergedListEntries: [WallpaperListEntry] {
         let videoEntries = filteredPaths.map { WallpaperListEntry.video($0) }
-        // ディスプレイ割り当てはまだ動画のみ対応(専用プレイヤーがWeb壁紙に非対応)。
-        guard model.webWallpaperFeatureEnabled, activeDisplayOverrideScreenID == nil else {
+        // ディスプレイ/Space割り当てはまだ動画のみ対応(専用プレイヤーがWeb壁紙に非対応)。
+        guard model.webWallpaperFeatureEnabled,
+              activeDisplayOverrideScreenID == nil,
+              activeSpaceScopeUUID == nil
+        else {
             return videoEntries
         }
         return videoEntries + filteredWebSources.map { WallpaperListEntry.web($0) }
@@ -161,6 +166,23 @@ extension SettingsView {
             playlistInlineNameEditor(playlistID: editingID)
         } else if let screenID = activeDisplayOverrideScreenID {
             screenPlaylistFilterControl(forScreenID: screenID)
+        } else if activeSpaceScopeUUID != nil {
+            // Space割り当てはv1では動画1本の固定のみ(プレイリスト非対応)なので、
+            // 常にライブラリ全体を表示する。
+            HStack(spacing: 6) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("\(model.localizedString("すべての壁紙")) (\(model.libraryVideoPaths.count))")
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.secondary.opacity(0.12))
+            )
         } else {
             Menu {
                 Picker("", selection: playlistSelectionBinding) {
@@ -377,6 +399,12 @@ extension SettingsView {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
+            } else if activeSpaceScopeUUID != nil {
+                Text(model.localizedString("カードをクリックするとこのデスクトップに割り当てられます"))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             } else if let summaryText = selectedPlaylistSummaryText {
                 Text(summaryText)
                     .font(.caption2)
@@ -496,6 +524,16 @@ extension SettingsView {
                                         model.setVideoOverride(path: path, forScreenID: screenID)
                                     }
                                 )
+                            } else if let spaceUUID = activeSpaceScopeUUID {
+                                wallpaperCard(
+                                    path: path,
+                                    cardWidth: layout.1,
+                                    switchToWallpaperTabOnSelect: false,
+                                    isSelected: model.spaceVideo(forSpaceUUID: spaceUUID) == path,
+                                    onSelect: {
+                                        model.setSpaceVideo(path: path, forSpaceUUID: spaceUUID)
+                                    }
+                                )
                             } else {
                                 wallpaperCard(
                                     path: path,
@@ -559,6 +597,33 @@ extension SettingsView {
                 }
                 .buttonStyle(.bordered)
                 .disabled(count < 2)
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    /// Space割り当てモード用のフッター。v1は動画1本の固定のみなので、
+    /// 再生コントロールは持たず説明と割り当て解除だけを出す。
+    private func spaceScopeControls(forSpaceUUID uuid: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider()
+
+            Text(
+                model.localizedString(
+                    "このデスクトップに固定表示する動画です。未割り当てのデスクトップは通常の壁紙を表示します。"
+                )
+            )
+            .font(.caption2)
+            .foregroundColor(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                Button(model.localizedString("割り当てを解除")) {
+                    model.setSpaceVideo(path: nil, forSpaceUUID: uuid)
+                }
+                .buttonStyle(.bordered)
+                .disabled(model.spaceVideo(forSpaceUUID: uuid) == nil)
 
                 Spacer(minLength: 0)
             }

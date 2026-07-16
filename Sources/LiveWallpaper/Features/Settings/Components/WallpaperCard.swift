@@ -171,6 +171,11 @@ extension SettingsView {
             if model.availableDisplayScreens().count > 1 {
                 displayOverrideMenu(path: path)
             }
+            if model.spaceWallpaperFeatureEnabled, model.isSpaceWallpaperAvailable,
+               !model.knownDesktopSpaces.isEmpty
+            {
+                spaceOverrideMenu(path: path)
+            }
             playlistMembershipMenus(
                 isContained: { model.playlistContainsVideo($0.id, path: path) },
                 add: { playlistID in _ = model.addRegisteredVideo(path: path, to: playlistID) },
@@ -216,6 +221,37 @@ extension SettingsView {
                 Button(model.localizedString("すべての割り当てを解除")) {
                     for screenID in Array(model.videoOverrideByScreenID.keys) {
                         model.setVideoOverride(path: nil, forScreenID: screenID)
+                    }
+                }
+            }
+        }
+    }
+
+    /// この動画を特定のデスクトップ(Space)に固定表示するメニュー。
+    /// 選択で割り当て、割り当て済みのデスクトップを選ぶと解除(トグル)。
+    @ViewBuilder
+    func spaceOverrideMenu(path: String) -> some View {
+        Menu(model.localizedString("デスクトップに割り当て…")) {
+            ForEach(model.knownDesktopSpaces) { space in
+                Button {
+                    if model.spaceVideo(forSpaceUUID: space.uuid) == path {
+                        model.setSpaceVideo(path: nil, forSpaceUUID: space.uuid)
+                    } else {
+                        model.setSpaceVideo(path: path, forSpaceUUID: space.uuid)
+                    }
+                } label: {
+                    if model.spaceVideo(forSpaceUUID: space.uuid) == path {
+                        Label(desktopSpaceDisplayName(for: space), systemImage: "checkmark")
+                    } else {
+                        Text(desktopSpaceDisplayName(for: space))
+                    }
+                }
+            }
+            if !model.videoBySpaceUUID.isEmpty {
+                Divider()
+                Button(model.localizedString("すべての割り当てを解除")) {
+                    for uuid in Array(model.videoBySpaceUUID.keys) {
+                        model.setSpaceVideo(path: nil, forSpaceUUID: uuid)
                     }
                 }
             }

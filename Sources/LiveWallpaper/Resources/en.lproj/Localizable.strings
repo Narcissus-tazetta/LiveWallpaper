@@ -322,3 +322,20 @@
 "この画面専用のプレイリストです" = "This is a playlist just for this display";
 
 "カードをクリックするとこの画面に割り当てられます" = "Click a card to assign it to this display";
+
+"デスクトップ（Space）ごとに壁紙を切り替える" = "Switch wallpaper per desktop (Space)";
+"Mission Control のデスクトップごとに別の壁紙を割り当てられます。割り当ては壁紙タブのデスクトップタブ横のメニュー、または壁紙カードの右クリックから行えます。割り当てのないデスクトップは通常の壁紙を表示します。割り当てた壁紙の音声は再生されません。デスクトップ切り替え直後、壁紙の切り替わりが数百ミリ秒ほど遅れることがあります。これはmacOS側のデスクトップ切替通知が遅れて届くことによるもので、アプリの不具合ではありません。" = "Assign a different wallpaper to each Mission Control desktop. Assign from the menu next to the Desktop tab in the Wallpaper tab, or by right-clicking a wallpaper card. Desktops without an assignment show the regular wallpaper. Audio is not played for assigned wallpapers. Right after switching desktops, the wallpaper may take a few hundred milliseconds to catch up. This is caused by a delay in macOS's own desktop-switch notification, not an app issue.";
+"この機能はご利用のmacOSでは利用できません。" = "This feature is not available on your version of macOS.";
+"デスクトップ%d" = "Desktop %d";
+"仮想デスクトップ" = "Virtual Desktops";
+"現在" = "Current";
+"デスクトップに割り当て…" = "Assign to Desktop…";
+"デスクトップに割り当て" = "Assign to desktop";
+"カードをクリックするとこのデスクトップに割り当てられます" = "Click a card to assign it to this desktop";
+"このデスクトップに固定表示する動画です。未割り当てのデスクトップは通常の壁紙を表示します。" = "This video is pinned to this desktop. Desktops without an assignment show the regular wallpaper.";
+"割り当てを解除" = "Remove assignment";
+"この動画を現在のデスクトップに割り当て" = "Assign this video to the current desktop";
+"この動画をデスクトップ%dに割り当て" = "Assign this video to Desktop %d";
+"メニューバーにデスクトップ番号を表示" = "Show desktop number in the menu bar";
+"デスクトップ・画面切替時に再生位置を記憶する" = "Remember playback position when switching desktops or displays";
+"OFFにすると、切替のたびに動画は常に最初から再生されます。ONでも負荷が高いときは自動的に控えめな動作に切り替わります。" = "When off, playback always restarts from the beginning on every switch. Even when on, it automatically scales back under high load.";

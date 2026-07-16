@@ -250,8 +250,8 @@ extension WallpaperModel {
 
     func applyLightweightSettings() {
         sharedPlayer?.automaticallyWaitsToMinimizeStalling = lightweightMode
-        for player in dedicatedPlayersByScreenID.values {
-            player.automaticallyWaitsToMinimizeStalling = lightweightMode
+        for entry in allDedicatedSlotEntries() {
+            entry.slot.player.automaticallyWaitsToMinimizeStalling = lightweightMode
         }
     }
 
@@ -391,7 +391,20 @@ extension WallpaperModel {
         }
     }
 
-    func resolvePlaybackProfile() -> (bitRate: Double, buffer: TimeInterval) {
+    func resolvePlaybackProfile(
+        role: DedicatedPlayerRole = .active
+    ) -> (bitRate: Double, buffer: TimeInterval) {
+        let base = resolveActivePlaybackProfile()
+        guard role == .warmStandby else {
+            return base
+        }
+        // 一時停止中で画面に出ていないアイテムは、即座に昇格できる最小限の準備
+        // だけで足りる(Apple推奨: preferredForwardBufferDuration を絞る)。
+        // ビットレートは維持し、昇格直後の初期画質が落ちないようにする。
+        return (bitRate: base.bitRate, buffer: min(base.buffer, 0.2))
+    }
+
+    private func resolveActivePlaybackProfile() -> (bitRate: Double, buffer: TimeInterval) {
         switch resolvedWorkProfile() {
         case .ultraLight:
             return (bitRate: 900_000, buffer: 0.08)
@@ -465,22 +478,23 @@ extension WallpaperModel {
 
     @discardableResult
     private func applyDynamicPlaybackProfile() -> Bool {
-        var targetItems: [AVPlayerItem] = []
+        var didApply = false
         if let item = sharedPlayer?.currentItem {
-            targetItems.append(item)
-        }
-        targetItems.append(
-            contentsOf: dedicatedPlayersByScreenID.values.compactMap(\.currentItem)
-        )
-        guard !targetItems.isEmpty else {
-            return false
-        }
-        let profile = resolvePlaybackProfile()
-        for item in targetItems {
+            let profile = resolvePlaybackProfile()
             item.preferredPeakBitRate = profile.bitRate
             item.preferredForwardBufferDuration = profile.buffer
+            didApply = true
         }
-        return true
+        for entry in allDedicatedSlotEntries() {
+            guard let item = entry.slot.player.currentItem else {
+                continue
+            }
+            let profile = resolvePlaybackProfile(role: entry.isActive ? .active : .warmStandby)
+            item.preferredPeakBitRate = profile.bitRate
+            item.preferredForwardBufferDuration = profile.buffer
+            didApply = true
+        }
+        return didApply
     }
 
     private func requestPlaybackReconfiguration() {

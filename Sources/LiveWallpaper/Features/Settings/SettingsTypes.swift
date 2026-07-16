@@ -48,6 +48,7 @@ extension SettingsView {
         case batteryAwareQuality
         case videoLoop
         case menuBarOpaque
+        case spaceWallpaper
         case suspendHighSensitivity
         case suspendFrontmostOnly
         case globalFitMode
