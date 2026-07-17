@@ -87,6 +87,9 @@ final class FitEditorController: ObservableObject {
         return 16.0 / 9.0
     }
 
+    /// 選択中の画面が接続一覧から消えていたら先頭の画面へ寄せる。activate() だけで
+    /// なく画面構成が変わるたびに呼ぶこと。Picker の選択はタグ一致で描画されるため、
+    /// 外した画面のIDを持ったままだと選択が空欄になる。
     func ensureScreenSelection() {
         let screens = screens
         if screens.isEmpty {
@@ -97,6 +100,7 @@ final class FitEditorController: ObservableObject {
             return
         }
         selectedScreenID = screens[0].id
+        syncDraftWithCurrentSelection()
     }
 
     func resolvedScreenID() -> String {

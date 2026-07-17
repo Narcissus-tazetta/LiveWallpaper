@@ -37,6 +37,15 @@ extension SettingsView {
         case lockScreen
     }
 
+    /// 「デスクトップ」タブが今どのスコープの割り当てを見せているか。
+    /// 画面別と Space別は排他なので、2つの Optional を手で打ち消し合わせるのでは
+    /// なく1つの値にする。スコープ Picker のタグはこの値をそのまま使う。
+    enum WallpaperScope: Hashable {
+        case shared
+        case display(String)
+        case space(String)
+    }
+
     enum HelpTopic: Hashable {
         case qualityPreset
         case workProfile

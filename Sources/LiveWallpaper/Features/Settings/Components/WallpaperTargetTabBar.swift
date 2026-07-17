@@ -27,12 +27,34 @@ extension SettingsView {
         }
     }
 
+    /// スコープがまだ選択可能か(画面が繋がっているか / Space が存在し機能がONか)。
+    /// 選択肢の生成と選択の妥当性判定を同じ述語に通し、Picker に出ないスコープが
+    /// 選ばれたままになる状態を作らない。
+    func isScopeSelectable(_ scope: WallpaperScope) -> Bool {
+        switch scope {
+        case .shared:
+            return true
+        case .display(let id):
+            return model.availableDisplayScreens().contains { $0.id == id }
+        case .space(let uuid):
+            return showsSpaceScopeOptions
+                && model.knownDesktopSpaces.contains { $0.uuid == uuid }
+        }
+    }
+
+    /// 選択中のスコープが消えていたら共有へ戻す。画面の抜き差し・Space機能の
+    /// トグル・Space の増減で呼ぶ。割り当てデータ自体は消さない(再接続や再ONで
+    /// 復活し、解除手段も壁紙カードのメニューに残る)。
+    func pruneStaleScope() {
+        guard !isScopeSelectable(selectedScope) else {
+            return
+        }
+        selectedScope = .shared
+    }
+
     /// 接続が切れた画面を選択したままにならないよう解決した現在の画面ID。
     var resolvedDisplayOverrideScreenID: String? {
-        guard let id = selectedDisplayOverrideScreenID else {
-            return nil
-        }
-        guard model.availableDisplayScreens().contains(where: { $0.id == id }) else {
+        guard case .display(let id) = selectedScope, isScopeSelectable(selectedScope) else {
             return nil
         }
         return id
@@ -41,12 +63,7 @@ extension SettingsView {
     /// 削除された Space を選択したままにならないよう解決した現在の Space uuid。
     /// (割り当てデータ自体は保持される。UIスコープの選択だけを解除する)
     var resolvedSpaceScopeUUID: String? {
-        guard model.spaceWallpaperFeatureEnabled, model.isSpaceWallpaperAvailable,
-              let uuid = selectedSpaceScopeUUID
-        else {
-            return nil
-        }
-        guard model.knownDesktopSpaces.contains(where: { $0.uuid == uuid }) else {
+        guard case .space(let uuid) = selectedScope, isScopeSelectable(selectedScope) else {
             return nil
         }
         return uuid
@@ -80,37 +97,23 @@ extension SettingsView {
         return resolvedSpaceScopeUUID
     }
 
-    /// スコープ Picker の選択値。共有(nil)・画面("d:<id>")・Space("s:<uuid>") を
-    /// 1つの Picker で排他選択させるためのエンコード。
-    private var scopeSelectionBinding: Binding<String?> {
+    /// スコープ Picker の選択値。選択中のスコープが既に無効なら共有として見せる
+    /// (pruneStaleScope() が書き戻すまでの1フレームでも Picker が空にならないよう、
+    /// get 側でも解決しておく)。
+    private var scopeSelectionBinding: Binding<WallpaperScope> {
         Binding(
             get: {
-                if let screenID = resolvedDisplayOverrideScreenID {
-                    return "d:\(screenID)"
-                }
-                if let uuid = resolvedSpaceScopeUUID {
-                    return "s:\(uuid)"
-                }
-                return nil
+                isScopeSelectable(selectedScope) ? selectedScope : .shared
             },
             set: { value in
-                if let value, value.hasPrefix("d:") {
-                    selectedDisplayOverrideScreenID = String(value.dropFirst(2))
-                    selectedSpaceScopeUUID = nil
-                } else if let value, value.hasPrefix("s:") {
-                    selectedSpaceScopeUUID = String(value.dropFirst(2))
-                    selectedDisplayOverrideScreenID = nil
-                } else {
-                    selectedDisplayOverrideScreenID = nil
-                    selectedSpaceScopeUUID = nil
-                }
+                selectedScope = value
                 selectedAssignmentTarget = .desktop
             }
         )
     }
 
     /// スコープ Picker に Space の選択肢を出すか。
-    private var showsSpaceScopeOptions: Bool {
+    var showsSpaceScopeOptions: Bool {
         model.spaceWallpaperFeatureEnabled && model.isSpaceWallpaperAvailable
             && !model.knownDesktopSpaces.isEmpty
     }
@@ -124,14 +127,14 @@ extension SettingsView {
                     model.localizedString("デスクトップ（共有）"),
                     systemImage: "infinity"
                 )
-                .tag(String?.none)
+                .tag(WallpaperScope.shared)
 
                 let screens = model.availableDisplayScreens()
                 if !screens.isEmpty {
                     Section(model.localizedString("画面")) {
                         ForEach(screens) { screen in
                             Label(screen.name, systemImage: "display")
-                                .tag(Optional("d:\(screen.id)"))
+                                .tag(WallpaperScope.display(screen.id))
                         }
                     }
                 }
@@ -142,7 +145,7 @@ extension SettingsView {
                                 desktopSpaceDisplayName(for: space),
                                 systemImage: "macwindow"
                             )
-                            .tag(Optional("s:\(space.uuid)"))
+                            .tag(WallpaperScope.space(space.uuid))
                         }
                     }
                 }

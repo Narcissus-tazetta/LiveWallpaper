@@ -97,6 +97,11 @@ extension WallpaperModel {
             refreshSpacesSnapshot()
         } else {
             orderedSpaceUUIDsByDisplayID.removeAll()
+            // 機能OFF中はスナップショットを取り直さないので、残しておくと二度と
+            // 更新されない古い Space 一覧をUIに見せることになる。割り当て自体
+            // (videoBySpaceUUID)は再ONで復元できるよう保持する。
+            knownDesktopSpaces = []
+            currentSpaceUUIDByDisplayID = [:]
         }
         applySpaceWallpaperSwap()
     }

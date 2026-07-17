@@ -17,7 +17,7 @@ extension SettingsView {
         // Web壁紙が実際に表示中のときは動画側を「デスクトップに設定中」として扱わない。
         let isDesktopAssigned = model.currentVideoPath == path && !model.isWebWallpaperActive
         let isLockScreenAssigned = model.lockScreenVideoPath == path
-        let isDisplayOverrideAssigned = model.videoOverrideByScreenID.values.contains(path)
+        let isDisplayOverrideAssigned = model.hasLiveDisplayOverride(forPath: path)
         let strokeColor = wallpaperCardStrokeColor(
             path: path,
             assignmentTarget: assignmentTarget,

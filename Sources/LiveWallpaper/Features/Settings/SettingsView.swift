@@ -17,15 +17,11 @@ struct SettingsView: View {
     @State var editingWallpaperNameInput: String = ""
     @State var isDropTargeted: Bool = false
     @State var selectedAssignmentTarget: WallpaperAssignmentTarget = .desktop
-    /// 「デスクトップ」タブが共有壁紙ではなく特定ディスプレイの割り当てを
-    /// 表示している場合の画面ID。接続が切れた画面は resolvedDisplayOverrideScreenID
-    /// 側で自動的に無視される。
-    @State var selectedDisplayOverrideScreenID: String?
-    /// 「デスクトップ」タブが特定 Space(仮想デスクトップ)の割り当てを表示して
-    /// いる場合の Space uuid。selectedDisplayOverrideScreenID と排他(スコープ
-    /// Picker がどちらか一方だけを選ばせる)。削除済み Space は
-    /// resolvedSpaceScopeUUID 側で自動的に無視される。
-    @State var selectedSpaceScopeUUID: String?
+    /// 「デスクトップ」タブが今見せているスコープ(共有 / 画面別 / Space別)。
+    /// 画面が外れた・Space機能がOFFになったなど、選択中のスコープが消えたときは
+    /// 読み取り側で無視するのではなく pruneStaleScope() が .shared を書き戻す。
+    /// 無視するだけだと選択が残り、機能を戻した瞬間に古いスコープへ復帰する。
+    @State var selectedScope: WallpaperScope = .shared
     @StateObject var fitEditor: FitEditorController
     @State var isResetSettingsDialogPresented: Bool = false
     @State var librarySearchText: String = ""
@@ -152,6 +148,18 @@ struct SettingsView: View {
             }
             .onChange(of: model.selectedPlaylistID) { _ in
                 resetLibrarySearchState()
+            }
+            // スコープの土台が動いたら選択を畳む。画面を外す・Space機能をOFFにする
+            // ・Space を消す、のどれでも「消えたスコープを選んだまま」にしない。
+            .onChange(of: model.displayScreens) { _ in
+                pruneStaleScope()
+                fitEditor.ensureScreenSelection()
+            }
+            .onChange(of: model.knownDesktopSpaces) { _ in
+                pruneStaleScope()
+            }
+            .onChange(of: model.spaceWallpaperFeatureEnabled) { _ in
+                pruneStaleScope()
             }
             .onChange(of: isVolumeInputFocused) { focused in
                 if !focused {

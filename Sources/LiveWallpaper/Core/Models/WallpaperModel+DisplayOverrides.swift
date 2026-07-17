@@ -12,6 +12,17 @@ import AVFoundation
 ///   全面被覆時に一時停止+フリーズフレーム表示まで。
 @MainActor
 extension WallpaperModel {
+    /// この動画が、今つながっている画面のどれかに割り当てられているか。
+    /// 壁紙一覧のバッジ用。videoOverrideByScreenID を直に見ると、外した画面宛ての
+    /// 残った割り当てでもバッジが点く(その割り当ての解除手段はカードのメニュー側に
+    /// 残してあるので、ここで見せないだけなら情報は失われない)。
+    func hasLiveDisplayOverride(forPath path: String) -> Bool {
+        let connected = Set(availableDisplayScreens().map(\.id))
+        return videoOverrideByScreenID.contains { screenID, assigned in
+            assigned == path && connected.contains(screenID)
+        }
+    }
+
     func videoOverride(forScreenID screenID: String) -> String? {
         videoOverrideByScreenID[screenID]
     }

@@ -96,9 +96,13 @@ extension WallpaperModel {
     }
 
     func availableDisplayScreens() -> [DisplayScreenInfo] {
-        if let cachedDisplayScreens {
-            return cachedDisplayScreens
-        }
+        displayScreens
+    }
+
+    /// NSScreen.screens から画面一覧を作り直して displayScreens に発行する。
+    /// 画面名はローカライズされるため、画面構成の変化だけでなく言語変更でも
+    /// 呼ぶ必要がある。
+    func refreshDisplayScreens() {
         let screens = NSScreen.screens
         let result = screens.enumerated().map { index, screen in
             let screenID = displayIDString(for: screen)
@@ -110,8 +114,10 @@ extension WallpaperModel {
                 : "\(screenLabel)\(index + 1)"
             return DisplayScreenInfo(id: screenID, name: name, frame: screen.frame)
         }
-        cachedDisplayScreens = result
-        return result
+        guard result != displayScreens else {
+            return
+        }
+        displayScreens = result
     }
 
     func displayIDForWindow(at index: Int) -> String {
@@ -751,7 +757,7 @@ extension WallpaperModel {
     }
 
     func scheduleScreenSync() {
-        cachedDisplayScreens = nil
+        refreshDisplayScreens()
         screenChangeWorkItem?.cancel()
 
         let workItem = DispatchWorkItem { [weak self] in
@@ -766,6 +772,12 @@ extension WallpaperModel {
     }
 
     private func syncWindowsToCurrentScreens() {
+        // 画面一覧は「壁紙ウィンドウを作り直すか」とは独立に最新化する。mainOnly では
+        // targetScreens() がメインしか返さないため、サブ画面を外しても signature は
+        // 変わらず下の guard で return する。ここで発行しないと、その経路では設定UIが
+        // 外した画面を出したままになる。
+        refreshDisplayScreens()
+
         let screens = targetScreens()
         let signatures = screenSignatures(for: screens)
 

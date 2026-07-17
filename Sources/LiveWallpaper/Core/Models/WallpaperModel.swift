@@ -64,7 +64,11 @@ final class WallpaperModel: ObservableObject {
     var displayIDByWindow: [ObjectIdentifier: String] = [:]
     var activeSpaceWindowRefreshWorkItems: [DispatchWorkItem] = []
     var lastScreenSignatures: [ScreenSignature] = []
-    var cachedDisplayScreens: [DisplayScreenInfo]?
+    /// 接続中の画面一覧。設定UIはこの一覧から「今スコープに選べる画面」を導出する
+    /// ため、遅延キャッシュではなく発行される事実として持つ。非Publishedのキャッシュ
+    /// だと画面を外しても SwiftUI が再描画されず、消えた画面が選ばれたまま残る。
+    /// 更新は refreshDisplayScreens() 経由のみ(直接代入しないこと)。
+    @Published var displayScreens: [DisplayScreenInfo] = []
     var frontmostAppObserver: NSObjectProtocol?
     var windowOcclusionObserver: NSObjectProtocol?
     var spaceTransitionGuardObserver: NSObjectProtocol?
@@ -262,9 +266,11 @@ final class WallpaperModel: ObservableObject {
             return
         }
         appLanguage = language
-        cachedDisplayScreens = nil
         UserDefaults.standard.set(language.rawValue, forKey: "appLanguage")
         LocalizationManager.setLanguage(language.effectiveLanguageCode)
+        // 画面名(「画面1 (メイン)」)は localizedString で組み立てるため、
+        // 言語切替後に作り直す。LocalizationManager 更新後である必要がある。
+        refreshDisplayScreens()
         AppLog.localization.debug(
             "setAppLanguage -> \(String(describing: language), privacy: .public) effective=\(language.effectiveLanguageCode, privacy: .public)"
         )
@@ -276,6 +282,7 @@ final class WallpaperModel: ObservableObject {
         restoreState()
         recoverStaleLockScreenSyncOnLaunchIfNeeded()
         LocalizationManager.setLanguage(effectiveAppLanguageCode)
+        refreshDisplayScreens()
         rebuildWindows()
         if isWebWallpaperActive {
             webWallpaperLoadState = .loading
