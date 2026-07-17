@@ -112,7 +112,7 @@ extension AppDelegate {
         panel.canChooseFiles = true
 
         if #available(macOS 11.0, *) {
-            panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie]
+            panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie, .gif, .webP, .png]
         }
 
         guard panel.runModal() == .OK else {
@@ -136,7 +136,7 @@ extension AppDelegate {
         panel.canChooseFiles = true
 
         if #available(macOS 11.0, *) {
-            panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie]
+            panel.allowedContentTypes = [.mpeg4Movie, .quickTimeMovie, .movie, .gif, .webP, .png]
         }
 
         if panel.runModal() == .OK, let url: URL = panel.url {

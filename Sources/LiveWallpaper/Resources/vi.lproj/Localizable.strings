@@ -4,7 +4,7 @@
 "現在の壁紙" = "Hình nền hiện tại";
 "プレイリスト" = "Danh sách phát";
 "表示" = "Hiển thị";
-"動画を追加" = "Thêm video";
+"メディアを追加" = "Thêm phương tiện";
 "壁紙を共有" = "Chia sẻ hình nền";
 "新規プレイリスト" = "Danh sách phát mới";
 "プレイリスト・設定" = "Danh sách phát và cài đặt";
@@ -207,8 +207,8 @@
 "軽量" = "Nhẹ";
 "高負荷" = "Nặng";
 "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Chọn cách giải mã video. Tự động theo môi trường, Cân bằng ưu tiên mượt, Tiết kiệm pin giảm CPU và điện năng.";
-"1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます" = "1. Nhấn \"Thêm video\" để chọn video.\n2. Video đã chọn sẽ phát ngay làm hình nền.";
-"動画ファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "Bạn cũng có thể thêm video bằng cách kéo và thả vào cửa sổ này.";
+"1. 「メディアを追加」を押して動画やGIFを選ぶ\n2. 選んだメディアがそのまま壁紙として再生されます" = "1. Nhấn \"Thêm phương tiện\" để chọn video hoặc GIF.\n2. Phương tiện đã chọn sẽ phát ngay làm hình nền.";
+"動画やGIFなどのファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "Bạn cũng có thể thêm video hoặc GIF bằng cách kéo và thả vào cửa sổ này.";
 "壁紙を保存するフォルダを選択してください" = "Chọn thư mục để lưu hình nền.";
 "設定を初期化" = "Đặt lại cài đặt";
 "表示・再生に関する設定を初期値へ戻します" = "Khôi phục cài đặt hiển thị và phát lại về mặc định.";
@@ -309,3 +309,11 @@
 "メニューバーにデスクトップ番号を表示" = "Hiển thị số desktop trên thanh menu";
 "デスクトップ・画面切替時に再生位置を記憶する" = "Nhớ vị trí phát khi chuyển desktop hoặc màn hình";
 "OFFにすると、切替のたびに動画は常に最初から再生されます。ONでも負荷が高いときは自動的に控えめな動作に切り替わります。" = "Khi tắt, video sẽ luôn phát lại từ đầu mỗi khi chuyển. Ngay cả khi bật, chế độ này cũng tự động giảm tải khi hệ thống bận.";
+
+// アニメ画像(GIF/APNG/WebP)→動画変換
+"変換中…" = "Đang chuyển đổi…";
+"変換をキャンセル" = "Hủy chuyển đổi";
+"変換をキャンセルしました" = "Đã hủy chuyển đổi";
+"画像を読み込めませんでした。ファイルが壊れている可能性があります。" = "Không thể đọc hình ảnh. Tệp có thể bị hỏng.";
+"アニメーションのフレームを取得できませんでした。" = "Không thể lấy các khung hình của hoạt ảnh.";
+"動画への変換に失敗しました。ディスクの空き容量を確認してください。" = "Chuyển đổi sang video thất bại. Vui lòng kiểm tra dung lượng đĩa trống.";

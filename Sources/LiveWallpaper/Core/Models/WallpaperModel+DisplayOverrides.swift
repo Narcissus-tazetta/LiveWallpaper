@@ -269,7 +269,9 @@ extension WallpaperModel {
             activeDedicatedPathByScreenID[screenID] = path
         }
 
-        if let remembered = dedicatedResumeTimeByKey[ScreenPathKey(screenID: screenID, path: path)] {
+        if dedicatedPlaybackContinuityEnabled,
+           let remembered = dedicatedResumeTimeByKey[ScreenPathKey(screenID: screenID, path: path)]
+        {
             AppLog.continuity.debug(
                 "restore requested display=\(screenID, privacy: .public) seconds=\(remembered.seconds) path=\((path as NSString).lastPathComponent, privacy: .public)"
             )
@@ -310,7 +312,9 @@ extension WallpaperModel {
         AppLog.continuity.debug(
             "evict display=\(screenID, privacy: .public) seconds=\(evictTime.isNumeric ? evictTime.seconds : -1) path=\((path as NSString).lastPathComponent, privacy: .public)"
         )
-        recordResumeTime(evictTime, forScreenID: screenID, path: path)
+        if dedicatedPlaybackContinuityEnabled {
+            recordResumeTime(evictTime, forScreenID: screenID, path: path)
+        }
         slot.looper.disableLooping()
         slot.player.pause()
         slot.player.removeAllItems()

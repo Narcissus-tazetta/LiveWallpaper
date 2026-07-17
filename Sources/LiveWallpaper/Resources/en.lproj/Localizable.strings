@@ -186,13 +186,13 @@
 "アップデートを自動で確認する（起動時にも通知）" = "Automatically check for updates (notify on launch)";
 "今すぐ確認" = "Check Now";
 "更新が失敗する場合は、Releasesから最新版を取得して /Applications の LiveWallpaper.app を置き換えてください" = "If updates fail, download the latest release and replace /Applications/LiveWallpaper.app.";
-"動画を追加" = "Add Video";
+"メディアを追加" = "Add Media";
 "%" = "%";
 "(選択なし)" = "(None selected)";
 "X" = "X";
 "Y" = "Y";
-"1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます" = "1. Press \"Add Video\" to choose a video.\n2. The selected video plays as your wallpaper.";
-"動画ファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "You can also add a video by dragging it onto this window.";
+"1. 「メディアを追加」を押して動画やGIFを選ぶ\n2. 選んだメディアがそのまま壁紙として再生されます" = "1. Press \"Add Media\" to choose a video or GIF.\n2. The selected media plays as your wallpaper.";
+"動画やGIFなどのファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "You can also add videos or GIFs by dragging them onto this window.";
 "壁紙を保存するフォルダを選択してください" = "Choose a folder to save the wallpaper.";
 "静止画" = "Still";
 "設定をリセット" = "Reset Settings";
@@ -339,3 +339,11 @@
 "メニューバーにデスクトップ番号を表示" = "Show desktop number in the menu bar";
 "デスクトップ・画面切替時に再生位置を記憶する" = "Remember playback position when switching desktops or displays";
 "OFFにすると、切替のたびに動画は常に最初から再生されます。ONでも負荷が高いときは自動的に控えめな動作に切り替わります。" = "When off, playback always restarts from the beginning on every switch. Even when on, it automatically scales back under high load.";
+
+// アニメ画像(GIF/APNG/WebP)→動画変換
+"変換中…" = "Converting…";
+"変換をキャンセル" = "Cancel conversion";
+"変換をキャンセルしました" = "Conversion cancelled";
+"画像を読み込めませんでした。ファイルが壊れている可能性があります。" = "Could not read the image. The file may be corrupted.";
+"アニメーションのフレームを取得できませんでした。" = "Could not extract animation frames.";
+"動画への変換に失敗しました。ディスクの空き容量を確認してください。" = "Failed to convert to video. Check your free disk space.";

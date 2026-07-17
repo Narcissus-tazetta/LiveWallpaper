@@ -20,6 +20,13 @@ extension SettingsView {
         VStack(alignment: .leading, spacing: 10) {
             wallpaperContentHeader
             wallpaperActionToolbar
+
+            if let importErrorMessage = model.mediaImportErrorMessage {
+                Text(importErrorMessage)
+                    .font(.caption)
+                    .foregroundColor(.orange)
+            }
+
             wallpaperListContent
 
             if let screenID = activeDisplayOverrideScreenID {
@@ -419,11 +426,6 @@ extension SettingsView {
             .buttonStyle(.bordered)
             .disabled(model.libraryVideoPaths.isEmpty)
 
-            Button(model.localizedString("動画を追加")) {
-                NotificationCenter.default.post(name: .chooseVideo, object: nil)
-            }
-            .buttonStyle(.borderedProminent)
-
             if selectedAssignmentTarget == .desktop, activeDisplayOverrideScreenID == nil,
                model.webWallpaperFeatureEnabled
             {
@@ -437,6 +439,30 @@ extension SettingsView {
                         .frame(width: 360)
                 }
             }
+
+            if model.isImportingMedia {
+                HStack(spacing: 6) {
+                    ProgressView(value: model.mediaImportProgress)
+                        .frame(width: 80)
+                    Text(model.localizedString("変換中…"))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Button {
+                        model.cancelMediaImport()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(model.localizedString("変換をキャンセル"))
+                }
+            }
+
+            Button(model.localizedString("メディアを追加")) {
+                NotificationCenter.default.post(name: .chooseVideo, object: nil)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(model.isImportingMedia)
         }
     }
 
@@ -488,10 +514,10 @@ extension SettingsView {
     @ViewBuilder
     private var wallpaperEmptyStateText: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(model.localizedString("1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます"))
+            Text(model.localizedString("1. 「メディアを追加」を押して動画やGIFを選ぶ\n2. 選んだメディアがそのまま壁紙として再生されます"))
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Text(model.localizedString("動画ファイルをウィンドウにドラッグ&ドロップして追加することもできます"))
+            Text(model.localizedString("動画やGIFなどのファイルをウィンドウにドラッグ&ドロップして追加することもできます"))
                 .font(.caption2)
                 .foregroundColor(.secondary.opacity(0.85))
             if model.webWallpaperFeatureEnabled {

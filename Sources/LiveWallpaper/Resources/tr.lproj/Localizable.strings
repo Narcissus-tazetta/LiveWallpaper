@@ -4,7 +4,7 @@
 "現在の壁紙" = "Geçerli Duvar Kağıdı";
 "プレイリスト" = "Oynatma Listesi";
 "表示" = "Görüntü";
-"動画を追加" = "Video Ekle";
+"メディアを追加" = "Medya Ekle";
 "壁紙を共有" = "Duvar Kağıdını Paylaş";
 "新規プレイリスト" = "Yeni Oynatma Listesi";
 "プレイリスト・設定" = "Oynatma Listesi ve Ayarlar";
@@ -209,8 +209,8 @@
 "軽量" = "Hafif";
 "高負荷" = "Yüksek";
 "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Video kod çözme yöntemini seçin. Otomatik ortama göre, Dengeli akıcılığı, Güç Tasarrufu CPU ve güç tüketimini azaltır.";
-"1. 「動画を追加」を押して動画を選ぶ\n2. 選んだ動画がそのまま壁紙として再生されます" = "1. Video seçmek için \"Video Ekle\"ye basın.\n2. Seçilen video doğrudan duvar kağıdı olarak oynatılır.";
-"動画ファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "Ayrıca bir videoyu bu pencereye sürükleyerek de ekleyebilirsiniz.";
+"1. 「メディアを追加」を押して動画やGIFを選ぶ\n2. 選んだメディアがそのまま壁紙として再生されます" = "1. Video veya GIF seçmek için \"Medya Ekle\"ye basın.\n2. Seçilen medya doğrudan duvar kağıdı olarak oynatılır.";
+"動画やGIFなどのファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "Ayrıca bir videoyu veya GIF'i bu pencereye sürükleyerek de ekleyebilirsiniz.";
 "壁紙を保存するフォルダを選択してください" = "Duvar kağıdını kaydetmek için bir klasör seçin.";
 "高度な共有を有効にする" = "Gelişmiş paylaşımı etkinleştir";
 "オフのときは動画ファイルだけを書き出します。オンにすると配置情報を含む .lwpkg も一緒に書き出します。" = "Kapalıyken yalnızca video dosyası dışa aktarılır. Açıkken yerleşim bilgilerini içeren bir .lwpkg paketi de dışa aktarılır.";
@@ -309,3 +309,11 @@
 "メニューバーにデスクトップ番号を表示" = "Menü çubuğunda masaüstü numarasını göster";
 "デスクトップ・画面切替時に再生位置を記憶する" = "Masaüstü veya ekran değiştirirken oynatma konumunu hatırla";
 "OFFにすると、切替のたびに動画は常に最初から再生されます。ONでも負荷が高いときは自動的に控えめな動作に切り替わります。" = "Kapalıyken, her geçişte oynatma her zaman baştan başlar. Açıkken bile yüksek yük altında otomatik olarak daha ölçülü çalışır.";
+
+// アニメ画像(GIF/APNG/WebP)→動画変換
+"変換中…" = "Dönüştürülüyor…";
+"変換をキャンセル" = "Dönüştürmeyi iptal et";
+"変換をキャンセルしました" = "Dönüştürme iptal edildi";
+"画像を読み込めませんでした。ファイルが壊れている可能性があります。" = "Görüntü okunamadı. Dosya bozuk olabilir.";
+"アニメーションのフレームを取得できませんでした。" = "Animasyon kareleri alınamadı.";
+"動画への変換に失敗しました。ディスクの空き容量を確認してください。" = "Videoya dönüştürme başarısız oldu. Boş disk alanınızı kontrol edin.";

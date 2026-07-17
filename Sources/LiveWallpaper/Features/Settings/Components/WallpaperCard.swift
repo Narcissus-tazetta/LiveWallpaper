@@ -168,7 +168,11 @@ extension SettingsView {
                 model.selectLockScreenVideo(path: path)
             }
             .disabled(!model.lockScreenSyncService.isSupported)
-            if model.availableDisplayScreens().count > 1 {
+            // 新規割り当てには2台以上が必要だが、接続解除後も残った古い割り当て
+            // (このパス宛て)を解除する手段は画面数によらず必ず出す。
+            if model.availableDisplayScreens().count > 1
+                || model.videoOverrideByScreenID.values.contains(path)
+            {
                 displayOverrideMenu(path: path)
             }
             if model.spaceWallpaperFeatureEnabled, model.isSpaceWallpaperAvailable,

@@ -18,6 +18,11 @@ extension SettingsView {
     private static let settingsSectionKeywords: [SettingsSection: [String]] = [
         .video: [
             "動画",
+            "メディアを追加",
+            "GIF",
+            "WebP",
+            "APNG",
+            "アニメ画像",
             "クリック貫通を有効にする",
             "ログイン時に自動起動する",
             "音声を再生する",

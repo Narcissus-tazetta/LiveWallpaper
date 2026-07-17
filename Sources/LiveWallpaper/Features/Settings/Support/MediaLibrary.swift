@@ -65,7 +65,8 @@ extension SettingsView {
         return true
     }
 
-    /// ドロップされた動画をそのままライブラリへ登録して再生する。
+    /// ドロップされた動画・アニメ画像をそのままライブラリへ登録して再生する。
+    /// アニメ画像(GIF等)は取り込み時に動画へ変換される。
     /// プレイリスト選択中はそのプレイリストにも追加される(setVideoの挙動に従う)。
     func prepareDroppedVideo(_ url: URL) {
         let fileURL = url.isFileURL ? url : URL(fileURLWithPath: url.path)
@@ -73,7 +74,8 @@ extension SettingsView {
             return
         }
         let ext = fileURL.pathExtension
-        guard let type = UTType(filenameExtension: ext), type.conforms(to: .movie) else {
+        let isMovie = UTType(filenameExtension: ext)?.conforms(to: .movie) ?? false
+        guard isMovie || AnimatedImageTranscoder.isSupportedImageExtension(ext) else {
             return
         }
         Task { @MainActor in

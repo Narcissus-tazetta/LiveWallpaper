@@ -141,6 +141,12 @@ final class WallpaperModel: ObservableObject {
     @Published var currentWebWallpaperID: UUID?
     @Published var webWallpaperLoadState: WebWallpaperLoadState = .idle
     @Published var webWallpaperErrorMessage: String?
+    /// アニメ画像(GIF等)→動画変換の進行状態。UIの進捗表示・追加ボタン無効化に使う。
+    @Published var isImportingMedia: Bool = false
+    @Published var mediaImportProgress: Double = 0
+    @Published var mediaImportErrorMessage: String?
+    /// 変換中のインポートをキャンセルするためのハンドル
+    var activeMediaImportTask: Task<Result<URL, Error>, Never>?
     /// 登録済み動画の本体。プレイリストはここへの参照のみを持つ。
     @Published var libraryVideoPaths: [String] = []
     @Published var playlists: [WallpaperPlaylist] = []
