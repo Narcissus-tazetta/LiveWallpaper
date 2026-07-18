@@ -79,6 +79,47 @@ extension WallpaperModel {
         isDeepSuspended = true
     }
 
+    // MARK: - Web壁紙
+
+    /// Web壁紙版の deep suspend タイマー。動画側と同じく、被覆が続いた場合のみ
+    /// 発火するよう呼ばれるたびに期限を延ばす。
+    func scheduleWebDeepSuspend() {
+        webDeepSuspendWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.performWebDeepSuspend()
+        }
+        webDeepSuspendWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + webDeepSuspendDelay, execute: workItem)
+    }
+
+    func cancelWebDeepSuspend() {
+        webDeepSuspendWorkItem?.cancel()
+        webDeepSuspendWorkItem = nil
+    }
+
+    /// 全画面が被覆されたまま `webDeepSuspendDelay` が経過したら、各 WebPlayerView に
+    /// ページ本体を解放させる。表示中のフリーズ画像はそのまま残るので見た目は変わらない。
+    /// 復帰(再ロード)は WebPlayerView.setSuspended(false) 側が担当する。
+    private func performWebDeepSuspend() {
+        webDeepSuspendWorkItem = nil
+        guard isWebWallpaperActive else {
+            return
+        }
+        // タイマー発火までの間に被覆が解けていないか、ここで必ず取り直して確認する。
+        let displayIDs = (0 ..< webPlayerViews.count).map { displayIDForWindow(at: $0) }
+        guard !displayIDs.isEmpty,
+              displayIDs.allSatisfy({ suspendedDisplayIDs.contains($0) })
+        else {
+            return
+        }
+        AppLog.suspend.debug(
+            "web deep suspend: unloading views=\(self.webPlayerViews.count)"
+        )
+        for view in webPlayerViews {
+            view.deepUnload()
+        }
+    }
+
     /// Rebuilds the freed video in the background while the freeze frame stays
     /// visible, then swaps to live playback at the frozen position once ready.
     func resumeFromDeepSuspend() {

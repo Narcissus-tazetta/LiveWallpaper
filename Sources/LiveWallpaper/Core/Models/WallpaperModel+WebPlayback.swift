@@ -150,6 +150,7 @@ extension WallpaperModel {
     }
 
     func stopWebWallpaper() {
+        cancelWebDeepSuspend()
         for view in webPlayerViews {
             view.stopLoading()
             view.onLoadStateChanged = nil
@@ -196,21 +197,25 @@ extension WallpaperModel {
     }
 
     func applyWebSuspensionState() {
-        applyDisplaySuspension(to: webPlayerViews.enumerated().map { index, view in
-            (displayIDForWindow(at: index), { view.setSuspended($0) })
-        })
-    }
-
-    private func applyDisplaySuspension(
-        to targets: [(displayID: String, apply: (Bool) -> Void)]
-    ) {
-        guard !targets.isEmpty else {
+        guard !webPlayerViews.isEmpty else {
+            cancelWebDeepSuspend()
             return
         }
-        let displayIDs = targets.map(\.displayID)
+        let displayIDs = (0 ..< webPlayerViews.count).map { displayIDForWindow(at: $0) }
         let allSuspended = displayIDs.allSatisfy { suspendedDisplayIDs.contains($0) }
-        for (displayID, apply) in targets {
-            apply(allSuspended || suspendedDisplayIDs.contains(displayID))
+        for (index, view) in webPlayerViews.enumerated() {
+            view.setSuspended(allSuspended || suspendedDisplayIDs.contains(displayIDs[index]))
+        }
+
+        // Freeing the page only pays off once every display is covered — a page
+        // still visible somewhere has to stay loaded regardless. Mirrors the
+        // shared video player's deep suspend, just on a longer fuse: rebuilding a
+        // web page costs a network round trip, so it must not fire on the brief
+        // coverage of an app switch.
+        if allSuspended {
+            scheduleWebDeepSuspend()
+        } else {
+            cancelWebDeepSuspend()
         }
     }
 

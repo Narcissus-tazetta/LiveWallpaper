@@ -3,6 +3,12 @@ import Foundation
 
 @MainActor
 extension WallpaperModel {
+    /// 保存済みの設定を復元する。ここでは動画ファイルの存在確認を一切しない:
+    /// stat はローカルSSDなら一瞬だが、外付け・ネットワークボリュームや未ダウンロード
+    /// のiCloudファイルでは1件で数秒ブロックしうる。それを登録本数ぶん直列に、
+    /// しかもウィンドウを出す前のメインスレッドでやると起動がそのまま止まる。
+    /// 参照はいったん全部復元し、実在確認と間引きは verifyRestoredVideoPaths() が
+    /// 起動直後にバックグラウンドでまとめて行う。
     func restoreState() {
         clickThrough = UserDefaults.standard.object(forKey: "clickThrough") as? Bool ?? true
         if let modeValue: String = UserDefaults.standard.string(forKey: "displayMode"),
@@ -94,16 +100,12 @@ extension WallpaperModel {
             )
             .sorted()
         }
+        // 存在しないパスの間引きは verifyRestoredVideoPaths() が起動後に行う
+        // (このメソッド全体の注記を参照)。
         if let playlistData = UserDefaults.standard.data(forKey: "playlistsData"),
            let decoded = try? JSONDecoder().decode([WallpaperPlaylist].self, from: playlistData)
         {
-            playlists = decoded.map { playlist in
-                var cleaned = playlist
-                cleaned.videoPaths = cleaned.videoPaths.filter {
-                    FileManager.default.fileExists(atPath: $0)
-                }
-                return cleaned
-            }
+            playlists = decoded
         }
 
         restoreLibraryVideoPaths()
@@ -130,7 +132,6 @@ extension WallpaperModel {
             }
         }
         if let savedPath: String = UserDefaults.standard.string(forKey: "videoPath"),
-           FileManager.default.fileExists(atPath: savedPath),
            libraryVideoPaths.contains(savedPath)
         {
             currentVideoPath = savedPath
@@ -179,15 +180,13 @@ extension WallpaperModel {
     private func restoreLibraryVideoPaths() {
         var restored: [String]
         if let savedLibrary = UserDefaults.standard.stringArray(forKey: "libraryVideoPaths") {
-            restored = savedLibrary.filter { FileManager.default.fileExists(atPath: $0) }
+            restored = savedLibrary
         } else {
             let legacyPaths =
                 UserDefaults.standard.stringArray(forKey: "registeredVideoPaths") ?? []
             restored = []
             var seen = Set<String>()
-            for path in playlists.flatMap(\.videoPaths) + legacyPaths
-                where !seen.contains(path) && FileManager.default.fileExists(atPath: path)
-            {
+            for path in playlists.flatMap(\.videoPaths) + legacyPaths where !seen.contains(path) {
                 seen.insert(path)
                 restored.append(path)
             }

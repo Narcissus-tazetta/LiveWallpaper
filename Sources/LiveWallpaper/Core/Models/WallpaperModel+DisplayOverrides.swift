@@ -208,7 +208,8 @@ extension WallpaperModel {
         else {
             return
         }
-        videoOverrideByScreenID = saved.filter { FileManager.default.fileExists(atPath: $0.value) }
+        // 実在確認は verifyRestoredVideoPaths() が起動後にまとめて行う(restoreState 参照)。
+        videoOverrideByScreenID = saved
     }
 
     private func persistVideoOverrides() {

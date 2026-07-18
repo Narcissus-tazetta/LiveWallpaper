@@ -317,3 +317,37 @@
 "画像を読み込めませんでした。ファイルが壊れている可能性があります。" = "Không thể đọc hình ảnh. Tệp có thể bị hỏng.";
 "アニメーションのフレームを取得できませんでした。" = "Không thể lấy các khung hình của hoạt ảnh.";
 "動画への変換に失敗しました。ディスクの空き容量を確認してください。" = "Chuyển đổi sang video thất bại. Vui lòng kiểm tra dung lượng đĩa trống.";
+
+// ロック画面同期・Aerial壁紙・バッテリー・アプリ選択
+"ロック画面にも動画を同期" = "Đồng bộ video với màn hình khóa";
+"ロック画面用にシステム壁紙を一時設定" = "Đặt tạm hình nền hệ thống cho màn hình khóa";
+"System Settings を開く" = "Mở System Settings";
+"今すぐ設定" = "Đặt ngay";
+"今すぐ同期" = "Đồng bộ ngay";
+"ロック画面同期を削除" = "Xóa đồng bộ màn hình khóa";
+"元のAerialに戻す" = "Khôi phục Aerial gốc";
+"壊れた設定を復元" = "Khôi phục cài đặt bị hỏng";
+"初回のみ System Settings の壁紙画面で「LiveWallpaper Video」を選び、「スクリーンセーバーとして表示」をオンにしてください。以降の動画変更は自動同期されます。" = "Lần đầu, hãy mở mục Hình nền trong System Settings, chọn \"LiveWallpaper Video\" và bật \"Hiển thị làm trình bảo vệ màn hình\". Các lần đổi video sau sẽ tự động đồng bộ.";
+"オンにすると現在の動画をロック画面用のシステム壁紙として設定します。以降の動画変更も自動同期されます。反映されない時は「ロック画面に設定」を押してください。" = "Khi bật, video hiện tại sẽ được đặt làm hình nền hệ thống cho màn hình khóa. Các lần đổi video sau sẽ tự động đồng bộ. Nếu không áp dụng, hãy nhấn \"Đặt làm màn hình khóa\".";
+"オンにすると現在の動画をロック画面へ設定します。動画変更後に反映されない時は「今すぐ設定」を押してください。" = "Khi bật, video hiện tại sẽ được đặt cho màn hình khóa. Nếu không áp dụng sau khi đổi video, hãy nhấn \"Đặt ngay\".";
+"オンにすると現在の動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "Khi bật, video hiện tại sẽ được đặt tạm làm hình nền Aerial của hệ thống. Hình nền gốc được khôi phục khi thoát app.";
+"System Settings でダイナミック壁紙を1つダウンロードしてから、もう一度設定してください。" = "Hãy tải một hình nền động trong System Settings, rồi đặt lại.";
+"うまく反映されない時は、右のメニューから復元できます。System Settings は閉じてから実行してください。" = "Nếu không áp dụng đúng, hãy dùng menu bên phải để khôi phục. Hãy đóng System Settings trước khi chạy.";
+"ロック画面同期はオフです" = "Đồng bộ màn hình khóa đang tắt";
+"macOS 26 以降で利用できます" = "Khả dụng trên macOS 26 trở lên";
+"同期待機中" = "Đang chờ đồng bộ";
+"同期中" = "Đang đồng bộ";
+"同期済み" = "Đã đồng bộ";
+"借用中" = "Đang mượn";
+"前回のロック画面設定を復元中" = "Đang khôi phục cài đặt màn hình khóa trước đó";
+"削除中" = "Đang xóa";
+"元のAerialに戻しています" = "Đang khôi phục Aerial gốc";
+"復元中" = "Đang khôi phục";
+"復元済み" = "Đã khôi phục";
+"前回のロック画面設定を復元しました" = "Đã khôi phục cài đặt màn hình khóa trước đó";
+"Aerial動画が未ダウンロードです" = "Chưa tải xuống video Aerial nào";
+"同期に失敗しました" = "Đồng bộ thất bại";
+"前回終了時に残ったロック画面設定を自動で元に戻しました。" = "Cài đặt màn hình khóa còn lại từ lần chạy trước đã được tự động khôi phục.";
+"バッテリー残量に応じて画質を自動調整" = "Tự động điều chỉnh chất lượng theo mức pin";
+"バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "Khi dùng pin và mức pin còn 10% trở xuống, tải phát lại sẽ tự động giảm để tiết kiệm điện.";
+"アプリを選択して追加" = "Chọn app để thêm";

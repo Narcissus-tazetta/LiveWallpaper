@@ -317,3 +317,37 @@
 "画像を読み込めませんでした。ファイルが壊れている可能性があります。" = "Görüntü okunamadı. Dosya bozuk olabilir.";
 "アニメーションのフレームを取得できませんでした。" = "Animasyon kareleri alınamadı.";
 "動画への変換に失敗しました。ディスクの空き容量を確認してください。" = "Videoya dönüştürme başarısız oldu. Boş disk alanınızı kontrol edin.";
+
+// ロック画面同期・Aerial壁紙・バッテリー・アプリ選択
+"ロック画面にも動画を同期" = "Videoyu kilit ekranıyla da eşitle";
+"ロック画面用にシステム壁紙を一時設定" = "Kilit ekranı için sistem duvar kağıdını geçici olarak ayarla";
+"System Settings を開く" = "Sistem Ayarları'nı Aç";
+"今すぐ設定" = "Şimdi Ayarla";
+"今すぐ同期" = "Şimdi Eşitle";
+"ロック画面同期を削除" = "Kilit Ekranı Eşitlemesini Kaldır";
+"元のAerialに戻す" = "Özgün Aerial'ı Geri Yükle";
+"壊れた設定を復元" = "Bozuk Ayarları Geri Yükle";
+"初回のみ System Settings の壁紙画面で「LiveWallpaper Video」を選び、「スクリーンセーバーとして表示」をオンにしてください。以降の動画変更は自動同期されます。" = "İlk kurulumda Sistem Ayarları'ndaki Duvar Kağıdı bölümünden \"LiveWallpaper Video\"yu seçin ve \"Ekran Koruyucu Olarak Göster\" seçeneğini açın. Sonraki video değişiklikleri otomatik eşitlenir.";
+"オンにすると現在の動画をロック画面用のシステム壁紙として設定します。以降の動画変更も自動同期されます。反映されない時は「ロック画面に設定」を押してください。" = "Açıldığında geçerli video kilit ekranı için sistem duvar kağıdı olarak ayarlanır. Sonraki video değişiklikleri otomatik eşitlenir. Uygulanmazsa \"Kilit ekranına ayarla\" düğmesine basın.";
+"オンにすると現在の動画をロック画面へ設定します。動画変更後に反映されない時は「今すぐ設定」を押してください。" = "Açıldığında geçerli video kilit ekranına ayarlanır. Video değiştirdikten sonra uygulanmazsa \"Şimdi Ayarla\" düğmesine basın.";
+"オンにすると現在の動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "Açıldığında geçerli video geçici olarak sistem Aerial duvar kağıdı olarak ayarlanır. Uygulama kapanınca önceki duvar kağıdına döner.";
+"System Settings でダイナミック壁紙を1つダウンロードしてから、もう一度設定してください。" = "Sistem Ayarları'ndan bir dinamik duvar kağıdı indirin, ardından yeniden ayarlayın.";
+"うまく反映されない時は、右のメニューから復元できます。System Settings は閉じてから実行してください。" = "Doğru uygulanmazsa sağdaki menüden geri yükleyebilirsiniz. Çalıştırmadan önce Sistem Ayarları'nı kapatın.";
+"ロック画面同期はオフです" = "Kilit ekranı eşitlemesi kapalı";
+"macOS 26 以降で利用できます" = "macOS 26 veya sonrasında kullanılabilir";
+"同期待機中" = "Eşitleme bekleniyor";
+"同期中" = "Eşitleniyor";
+"同期済み" = "Eşitlendi";
+"借用中" = "Ödünç alınıyor";
+"前回のロック画面設定を復元中" = "Önceki kilit ekranı ayarı geri yükleniyor";
+"削除中" = "Kaldırılıyor";
+"元のAerialに戻しています" = "Özgün Aerial geri yükleniyor";
+"復元中" = "Geri yükleniyor";
+"復元済み" = "Geri yüklendi";
+"前回のロック画面設定を復元しました" = "Önceki kilit ekranı ayarı geri yüklendi";
+"Aerial動画が未ダウンロードです" = "İndirilmiş Aerial videosu yok";
+"同期に失敗しました" = "Eşitleme başarısız oldu";
+"前回終了時に残ったロック画面設定を自動で元に戻しました。" = "Önceki oturumdan kalan kilit ekranı ayarı otomatik olarak geri alındı.";
+"バッテリー残量に応じて画質を自動調整" = "Kaliteyi pil düzeyine göre otomatik ayarla";
+"バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "Pil ile çalışırken şarj %10 veya altına düştüğünde, güç tasarrufu için oynatma yükü otomatik olarak azaltılır.";
+"アプリを選択して追加" = "Eklemek için uygulama seçin";

@@ -81,6 +81,11 @@ final class WallpaperModel: ObservableObject {
     var isDeepSuspended: Bool = false
     var isDeepResuming: Bool = false
     let deepSuspendDelay: TimeInterval = 10
+    var webDeepSuspendWorkItem: DispatchWorkItem?
+    /// Web壁紙のページ解放までの猶予。動画(deepSuspendDelay)より長いのは、
+    /// 復帰にネットワーク往復とJSの起動が要るぶん、短い被覆で解放すると
+    /// 戻したときの待ちが目立つため。
+    let webDeepSuspendDelay: TimeInterval = 60
     var autoFrameRateTimer: Timer?
     var autoSwitchTimer: Timer?
     var autoFrameRateThermalObserver: NSObjectProtocol?
@@ -301,6 +306,8 @@ final class WallpaperModel: ObservableObject {
         configureWallpaperWindowRefreshMonitoring()
         configureForegroundCoverageMonitoring()
         startAutoFrameRateMonitoring()
+        // 復元では実在確認を省いているので、壁紙を出した後で確認して間引く。
+        verifyRestoredVideoPaths()
     }
 
     deinit {
@@ -311,6 +318,8 @@ final class WallpaperModel: ObservableObject {
         activeSpaceWindowRefreshWorkItems.forEach { $0.cancel() }
         activeSpaceWindowRefreshWorkItems.removeAll()
         coverageEvaluationWorkItem?.cancel()
+        deepSuspendWorkItem?.cancel()
+        webDeepSuspendWorkItem?.cancel()
         statePersistWorkItem?.cancel()
         lockScreenUnlockResetWorkItem?.cancel()
         lockScreenSyncTask?.cancel()

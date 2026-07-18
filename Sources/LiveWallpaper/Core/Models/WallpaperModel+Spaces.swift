@@ -131,7 +131,8 @@ extension WallpaperModel {
         if let saved = UserDefaults.standard.dictionary(forKey: "videoBySpaceUUID")
             as? [String: String]
         {
-            videoBySpaceUUID = saved.filter { FileManager.default.fileExists(atPath: $0.value) }
+            // 実在確認は verifyRestoredVideoPaths() が起動後にまとめて行う(restoreState 参照)。
+            videoBySpaceUUID = saved
         }
         if spaceWallpaperFeatureEnabled {
             refreshSpacesSnapshot()
