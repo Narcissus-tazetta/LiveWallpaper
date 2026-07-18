@@ -11,8 +11,6 @@ extension SettingsView {
             if isScheduleCardExpanded {
                 scheduleFollowAppearanceContent
                 Divider().opacity(0.35)
-                scheduleSimpleTimeRangeContent
-                Divider().opacity(0.35)
                 scheduleAdvancedRulesContent
             }
         }
@@ -58,7 +56,7 @@ extension SettingsView {
             return model.localizedString("オフ")
         }
         if let active = enabledRules.first(where: { model.isScheduleRuleCurrentlyActive($0.id) }) {
-            let name = active.name.isEmpty ? model.localizedString("新しいルール") : active.name
+            let name = model.scheduleRuleDisplayName(active.name)
             return String(format: model.localizedString("適用中: %@"), name)
         }
         return String(format: model.localizedString("%d件のルールが有効"), enabledRules.count)
@@ -114,34 +112,6 @@ extension SettingsView {
         }
     }
 
-    // MARK: - 簡易UI: 時間帯で切り替える(可変個のスロット)
-
-    private var scheduleSimpleTimeRangeContent: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            toggleWithHelp(
-                model.localizedString("時間帯で切り替える"),
-                isOn: simpleTimeRangeEnabledBinding,
-                helpTopic: .scheduleSimpleTimeRange,
-                helpText: model.localizedString(
-                    "時間帯ごとに壁紙を自動で切り替えます。時間帯はいくつでも追加でき、重なった場合は上の行が優先されます。どの時間帯にも当てはまらない時間は、手動で選んだ壁紙のままになります。「システムの外観設定に従う」と両方ONの場合は、時間帯の指定が優先されます。"
-                )
-            )
-            if model.simpleTimeRangeEnabled {
-                ForEach(model.simpleTimeSlotRules) { slot in
-                    scheduleSimpleTimeSlotRow(id: slot.id)
-                }
-                Button {
-                    _ = model.addSimpleTimeSlot()
-                } label: {
-                    Label(model.localizedString("時間帯を追加"), systemImage: "plus")
-                }
-                .buttonStyle(.borderless)
-                .controlSize(.small)
-                .padding(.leading, 20)
-            }
-        }
-    }
-
     private func scheduleSimpleTargetRow(title: String, ruleID: UUID?) -> some View {
         HStack(spacing: 10) {
             Text(title)
@@ -149,47 +119,6 @@ extension SettingsView {
             if let ruleID {
                 scheduleTargetPickerButton(ruleID: ruleID, target: scheduleTargetForRule(ruleID))
             }
-            Spacer(minLength: 0)
-        }
-        .padding(.leading, 20)
-    }
-
-    /// 1スロット=「名前+時間帯+壁紙」の1行。行数は可変で、右端のゴミ箱で削除する
-    /// (最後の1つを消すとトグル自体がOFFに戻る)。
-    private func scheduleSimpleTimeSlotRow(id: UUID) -> some View {
-        let ruleBinding = scheduleRuleBinding(id: id)
-        let rule = ruleBinding.wrappedValue
-        return HStack(spacing: 8) {
-            TextField(model.localizedString("ルール名"), text: ruleBinding.name)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12))
-                .frame(width: 90)
-            DatePicker(
-                "", selection: scheduleTimeBinding(ruleBinding, isStart: true),
-                displayedComponents: .hourAndMinute
-            )
-            .labelsHidden()
-            Text("–")
-            DatePicker(
-                "", selection: scheduleTimeBinding(ruleBinding, isStart: false),
-                displayedComponents: .hourAndMinute
-            )
-            .labelsHidden()
-            if let range = rule.timeRange,
-               range.start.minutesFromMidnight > range.end.minutesFromMidnight
-            {
-                Text(model.localizedString("(翌日)"))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            scheduleTargetPickerButton(ruleID: id, target: rule.target)
-            Button(role: .destructive) {
-                model.removeScheduleRule(id: id)
-            } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.borderless)
-            .controlSize(.small)
             Spacer(minLength: 0)
         }
         .padding(.leading, 20)
@@ -244,6 +173,7 @@ extension SettingsView {
                     ForEach(Array(advancedRules.enumerated()), id: \.element.id) { index, rule in
                         scheduleRuleRow(
                             id: rule.id,
+                            priority: index + 1,
                             canMoveUp: index > 0,
                             canMoveDown: index < advancedRules.count - 1
                         )
@@ -253,21 +183,24 @@ extension SettingsView {
         }
     }
 
-    /// コンパクトな1行サマリー(トグル・名前・条件の要約・適用中バッジ)。タップで
-    /// 展開してフルエディタを表示する。ルールが増えても一覧性が保てるようにする。
-    private func scheduleRuleRow(id: UUID, canMoveUp: Bool, canMoveDown: Bool) -> some View {
+    /// コンパクトな1行サマリー(優先順位・トグル・名前・条件の要約・適用中バッジ)。
+    /// タップで展開してフルエディタを表示する。ルールが増えても一覧性が保てるようにする。
+    private func scheduleRuleRow(
+        id: UUID, priority: Int, canMoveUp: Bool, canMoveDown: Bool
+    ) -> some View {
         let ruleBinding = scheduleRuleBinding(id: id)
         let rule = ruleBinding.wrappedValue
         let isExpanded = expandedScheduleRuleID == id
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
+                scheduleRulePriorityBadge(priority)
                 Toggle("", isOn: ruleBinding.isEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.small)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text(rule.name.isEmpty ? model.localizedString("新しいルール") : rule.name)
+                        Text(model.scheduleRuleDisplayName(rule.name))
                             .font(.system(size: 12, weight: .semibold))
                             .lineLimit(1)
                         if rule.isEnabled, model.isScheduleRuleCurrentlyActive(id) {
@@ -307,6 +240,17 @@ extension SettingsView {
         )
     }
 
+    /// 「上のルールほど優先」というテキスト説明を、一覧を畳んだままでも
+    /// 数字で裏付けるためのバッジ。上下移動ボタンだけでは順序が伝わりにくかった。
+    private func scheduleRulePriorityBadge(_ priority: Int) -> some View {
+        Text("\(priority)")
+            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .foregroundColor(.secondary)
+            .frame(width: 16, height: 16)
+            .background(Circle().fill(Color.secondary.opacity(0.12)))
+            .accessibilityLabel(String(format: model.localizedString("優先度 %d"), priority))
+    }
+
     private var activeScheduleRuleBadge: some View {
         Text(model.localizedString("適用中"))
             .font(.system(size: 9, weight: .bold))
@@ -323,12 +267,16 @@ extension SettingsView {
         let rule = ruleBinding.wrappedValue
         let id = rule.id
         VStack(alignment: .leading, spacing: 8) {
-            TextField(model.localizedString("ルール名"), text: ruleBinding.name)
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.small)
-                .frame(maxWidth: 220)
+            // 旧既定名(昼の壁紙など)は編集欄にも訳語で見せる。編集して確定した
+            // 時点でその表記が保存され、以降は通常のユーザー命名として扱われる。
+            ScheduleRuleNameField(
+                ruleID: id,
+                initialValue: rule.name.isEmpty ? "" : model.scheduleRuleDisplayName(rule.name),
+                placeholder: model.localizedString("ルール名"),
+                commit: { ruleBinding.wrappedValue.name = $0 }
+            )
 
-            WeekdaySelector(selection: ruleBinding.weekdays)
+            WeekdaySelector(selection: ruleBinding.weekdays, locale: model.appLocale)
 
             HStack(spacing: 10) {
                 Toggle(model.localizedString("終日"), isOn: scheduleAllDayBinding(ruleBinding))
@@ -406,18 +354,39 @@ extension SettingsView {
                 .controlSize(.small)
                 Spacer()
                 Button(role: .destructive) {
-                    if expandedScheduleRuleID == id {
-                        expandedScheduleRuleID = nil
-                    }
-                    model.removeScheduleRule(id: id)
+                    scheduleRulePendingDeletionID = id
                 } label: {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
                 .controlSize(.small)
                 .tint(.red)
+                .confirmationDialog(
+                    model.localizedString("このルールを削除しますか？"),
+                    isPresented: scheduleDeleteConfirmationBinding(for: id),
+                    titleVisibility: .visible
+                ) {
+                    Button(model.localizedString("削除"), role: .destructive) {
+                        if expandedScheduleRuleID == id {
+                            expandedScheduleRuleID = nil
+                        }
+                        model.removeScheduleRule(id: id)
+                    }
+                    Button(model.localizedString("キャンセル"), role: .cancel) {}
+                } message: {
+                    Text(model.scheduleRuleDisplayName(rule.name))
+                }
             }
         }
+    }
+
+    private func scheduleDeleteConfirmationBinding(for ruleID: UUID) -> Binding<Bool> {
+        Binding<Bool>(
+            get: { scheduleRulePendingDeletionID == ruleID },
+            set: { isPresented in
+                scheduleRulePendingDeletionID = isPresented ? ruleID : nil
+            }
+        )
     }
 
     // MARK: - サマリー表示
@@ -445,7 +414,7 @@ extension SettingsView {
         if effective.count == 7 {
             return model.localizedString("毎日")
         }
-        let symbols = Calendar.current.veryShortWeekdaySymbols
+        let symbols = WeekdaySelector.symbols(for: model.appLocale)
         var runs: [(start: Int, end: Int)] = []
         for day in effective.sorted() {
             if let last = runs.last, day == last.end + 1 {
@@ -576,8 +545,8 @@ extension SettingsView {
         Button {
             scheduleTargetPickerContext = .rule(ruleID)
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: target.kind == .web ? "globe" : "film")
+            HStack(spacing: 5) {
+                scheduleTargetThumbnail(target)
                 Text(scheduleTargetLabel(target))
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -588,6 +557,49 @@ extension SettingsView {
         .controlSize(.small)
         .popover(isPresented: scheduleTargetPickerBinding(for: ruleID), arrowEdge: .bottom) {
             scheduleTargetPickerPopover(ruleID: ruleID)
+        }
+    }
+
+    /// ターゲットボタンにファイル名だけでなく見た目のヒントを添える。ファイル名の
+    /// 判読だけでどの動画か思い出すのが難しかったため、サムネイルで視覚的に判断できるようにする。
+    @ViewBuilder
+    private func scheduleTargetThumbnail(_ target: ScheduleTarget) -> some View {
+        let size = CGSize(width: 22, height: 14)
+        switch target.kind {
+        case .video:
+            if let path = target.videoPath, !path.isEmpty {
+                Group {
+                    if let image = thumbnailCache.image(for: path) {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: size.width, height: size.height)
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    } else {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.secondary.opacity(0.15))
+                            .frame(width: size.width, height: size.height)
+                            .overlay(Image(systemName: "film").font(.system(size: 8)))
+                    }
+                }
+                .onAppear { requestWallpaperThumbnail(path: path) }
+            } else {
+                Image(systemName: "film")
+            }
+        case .web:
+            if let id = target.webWallpaperID,
+               let source = model.webWallpaperSources.first(where: { $0.id == id })
+            {
+                WebWallpaperThumbnailView(
+                    source: source,
+                    isActive: false,
+                    thumbnailStore: webThumbnailStore,
+                    width: size.width,
+                    height: size.height
+                )
+            } else {
+                Image(systemName: "globe")
+            }
         }
     }
 
@@ -756,5 +768,47 @@ extension SettingsView {
                 ruleBinding.wrappedValue.timeRange = range
             }
         )
+    }
+}
+
+/// ルール名の入力欄。ruleBinding.name に直結させると、1打鍵ごとに
+/// model.scheduleRules 全体を書き換えて再描画が走り、日本語入力(IME)の
+/// 変換中の文字列が壊れて入力が崩れる不具合があった。ローカルの @State を
+/// 唯一の描画ソースにし、確定した値だけを commit で親へ伝えることで
+/// TextField 自体の再生成を防ぐ。
+private struct ScheduleRuleNameField: View {
+    let ruleID: UUID
+    let placeholder: String
+    let commit: (String) -> Void
+    @State private var text: String
+
+    init(
+        ruleID: UUID, initialValue: String, placeholder: String,
+        commit: @escaping (String) -> Void
+    ) {
+        self.ruleID = ruleID
+        self.placeholder = placeholder
+        self.commit = commit
+        _text = State(initialValue: initialValue)
+    }
+
+    var body: some View {
+        // grouped Form 配下ではタイトル付き TextField が「左ラベル+中央寄せ値」の
+        // フォーム行スタイルになるため、labelsHidden でそれを外して通常の左寄せ
+        // 入力欄に戻す。ラベルを隠すとタイトルはプレースホルダにならないので
+        // prompt で明示する。
+        TextField(placeholder, text: Binding(
+            get: { text },
+            set: { newValue in
+                text = newValue
+                commit(newValue)
+            }
+        ), prompt: Text(placeholder))
+        .textFieldStyle(.roundedBorder)
+        .controlSize(.small)
+        .multilineTextAlignment(.leading)
+        .labelsHidden()
+        .frame(maxWidth: 220)
+        .id(ruleID)
     }
 }

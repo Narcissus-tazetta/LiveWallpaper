@@ -23,7 +23,7 @@ enum ScheduleRuleMoveDirection {
     case down
 }
 
-/// 時間帯/ダークモード連動切替(簡易UI)+曜日スケジュール(高度ルールビルダー)の
+/// ダークモード連動切替(簡易UI)+曜日スケジュール(統合ルールビルダー)の
 /// 共有エンジン。両機能は同じ [ScheduleRule] を評価対象にし、origin で区別される
 /// (詳細は ScheduleModels.swift のコメント参照)。
 ///
@@ -43,9 +43,6 @@ extension WallpaperModel {
         UUID(uuidString: "3B1D9C9E-0001-4A9E-8B1D-000000000001")!
     static let simpleAppearanceDarkRuleID =
         UUID(uuidString: "3B1D9C9E-0001-4A9E-8B1D-000000000002")!
-    static let simpleTimeRangeDayRuleID = UUID(uuidString: "3B1D9C9E-0001-4A9E-8B1D-000000000003")!
-    static let simpleTimeRangeNightRuleID =
-        UUID(uuidString: "3B1D9C9E-0001-4A9E-8B1D-000000000004")!
 
     // MARK: - 純粋なマッチングロジック(テスト容易・UI/永続化から独立)
 
@@ -250,13 +247,29 @@ extension WallpaperModel {
 
     // MARK: - CRUD(高度ルールビルダー)
 
+    /// ルール名の表示用文字列。空なら現在言語の「新しいルール」を補い、旧
+    /// 「時間帯で切り替える」簡易UIが保存時に焼き込んだ既定名(l10nキー=日本語
+    /// そのもの)は表示のたびに現在言語へ訳し直す。ユーザーが自分で付けた名前は
+    /// そのまま返す(キーと偶然一致した場合も訳されるが、意味は保たれる)。
+    func scheduleRuleDisplayName(_ name: String) -> String {
+        if name.isEmpty {
+            return localizedString("新しいルール")
+        }
+        if name == "昼の壁紙" || name == "夜の壁紙" {
+            return localizedString(name)
+        }
+        return name
+    }
+
     @discardableResult
     func addScheduleRule() -> UUID {
         // 追加直後にターゲットを見直す前に共有壁紙が切り替わってしまわないよう、
         // 新規ルールは無効な状態で作る。ユーザーが内容を確認してトグルをONにする。
+        // 名前は空で保存し、表示側が現在の言語で「新しいルール」を補う
+        // (訳語を保存データへ焼き込むと後から言語を切り替えても追従しないため)。
         let rule = ScheduleRule(
             id: UUID(),
-            name: localizedString("新しいルール"),
+            name: "",
             isEnabled: false,
             origin: .advanced,
             target: currentSharedScheduleTarget
@@ -279,7 +292,10 @@ extension WallpaperModel {
         var copy = scheduleRules[index]
         copy.id = UUID()
         copy.isEnabled = false
-        copy.name = String(format: localizedString("%@ のコピー"), copy.name)
+        copy.name = String(
+            format: localizedString("%@ のコピー"),
+            scheduleRuleDisplayName(copy.name)
+        )
         scheduleRules.insert(copy, at: index + 1)
         handleScheduleRulesChanged()
         return copy.id
@@ -375,7 +391,7 @@ extension WallpaperModel {
             if scheduleRules.contains(where: { $0.origin == .simpleAppearance }) {
                 // OFF時に無効化して保持しておいたルールを、ライト/ダークの
                 // ターゲット指定ごとそのまま復元する。
-                setSimpleRulesEnabled(true, origin: .simpleAppearance)
+                setSimpleAppearanceRulesEnabled(true)
             } else {
                 let lightTarget = simpleAppearanceTarget(for: .light) ?? currentSharedScheduleTarget
                 let darkTarget = simpleAppearanceTarget(for: .dark) ?? currentSharedScheduleTarget
@@ -397,7 +413,7 @@ extension WallpaperModel {
         } else {
             // 削除するとユーザーのライト/ダーク指定が失われる(再ON時に現在の共有壁紙へ
             // 潰れる)。無効化して残すことで、再ONで元の指定を復元できるようにする。
-            setSimpleRulesEnabled(false, origin: .simpleAppearance)
+            setSimpleAppearanceRulesEnabled(false)
         }
         handleScheduleRulesChanged()
     }
@@ -408,108 +424,24 @@ extension WallpaperModel {
         return scheduleRules.first(where: { $0.id == id })?.target
     }
 
-    // MARK: - 簡易UI: 時間帯で切り替える(可変個のスロット)
-
-    /// followSystemAppearanceEnabled と同じく、OFF時は無効化して残すため isEnabled で判定。
-    var simpleTimeRangeEnabled: Bool {
-        scheduleRules.contains { $0.origin == .simpleTimeRange && $0.isEnabled }
-    }
-
-    /// 「時間帯で切り替える」に表示するスロット一覧。配列順=表示順=優先順位
-    /// (重なった場合は上の行が勝つ。first-match-wins をそのまま流用)。
-    var simpleTimeSlotRules: [ScheduleRule] {
-        scheduleRules.filter { $0.origin == .simpleTimeRange }
-    }
-
-    func setSimpleTimeRangeEnabled(_ enabled: Bool) {
-        guard simpleTimeRangeEnabled != enabled else {
-            return
-        }
-        if enabled {
-            if scheduleRules.contains(where: { $0.origin == .simpleTimeRange }) {
-                // OFF時に無効化して残したスロット(既定の昼/夜に加え、ユーザーが
-                // 追加したカスタムスロットも含む)を、名前・時間帯・ターゲットごと
-                // まとめて復元する。
-                setSimpleRulesEnabled(true, origin: .simpleTimeRange)
-            } else {
-                // 初回のみ既定の昼/夜2スロットを作る。以降はユーザーが自由に追加・削除する。
-                upsertSystemRule(ScheduleRule(
-                    id: Self.simpleTimeRangeDayRuleID,
-                    name: localizedString("昼の壁紙"),
-                    origin: .simpleTimeRange,
-                    timeRange: ScheduleTimeRange(
-                        start: ScheduleTimeOfDay(hour: 6, minute: 0),
-                        end: ScheduleTimeOfDay(hour: 18, minute: 0)
-                    ),
-                    target: currentSharedScheduleTarget
-                ))
-                upsertSystemRule(ScheduleRule(
-                    id: Self.simpleTimeRangeNightRuleID,
-                    name: localizedString("夜の壁紙"),
-                    origin: .simpleTimeRange,
-                    timeRange: ScheduleTimeRange(
-                        start: ScheduleTimeOfDay(hour: 18, minute: 0),
-                        end: ScheduleTimeOfDay(hour: 6, minute: 0)
-                    ),
-                    target: currentSharedScheduleTarget
-                ))
-            }
-        } else {
-            // 削除するとユーザーが追加したカスタムスロットまで失われる。無効化して残し、
-            // 再ONで全スロットを復元できるようにする。
-            setSimpleRulesEnabled(false, origin: .simpleTimeRange)
-        }
-        handleScheduleRulesChanged()
-    }
-
-    /// 指定 origin のシステム管理ルールをまとめて有効/無効にする。簡易UIのトグルOFFで
-    /// ルールを削除せず無効化して残す(ユーザー設定を保持する)ために使う。
-    private func setSimpleRulesEnabled(_ enabled: Bool, origin: ScheduleRuleOrigin) {
-        for index in scheduleRules.indices where scheduleRules[index].origin == origin {
+    /// ライト/ダーク両ルールをまとめて有効/無効にする。トグルOFFでルールを削除せず
+    /// 無効化して残す(ユーザー設定を保持する)ために使う。
+    private func setSimpleAppearanceRulesEnabled(_ enabled: Bool) {
+        for index in scheduleRules.indices where scheduleRules[index].origin == .simpleAppearance {
             scheduleRules[index].isEnabled = enabled
         }
     }
 
-    /// スロットを1つ追加する。初期値は「最後のスロットの終了時刻から1時間」で、
-    /// 隙間なく続きの枠を作る操作(08–11 の次に 11–12 を足すような使い方)を1タップにする。
-    @discardableResult
-    func addSimpleTimeSlot() -> UUID {
-        let slots = simpleTimeSlotRules
-        let start = slots.last?.timeRange?.end ?? ScheduleTimeOfDay(hour: 8, minute: 0)
-        let end = ScheduleTimeOfDay(hour: (start.hour + 1) % 24, minute: start.minute)
-        let rule = ScheduleRule(
-            id: UUID(),
-            name: String(format: localizedString("時間帯 %d"), slots.count + 1),
-            origin: .simpleTimeRange,
-            timeRange: ScheduleTimeRange(start: start, end: end),
-            target: currentSharedScheduleTarget
-        )
-        let insertionIndex = scheduleRules.firstIndex { $0.origin == .simpleAppearance }
-            ?? scheduleRules.count
-        scheduleRules.insert(rule, at: insertionIndex)
-        handleScheduleRulesChanged()
-        return rule.id
-    }
-
-    /// システム管理ルール(simpleAppearance/simpleTimeRange)を、存在すれば更新・
-    /// 無ければ「advancedの直後・simpleTimeRangeがsimpleAppearanceより前」という
-    /// 並び順を保って挿入する。挿入順序がそのまま first-match-wins の優先順位になる
-    /// (ユーザーが明示指定した時間帯の方が、間接的に導出される外観状態より具体的、
-    /// という原則)。
+    /// システム管理ルール(simpleAppearance)を、存在すれば更新・無ければ末尾に挿入する。
+    /// simpleAppearance は常に advanced ルールより優先度が低い(間接的に導出される
+    /// 外観状態より、ユーザーが明示指定したルールの方が具体的、という原則)ため、
+    /// 挿入位置は常に配列末尾でよい。
     private func upsertSystemRule(_ rule: ScheduleRule) {
         if let index = scheduleRules.firstIndex(where: { $0.id == rule.id }) {
             scheduleRules[index] = rule
             return
         }
-        let insertionIndex: Int = switch rule.origin {
-        case .advanced:
-            scheduleRules.firstIndex { $0.origin != .advanced } ?? scheduleRules.count
-        case .simpleTimeRange:
-            scheduleRules.firstIndex { $0.origin == .simpleAppearance } ?? scheduleRules.count
-        case .simpleAppearance:
-            scheduleRules.count
-        }
-        scheduleRules.insert(rule, at: insertionIndex)
+        scheduleRules.append(rule)
     }
 
     private func handleScheduleRulesChanged() {
@@ -522,8 +454,15 @@ extension WallpaperModel {
 
     func restoreScheduleState() {
         if let data = UserDefaults.standard.data(forKey: "scheduleRulesData"),
-           let decoded = try? JSONDecoder().decode([ScheduleRule].self, from: data)
+           var decoded = try? JSONDecoder().decode([ScheduleRule].self, from: data)
         {
+            // 「時間帯で切り替える」簡易UIは曜日スケジュールへ統合され廃止したため、
+            // 旧バージョンが作った simpleTimeRange ルールは advanced として扱う。
+            // id・時間帯・有効状態はそのまま引き継がれるので、統合後のリストにも
+            // 従来どおりの優先順位(配列の並び)で現れる。
+            for index in decoded.indices where decoded[index].origin == .simpleTimeRange {
+                decoded[index].origin = .advanced
+            }
             scheduleRules = decoded
         }
     }

@@ -144,8 +144,4 @@ extension SettingsView {
     var followSystemAppearanceBinding: Binding<Bool> {
         modelBinding(model.followSystemAppearanceEnabled) { model.setFollowSystemAppearanceEnabled($0) }
     }
-
-    var simpleTimeRangeEnabledBinding: Binding<Bool> {
-        modelBinding(model.simpleTimeRangeEnabled) { model.setSimpleTimeRangeEnabled($0) }
-    }
 }

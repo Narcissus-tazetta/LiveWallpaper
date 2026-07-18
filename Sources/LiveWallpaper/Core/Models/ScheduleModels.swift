@@ -84,10 +84,15 @@ struct ScheduleScope: Codable, Equatable, Hashable {
     }
 }
 
-/// ルールの由来。「時間帯/ダークモード連動切替」の簡易UIが自動生成・更新する
-/// システム管理ルール(simpleAppearance/simpleTimeRange)と、「曜日スケジュール」の
-/// 高度ルールビルダーでユーザーが直接作成するルール(advanced)を区別する唯一の判別子。
-/// 高度ルール一覧UIは origin == .advanced のもののみを表示・編集対象にする。
+/// ルールの由来。「システムの外観設定に従う」簡易UIが自動生成・更新するシステム
+/// 管理ルール(simpleAppearance)と、「曜日スケジュール」の統合ルールビルダーで
+/// ユーザーが直接作成・編集するルール(advanced)を区別する唯一の判別子。高度ルール
+/// 一覧UIは origin == .advanced のもののみを表示・編集対象にする。
+///
+/// simpleTimeRange は「時間帯で切り替える」という別UIが自動生成していた旧originで、
+/// 現在はUIを曜日スケジュールへ統合したため新規には作られない。旧バージョンで
+/// 永続化された JSON をデコードするためだけに残しており、
+/// WallpaperModel.restoreScheduleState が読み込み時に advanced へ移行する。
 enum ScheduleRuleOrigin: String, Codable {
     case simpleAppearance
     case simpleTimeRange

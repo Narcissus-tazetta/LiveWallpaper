@@ -65,7 +65,6 @@ extension SettingsView {
         case fitLiveApply
         case desktopReadabilityDim
         case scheduleFollowAppearance
-        case scheduleSimpleTimeRange
         case scheduleAdvancedRules
     }
 

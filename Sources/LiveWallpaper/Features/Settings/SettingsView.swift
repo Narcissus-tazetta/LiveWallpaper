@@ -46,6 +46,9 @@ struct SettingsView: View {
     @State var scheduleTargetPickerContext: ScheduleTargetPickerContext?
     /// 曜日スケジュールで編集用に展開中のルール。nil なら全行がコンパクト表示。
     @State var expandedScheduleRuleID: UUID?
+    /// 削除確認ダイアログを出しているルール。誤タップでのルール消失を防ぐため、
+    /// ゴミ箱ボタンでは即削除せずここに立ててからダイアログで確定させる。
+    @State var scheduleRulePendingDeletionID: UUID?
     /// 壁紙タブのスケジュールカードの開閉。既定は閉(1行サマリーのみ)で、
     /// 設定検索の案内行から飛んできたときは開いた状態にする。
     @State var isScheduleCardExpanded: Bool = false

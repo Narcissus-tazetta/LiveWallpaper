@@ -387,5 +387,7 @@
 "先に上の一覧から動画を追加してください" = "Add a video to the list above first";
 "適用中: %@" = "Active: %@";
 "%d件のルールが有効" = "%d rules enabled";
+"優先度 %d" = "Priority %d";
+"このルールを削除しますか？" = "Delete this rule?";
 "スケジュールは「壁紙」タブに移動しました" = "Schedule has moved to the Wallpaper tab";
 "開く" = "Open";

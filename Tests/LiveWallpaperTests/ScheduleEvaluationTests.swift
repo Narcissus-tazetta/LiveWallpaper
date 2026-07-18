@@ -273,27 +273,33 @@ final class ScheduleEvaluationTests: XCTestCase {
 
     // MARK: - 簡易UIトグルの非破壊性(OFF/ONで設定を失わない)
 
-    /// 「時間帯で切り替える」をOFF→ONしても、ユーザーが追加したカスタムスロットが
-    /// 消えないこと(以前は removeAll で全削除され、既定の昼/夜だけに戻っていた)。
-    func testTogglingSimpleTimeRangeOffThenOnPreservesCustomSlots() {
+    /// 「時間帯で切り替える」簡易UIは廃止し、曜日スケジュール(advanced)へ統合した。
+    /// 旧バージョンが永続化した simpleTimeRange ルールは、読み込み時に advanced へ
+    /// 移行され、id・時間帯・有効状態を保ったまま統合後の一覧に現れること。
+    func testLegacySimpleTimeRangeRulesMigrateToAdvancedOnRestore() throws {
+        let legacyID = UUID()
+        let legacyRule = ScheduleRule(
+            id: legacyID,
+            name: "昼の壁紙",
+            isEnabled: false,
+            origin: .simpleTimeRange,
+            timeRange: ScheduleTimeRange(
+                start: ScheduleTimeOfDay(hour: 6, minute: 0),
+                end: ScheduleTimeOfDay(hour: 18, minute: 0)
+            ),
+            target: .video("/tmp/day.mov")
+        )
+        let data = try JSONEncoder().encode([legacyRule])
+        UserDefaults.standard.set(data, forKey: "scheduleRulesData")
+
         let model = WallpaperModel()
-        model.scheduleNowProvider = { self.date(2026, 7, 13, 12, 0) }
-        model.scheduleAppearanceProvider = { .light }
-
-        model.setSimpleTimeRangeEnabled(true) // 既定の昼/夜の2スロット
-        _ = model.addSimpleTimeSlot() // カスタムを1つ追加 → 計3
-        XCTAssertEqual(model.simpleTimeSlotRules.count, 3)
-        XCTAssertTrue(model.simpleTimeRangeEnabled)
-
-        model.setSimpleTimeRangeEnabled(false)
-        XCTAssertFalse(model.simpleTimeRangeEnabled)
-        // 削除ではなく無効化して保持されている。
-        XCTAssertEqual(model.simpleTimeSlotRules.count, 3)
-
-        model.setSimpleTimeRangeEnabled(true)
-        XCTAssertTrue(model.simpleTimeRangeEnabled)
-        XCTAssertEqual(model.simpleTimeSlotRules.count, 3, "カスタムスロットが復元されるべき")
-        XCTAssertTrue(model.simpleTimeSlotRules.allSatisfy(\.isEnabled))
+        guard let migrated = model.scheduleRules.first(where: { $0.id == legacyID }) else {
+            return XCTFail("legacy rule should still be present after migration")
+        }
+        XCTAssertEqual(migrated.origin, .advanced)
+        XCTAssertEqual(migrated.isEnabled, false)
+        XCTAssertEqual(migrated.timeRange, legacyRule.timeRange)
+        XCTAssertEqual(migrated.target, legacyRule.target)
     }
 
     /// 「システムの外観設定に従う」をOFF→ONしても、ライト/ダークの別々の指定が

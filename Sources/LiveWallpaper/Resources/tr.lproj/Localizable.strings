@@ -391,5 +391,7 @@
 "先に上の一覧から動画を追加してください" = "Önce yukarıdaki listeye bir video ekle";
 "適用中: %@" = "Etkin: %@";
 "%d件のルールが有効" = "%d kural etkin";
+"優先度 %d" = "Öncelik %d";
+"このルールを削除しますか？" = "Bu kural silinsin mi?";
 "スケジュールは「壁紙」タブに移動しました" = "Zamanlama, Duvar Kâğıdı sekmesine taşındı";
 "開く" = "Aç";

@@ -391,5 +391,7 @@
 "先に上の一覧から動画を追加してください" = "Hãy thêm video vào danh sách ở trên trước";
 "適用中: %@" = "Đang áp dụng: %@";
 "%d件のルールが有効" = "%d quy tắc đang bật";
+"優先度 %d" = "Mức ưu tiên %d";
+"このルールを削除しますか？" = "Xóa quy tắc này?";
 "スケジュールは「壁紙」タブに移動しました" = "Lịch trình đã chuyển sang thẻ Hình nền";
 "開く" = "Mở";
