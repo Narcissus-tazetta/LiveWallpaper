@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 extension SettingsView {
+  @ViewBuilder
   var displaySettingsSection: some View {
     Section(header: Label(model.localizedString("表示"), systemImage: "display.2")) {
       settingsInsetCard {
@@ -30,42 +31,40 @@ extension SettingsView {
         }
       }
 
-      Toggle(isOn: desktopIconsVisibleBinding) {
-        HStack(spacing: 6) {
-          Text(model.localizedString("デスクトップのアイコンを表示"))
-          helpIconButton(for: .desktopIcons)
-        }
-      }
-      if expandedHelpTopics.contains(.desktopIcons) {
-        settingsFootnote(
-          model.localizedString(
-            "System Settings の「デスクトップに項目を表示」と同じ設定です。OFF にすると Finder が再起動し、デスクトップ上のファイルとフォルダが非表示になります。"
-          )
+      toggleWithHelp(
+        model.localizedString("デスクトップのアイコンを表示"),
+        isOn: desktopIconsVisibleBinding,
+        helpTopic: .desktopIcons,
+        helpText: model.localizedString(
+          "System Settings の「デスクトップに項目を表示」と同じ設定です。OFF にすると Finder が再起動し、デスクトップ上のファイルとフォルダが非表示になります。"
         )
-      }
+      )
       if let message = model.desktopIconsFailureMessage {
         settingsFootnote(message, color: .orange)
       }
+    }
+    .onAppear {
+      model.refreshDesktopIconsVisibility()
+      model.refreshMenuBarAutoHideState()
+    }
 
+    Section(
+      header: Label(model.localizedString("デスクトップ切り替え"), systemImage: "square.stack.3d.up")
+    ) {
       settingsCalloutNote(
         systemImage: "info.circle",
         text: spaceSwitchingLimitationText()
       )
 
-      Toggle(isOn: spaceWallpaperFeatureBinding) {
-        HStack(spacing: 6) {
-          Text(model.localizedString("デスクトップ（Space）ごとに壁紙を切り替える"))
-          helpIconButton(for: .spaceWallpaper)
-        }
-      }
-      .disabled(!model.isSpaceWallpaperAvailable)
-      if expandedHelpTopics.contains(.spaceWallpaper) {
-        settingsFootnote(
-          model.localizedString(
-            "Mission Control のデスクトップごとに別の壁紙を割り当てられます。割り当ては壁紙タブのデスクトップタブ横のメニュー、または壁紙カードの右クリックから行えます。割り当てのないデスクトップは通常の壁紙を表示します。割り当てた壁紙の音声は再生されません。デスクトップ切り替え直後、壁紙の切り替わりが数百ミリ秒ほど遅れることがあります。これはmacOS側のデスクトップ切替通知が遅れて届くことによるもので、アプリの不具合ではありません。"
-          )
-        )
-      }
+      toggleWithHelp(
+        model.localizedString("デスクトップ（Space）ごとに壁紙を切り替える"),
+        isOn: spaceWallpaperFeatureBinding,
+        helpTopic: .spaceWallpaper,
+        helpText: model.localizedString(
+          "Mission Control のデスクトップごとに別の壁紙を割り当てられます。割り当ては壁紙タブのデスクトップタブ横のメニュー、または壁紙カードの右クリックから行えます。割り当てのないデスクトップは通常の壁紙を表示します。割り当てた壁紙の音声は再生されません。デスクトップ切り替え直後、壁紙の切り替わりが数百ミリ秒ほど遅れることがあります。これはmacOS側のデスクトップ切替通知が遅れて届くことによるもので、アプリの不具合ではありません。"
+        ),
+        disabled: !model.isSpaceWallpaperAvailable
+      )
       if !model.isSpaceWallpaperAvailable {
         settingsFootnote(
           model.localizedString("この機能はご利用のmacOSでは利用できません。"),
@@ -89,7 +88,11 @@ extension SettingsView {
           "OFFにすると、切替のたびに動画は常に最初から再生されます。ONでも負荷が高いときは自動的に控えめな動作に切り替わります。"
         )
       )
+    }
 
+    Section(
+      header: Label(model.localizedString("パフォーマンス・省電力"), systemImage: "bolt.fill")
+    ) {
       Toggle(model.localizedString("再生の軽量モード（省電力）"), isOn: lightweightModeBinding)
       if model.lightweightProxyState == .generating {
         settingsFootnote(model.localizedString("軽量版を生成中..."))
@@ -106,32 +109,25 @@ extension SettingsView {
         suspendExclusionSection
       }
 
-      Toggle(isOn: menuBarOpaqueBinding) {
-        HStack(spacing: 6) {
-          Text(model.localizedString("メニューバーを不透明にする"))
-          helpIconButton(for: .menuBarOpaque)
-        }
-      }
-      .disabled(model.menuBarAutoHideDetected)
-      if expandedHelpTopics.contains(.menuBarOpaque) {
-        settingsFootnote(
-          model.localizedString(
-            "メニューバーの裏側に不透明な帯を重ねて、壁紙が透けて見えないようにします。システムのメニューバー自体を直接変更するものではないため、環境によっては完全に一致した見た目にならない場合があります。"
-          )
-        )
-      }
+      advancedSettingsSection
+    }
+
+    Section(header: Label(model.localizedString("メニューバー"), systemImage: "menubar.rectangle")) {
+      toggleWithHelp(
+        model.localizedString("メニューバーを不透明にする"),
+        isOn: menuBarOpaqueBinding,
+        helpTopic: .menuBarOpaque,
+        helpText: model.localizedString(
+          "メニューバーの裏側に不透明な帯を重ねて、壁紙が透けて見えないようにします。システムのメニューバー自体を直接変更するものではないため、環境によっては完全に一致した見た目にならない場合があります。"
+        ),
+        disabled: model.menuBarAutoHideDetected
+      )
       if model.menuBarAutoHideDetected {
         settingsFootnote(
           model.localizedString("メニューバーの自動的に表示/非表示がONのため、この設定は使用できません。"),
           color: .orange
         )
       }
-
-      advancedSettingsSection
-    }
-    .onAppear {
-      model.refreshDesktopIconsVisibility()
-      model.refreshMenuBarAutoHideState()
     }
   }
 
@@ -150,33 +146,23 @@ extension SettingsView {
           )
         )
 
-        Toggle(isOn: suspendFrontmostOnlyBinding) {
-          HStack(spacing: 6) {
-            Text(model.localizedString("ほかのアプリを使っている間は再生を停止"))
-            helpIconButton(for: .suspendFrontmostOnly)
-          }
-        }
-        if expandedHelpTopics.contains(.suspendFrontmostOnly) {
-          settingsFootnote(
-            model.localizedString(
-              "壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。"
-            )
+        toggleWithHelp(
+          model.localizedString("ほかのアプリを使っている間は再生を停止"),
+          isOn: suspendFrontmostOnlyBinding,
+          helpTopic: .suspendFrontmostOnly,
+          helpText: model.localizedString(
+            "壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。"
           )
-        }
+        )
 
-        Toggle(isOn: suspendHighSensitivityBinding) {
-          HStack(spacing: 6) {
-            Text(model.localizedString("画面がほぼ隠れたら停止（高精度）"))
-            helpIconButton(for: .suspendHighSensitivity)
-          }
-        }
-        if expandedHelpTopics.contains(.suspendHighSensitivity) {
-          settingsFootnote(
-            model.localizedString(
-              "壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。"
-            )
+        toggleWithHelp(
+          model.localizedString("画面がほぼ隠れたら停止（高精度）"),
+          isOn: suspendHighSensitivityBinding,
+          helpTopic: .suspendHighSensitivity,
+          helpText: model.localizedString(
+            "壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。"
           )
-        }
+        )
         if shouldShowScreenRecordingCoverageWarning {
           VStack(alignment: .leading, spacing: 6) {
             settingsFootnote(screenRecordingCoverageWarningText(), color: .red)
@@ -468,11 +454,41 @@ extension SettingsView {
       .frame(height: 24)
       .fixedSize(horizontal: true, vertical: false)
 
-      if let helpTopic, let helpText, expandedHelpTopics.contains(helpTopic) {
-        settingsFootnote(helpText)
+      if let helpTopic, let helpText {
+        helpFootnote(for: helpTopic, text: helpText)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  /// トグル本体とヘルプアイコン、展開時の説明文をまとめた行。
+  /// 「Toggle + はてなアイコン + 折りたたみ説明」が表示セクション全体で
+  /// 繰り返し登場するため、ここに集約している。
+  func toggleWithHelp(
+    _ title: String,
+    isOn: Binding<Bool>,
+    helpTopic: HelpTopic,
+    helpText: String,
+    disabled: Bool = false
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Toggle(isOn: isOn) {
+        HStack(spacing: 6) {
+          Text(title)
+          helpIconButton(for: helpTopic)
+        }
+      }
+      .disabled(disabled)
+
+      helpFootnote(for: helpTopic, text: helpText)
+    }
+  }
+
+  @ViewBuilder
+  func helpFootnote(for topic: HelpTopic, text: String) -> some View {
+    if expandedHelpTopics.contains(topic) {
+      settingsFootnote(text)
+    }
   }
 
   var advancedSettingsSection: some View {
@@ -635,29 +651,19 @@ extension SettingsView {
             Text(model.localizedString("環境に応じて再生負荷を自動調整"))
           }
 
-          Toggle(isOn: batteryAwareQualityBinding) {
-            HStack(spacing: 6) {
-              Text(model.localizedString("バッテリー残量に応じて画質を自動調整"))
-              helpIconButton(for: .batteryAwareQuality)
-            }
-          }
-          if expandedHelpTopics.contains(.batteryAwareQuality) {
-            settingsFootnote(
-              model.localizedString("バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。")
-            )
-          }
+          toggleWithHelp(
+            model.localizedString("バッテリー残量に応じて画質を自動調整"),
+            isOn: batteryAwareQualityBinding,
+            helpTopic: .batteryAwareQuality,
+            helpText: model.localizedString("バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。")
+          )
 
-          Toggle(isOn: fullScreenAuxiliaryBinding) {
-            HStack(spacing: 6) {
-              Text(model.localizedString("fullScreenAuxiliary を有効化"))
-              helpIconButton(for: .fullScreenAuxiliary)
-            }
-          }
-          if expandedHelpTopics.contains(.fullScreenAuxiliary) {
-            settingsFootnote(
-              model.localizedString("フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。")
-            )
-          }
+          toggleWithHelp(
+            model.localizedString("fullScreenAuxiliary を有効化"),
+            isOn: fullScreenAuxiliaryBinding,
+            helpTopic: .fullScreenAuxiliary,
+            helpText: model.localizedString("フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。")
+          )
         }
       }
     }
@@ -686,9 +692,7 @@ extension SettingsView {
         Spacer(minLength: 0)
       }
 
-      if expandedHelpTopics.contains(helpTopic) {
-        settingsFootnote(helpText)
-      }
+      helpFootnote(for: helpTopic, text: helpText)
     }
   }
 
