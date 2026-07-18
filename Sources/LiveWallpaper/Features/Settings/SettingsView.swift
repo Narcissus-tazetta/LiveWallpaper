@@ -41,6 +41,14 @@ struct SettingsView: View {
     @State var isLibrarySearchFocused: Bool = false
     @State var settingsSearchText: String = ""
     @State var isSettingsSearchFocused: Bool = false
+    /// スケジュールのターゲット壁紙ピッカーを開いている対象(ルールIDまたは簡易UIの
+    /// 固定キー)。nil ならどのポップオーバーも表示しない。
+    @State var scheduleTargetPickerContext: ScheduleTargetPickerContext?
+    /// 曜日スケジュールで編集用に展開中のルール。nil なら全行がコンパクト表示。
+    @State var expandedScheduleRuleID: UUID?
+    /// 壁紙タブのスケジュールカードの開閉。既定は閉(1行サマリーのみ)で、
+    /// 設定検索の案内行から飛んできたときは開いた状態にする。
+    @State var isScheduleCardExpanded: Bool = false
     let wallpaperCardMinimumWidth: CGFloat = 140
     let wallpaperCardMaximumWidth: CGFloat = 220
     let wallpaperGridColumnSpacing: CGFloat = 6
@@ -295,6 +303,12 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     wallpaperTargetTabBar
                     wallpaperContentPane
+
+                    // スケジュールのターゲットはデスクトップ壁紙のみのため、
+                    // ロック画面タブでは出さない。
+                    if selectedAssignmentTarget == .desktop {
+                        wallpaperScheduleCard
+                    }
                 }
             }
         case .wallpaperFit:
@@ -325,6 +339,11 @@ struct SettingsView: View {
                     }
                     if settingsSectionMatches(.display) {
                         displaySettingsSection
+                    }
+                    // スケジュール本体は壁紙タブへ移動済み。検索でヒットしたとき
+                    // だけ案内行を出す(非検索時は何も出さない)。
+                    if isSettingsSearchActive, settingsSectionMatches(.schedule) {
+                        scheduleSearchRedirectSection
                     }
                     if settingsSectionMatches(.language) {
                         languageSettingsSection

@@ -128,6 +128,16 @@ extension WallpaperModel {
         }
         cancelDeepSuspend()
         isDeepSuspended = false
+        // サスペンド中にスケジュール境界を跨いでいた場合、ガードで保留されていた適用を
+        // ここで実行する。適用によって共有壁紙(動画/Web)が切り替わったら、そちらが
+        // 既に再生を開始しているのでフリーズフレーム復帰は行わず終了する。
+        if !scheduleRules.isEmpty {
+            let previousPath = currentVideoPath
+            evaluateSchedule(trigger: .deepSuspendResumed)
+            if isWebWallpaperActive || currentVideoPath != previousPath {
+                return
+            }
+        }
         guard let path = currentVideoPath else {
             return
         }

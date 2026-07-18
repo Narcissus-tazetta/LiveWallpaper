@@ -239,13 +239,21 @@ extension WallpaperModel {
         guard spaceWallpaperFeatureEnabled, isSpaceWallpaperAvailable,
               !isWebWallpaperActive
         else {
+            // Space別機能が無効/不可/Web表示中でも、共有・ディスプレイ別スコープの
+            // スケジュール境界を跨いでいる可能性があるため、評価自体は必ず行う。
+            evaluateSchedule(trigger: .spaceChanged)
             return
         }
         let previous = currentSpaceUUIDByDisplayID
         refreshSpacesSnapshot()
         guard currentSpaceUUIDByDisplayID != previous else {
+            evaluateSchedule(trigger: .spaceChanged)
             return
         }
+        // スナップショット更新後・表示反映前に評価する。Space別ルールのターゲットを
+        // 先に確定させることで、applySpaceWallpaperSwap が最終状態を一度だけ描画し、
+        // 「旧壁紙 → 正しい壁紙」の二度描画(フラッシュ)を避ける。
+        evaluateSchedule(trigger: .spaceChanged)
         applySpaceWallpaperSwap()
         refreshSpaceDependentInterface()
     }
@@ -381,6 +389,8 @@ extension WallpaperModel {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
+                // handleActiveSpaceChanged が全経路でスケジュールを再評価するため、
+                // ここで別途 evaluateSchedule を呼ぶ必要はない(二重評価を避ける)。
                 self?.handleActiveSpaceChanged()
             }
         }

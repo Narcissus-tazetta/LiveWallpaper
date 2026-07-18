@@ -46,6 +46,9 @@ extension WallpaperModel {
     func normalizePlaybackConstraints() {
         if pinCurrentVideo, !canPinCurrentVideo {
             pinCurrentVideo = false
+            // 自動的な pin 解除でも共有スコープのスケジュールガードが外れるため再評価する。
+            // (evaluateSchedule は再入ガードで多重実行を防いでいる。)
+            evaluateSchedule(trigger: .playbackConstraintChanged)
         }
         if pinCurrentVideo, shufflePlaybackEnabled {
             shufflePlaybackEnabled = false

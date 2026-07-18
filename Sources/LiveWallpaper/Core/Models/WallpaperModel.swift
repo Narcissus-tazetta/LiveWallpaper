@@ -118,6 +118,8 @@ final class WallpaperModel: ObservableObject {
     @Published var lightweightProxyState: LightweightProxyCache.ProxyGenerationState = .idle
     @Published var audioEnabled: Bool = false
     @Published var audioVolume: Float = 1.0
+    /// 壁紙を暗くしてデスクトップアイコン・ファイル名を読みやすくする度合い(0...1)。0はオフ。
+    @Published var desktopReadabilityDimOpacity: Double = 0
     @Published var frameRateLimit: FrameRateLimit = .off
     @Published var decodeMode: DecodeMode = .automatic
     @Published var qualityPreset: QualityPreset = .auto
@@ -233,6 +235,23 @@ final class WallpaperModel: ObservableObject {
     var spacesSnapshotFailureCount: Int = 0
     var workspaceWakeObserver: NSObjectProtocol?
 
+    // MARK: - スケジュール(時間帯/ダークモード連動切替・曜日スケジュール)
+
+    var scheduleEvaluationTimer: Timer?
+    /// evaluateSchedule の再入ガード。適用処理が間接的に評価を呼び戻しても多重実行しない。
+    var isEvaluatingSchedule: Bool = false
+    /// スコープ単位で「今どのルールが適用中か」を追跡する。ルール境界を跨いだ瞬間
+    /// だけ書き込みを行うための状態で、セッション固有(ディスプレイ/Space構成に依存)
+    /// のため永続化しない(再起動後は空から再評価する)。
+    var lastScheduleApplicationState: [ScheduleScope: ScheduleApplicationState] = [:]
+    var lastScheduleAppliedTarget: [ScheduleScope: ScheduleTarget] = [:]
+    /// テスト用フック。本番では常に Date()/実際の外観を返す。
+    var scheduleNowProvider: () -> Date = { Date() }
+    var scheduleAppearanceProvider: () -> ScheduleAppearanceCondition = {
+        NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light
+    }
+    @Published var scheduleRules: [ScheduleRule] = []
+
     var canAddPlaylist: Bool {
         playlists.count < maxPlaylistCount
     }
@@ -308,6 +327,8 @@ final class WallpaperModel: ObservableObject {
         startAutoFrameRateMonitoring()
         // 復元では実在確認を省いているので、壁紙を出した後で確認して間引く。
         verifyRestoredVideoPaths()
+        restartScheduleEvaluationTimer()
+        evaluateSchedule(trigger: .launch)
     }
 
     deinit {
@@ -348,6 +369,8 @@ final class WallpaperModel: ObservableObject {
         }
         autoFrameRateTimer?.invalidate()
         autoFrameRateTimer = nil
+        scheduleEvaluationTimer?.invalidate()
+        scheduleEvaluationTimer = nil
         if let observer = autoFrameRateThermalObserver {
             NotificationCenter.default.removeObserver(observer)
         }

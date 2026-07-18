@@ -9,6 +9,7 @@ extension SettingsView {
         case share
         case webWallpaper
         case display
+        case schedule
         case language
         case cache
         case reset
@@ -47,6 +48,7 @@ extension SettingsView {
             "メインのみ",
             "全ディスプレイ",
             "動画のフィット",
+            "デスクトップの見やすさ",
             "デスクトップのアイコンを表示",
             "再生の軽量モード（省電力）",
             "作業中は壁紙の再生を自動停止",
@@ -69,6 +71,24 @@ extension SettingsView {
             "環境に応じて再生負荷を自動調整",
             "バッテリー残量に応じて画質を自動調整",
             "fullScreenAuxiliary を有効化"
+        ],
+        // スケジュール本体は壁紙タブに住んでいる。ここでヒットしても設定タブには
+        // セクションを描かず、壁紙タブへ飛ぶ案内行(scheduleSearchRedirectSection)を出す。
+        .schedule: [
+            "スケジュール",
+            "システムの外観設定に従う",
+            "時間帯で切り替える",
+            "ライトモード用の壁紙",
+            "ダークモード用の壁紙",
+            "昼の壁紙",
+            "夜の壁紙",
+            "曜日スケジュール",
+            "ルールを追加",
+            "終日",
+            "時間帯を追加",
+            "毎日",
+            "適用中",
+            "複製"
         ],
         .language: [
             "言語",

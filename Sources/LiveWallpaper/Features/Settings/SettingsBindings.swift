@@ -29,6 +29,10 @@ extension SettingsView {
         modelBinding(Double(model.audioVolume)) { model.setAudioVolume(Float($0)) }
     }
 
+    var desktopReadabilityDimOpacityBinding: Binding<Double> {
+        modelBinding(model.desktopReadabilityDimOpacity) { model.setDesktopReadabilityDimOpacity($0) }
+    }
+
     var displayModeBinding: Binding<DisplayMode> {
         modelBinding(model.displayMode) { model.setDisplayMode($0) }
     }
@@ -135,5 +139,13 @@ extension SettingsView {
 
     var desktopIconsVisibleBinding: Binding<Bool> {
         modelBinding(model.desktopIconsVisible) { model.setDesktopIconsVisible($0) }
+    }
+
+    var followSystemAppearanceBinding: Binding<Bool> {
+        modelBinding(model.followSystemAppearanceEnabled) { model.setFollowSystemAppearanceEnabled($0) }
+    }
+
+    var simpleTimeRangeEnabledBinding: Binding<Bool> {
+        modelBinding(model.simpleTimeRangeEnabled) { model.setSimpleTimeRangeEnabled($0) }
     }
 }

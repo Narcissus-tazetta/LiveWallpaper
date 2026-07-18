@@ -111,6 +111,7 @@ extension WallpaperModel {
         let wasActive = currentWebWallpaperID == id
         webWallpaperSources.remove(at: index)
         pruneWebWallpaperIDsFromPlaylists()
+        pruneScheduleRules(referencingWebWallpaperID: id)
         syncActivePlaylistPaths()
 
         if wasActive {

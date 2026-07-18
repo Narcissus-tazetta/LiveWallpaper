@@ -63,5 +63,16 @@ extension SettingsView {
         case globalFitMode
         case perVideoFitMode
         case fitLiveApply
+        case desktopReadabilityDim
+        case scheduleFollowAppearance
+        case scheduleSimpleTimeRange
+        case scheduleAdvancedRules
+    }
+
+    /// スケジュールのターゲット壁紙ポップオーバーが今どの選択スロットに対して
+    /// 開いているか。簡易UI(ライト/ダーク/昼/夜)も高度ルールも、対象の
+    /// ScheduleRule の id をそのままキーに使う。
+    enum ScheduleTargetPickerContext: Hashable {
+        case rule(UUID)
     }
 }

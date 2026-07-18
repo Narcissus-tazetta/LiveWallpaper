@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var cancellables = Set<AnyCancellable>()
     var settingsKeyMonitor: Any?
     var screenUnlockObserver: NSObjectProtocol?
+    var appearanceObserver: NSKeyValueObservation?
     #if canImport(Sparkle)
         var updaterController: SPUStandardUpdaterController?
         var sparkleStarted = false
@@ -57,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusBar()
         setupSettingsWindow()
         setupScreenUnlockObserver()
+        setupAppearanceObserver()
         verifyUpdatePrerequisites()
         setupSparkleUpdater()
     }
@@ -77,6 +79,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.wallpaperModel.handleScreenUnlockedForLockScreenSync()
+                self?.wallpaperModel.evaluateSchedule(trigger: .unlock)
+            }
+        }
+    }
+
+    /// ダークモード切替検出。非公開の AppleInterfaceThemeChangedNotification ではなく、
+    /// NSApp.effectiveAppearance への集中KVOという公式に推奨される方式を使う。
+    private func setupAppearanceObserver() {
+        appearanceObserver = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+            MainActor.assumeIsolated {
+                self?.wallpaperModel.evaluateSchedule(trigger: .appearanceChanged)
             }
         }
     }
@@ -86,6 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let observer = screenUnlockObserver {
             DistributedNotificationCenter.default().removeObserver(observer)
         }
+        appearanceObserver?.invalidate()
         if let monitor: Any = settingsKeyMonitor {
             NSEvent.removeMonitor(monitor)
         }

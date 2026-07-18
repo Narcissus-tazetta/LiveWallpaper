@@ -31,12 +31,6 @@ enum VideoFrameCapture {
     /// lets it snap to the nearest sync sample instead — imperceptible here
     /// since the frozen still is only shown while another app already covers
     /// the screen.
-    static func capture(path: String, time: CMTime) -> CGImage? {
-        let generator = generator(for: path)
-        scheduleEviction()
-        return try? generator.copyCGImage(at: time, actualTime: nil)
-    }
-
     /// Building the generator means opening the file and parsing its container,
     /// which dwarfs the single-frame decode that follows. Captures come in
     /// bursts — one per display on a Space switch, and repeatedly as the user
@@ -52,11 +46,23 @@ enum VideoFrameCapture {
     /// the app writes over an existing registered path (imports and transcodes
     /// always pick a fresh destination), and the TTL bounds any external
     /// replacement to a stale still shown while the screen is already covered.
-    private static func generator(for path: String) -> AVAssetImageGenerator {
+    ///
+    /// Caching is gated on a successful decode: a generator built from a
+    /// missing/unreadable path (e.g. a video removed mid Space-switch) would
+    /// otherwise occupy one of only `cacheLimit` slots and evict a different
+    /// display's still-valid, warm generator.
+    static func capture(path: String, time: CMTime) -> CGImage? {
         if var entry = entriesByPath[path] {
+            guard let image = try? entry.generator.copyCGImage(at: time, actualTime: nil) else {
+                // キャッシュ済みでもファイル消失等でデコードが失敗しうる。壊れた
+                // 生成器は取り除き、有効な生成器の枠を守る。
+                entriesByPath.removeValue(forKey: path)
+                return nil
+            }
             entry.lastUsedAt = Date()
             entriesByPath[path] = entry
-            return entry.generator
+            scheduleEviction()
+            return image
         }
 
         let asset = AVURLAsset(url: URL(fileURLWithPath: path))
@@ -66,9 +72,14 @@ enum VideoFrameCapture {
         generator.requestedTimeToleranceBefore = tolerance
         generator.requestedTimeToleranceAfter = tolerance
 
+        guard let image = try? generator.copyCGImage(at: time, actualTime: nil) else {
+            // デコード失敗時はキャッシュに載せない(欠落パスの生成器で有効枠を潰さない)。
+            return nil
+        }
         entriesByPath[path] = Entry(generator: generator, lastUsedAt: Date())
         evictLeastRecentlyUsedIfNeeded()
-        return generator
+        scheduleEviction()
+        return image
     }
 
     private static func evictLeastRecentlyUsedIfNeeded() {

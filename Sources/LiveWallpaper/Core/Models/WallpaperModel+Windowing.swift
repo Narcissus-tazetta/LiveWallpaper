@@ -436,6 +436,7 @@ extension WallpaperModel {
             rebuildVideoWindows()
         }
         applyMenuBarMaskState()
+        applyDesktopReadabilityDimState()
     }
 
     private func rebuildVideoWindows() {
@@ -705,6 +706,7 @@ extension WallpaperModel {
             applySuspensionStateToPlayers()
         }
         applyMenuBarMaskState()
+        applyDesktopReadabilityDimState()
     }
 
     private func reassertWallpaperOrdering(_ window: NSWindow) {
@@ -791,6 +793,7 @@ extension WallpaperModel {
             refreshSpacesSnapshot()
         }
         rebuildWindows()
+        evaluateSchedule(trigger: .displayConfigurationChanged)
     }
 
     func scheduleWindowRebuild(delay: TimeInterval = 0.2) {

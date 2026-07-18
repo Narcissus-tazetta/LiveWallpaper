@@ -28,6 +28,8 @@ extension SettingsView {
               "この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です"
             )
           )
+
+          desktopReadabilityDimSection
         }
       }
 
@@ -129,6 +131,31 @@ extension SettingsView {
         )
       }
     }
+  }
+
+  var desktopReadabilityDimSection: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 4) {
+        Text(model.localizedString("デスクトップの見やすさ"))
+        helpIconButton(for: .desktopReadabilityDim)
+      }
+
+      HStack(spacing: 10) {
+        Slider(value: desktopReadabilityDimOpacityBinding, in: 0...1)
+          .frame(minWidth: 180, maxWidth: .infinity)
+        Text("\(Int((model.desktopReadabilityDimOpacity * 100).rounded()))%")
+          .foregroundColor(.secondary)
+          .frame(width: 44, alignment: .trailing)
+      }
+
+      helpFootnote(
+        for: .desktopReadabilityDim,
+        text: model.localizedString(
+          "壁紙全体を暗くして、デスクトップのアイコンやファイル名を読みやすくします。0%でオフになります。"
+        )
+      )
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   func spaceSwitchingLimitationText() -> String {

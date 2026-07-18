@@ -13,6 +13,14 @@ final class PlayerView: NSView {
         return view
     }()
 
+    private lazy var readabilityDimOverlayView: NSView = {
+        let view = NSView()
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.black.cgColor
+        view.isHidden = true
+        return view
+    }()
+
     var menuBarMaskHeight: CGFloat = 0 {
         didSet {
             guard menuBarMaskHeight != oldValue else {
@@ -20,6 +28,16 @@ final class PlayerView: NSView {
             }
             menuBarMaskView.isHidden = menuBarMaskHeight <= 0
             layoutMenuBarMask()
+        }
+    }
+
+    var readabilityDimOpacity: CGFloat = 0 {
+        didSet {
+            guard readabilityDimOpacity != oldValue else {
+                return
+            }
+            readabilityDimOverlayView.alphaValue = readabilityDimOpacity
+            readabilityDimOverlayView.isHidden = readabilityDimOpacity <= 0
         }
     }
 
@@ -40,6 +58,7 @@ final class PlayerView: NSView {
     override func layout() {
         super.layout()
         layer?.frame = bounds
+        readabilityDimOverlayView.frame = bounds
         layoutMenuBarMask()
     }
 
@@ -52,7 +71,12 @@ final class PlayerView: NSView {
         if playerLayer.superlayer == nil {
             layer?.addSublayer(playerLayer)
         }
+        // 減光オーバーレイはメニューバーマスクより上に載せる。マスク
+        // (NSVisualEffectView, .withinWindow)は下のコンテンツをサンプルするため、
+        // マスクを上にすると減光済みの黒を拾ってメニューバー帯だけ色味が変わる。
+        // 上下逆にして、壁紙全体に均一な減光がかかるようにする。
         addSubview(menuBarMaskView, positioned: .above, relativeTo: nil)
+        addSubview(readabilityDimOverlayView, positioned: .above, relativeTo: nil)
     }
 
     private func layoutMenuBarMask() {

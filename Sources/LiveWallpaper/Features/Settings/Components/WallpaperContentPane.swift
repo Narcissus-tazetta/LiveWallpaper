@@ -670,6 +670,9 @@ extension SettingsView {
                             set: { model.setVideoLoopEnabled($0) }
                         )
                     )
+                    // 無効時はアクセントカラーのまま暗くすると他のOFFトグルと違う色に沈んで見えるため、
+                    // 無効時だけsecondaryに切り替えてOFFトグルと同系統のグレーに揃える。
+                    .tint(model.isVideoLoopSettingEnabled ? Color.accentColor : Color.secondary)
                     .disabled(!model.isVideoLoopSettingEnabled)
 
                     helpIconButton(for: .videoLoop)

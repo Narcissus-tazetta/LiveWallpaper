@@ -58,6 +58,9 @@ extension WallpaperModel {
         } else {
             audioVolume = 1.0
         }
+        if let storedDimOpacity = UserDefaults.standard.object(forKey: "desktopReadabilityDimOpacity") as? Double {
+            desktopReadabilityDimOpacity = min(max(storedDimOpacity, 0), 1)
+        }
         if let appLanguageValue = UserDefaults.standard.string(forKey: "appLanguage"),
            let restoredAppLanguage = AppLanguage(rawValue: appLanguageValue)
         {
@@ -78,6 +81,7 @@ extension WallpaperModel {
         restoreVideoOverrides()
         restoreScreenPlaylists()
         restoreSpaceWallpaperState()
+        restoreScheduleState()
         if let savedSuspendDisabled = UserDefaults.standard.stringArray(
             forKey: "suspendDisabledDisplayIDs"
         ) {
@@ -543,6 +547,7 @@ extension WallpaperModel {
         setLightweightMode(false)
         setAudioEnabled(false)
         setAudioVolume(1.0)
+        setDesktopReadabilityDimOpacity(0)
         setFrameRateLimit(.off)
         setDecodeMode(.automatic)
         setWorkProfile(.normal)
@@ -566,6 +571,10 @@ extension WallpaperModel {
         // ディスプレイ別オーバーライドと同様、リセット対象にしない。
         setSpaceWallpaperFeatureEnabled(false)
         setMenuBarSpaceNumberEnabled(false)
+        // スケジュール(簡易UI/曜日ルール)は全て消し、評価タイマー停止と各スコープの
+        // オーバーライド解除まで行う。残すとリセット直後の外観変化や時刻境界で壁紙が
+        // 勝手に切り替わり、リセットが効いていないように見える。
+        resetScheduleState()
         startAutoFrameRateMonitoring()
     }
 }

@@ -134,6 +134,11 @@ extension WallpaperModel {
             pinCurrentVideo = false
         }
         requestPlaybackReconfiguration()
+        if !enabled {
+            // pin解除で共有スコープのスケジュールガードが外れる。境界を跨いだまま
+            // 保留されていたルールをここで即時反映する(次のタイマーtickを待たない)。
+            evaluateSchedule(trigger: .playbackConstraintChanged)
+        }
     }
 
     func refreshPlaybackState() {

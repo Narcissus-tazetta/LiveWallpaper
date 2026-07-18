@@ -59,6 +59,14 @@ final class WebPlayerView: NSView {
         return view
     }()
 
+    private lazy var readabilityDimOverlayView: NSView = {
+        let view = NSView()
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.black.cgColor
+        view.isHidden = true
+        return view
+    }()
+
     var menuBarMaskHeight: CGFloat = 0 {
         didSet {
             guard menuBarMaskHeight != oldValue else {
@@ -66,6 +74,16 @@ final class WebPlayerView: NSView {
             }
             menuBarMaskView.isHidden = menuBarMaskHeight <= 0
             layoutMenuBarMask()
+        }
+    }
+
+    var readabilityDimOpacity: CGFloat = 0 {
+        didSet {
+            guard readabilityDimOpacity != oldValue else {
+                return
+            }
+            readabilityDimOverlayView.alphaValue = readabilityDimOpacity
+            readabilityDimOverlayView.isHidden = readabilityDimOpacity <= 0
         }
     }
 
@@ -423,13 +441,16 @@ final class WebPlayerView: NSView {
         webView.frame = bounds
         addSubview(freezeImageView)
         freezeImageView.frame = bounds
+        // 減光オーバーレイはメニューバーマスクより上に載せる(理由は PlayerView 参照)。
         addSubview(menuBarMaskView, positioned: .above, relativeTo: nil)
+        addSubview(readabilityDimOverlayView, positioned: .above, relativeTo: nil)
     }
 
     override func layout() {
         super.layout()
         webView.frame = bounds
         freezeImageView.frame = bounds
+        readabilityDimOverlayView.frame = bounds
         layoutMenuBarMask()
     }
 

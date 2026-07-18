@@ -56,6 +56,14 @@ extension WallpaperModel {
         guard !isDeepSuspended else {
             return
         }
+        // スケジュール機能が共有スコープに今マッチしている間は、ローテーションが
+        // その選択と競合しないよう抑制する(ルール自体を無効化はしない)。
+        guard Self.matchingScheduleRule(
+            in: scheduleRules, scope: .shared, now: scheduleNowProvider(),
+            appearance: scheduleAppearanceProvider()
+        ) == nil else {
+            return
+        }
         let sharedIDs = sharedPlayerDisplayIDs(among: allWallpaperDisplayIDs())
         guard !sharedIDs.isEmpty, !sharedIDs.allSatisfy({ suspendedDisplayIDs.contains($0) }) else {
             return

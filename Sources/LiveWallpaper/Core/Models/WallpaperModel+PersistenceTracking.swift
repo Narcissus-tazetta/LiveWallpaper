@@ -53,6 +53,8 @@ extension WallpaperModel {
             UserDefaults.standard.set(presentationData, forKey: wallpaperPresentationStorageKey)
             let webData = try JSONEncoder().encode(webWallpaperSources)
             UserDefaults.standard.set(webData, forKey: "webWallpaperSourcesData")
+            let scheduleData = try JSONEncoder().encode(scheduleRules)
+            UserDefaults.standard.set(scheduleData, forKey: "scheduleRulesData")
             UserDefaults.standard.set(wallpaperKind.rawValue, forKey: "wallpaperKind")
             if let webID = currentWebWallpaperID {
                 UserDefaults.standard.set(webID.uuidString, forKey: "currentWebWallpaperID")
