@@ -52,6 +52,7 @@ struct SettingsView: View {
     /// 壁紙タブのスケジュールカードの開閉。既定は閉(1行サマリーのみ)で、
     /// 設定検索の案内行から飛んできたときは開いた状態にする。
     @State var isScheduleCardExpanded: Bool = false
+    @State var isFocusCardExpanded: Bool = false
     let wallpaperCardMinimumWidth: CGFloat = 140
     let wallpaperCardMaximumWidth: CGFloat = 220
     let wallpaperGridColumnSpacing: CGFloat = 6
@@ -307,9 +308,10 @@ struct SettingsView: View {
                     wallpaperTargetTabBar
                     wallpaperContentPane
 
-                    // スケジュールのターゲットはデスクトップ壁紙のみのため、
-                    // ロック画面タブでは出さない。
+                    // 集中モード連携・スケジュールのターゲットはデスクトップ壁紙のみの
+                    // ため、ロック画面タブでは出さない。
                     if selectedAssignmentTarget == .desktop {
+                        wallpaperFocusFilterCard
                         wallpaperScheduleCard
                     }
                 }
@@ -347,6 +349,9 @@ struct SettingsView: View {
                     // だけ案内行を出す(非検索時は何も出さない)。
                     if isSettingsSearchActive, settingsSectionMatches(.schedule) {
                         scheduleSearchRedirectSection
+                    }
+                    if isSettingsSearchActive, settingsSectionMatches(.focusFilter) {
+                        focusFilterSearchRedirectSection
                     }
                     if settingsSectionMatches(.language) {
                         languageSettingsSection

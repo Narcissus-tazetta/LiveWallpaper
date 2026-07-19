@@ -16,6 +16,8 @@ enum ScheduleEvaluationTrigger {
     case playbackConstraintChanged
     /// ディープサスペンドからの復帰。
     case deepSuspendResumed
+    /// 集中モードが有効化/変更/解除された(FocusModeMonitor → syncFocusModeState経由)。
+    case focusFilterChanged
 }
 
 enum ScheduleRuleMoveDirection {
@@ -53,12 +55,13 @@ extension WallpaperModel {
         scope: ScheduleScope,
         now: Date,
         appearance: ScheduleAppearanceCondition,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        focusFilterEnabled: Bool = true
     ) -> ScheduleRule? {
         let weekday = calendar.component(.weekday, from: now)
         let components = calendar.dateComponents([.hour, .minute], from: now)
         let time = ScheduleTimeOfDay(hour: components.hour ?? 0, minute: components.minute ?? 0)
-        return rules.first { rule in
+        func matches(_ rule: ScheduleRule) -> Bool {
             guard rule.isEnabled, rule.scope == scope else {
                 return false
             }
@@ -73,6 +76,15 @@ extension WallpaperModel {
             }
             return true
         }
+        // 集中モードのFocus Filterは「今まさに切り替えた」明示的なユーザー操作の
+        // 結果なので、曜日/外観スケジュールより常に優先する。アプリ内トグルで連携を
+        // OFFにしている間は、Intentがルールを記録し続けていても評価から除外する。
+        if focusFilterEnabled,
+           let focusRule = rules.first(where: { $0.origin == .focusFilter && matches($0) })
+        {
+            return focusRule
+        }
+        return rules.first { $0.origin != .focusFilter && matches($0) }
     }
 
     // MARK: - 評価エンジン
@@ -102,7 +114,8 @@ extension WallpaperModel {
         _ scope: ScheduleScope, now: Date, appearance: ScheduleAppearanceCondition
     ) {
         let matched = Self.matchingScheduleRule(
-            in: scheduleRules, scope: scope, now: now, appearance: appearance
+            in: scheduleRules, scope: scope, now: now, appearance: appearance,
+            focusFilterEnabled: focusFilterIntegrationEnabled
         )
         let newState: ScheduleApplicationState = matched.map { .rule($0.id) } ?? .none
         // ルール境界を跨いでいなくても、適用中ルールのターゲット自体が編集された
@@ -241,7 +254,8 @@ extension WallpaperModel {
         }
         return Self.matchingScheduleRule(
             in: scheduleRules, scope: rule.scope,
-            now: scheduleNowProvider(), appearance: scheduleAppearanceProvider()
+            now: scheduleNowProvider(), appearance: scheduleAppearanceProvider(),
+            focusFilterEnabled: focusFilterIntegrationEnabled
         )?.id == id
     }
 
@@ -321,6 +335,7 @@ extension WallpaperModel {
     /// (removeRegisteredVideo)に呼ぶ。宙に浮いたルールが無言で何もしなくなったり、
     /// 削除済み動画を再登録・復活させたりするのを防ぐ。
     func pruneScheduleRules(referencingVideoPath path: String) {
+        pruneFocusModeAssignments(referencingVideoPath: path)
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         let before = scheduleRules.count
         scheduleRules.removeAll { $0.target.kind == .video && $0.target.videoPath == trimmed }
@@ -332,6 +347,7 @@ extension WallpaperModel {
 
     /// 指定したWeb壁紙を参照するルールを取り除く。Web壁紙削除時(removeWebWallpaper)に呼ぶ。
     func pruneScheduleRules(referencingWebWallpaperID id: UUID) {
+        pruneFocusModeAssignments(referencingWebWallpaperID: id)
         let before = scheduleRules.count
         scheduleRules.removeAll { $0.target.kind == .web && $0.target.webWallpaperID == id }
         guard scheduleRules.count != before else {
@@ -444,10 +460,66 @@ extension WallpaperModel {
         scheduleRules.append(rule)
     }
 
-    private func handleScheduleRulesChanged() {
+    private func handleScheduleRulesChanged(trigger: ScheduleEvaluationTrigger = .ruleListChanged) {
         schedulePersistedStateFlush()
         restartScheduleEvaluationTimer()
-        evaluateSchedule(trigger: .ruleListChanged)
+        evaluateSchedule(trigger: trigger)
+    }
+
+    // MARK: - 集中モード
+
+    /// 集中モード連携(WallpaperModel+FocusModes.swift)が管理する合成ルールの固定ID。
+    /// simpleAppearance系と同様、UIの一覧編集対象ではなくこのIDで直接特定する。
+    static let focusFilterRuleID =
+        UUID(uuidString: "3B1D9C9E-0001-4A9E-8B1D-000000000003")!
+
+    /// 現在の集中モード合成ルール(存在しない/未一度も有効化されていない場合はnil)。
+    /// FocusFilterSection.swift のステータス表示に使う。
+    var focusFilterRule: ScheduleRule? {
+        scheduleRules.first(where: { $0.id == Self.focusFilterRuleID })
+    }
+
+    /// syncFocusModeState(WallpaperModel+FocusModes.swift)から呼ばれる。target が nil なら
+    /// 「壁紙を割り当てた集中モードが今ひとつも有効でない」ことを表し、曜日スケジュール等へ
+    /// フォールバックする。ルール自体は削除せず無効化して残す(simpleAppearanceと同じ理由:
+    /// isEnabled切替の方がCRUDとしてシンプルなため踏襲する)。
+    func applyFocusFilterState(target: ScheduleTarget?) {
+        guard let target else {
+            setFocusFilterRuleEnabled(false)
+            handleScheduleRulesChanged(trigger: .focusFilterChanged)
+            return
+        }
+        upsertSystemRule(ScheduleRule(
+            id: Self.focusFilterRuleID,
+            name: localizedString("集中モード"),
+            origin: .focusFilter,
+            target: target
+        ))
+        handleScheduleRulesChanged(trigger: .focusFilterChanged)
+    }
+
+    /// アプリ内トグルによる集中モード連携のON/OFF。OFFでもIntentからの記録
+    /// (applyFocusFilterState)は受け続けるため、再ONした瞬間に「今有効な集中モード」の
+    /// 壁紙へ追い付ける。macOSはアプリ側から集中モード一覧を列挙するAPIを提供しない
+    /// (~/Library/DoNotDisturb/DB はTCC保護)ため、どのモードで何を表示するかは
+    /// System Settings側で設定してもらうしかなく、アプリが持てる主導権はこのマスター
+    /// スイッチのみ。
+    func setFocusFilterIntegrationEnabled(_ enabled: Bool) {
+        guard focusFilterIntegrationEnabled != enabled else {
+            return
+        }
+        focusFilterIntegrationEnabled = enabled
+        schedulePersistedStateFlush()
+        evaluateSchedule(trigger: .focusFilterChanged)
+    }
+
+    private func setFocusFilterRuleEnabled(_ enabled: Bool) {
+        guard let index = scheduleRules.firstIndex(where: { $0.id == Self.focusFilterRuleID }),
+              scheduleRules[index].isEnabled != enabled
+        else {
+            return
+        }
+        scheduleRules[index].isEnabled = enabled
     }
 
     // MARK: - 永続化
@@ -465,5 +537,11 @@ extension WallpaperModel {
             }
             scheduleRules = decoded
         }
+        // 未保存(初回起動・旧バージョンからの更新)はデフォルトON。
+        if UserDefaults.standard.object(forKey: "focusFilterIntegrationEnabled") != nil {
+            focusFilterIntegrationEnabled = UserDefaults.standard
+                .bool(forKey: "focusFilterIntegrationEnabled")
+        }
+        restoreFocusModeAssignments()
     }
 }

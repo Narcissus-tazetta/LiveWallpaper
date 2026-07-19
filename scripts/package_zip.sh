@@ -8,6 +8,9 @@ BUILD_NUMBER="${2:-1}"
 SPARKLE_APPCAST_URL="${SPARKLE_APPCAST_URL:-https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml}"
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-}"
 ARCH_MODE="${ARCH_MODE:-universal}"
+# 既定はad-hoc署名。手元の証明書で署名したい場合は
+# CODESIGN_IDENTITY="Apple Development: ..." のように上書きする。
+CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
 CREATE_DMG="${CREATE_DMG:-true}"
 CREATE_DMG_COMMAND="${CREATE_DMG_COMMAND:-create-dmg}"
 
@@ -66,7 +69,7 @@ PY
 }
 
 sign_app_bundle() {
-  codesign --force --deep --sign - "$APP_DIR"
+  codesign --force --deep --sign "$CODESIGN_IDENTITY" "$APP_DIR"
   codesign --verify --deep --verbose=2 "$APP_DIR"
 }
 

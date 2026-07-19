@@ -395,3 +395,20 @@
 "このルールを削除しますか？" = "Bu kural silinsin mi?";
 "スケジュールは「壁紙」タブに移動しました" = "Zamanlama, Duvar Kâğıdı sekmesine taşındı";
 "開く" = "Aç";
+
+// 集中モード(Focus Filter)
+"集中モード" = "Odak Modu";
+"集中モードごとに表示する壁紙を選べます。" = "Her Odak modu için gösterilecek duvar kağıdını seçebilirsiniz.";
+"集中モードごとに表示する壁紙を選べます。macOSは集中モードの情報をアプリに公開しないため、この機能には「フルディスクアクセス」の許可が必要です。" = "Her Odak modu için gösterilecek duvar kağıdını seçebilirsiniz. macOS, Odak bilgilerini uygulamalara açmadığından bu özellik Tam Disk Erişimi gerektirir.";
+"1. 下のボタンからフルディスクアクセスの設定を開く" = "1. Aşağıdaki düğmeyle Tam Disk Erişimi ayarlarını açın";
+"2. 一覧にこのAppを追加してスイッチをオンにする" = "2. Bu uygulamayı listeye ekleyin ve açın";
+"3. このAppを再起動する" = "3. Uygulamayı yeniden başlatın";
+"フルディスクアクセスの設定を開く" = "Tam Disk Erişimi Ayarlarını Aç";
+"フルディスクアクセスが必要" = "Tam Disk Erişimi gerekli";
+"%d件の割り当て" = "%d atama";
+"変更しない" = "Değiştirme";
+"おやすみモード" = "Rahatsız Etmeyin";
+"さまたげ低減" = "Kesintileri Azalt";
+"集中モードで壁紙を切り替える" = "Duvar kağıdını Odak modlarıyla değiştir";
+"オフの間は、集中モードによる壁紙の切り替えを行いません。" = "Kapalıyken Odak modları duvar kağıdını değiştirmez.";
+"集中モードとの連携は「壁紙」タブにあります" = "Odak Modu entegrasyonu Duvar Kâğıdı sekmesinde";

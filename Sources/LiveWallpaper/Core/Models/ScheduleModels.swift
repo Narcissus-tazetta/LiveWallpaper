@@ -93,10 +93,16 @@ struct ScheduleScope: Codable, Equatable, Hashable {
 /// 現在はUIを曜日スケジュールへ統合したため新規には作られない。旧バージョンで
 /// 永続化された JSON をデコードするためだけに残しており、
 /// WallpaperModel.restoreScheduleState が読み込み時に advanced へ移行する。
+///
+/// focusFilter は macOS の集中モードが現在有効かどうかを表す、simpleAppearance と
+/// 同様の自動管理される単一の合成ルール。ユーザーが一覧編集するものではなく、
+/// 集中モード監視(WallpaperModel+FocusModes.swift の syncFocusModeState →
+/// applyFocusFilterState)が isEnabled/target を書き換える。
 enum ScheduleRuleOrigin: String, Codable {
     case simpleAppearance
     case simpleTimeRange
     case advanced
+    case focusFilter
 }
 
 struct ScheduleRule: Codable, Identifiable, Equatable {

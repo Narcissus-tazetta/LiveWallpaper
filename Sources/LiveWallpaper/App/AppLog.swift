@@ -21,4 +21,5 @@ enum AppLog {
     static let appDelegate = Logger(subsystem: subsystem, category: "appDelegate")
     static let thumbnailCache = Logger(subsystem: subsystem, category: "thumbnailCache")
     static let continuity = Logger(subsystem: subsystem, category: "continuity")
+    static let focus = Logger(subsystem: subsystem, category: "focus")
 }

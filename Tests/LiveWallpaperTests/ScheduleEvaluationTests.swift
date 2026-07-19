@@ -3,16 +3,24 @@ import XCTest
 
 @MainActor
 final class ScheduleEvaluationTests: XCTestCase {
-    // 一部のテストは handleScheduleRulesChanged 経由でルールを永続化しうる。
-    // 別テストの WallpaperModel() 復元に漏れないよう、前後でキーを消しておく。
+    // WallpaperModel はスケジュールルールだけでなく videoOverrideByScreenID 等も
+    // UserDefaults.standard(swift test では xctest プロセスのドメイン)へ同期的に
+    // 永続化する。キー単位の掃除では追随漏れが出る(実際に videoOverrideByScreenID の
+    // 残骸が次回実行の WallpaperModel() 復元へ漏れ、testUnresolvableTargetIsNotRecorded-
+    // AndRetries が落ちた)ため、テストプロセスの永続ドメインごと前後で消す。
     override func setUp() {
         super.setUp()
-        UserDefaults.standard.removeObject(forKey: "scheduleRulesData")
+        Self.wipePersistentDefaults()
     }
 
     override func tearDown() {
-        UserDefaults.standard.removeObject(forKey: "scheduleRulesData")
+        Self.wipePersistentDefaults()
         super.tearDown()
+    }
+
+    private static func wipePersistentDefaults() {
+        let domain = Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
+        UserDefaults.standard.removePersistentDomain(forName: domain)
     }
 
     // 決定的なテストのため、UTC固定のグレゴリオ暦を使う。
@@ -42,6 +50,17 @@ final class ScheduleEvaluationTests: XCTestCase {
             id: id, name: "r", isEnabled: isEnabled, origin: .advanced,
             weekdays: weekdays, timeRange: timeRange, appearance: appearance,
             scope: scope, target: .video(path)
+        )
+    }
+
+    private func focusFilterRule(
+        isEnabled: Bool = true,
+        scope: ScheduleScope = .shared,
+        path: String = "/tmp/focus.mov"
+    ) -> ScheduleRule {
+        ScheduleRule(
+            id: WallpaperModel.focusFilterRuleID, name: "集中モード", isEnabled: isEnabled,
+            origin: .focusFilter, scope: scope, target: .video(path)
         )
     }
 
@@ -177,6 +196,109 @@ final class ScheduleEvaluationTests: XCTestCase {
             in: [rule], scope: .shared, now: date(2026, 7, 13, 12, 0),
             appearance: .light, calendar: calendar
         ))
+    }
+
+    // MARK: - 集中モード(Focus Filter)の優先順位
+
+    /// origin == .focusFilter のルールは、配列内の位置に関わらず曜日/外観ルールより
+    /// 常に優先されること。
+    func testFocusFilterRuleTakesPriorityOverAdvancedRule() {
+        let advanced = videoRule(timeRange: nil, path: "/tmp/advanced.mov")
+        let focus = focusFilterRule(path: "/tmp/focus.mov")
+        let match = WallpaperModel.matchingScheduleRule(
+            in: [advanced, focus], scope: .shared, now: date(2026, 7, 13, 12, 0),
+            appearance: .light, calendar: calendar
+        )
+        XCTAssertEqual(match?.id, focus.id)
+    }
+
+    /// Focus Filterが解除された(isEnabled == false)場合は、曜日/外観ルールへ
+    /// フォールバックすること。
+    func testDisabledFocusFilterRuleFallsBackToAdvancedRule() {
+        let advanced = videoRule(timeRange: nil, path: "/tmp/advanced.mov")
+        let focus = focusFilterRule(isEnabled: false, path: "/tmp/focus.mov")
+        let match = WallpaperModel.matchingScheduleRule(
+            in: [advanced, focus], scope: .shared, now: date(2026, 7, 13, 12, 0),
+            appearance: .light, calendar: calendar
+        )
+        XCTAssertEqual(match?.id, advanced.id)
+    }
+
+    /// アプリ内トグル(focusFilterEnabled: false)の間は、有効なFocus Filterルールが
+    /// 存在しても評価から除外され、曜日/外観ルールへフォールバックすること。
+    func testFocusFilterIntegrationDisabledSkipsFocusRule() {
+        let advanced = videoRule(timeRange: nil, path: "/tmp/advanced.mov")
+        let focus = focusFilterRule(path: "/tmp/focus.mov")
+        let match = WallpaperModel.matchingScheduleRule(
+            in: [advanced, focus], scope: .shared, now: date(2026, 7, 13, 12, 0),
+            appearance: .light, calendar: calendar, focusFilterEnabled: false
+        )
+        XCTAssertEqual(match?.id, advanced.id)
+    }
+
+    /// Focus Filterルールが1件も存在しない既存挙動に変化がないこと(回帰防止)。
+    func testNoFocusFilterRuleMeansAdvancedRuleWins() {
+        let advanced = videoRule(timeRange: nil, path: "/tmp/advanced.mov")
+        let match = WallpaperModel.matchingScheduleRule(
+            in: [advanced], scope: .shared, now: date(2026, 7, 13, 12, 0),
+            appearance: .light, calendar: calendar
+        )
+        XCTAssertEqual(match?.id, advanced.id)
+    }
+
+    /// applyFocusFilterState(target:) の統合テスト: 有効化で曜日スケジュールを上書きし、
+    /// 解除(target: nil)で曜日スケジュールへフォールバックすること。
+    func testApplyFocusFilterStateOverridesThenFallsBackToSchedule() throws {
+        let scheduledVideo = try makeVideoFile()
+        let focusVideo = try makeVideoFile()
+        defer {
+            try? FileManager.default.removeItem(at: scheduledVideo)
+            try? FileManager.default.removeItem(at: focusVideo)
+        }
+
+        let model = WallpaperModel()
+        model.scheduleNowProvider = { self.date(2026, 7, 13, 12, 0) }
+        model.scheduleAppearanceProvider = { .light }
+        model.scheduleRules = [videoRule(timeRange: nil, path: scheduledVideo.path)]
+        model.evaluateSchedule(trigger: .ruleListChanged)
+        XCTAssertEqual(model.currentVideoPath, scheduledVideo.path)
+
+        model.applyFocusFilterState(target: .video(focusVideo.path))
+        XCTAssertEqual(model.currentVideoPath, focusVideo.path)
+        XCTAssertEqual(model.focusFilterRule?.isEnabled, true)
+
+        model.applyFocusFilterState(target: nil)
+        XCTAssertEqual(model.currentVideoPath, scheduledVideo.path)
+        XCTAssertEqual(model.focusFilterRule?.isEnabled, false)
+    }
+
+    /// 連携トグルOFFで即座に曜日スケジュールへフォールバックし、OFFの間もIntentからの
+    /// 状態記録は継続するため、再ONで「今有効な集中モード」の壁紙へ追い付くこと。
+    func testFocusFilterIntegrationToggleFallsBackAndCatchesUp() throws {
+        let scheduledVideo = try makeVideoFile()
+        let focusVideo = try makeVideoFile()
+        defer {
+            try? FileManager.default.removeItem(at: scheduledVideo)
+            try? FileManager.default.removeItem(at: focusVideo)
+        }
+
+        let model = WallpaperModel()
+        model.scheduleNowProvider = { self.date(2026, 7, 13, 12, 0) }
+        model.scheduleAppearanceProvider = { .light }
+        model.scheduleRules = [videoRule(timeRange: nil, path: scheduledVideo.path)]
+        model.applyFocusFilterState(target: .video(focusVideo.path))
+        XCTAssertEqual(model.currentVideoPath, focusVideo.path)
+
+        model.setFocusFilterIntegrationEnabled(false)
+        XCTAssertEqual(model.currentVideoPath, scheduledVideo.path)
+
+        // OFF中もIntentからの記録は受け続ける(適用はしない)。
+        model.applyFocusFilterState(target: .video(focusVideo.path))
+        XCTAssertEqual(model.currentVideoPath, scheduledVideo.path)
+        XCTAssertEqual(model.focusFilterRule?.isEnabled, true)
+
+        model.setFocusFilterIntegrationEnabled(true)
+        XCTAssertEqual(model.currentVideoPath, focusVideo.path)
     }
 
     // MARK: - 状態遷移

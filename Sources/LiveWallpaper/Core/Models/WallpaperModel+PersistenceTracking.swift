@@ -55,6 +55,11 @@ extension WallpaperModel {
             UserDefaults.standard.set(webData, forKey: "webWallpaperSourcesData")
             let scheduleData = try JSONEncoder().encode(scheduleRules)
             UserDefaults.standard.set(scheduleData, forKey: "scheduleRulesData")
+            UserDefaults.standard.set(
+                focusFilterIntegrationEnabled, forKey: "focusFilterIntegrationEnabled"
+            )
+            let focusAssignmentsData = try JSONEncoder().encode(focusModeAssignments)
+            UserDefaults.standard.set(focusAssignmentsData, forKey: "focusModeAssignmentsData")
             UserDefaults.standard.set(wallpaperKind.rawValue, forKey: "wallpaperKind")
             if let webID = currentWebWallpaperID {
                 UserDefaults.standard.set(webID.uuidString, forKey: "currentWebWallpaperID")

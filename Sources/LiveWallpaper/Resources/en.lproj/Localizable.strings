@@ -391,3 +391,20 @@
 "このルールを削除しますか？" = "Delete this rule?";
 "スケジュールは「壁紙」タブに移動しました" = "Schedule has moved to the Wallpaper tab";
 "開く" = "Open";
+
+// 集中モード(Focus Filter)
+"集中モード" = "Focus Mode";
+"集中モードごとに表示する壁紙を選べます。" = "You can choose which wallpaper each Focus mode shows.";
+"集中モードごとに表示する壁紙を選べます。macOSは集中モードの情報をアプリに公開しないため、この機能には「フルディスクアクセス」の許可が必要です。" = "You can choose which wallpaper each Focus mode shows. macOS doesn't expose Focus information to apps, so this feature needs Full Disk Access.";
+"1. 下のボタンからフルディスクアクセスの設定を開く" = "1. Open Full Disk Access settings with the button below";
+"2. 一覧にこのAppを追加してスイッチをオンにする" = "2. Add this app to the list and turn it on";
+"3. このAppを再起動する" = "3. Relaunch this app";
+"フルディスクアクセスの設定を開く" = "Open Full Disk Access Settings";
+"フルディスクアクセスが必要" = "Full Disk Access required";
+"%d件の割り当て" = "%d assigned";
+"変更しない" = "Don't Change";
+"おやすみモード" = "Do Not Disturb";
+"さまたげ低減" = "Reduce Interruptions";
+"集中モードで壁紙を切り替える" = "Switch wallpaper with Focus modes";
+"オフの間は、集中モードによる壁紙の切り替えを行いません。" = "While off, Focus modes won't switch the wallpaper.";
+"集中モードとの連携は「壁紙」タブにあります" = "Focus Mode integration is in the Wallpaper tab";

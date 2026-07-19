@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        wallpaperModel.startFocusModeMonitoring()
         syncLaunchAtLoginState()
         autoUpdateEnabled =
             UserDefaults.standard.object(forKey: "autoUpdateEnabled") as? Bool ?? true

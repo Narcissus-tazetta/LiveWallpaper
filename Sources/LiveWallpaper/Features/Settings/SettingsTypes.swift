@@ -70,8 +70,10 @@ extension SettingsView {
 
     /// スケジュールのターゲット壁紙ポップオーバーが今どの選択スロットに対して
     /// 開いているか。簡易UI(ライト/ダーク/昼/夜)も高度ルールも、対象の
-    /// ScheduleRule の id をそのままキーに使う。
+    /// ScheduleRule の id をそのままキーに使う。集中モードのモード行は
+    /// modeIdentifier をキーに使う。
     enum ScheduleTargetPickerContext: Hashable {
         case rule(UUID)
+        case focusMode(String)
     }
 }

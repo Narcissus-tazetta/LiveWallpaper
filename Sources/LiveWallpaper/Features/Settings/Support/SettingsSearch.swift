@@ -10,6 +10,7 @@ extension SettingsView {
         case webWallpaper
         case display
         case schedule
+        case focusFilter
         case language
         case cache
         case reset
@@ -85,6 +86,16 @@ extension SettingsView {
             "毎日",
             "適用中",
             "複製"
+        ],
+        // 集中モードカード本体も壁紙タブに住んでいる。scheduleと同じ理由で
+        // 案内行(focusFilterSearchRedirectSection)を出す。
+        .focusFilter: [
+            "集中モード",
+            "集中モードで壁紙を切り替える",
+            "集中モードごとに表示する壁紙を選べます。",
+            "フルディスクアクセス",
+            "おやすみモード",
+            "Focus"
         ],
         .language: [
             "言語",

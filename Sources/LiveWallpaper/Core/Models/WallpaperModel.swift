@@ -251,6 +251,18 @@ final class WallpaperModel: ObservableObject {
         NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light
     }
     @Published var scheduleRules: [ScheduleRule] = []
+    /// 集中モード連携のマスタースイッチ。OFFの間もDB監視は続けるが、評価時に
+    /// focusFilter ルールを無視する(WallpaperModel+Schedule.swift参照)。
+    @Published var focusFilterIntegrationEnabled: Bool = true
+    /// DoNotDisturb DBから読んだこのMacの集中モード一覧(WallpaperModel+FocusModes.swift)。
+    @Published var focusModes: [FocusMode] = []
+    /// 今有効な集中モードのidentifier。どのモードもオフならnil。
+    @Published var activeFocusModeID: String?
+    /// フルディスクアクセス未許可でDBを読めない状態(UIが許可導線を出す)。
+    @Published var focusModeAccessDenied: Bool = false
+    /// モードidentifier → 割り当て壁紙。「変更しない」モードはエントリ自体を持たない。
+    @Published var focusModeAssignments: [String: ScheduleTarget] = [:]
+    var focusModeMonitor: FocusModeMonitor?
 
     var canAddPlaylist: Bool {
         playlists.count < maxPlaylistCount

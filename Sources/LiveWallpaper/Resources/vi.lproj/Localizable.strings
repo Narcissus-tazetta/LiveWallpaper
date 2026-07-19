@@ -395,3 +395,20 @@
 "このルールを削除しますか？" = "Xóa quy tắc này?";
 "スケジュールは「壁紙」タブに移動しました" = "Lịch trình đã chuyển sang thẻ Hình nền";
 "開く" = "Mở";
+
+// 集中モード(Focus Filter)
+"集中モード" = "Chế độ Tập trung";
+"集中モードごとに表示する壁紙を選べます。" = "Bạn có thể chọn hình nền hiển thị cho từng Chế độ Tập trung.";
+"集中モードごとに表示する壁紙を選べます。macOSは集中モードの情報をアプリに公開しないため、この機能には「フルディスクアクセス」の許可が必要です。" = "Bạn có thể chọn hình nền hiển thị cho từng Chế độ Tập trung. macOS không cung cấp thông tin Chế độ Tập trung cho ứng dụng, nên tính năng này cần quyền Toàn quyền truy cập ổ đĩa.";
+"1. 下のボタンからフルディスクアクセスの設定を開く" = "1. Mở cài đặt Toàn quyền truy cập ổ đĩa bằng nút bên dưới";
+"2. 一覧にこのAppを追加してスイッチをオンにする" = "2. Thêm ứng dụng này vào danh sách và bật lên";
+"3. このAppを再起動する" = "3. Khởi động lại ứng dụng";
+"フルディスクアクセスの設定を開く" = "Mở cài đặt Toàn quyền truy cập ổ đĩa";
+"フルディスクアクセスが必要" = "Cần Toàn quyền truy cập ổ đĩa";
+"%d件の割り当て" = "%d mục đã gán";
+"変更しない" = "Không thay đổi";
+"おやすみモード" = "Không làm phiền";
+"さまたげ低減" = "Giảm gián đoạn";
+"集中モードで壁紙を切り替える" = "Chuyển hình nền theo Chế độ Tập trung";
+"オフの間は、集中モードによる壁紙の切り替えを行いません。" = "Khi tắt, Chế độ Tập trung sẽ không chuyển đổi hình nền.";
+"集中モードとの連携は「壁紙」タブにあります" = "Tích hợp Chế độ Tập trung nằm ở thẻ Hình nền";
