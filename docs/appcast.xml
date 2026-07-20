@@ -8,18 +8,18 @@
     <description>LiveWallpaper updates</description>
     <language>ja</language>
     <item>
-      <title>Version 1.2.4</title>
-      <sparkle:version>124</sparkle:version>
-      <sparkle:shortVersionString>1.2.4</sparkle:shortVersionString>
-      <pubDate>Fri, 10 Jul 2026 01:51:22 +0000</pubDate>
+      <title>Version 1.2.5</title>
+      <sparkle:version>125</sparkle:version>
+      <sparkle:shortVersionString>1.2.5</sparkle:shortVersionString>
+      <pubDate>Mon, 20 Jul 2026 04:12:02 +0000</pubDate>
       <enclosure
-        url="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v1.2.4/LiveWallpaper-macos-v1.2.4.zip"
-        sparkle:edSignature="UDJ87AOERQmOeDV4bcaaP84vnZMF93S8dpWieVh/0rYNJ7+7ADW/ae3A3f7lanDwGHUmtgf0+TPnF6ss9ba5Bg=="
-        sparkle:version="124"
-        sparkle:shortVersionString="1.2.4"
-        length="3764449"
+        url="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v1.2.5/LiveWallpaper-macos-v1.2.5.zip"
+        sparkle:edSignature="cVfMsQJ8Hh2f4fDzeJKarPs437MHD0OYa97Eoy4FBIeFcXTfHZrx8sGCGPxxvQKOSXISC5t8cUcO2Moy3tFtBg=="
+        sparkle:version="125"
+        sparkle:shortVersionString="1.2.5"
+        length="5324583"
         type="application/octet-stream"/>
-      <sparkle:releaseNotesLink>https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v1.2.4</sparkle:releaseNotesLink>
+      <sparkle:releaseNotesLink>https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v1.2.5</sparkle:releaseNotesLink>
     </item>
   </channel>
 </rss>
