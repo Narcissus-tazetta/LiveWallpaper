@@ -19,6 +19,7 @@ extension SettingsView {
         let valid = Set(model.allRegisteredVideoPaths)
         thumbnailCache.prune(validPaths: valid)
         fitEditor.pruneMissing(validPaths: valid)
+        wallpaperEditor.pruneMissing(validPaths: valid)
         if let editingPath = editingWallpaperPath, !valid.contains(editingPath) {
             cancelWallpaperNameEdit()
         }

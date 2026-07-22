@@ -190,6 +190,9 @@ extension SettingsView {
             Button(model.localizedString("共有…")) {
                 beginShareWallpaperSelection(path: path)
             }
+            Button(model.localizedString("Storeに共有…")) {
+                beginStoreShare(path: path)
+            }
             Divider()
             Button(model.localizedString("名前を編集")) {
                 startWallpaperNameEdit(path: path)

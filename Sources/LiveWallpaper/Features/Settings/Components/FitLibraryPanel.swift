@@ -34,6 +34,7 @@ extension SettingsView {
                                     isSelected: selectedPath == path,
                                     onSelect: {
                                         fitEditor.selectVideo(path: path)
+                                        wallpaperEditor.selectVideo(path: path)
                                     }
                                 )
                             }

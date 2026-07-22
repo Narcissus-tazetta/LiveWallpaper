@@ -615,6 +615,7 @@ extension WallpaperModel {
             registeredWebWallpaperIDs = webWallpaperFeatureEnabled ? webWallpaperSources.map(\.id) : []
         }
         pruneWallpaperPresentationsForExistingPaths()
+        pruneWallpaperEditsForExistingPaths()
         normalizePlaybackConstraints()
     }
 }

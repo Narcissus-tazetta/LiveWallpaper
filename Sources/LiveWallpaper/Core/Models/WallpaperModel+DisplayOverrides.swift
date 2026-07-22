@@ -265,7 +265,7 @@ extension WallpaperModel {
         item.preferredPeakBitRate = profile.bitRate
         item.preferredForwardBufferDuration = profile.buffer
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
-        let looper = AVPlayerLooper(player: player, templateItem: item)
+        let looper = makeWallpaperLooper(player: player, templateItem: item, path: path)
         // isActive: false (温存/ウォームスロット)でもここでは play() しない。常時再生
         // しておけばアクティブ昇格時のデコード開始待ちが無くなり体感ラグはほぼ消えるが、
         // 画面に出ていない動画をディスプレイ数×隣接数ぶん常時デコードし続けることになり
@@ -335,6 +335,25 @@ extension WallpaperModel {
         if activeDedicatedPathByScreenID[screenID] == path {
             activeDedicatedPathByScreenID.removeValue(forKey: screenID)
             dedicatedFreezeFrameByScreenID.removeValue(forKey: screenID)
+        }
+    }
+
+    /// トリム/ループ編集が保存されたときに呼ぶ。この動画を専用プレイヤーで
+    /// 表示している画面があれば、そのスロットだけ破棄する。破棄後は既存の
+    /// ウォームウィンドウ調整(scheduleDedicatedWarmWindowReconciliation)が
+    /// 通常の再構築経路(createDedicatedSlot、編集後の内容を反映する)で
+    /// 作り直す。
+    func refreshDedicatedSlotsIfNeeded(for path: String) {
+        var affected = false
+        for screenID in Array(dedicatedSlotsByScreenID.keys) {
+            guard dedicatedSlotsByScreenID[screenID]?[path] != nil else {
+                continue
+            }
+            evictDedicatedSlot(forScreenID: screenID, path: path)
+            affected = true
+        }
+        if affected {
+            scheduleDedicatedWarmWindowReconciliation()
         }
     }
 

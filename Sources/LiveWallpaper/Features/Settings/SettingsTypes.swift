@@ -27,7 +27,23 @@ extension SettingsView {
     enum SettingsTab: Hashable {
         case wallpaper
         case wallpaperFit
+        case store
         case settings
+    }
+
+    /// 「編集」タブ内のサブモード。フィット(表示位置)とトリム(カット/ループ)は
+    /// 別々のコントローラ(FitEditorController/WallpaperEditorController)が持つが、
+    /// タブとしては1つにまとめて切り替えられるようにする。
+    enum EditorSubMode: String, CaseIterable, Hashable {
+        case fit
+        case trim
+    }
+
+    enum StoreShareStatus: Equatable {
+        case idle
+        case submitting
+        case success(downloadURL: URL)
+        case failure(message: String)
     }
 
     /// 壁紙の設定先。将来「サブディスプレイ」タブを足す場合はここに case を追加し、

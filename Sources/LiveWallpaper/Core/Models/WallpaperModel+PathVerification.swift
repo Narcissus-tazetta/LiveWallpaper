@@ -60,6 +60,7 @@ extension WallpaperModel {
             clearLockScreenVideoIfMissing(path: path)
         }
         pruneWallpaperPresentationsForExistingPaths()
+        pruneWallpaperEditsForExistingPaths()
         AppLog.persistence.debug(
             "pruned missing video paths count=\(ordered.count)"
         )

@@ -23,9 +23,23 @@ struct SettingsView: View {
     /// 無視するだけだと選択が残り、機能を戻した瞬間に古いスコープへ復帰する。
     @State var selectedScope: WallpaperScope = .shared
     @StateObject var fitEditor: FitEditorController
+    @StateObject var wallpaperEditor: WallpaperEditorController
+    @StateObject var storeCatalog: StoreCatalogController
+    @State var editorSubMode: EditorSubMode = .fit
     @State var isResetSettingsDialogPresented: Bool = false
     @State var librarySearchText: String = ""
     @State var isWallpaperShareSheetPresented: Bool = false
+    @State var isStoreSharePickerPresented: Bool = false
+    @State var isStoreShareSheetPresented: Bool = false
+    /// Storeへの共有シートが対象にしている動画。共有シートはトリム編集タブの選択状態
+    /// (wallpaperEditor.selectedVideoPath)には依存しない — 右クリックメニューや
+    /// Storeタブのピッカーなど、編集タブを開かずに共有を始めた場合でも、選んだ動画を
+    /// 誤りなく送るため専用の状態として保持する。
+    @State var storeShareTargetPath: String?
+    @State var storeShareTitle: String = ""
+    @State var storeShareAuthor: String = ""
+    @State var storeShareLicense: String = ""
+    @State var storeShareStatus: StoreShareStatus = .idle
     @State var isSuspendExclusionAppPickerPresented: Bool = false
     @State var suspendExclusionAppPickerSearchText: String = ""
     @State var currentWallpaperPreviewThumbnailPath: String?
@@ -63,6 +77,8 @@ struct SettingsView: View {
         _thumbnailCache = StateObject(wrappedValue: DiskThumbnailCache())
         _webThumbnailStore = StateObject(wrappedValue: WebWallpaperThumbnailStore())
         _fitEditor = StateObject(wrappedValue: FitEditorController(model: model))
+        _wallpaperEditor = StateObject(wrappedValue: WallpaperEditorController(model: model))
+        _storeCatalog = StateObject(wrappedValue: StoreCatalogController())
     }
 
     func wallpaperGridLayout(for availableWidth: CGFloat) -> ([GridItem], CGFloat) {
@@ -207,8 +223,10 @@ struct SettingsView: View {
                 }
                 if tab == .wallpaperFit {
                     fitEditor.activate()
+                    wallpaperEditor.activate()
                 } else {
                     fitEditor.deactivate()
+                    wallpaperEditor.deactivate()
                 }
             }
             .onChange(of: model.lockScreenVideoPath) { _ in
@@ -217,6 +235,7 @@ struct SettingsView: View {
             .onChange(of: model.currentVideoPath) { _ in
                 requestCurrentWallpaperThumbnailIfNeeded()
                 fitEditor.handleCurrentVideoPathChange()
+                wallpaperEditor.handleCurrentVideoPathChange()
             }
             .onChange(of: model.currentWebWallpaperID) { _ in
                 if let source = model.activeWebWallpaperSource {
@@ -237,12 +256,14 @@ struct SettingsView: View {
                 processThumbnailQueue()
                 if selectedTab == .wallpaperFit {
                     fitEditor.activate()
+                    wallpaperEditor.activate()
                 }
             }
             .onDisappear {
                 releaseCurrentWallpaperThumbnailVisibility()
                 releaseLockScreenWallpaperThumbnailVisibility()
                 fitEditor.deactivate()
+                wallpaperEditor.deactivate()
             }
     }
 
@@ -250,6 +271,12 @@ struct SettingsView: View {
         view
             .sheet(isPresented: $isWallpaperShareSheetPresented) {
                 shareWallpaperPickerSheet
+            }
+            .sheet(isPresented: $isStoreSharePickerPresented) {
+                storeSharePickerSheet
+            }
+            .sheet(isPresented: $isStoreShareSheetPresented) {
+                storeShareSheet
             }
             .confirmationDialog(
                 model.localizedString("設定を初期化"),
@@ -276,8 +303,13 @@ struct SettingsView: View {
                 )
                 tabButton(
                     .wallpaperFit,
-                    title: model.localizedString("配置"),
+                    title: model.localizedString("編集"),
                     systemImage: "viewfinder"
+                )
+                tabButton(
+                    .store,
+                    title: model.localizedString("Store"),
+                    systemImage: "square.grid.2x2.fill"
                 )
                 tabButton(
                     .settings,
@@ -285,10 +317,6 @@ struct SettingsView: View {
                     systemImage: "gearshape"
                 )
                 Spacer(minLength: 0)
-
-                if selectedTab == .settings {
-                    settingsSearchField
-                }
             }
             .padding(8)
             .frame(minHeight: 72)
@@ -317,13 +345,34 @@ struct SettingsView: View {
                 }
             }
         case .wallpaperFit:
-            WallpaperFitTabView(title: model.localizedString("配置")) {
-                wallpaperFitEditorPanel
+            WallpaperFitTabView(title: model.localizedString("編集")) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Picker("", selection: $editorSubMode) {
+                        Text(model.localizedString("フィット編集")).tag(EditorSubMode.fit)
+                        Text(model.localizedString("トリム編集")).tag(EditorSubMode.trim)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+
+                    switch editorSubMode {
+                    case .fit:
+                        wallpaperFitEditorPanel
+                    case .trim:
+                        wallpaperTrimEditorPanel
+                    }
+                }
             } library: {
                 wallpaperFitLibraryPanel
             }
+        case .store:
+            WallpaperTabView(title: model.localizedString("Store")) {
+                storeTabContent
+            }
         case .settings:
             SettingsTabView {
+                Section {
+                    settingsSearchField
+                }
                 Group {
                     if let message = model.persistenceFailureMessage {
                         Section {

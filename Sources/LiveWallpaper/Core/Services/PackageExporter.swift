@@ -69,7 +69,7 @@ final class PackageExporter {
             }
         }
 
-        let manifest = manifestBuilder.buildManifest(
+        let manifest = await manifestBuilder.buildManifest(
             model: model,
             videoMap: videoMap,
             videoThumbnails: videoThumbnails,
@@ -114,11 +114,14 @@ final class PackageExporter {
         return outputURLs
     }
 
-    private func exportSingleWallpaperPackage(
+    /// Store共有(StoreClient)からも、パッケージ本体だけを作りたい場合に直接呼べるよう
+    /// internal にしている(exportSingleWallpaper は常に生動画コピーも作ってしまうため)。
+    func exportSingleWallpaperPackage(
         model: WallpaperModel,
         videoPath: String,
         outputFolderURL: URL,
-        baseFileName: String
+        baseFileName: String,
+        license: String? = nil
     ) async throws -> URL {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -157,12 +160,13 @@ final class PackageExporter {
             videoThumbnails[videoId] = "previews/\(videoId).png"
         }
 
-        let manifest = manifestBuilder.buildSingleVideoManifest(
+        let manifest = await manifestBuilder.buildSingleVideoManifest(
             model: model,
             videoPath: videoPath,
             videoId: videoId,
             videoThumbnails: videoThumbnails,
-            fileSize: fileSize
+            fileSize: fileSize,
+            license: license
         )
 
         let encoder = JSONEncoder()

@@ -28,17 +28,17 @@ extension SettingsView {
             "クリック貫通を有効にする",
             "ログイン時に自動起動する",
             "音声を再生する",
-            "音量"
+            "音量",
         ],
         .share: [
             "共有",
             "高度な共有を有効にする",
-            ".lwpkg"
+            ".lwpkg",
         ],
         .webWallpaper: [
             "Web壁紙",
             "Web壁紙機能を有効にする",
-            "URL"
+            "URL",
         ],
         .display: [
             "表示",
@@ -71,7 +71,7 @@ extension SettingsView {
             "デスクトップレベル",
             "環境に応じて再生負荷を自動調整",
             "バッテリー残量に応じて画質を自動調整",
-            "fullScreenAuxiliary を有効化"
+            "fullScreenAuxiliary を有効化",
         ],
         // スケジュール本体は壁紙タブに住んでいる。ここでヒットしても設定タブには
         // セクションを描かず、壁紙タブへ飛ぶ案内行(scheduleSearchRedirectSection)を出す。
@@ -85,7 +85,7 @@ extension SettingsView {
             "終日",
             "毎日",
             "適用中",
-            "複製"
+            "複製",
         ],
         // 集中モードカード本体も壁紙タブに住んでいる。scheduleと同じ理由で
         // 案内行(focusFilterSearchRedirectSection)を出す。
@@ -95,16 +95,16 @@ extension SettingsView {
             "集中モードごとに表示する壁紙を選べます。",
             "フルディスクアクセス",
             "おやすみモード",
-            "Focus"
+            "Focus",
         ],
         .language: [
             "言語",
-            "アプリの言語"
+            "アプリの言語",
         ],
         .cache: [
             "キャッシュ",
             "保存先を開く",
-            "キャッシュ削除"
+            "キャッシュ削除",
         ],
         .reset: [
             "設定の管理",
@@ -112,14 +112,14 @@ extension SettingsView {
             "設定をリセット",
             "設定を書き出す…",
             "設定を読み込む…",
-            "バックアップ"
+            "バックアップ",
         ],
         .update: [
             "アップデート",
             "アップデートを自動で確認する（起動時にも通知）",
             "今すぐ確認",
-            "手動ダウンロード"
-        ]
+            "手動ダウンロード",
+        ],
     ]
 
     private var trimmedSettingsSearchQuery: String {
@@ -161,7 +161,7 @@ extension SettingsView {
                 placeholder: model.localizedString("設定を検索"),
                 isFocused: $isSettingsSearchFocused
             )
-            .frame(width: 170)
+            .frame(minWidth: 120, maxWidth: .infinity)
             Button {
                 settingsSearchText = ""
                 isSettingsSearchFocused = true

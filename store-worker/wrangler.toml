@@ -1,0 +1,31 @@
+name = "livewallpaper-store"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+[[r2_buckets]]
+binding = "STORE_BUCKET"
+bucket_name = "livewallpaper-store"
+
+[[d1_databases]]
+binding = "STORE_DB"
+database_name = "livewallpaper-store-db"
+database_id = "ccb0a508-d776-41d0-909f-3a7e97955ed1"
+
+# IPごとに /upload-url, /report を制限する(乱用対策)。namespace_id は
+# このWorker内で一意であれば任意の値でよい。
+[[ratelimits]]
+name = "STORE_RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60
+
+[vars]
+# Cloudflare account ID (dashboard right sidebar, or `wrangler whoami`).
+R2_ACCOUNT_ID = "8cccd37f8611ab68926721072c2ae958"
+R2_BUCKET_NAME = "livewallpaper-store"
+# R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY are set via:
+#   wrangler secret put R2_ACCESS_KEY_ID
+#   wrangler secret put R2_SECRET_ACCESS_KEY
+# (R2 dashboard > Manage R2 API Tokens > Object Read & Write, scoped to this bucket)
