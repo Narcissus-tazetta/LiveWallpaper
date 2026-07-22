@@ -42,16 +42,12 @@ extension SettingsView {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-            case let .success(downloadURL):
+            case .success:
                 Label(
                     model.localizedString("公開しました"),
                     systemImage: "checkmark.circle.fill"
                 )
                 .foregroundColor(.green)
-                Text(downloadURL.absoluteString)
-                    .font(.caption.monospaced())
-                    .foregroundColor(.secondary)
-                    .textSelection(.enabled)
             case let .failure(message):
                 Label(message, systemImage: "exclamationmark.triangle.fill")
                     .foregroundColor(.red)
@@ -91,7 +87,8 @@ extension SettingsView {
                     videoPath: path,
                     title: title,
                     author: author,
-                    license: license.isEmpty ? nil : license
+                    license: license.isEmpty ? nil : license,
+                    thumbnailCache: thumbnailCache
                 )
                 storeShareStatus = .success(downloadURL: result.downloadURL)
             } catch {

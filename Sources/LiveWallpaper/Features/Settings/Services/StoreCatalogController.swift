@@ -11,6 +11,8 @@ final class StoreCatalogController: ObservableObject {
     @Published var errorMessage: String?
     @Published var downloadingEntryID: String?
     @Published var downloadResultMessage: String?
+    @Published var reportResultMessage: String?
+    @Published var reportedEntryIDs: Set<String> = []
 
     private var nextCursor: String?
     private var hasLoadedOnce: Bool = false
@@ -110,6 +112,10 @@ final class StoreCatalogController: ObservableObject {
     }
 
     func report(entry: StoreEntry, reason: String) async {
+        reportResultMessage = nil
+        guard !reportedEntryIDs.contains(entry.id) else {
+            return
+        }
         struct ReportBody: Encodable {
             let entryId: String
             let reason: String
@@ -118,6 +124,22 @@ final class StoreCatalogController: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = try? JSONEncoder().encode(ReportBody(entryId: entry.id, reason: reason))
-        _ = try? await session.data(for: request)
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                throw StoreClientError.invalidResponse
+            }
+            _ = data
+            reportedEntryIDs.insert(entry.id)
+            reportResultMessage = Self.localized("通報しました。ご協力ありがとうございます")
+        } catch {
+            reportResultMessage = Self.localized("通報に失敗しました。もう一度お試しください")
+        }
+    }
+
+    private static func localized(_ key: String) -> String {
+        let raw = UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.automatic.rawValue
+        let language = AppLanguage(rawValue: raw) ?? .automatic
+        return AppLocalization.localizedString(key, languageCode: language.effectiveLanguageCode)
     }
 }

@@ -7,7 +7,11 @@ extension SettingsView {
                 Label(model.localizedString("Store"), systemImage: "square.grid.2x2.fill")
                     .font(.system(size: 13, weight: .semibold))
                 Spacer(minLength: 0)
-                if let message = storeCatalog.downloadResultMessage {
+                if let message = storeCatalog.reportResultMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else if let message = storeCatalog.downloadResultMessage {
                     Text(message)
                         .font(.caption)
                         .foregroundColor(.secondary)

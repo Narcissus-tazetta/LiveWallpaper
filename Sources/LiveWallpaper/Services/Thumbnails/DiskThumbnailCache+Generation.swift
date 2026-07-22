@@ -1,43 +1,11 @@
-import AVFoundation
 import AppKit
-import QuickLookThumbnailing
 
 extension DiskThumbnailCache {
   func generate(path: String) {
-    let url = URL(fileURLWithPath: path)
-    let request = QLThumbnailGenerator.Request(
-      fileAt: url,
-      size: CGSize(width: 480, height: 270),
-      scale: NSScreen.main?.backingScaleFactor ?? 2,
-      representationTypes: .all
-    )
-
-    QLThumbnailGenerator.shared
-      .generateBestRepresentation(for: request) { [weak self] representation, _ in
-        guard let self else {
-          return
-        }
-
-        if let cgImage = representation?.cgImage,
-          !ThumbnailImageScorer.isLowInformation(cgImage)
-        {
-          let image = NSImage(
-            cgImage: cgImage,
-            size: NSSize(width: cgImage.width, height: cgImage.height)
-          )
-          DispatchQueue.main.async {
-            self.finishGeneration(path: path, image: image)
-          }
-          return
-        }
-
-        DispatchQueue.global(qos: .userInitiated).async {
-          let fallback = Self.generateFallbackThumbnail(path: path)
-          DispatchQueue.main.async {
-            self.finishGeneration(path: path, image: fallback)
-          }
-        }
-      }
+    Task {
+      let image = await VideoThumbnailGenerator.generateBestThumbnail(path: path)
+      finishGeneration(path: path, image: image)
+    }
   }
 
   func finishGeneration(path: String, image: NSImage?) {
@@ -51,43 +19,6 @@ extension DiskThumbnailCache {
     inFlight.remove(path)
     processQueue()
     bumpRevision()
-  }
-
-  nonisolated static func generateFallbackThumbnail(path: String) -> NSImage? {
-    let asset = AVURLAsset(url: URL(fileURLWithPath: path))
-    let generator = AVAssetImageGenerator(asset: asset)
-    generator.appliesPreferredTrackTransform = true
-    generator.maximumSize = CGSize(width: 420, height: 236)
-    generator.requestedTimeToleranceBefore = .zero
-    generator.requestedTimeToleranceAfter = .positiveInfinity
-
-    let candidateSeconds: [Double] = [0.2, 0.8, 1.5, 3.0, 6.0, 10.0, 15.0, 30.0]
-    var bestImage: CGImage?
-    var bestScore: Double = -1
-
-    for seconds in candidateSeconds {
-      let time = CMTime(seconds: seconds, preferredTimescale: 600)
-      guard let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) else {
-        continue
-      }
-      let score = ThumbnailImageScorer.score(cgImage)
-      if score > bestScore {
-        bestScore = score
-        bestImage = cgImage
-      }
-      if score >= 1200 {
-        break
-      }
-    }
-
-    if let bestImage {
-      return NSImage(
-        cgImage: bestImage,
-        size: NSSize(width: bestImage.width, height: bestImage.height)
-      )
-    }
-
-    return nil
   }
 
   func writeToDisk(path: String, image: NSImage) {

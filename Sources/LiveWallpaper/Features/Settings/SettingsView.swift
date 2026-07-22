@@ -25,6 +25,7 @@ struct SettingsView: View {
     @StateObject var fitEditor: FitEditorController
     @StateObject var wallpaperEditor: WallpaperEditorController
     @StateObject var storeCatalog: StoreCatalogController
+    @StateObject var remoteThumbnailCache: RemoteThumbnailCache
     @State var editorSubMode: EditorSubMode = .fit
     @State var isResetSettingsDialogPresented: Bool = false
     @State var librarySearchText: String = ""
@@ -42,6 +43,7 @@ struct SettingsView: View {
     @State var storeShareStatus: StoreShareStatus = .idle
     @State var isSuspendExclusionAppPickerPresented: Bool = false
     @State var suspendExclusionAppPickerSearchText: String = ""
+    @State var storeReportTargetEntry: StoreEntry?
     @State var currentWallpaperPreviewThumbnailPath: String?
     @State var currentLockScreenPreviewThumbnailPath: String?
     @State var webURLInput: String = ""
@@ -79,6 +81,7 @@ struct SettingsView: View {
         _fitEditor = StateObject(wrappedValue: FitEditorController(model: model))
         _wallpaperEditor = StateObject(wrappedValue: WallpaperEditorController(model: model))
         _storeCatalog = StateObject(wrappedValue: StoreCatalogController())
+        _remoteThumbnailCache = StateObject(wrappedValue: RemoteThumbnailCache())
     }
 
     func wallpaperGridLayout(for availableWidth: CGFloat) -> ([GridItem], CGFloat) {
@@ -290,6 +293,34 @@ struct SettingsView: View {
                 Button(model.localizedString("キャンセル"), role: .cancel) {}
             } message: {
                 Text(model.localizedString("表示・再生に関する設定を初期値へ戻します"))
+            }
+            .confirmationDialog(
+                model.localizedString("この動画を通報"),
+                isPresented: Binding(
+                    get: { storeReportTargetEntry != nil },
+                    set: { if !$0 { storeReportTargetEntry = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                ForEach(StoreReportReason.allCases) { reason in
+                    Button(model.localizedString(reason.localizationKey)) {
+                        if let entry = storeReportTargetEntry {
+                            Task {
+                                await storeCatalog.report(entry: entry, reason: reason.localizationKey)
+                            }
+                        }
+                        storeReportTargetEntry = nil
+                    }
+                }
+                Button(model.localizedString("キャンセル"), role: .cancel) {
+                    storeReportTargetEntry = nil
+                }
+            } message: {
+                if let entry = storeReportTargetEntry {
+                    Text(entry.title)
+                } else {
+                    Text(model.localizedString("通報の理由を選択してください"))
+                }
             }
     }
 

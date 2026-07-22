@@ -7,9 +7,18 @@ extension SettingsView {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.secondary.opacity(0.15))
                     .frame(height: cardWidth * 9 / 16)
-                Image(systemName: "film.stack")
-                    .font(.system(size: 22))
-                    .foregroundColor(.secondary)
+                if let image = remoteThumbnailCache.image(for: entry) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: cardWidth * 9 / 16)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                } else {
+                    Image(systemName: "film.stack")
+                        .font(.system(size: 22))
+                        .foregroundColor(.secondary)
+                }
             }
 
             Text(entry.title)
@@ -47,10 +56,27 @@ extension SettingsView {
             }
         }
         .frame(width: cardWidth, alignment: .leading)
+        // LazyVGrid内でcontextMenuにid()を付けないと、スクロール後にAppKit側が
+        // 別セルのメニュー(と閉じたクロージャが捕えたentry)を使い回すことがあり、
+        // 右クリックしたカードと違うentryが通報される不具合につながる。
+        .id(entry.id)
+        .contextMenu {
+            if storeCatalog.reportedEntryIDs.contains(entry.id) {
+                Text(model.localizedString("通報済み"))
+            } else {
+                Button(model.localizedString("この動画を通報")) {
+                    storeReportTargetEntry = entry
+                }
+            }
+        }
         .onAppear {
+            remoteThumbnailCache.setVisible(entryID: entry.id, isVisible: true)
             Task {
                 await storeCatalog.loadMoreIfNeeded(currentEntry: entry)
             }
+        }
+        .onDisappear {
+            remoteThumbnailCache.setVisible(entryID: entry.id, isVisible: false)
         }
     }
 

@@ -443,3 +443,13 @@
 "アクセスが集中しています。しばらく待ってから再度お試しください" = "Too many requests right now. Please wait and try again";
 "Storeサーバーで問題が発生しています。しばらくしてから再度お試しください" = "The Store server is having problems. Please try again later";
 "Storeへのリクエストに失敗しました" = "The request to the Store failed";
+
+// Store report
+"この動画を通報" = "Report this video";
+"通報の理由を選択してください" = "Select a reason for reporting";
+"不適切なコンテンツ" = "Inappropriate content";
+"著作権侵害の疑い" = "Suspected copyright infringement";
+"スパムまたは無関係なコンテンツ" = "Spam or irrelevant content";
+"通報しました。ご協力ありがとうございます" = "Reported. Thank you for your help";
+"通報に失敗しました。もう一度お試しください" = "Failed to report. Please try again";
+"通報済み" = "Already reported";
