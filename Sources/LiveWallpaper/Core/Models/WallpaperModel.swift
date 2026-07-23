@@ -192,16 +192,19 @@ final class WallpaperModel: ObservableObject {
         let player: AVQueuePlayer
         let looper: AVPlayerLooper
     }
+
     struct ScreenPathKey: Hashable {
         let screenID: String
         let path: String
     }
+
     /// screenID -> path -> 生きている専用プレイヤー。「現在」1枠 + 隣接の温存
     /// (最大2枠)を同じ辞書で保持する。
     var dedicatedSlotsByScreenID: [String: [String: DedicatedPlayerSlot]] = [:]
     /// screenID -> 現在レイヤーにアタッチされているパス(温存中の隣接スロットとの区別に使う)。
     var activeDedicatedPathByScreenID: [String: String] = [:]
-    var dedicatedFreezeFrameByScreenID: [String: (path: String, time: CMTime, image: CGImage?)] = [:]
+    var dedicatedFreezeFrameByScreenID: [String: (path: String, time: CMTime, image: CGImage?)] =
+        [:]
     /// (screenID, path) -> 直前に破棄したときの再生位置。メモリ上のみで再起動を跨いで
     /// 永続化しない(Space UUIDはOS再起動で作り直され得るため)。
     var dedicatedResumeTimeByKey: [ScreenPathKey: CMTime] = [:]
@@ -253,6 +256,7 @@ final class WallpaperModel: ObservableObject {
     var scheduleAppearanceProvider: () -> ScheduleAppearanceCondition = {
         NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light
     }
+
     @Published var scheduleRules: [ScheduleRule] = []
     /// 集中モード連携のマスタースイッチ。OFFの間もDB監視は続けるが、評価時に
     /// focusFilter ルールを無視する(WallpaperModel+Schedule.swift参照)。

@@ -41,7 +41,7 @@ final class PackageManifestCodecTests: XCTestCase {
 
     func testRoundTripWithEditMetadata() throws {
         let edit = PackageManifest.PackageVideo.EditMetadata(
-            trimStart: 1.5, trimEnd: 9.0, loopStart: 3.0
+            trimStart: 1.5, trimEnd: 9.0, loopStart: 4.0
         )
         let manifest = sampleManifest(edit: edit)
 
@@ -50,7 +50,7 @@ final class PackageManifestCodecTests: XCTestCase {
 
         XCTAssertEqual(decoded.videos.first?.edit?.trimStart, 1.5)
         XCTAssertEqual(decoded.videos.first?.edit?.trimEnd, 9.0)
-        XCTAssertEqual(decoded.videos.first?.edit?.loopStart, 3.0)
+        XCTAssertEqual(decoded.videos.first?.edit?.loopStart, 4.0)
         XCTAssertEqual(decoded.videos.first?.duration, 12.5)
         XCTAssertEqual(decoded.videos.first?.hasAudio, false)
         XCTAssertEqual(decoded.manifest.license, "CC-BY-4.0")

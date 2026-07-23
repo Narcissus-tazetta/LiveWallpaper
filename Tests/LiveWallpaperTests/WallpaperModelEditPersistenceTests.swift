@@ -34,7 +34,7 @@ final class WallpaperModelEditPersistenceTests: XCTestCase {
     func testRestoreStateDecodesWallpaperEditByPath() throws {
         UserDefaults.standard.set(["/a.mp4", "/b.mp4"], forKey: libraryKey)
         let edits: [String: WallpaperEditMetadata] = [
-            "/a.mp4": WallpaperEditMetadata(trimStart: 2, trimEnd: 8, loopStart: 4)
+            "/a.mp4": WallpaperEditMetadata(trimStart: 2, trimEnd: 8)
         ]
         UserDefaults.standard.set(try JSONEncoder().encode(edits), forKey: editKey)
 
@@ -46,8 +46,8 @@ final class WallpaperModelEditPersistenceTests: XCTestCase {
     func testRestoreStateDropsEditsForPathsNotInLibrary() throws {
         UserDefaults.standard.set(["/a.mp4"], forKey: libraryKey)
         let edits: [String: WallpaperEditMetadata] = [
-            "/a.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5, loopStart: nil),
-            "/stale.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5, loopStart: nil),
+            "/a.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5),
+            "/stale.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5),
         ]
         UserDefaults.standard.set(try JSONEncoder().encode(edits), forKey: editKey)
 
@@ -63,8 +63,8 @@ final class WallpaperModelEditPersistenceTests: XCTestCase {
 
         model.libraryVideoPaths = ["/a.mp4"]
         model.wallpaperEditByPath = [
-            "/a.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5, loopStart: nil),
-            "/gone.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5, loopStart: nil),
+            "/a.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5),
+            "/gone.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5),
         ]
 
         model.pruneWallpaperEditsForExistingPaths()
@@ -79,7 +79,7 @@ final class WallpaperModelEditPersistenceTests: XCTestCase {
 
         model.libraryVideoPaths = ["/a.mp4"]
         let edits: [String: WallpaperEditMetadata] = [
-            "/a.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5, loopStart: nil)
+            "/a.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5)
         ]
         model.wallpaperEditByPath = edits
 

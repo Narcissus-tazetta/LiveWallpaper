@@ -46,8 +46,14 @@ extension SettingsView {
                     .fill(Color.black.opacity(0.72))
                 TrimEditorPreviewPlayer(
                     videoPath: path,
-                    loopRange: previewLoopRange(draft: draft),
+                    trimStart: draft.trimStart,
+                    // 本番と同じ「実尺の内側へ収めた終端」を渡す。生の draft.trimEnd
+                    // (未設定なら nil)のままだと AVPlayerLooper が区間を作れず、
+                    // プレビューが再生されない。
+                    trimEnd: draft.loopSafeTrimEnd,
+                    loopStart: draft.loopStart,
                     isPlaying: wallpaperEditor.isPreviewPlaying,
+                    seekRequest: wallpaperEditor.seekRequest,
                     currentTime: $wallpaperEditor.playheadTime
                 )
                 .id(path)
@@ -64,55 +70,88 @@ extension SettingsView {
                 }
                 .buttonStyle(.bordered)
 
-                Text(trimEditorTimeLabel(draft.trimStart))
-                    .font(.caption.monospacedDigit())
-                    .foregroundColor(.secondary)
+                TrimTimeField(
+                    value: draft.trimStart,
+                    accessibilityLabel: model.localizedString("カット開始時刻"),
+                    onCommit: { wallpaperEditor.setDraftTrimStart($0) }
+                )
                 Spacer(minLength: 0)
                 Text(trimEditorTimeLabel(wallpaperEditor.playheadTime))
                     .font(.caption.monospacedDigit())
                 Spacer(minLength: 0)
-                Text(trimEditorTimeLabel(draft.effectiveTrimEnd))
-                    .font(.caption.monospacedDigit())
-                    .foregroundColor(.secondary)
+                TrimTimeField(
+                    value: draft.effectiveTrimEnd,
+                    accessibilityLabel: model.localizedString("カット終了時刻"),
+                    onCommit: { wallpaperEditor.setDraftTrimEnd($0) }
+                )
             }
 
             TrimRangeScrubber(
+                videoPath: path,
                 duration: duration,
                 trimStart: draft.trimStart,
                 trimEnd: draft.effectiveTrimEnd,
                 loopStart: draft.loopStart,
                 playhead: wallpaperEditor.playheadTime,
+                startHandleAccessibilityLabel: model.localizedString("カット開始位置"),
+                endHandleAccessibilityLabel: model.localizedString("カット終了位置"),
+                loopStartHandleAccessibilityLabel: model.localizedString("ループ開始位置"),
                 onTrimStartChanged: { wallpaperEditor.setDraftTrimStart($0) },
                 onTrimEndChanged: { wallpaperEditor.setDraftTrimEnd($0) },
-                onLoopStartChanged: { wallpaperEditor.setDraftLoopStart($0) }
+                onLoopStartChanged: { wallpaperEditor.setDraftLoopStart($0) },
+                onScrub: { wallpaperEditor.seek(to: $0) }
             )
 
-            Toggle(
-                model.localizedString("途中からループする"),
-                isOn: Binding(
-                    get: { draft.hasCustomLoopStart },
-                    set: { wallpaperEditor.toggleCustomLoopStart($0) }
+            HStack(spacing: 8) {
+                Toggle(
+                    model.localizedString("途中からループする"),
+                    isOn: Binding(
+                        get: { draft.hasCustomLoopStart },
+                        set: { wallpaperEditor.toggleCustomLoopStart($0) }
+                    )
                 )
-            )
-            .toggleStyle(.checkbox)
-            .font(.system(size: 12))
+                .toggleStyle(.checkbox)
+                .font(.system(size: 12))
 
-            Text(
-                model.localizedString(
-                    "オレンジのハンドルでループの開始位置を指定できます。オフのときはカット開始位置からループします"
+                Spacer(minLength: 0)
+
+                Text(
+                    "\(model.localizedString("ループ長")) \(trimEditorTimeLabel(loopDuration(draft: draft)))"
                 )
-            )
-            .font(.caption)
-            .foregroundColor(.secondary)
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+                Button {
+                    wallpaperEditor.isPreviewPlaying = true
+                    wallpaperEditor.seek(to: seamCheckSeekTime(draft: draft))
+                } label: {
+                    Label(
+                        model.localizedString("継ぎ目を確認"),
+                        systemImage: "arrow.triangle.2.circlepath"
+                    )
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help(
+                    model.localizedString(
+                        "カット終了位置の少し手前へ再生位置を移動し、ループの継ぎ目を確認できます"
+                    )
+                )
+            }
+
+            if draft.hasCustomLoopStart {
+                Text(
+                    model.localizedString(
+                        "オレンジのハンドルでループの開始位置を指定できます。初回だけカット開始位置から再生し、2周目以降はここから繰り返します"
+                    )
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
 
             trimEditorActions(path: path, isDirty: isDirty)
         }
-    }
-
-    private func previewLoopRange(draft: WallpaperEditDraft) -> ClosedRange<Double> {
-        let end = max(draft.effectiveTrimEnd, draft.trimStart + wallpaperEditor.minimumSegmentDuration)
-        let start = min(draft.loopStart ?? draft.trimStart, end - wallpaperEditor.minimumSegmentDuration)
-        return max(start, 0) ... end
     }
 
     private func trimEditorTimeLabel(_ seconds: Double) -> String {
@@ -120,6 +159,19 @@ extension SettingsView {
         let minutes = Int(clamped) / 60
         let secs = clamped.truncatingRemainder(dividingBy: 60)
         return String(format: "%d:%04.1f", minutes, secs)
+    }
+
+    /// 2周目以降に実際にループする区間(ループ開始位置 ... カット終了位置)の長さ。
+    private func loopDuration(draft: WallpaperEditDraft) -> Double {
+        max(draft.effectiveTrimEnd - draft.effectiveLoopStart, 0)
+    }
+
+    /// 「継ぎ目を確認」ボタンの飛び先。カット終了位置の少し手前(既定2秒)へ移動し、
+    /// ループがシームレスに戻る瞬間を繰り返し眺められるようにする。ループ区間が
+    /// 2秒より短い場合はループ開始位置より手前へ飛ばないようクランプする。
+    private func seamCheckSeekTime(draft: WallpaperEditDraft) -> Double {
+        let seamLeadIn = 2.0
+        return max(draft.effectiveLoopStart, draft.effectiveTrimEnd - seamLeadIn)
     }
 
     private func trimEditorActions(path: String, isDirty: Bool) -> some View {
@@ -159,5 +211,75 @@ extension SettingsView {
             .disabled(!isDirty)
         }
         .animation(.easeInOut(duration: 0.15), value: wallpaperEditor.showsSavedFeedback)
+    }
+}
+
+/// トリム開始/終了時刻を "M:SS.s" 形式で直接編集させるフィールド。編集中は外部の
+/// `value` 更新で表示を上書きしない(フォーカスを外れた時点でだけ確定・再フォーマット
+/// する)ことで、入力途中の文字列がドラッグ由来の値更新で消される事故を避ける。
+private struct TrimTimeField: View {
+    let value: Double
+    let accessibilityLabel: String
+    let onCommit: (Double) -> Void
+
+    @State private var text: String = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        TextField("", text: $text)
+            .textFieldStyle(.plain)
+            .font(.caption.monospacedDigit())
+            .multilineTextAlignment(.center)
+            .frame(width: 56)
+            .foregroundColor(.secondary)
+            .focused($isFocused)
+            .accessibilityLabel(accessibilityLabel)
+            .onAppear {
+                text = Self.format(value)
+            }
+            .onChange(of: value) { newValue in
+                if !isFocused {
+                    text = Self.format(newValue)
+                }
+            }
+            .onChange(of: isFocused) { focused in
+                if !focused {
+                    commit()
+                }
+            }
+            .onSubmit {
+                commit()
+            }
+    }
+
+    private func commit() {
+        guard let parsed = Self.parse(text) else {
+            text = Self.format(value)
+            return
+        }
+        onCommit(parsed)
+    }
+
+    private static func format(_ seconds: Double) -> String {
+        let clamped = max(seconds, 0)
+        let minutes = Int(clamped) / 60
+        let secs = clamped.truncatingRemainder(dividingBy: 60)
+        return String(format: "%d:%04.1f", minutes, secs)
+    }
+
+    private static func parse(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        if trimmed.contains(":") {
+            let parts = trimmed.split(separator: ":")
+            guard
+                parts.count == 2,
+                let minutes = Double(parts[0]),
+                let seconds = Double(parts[1])
+            else {
+                return nil
+            }
+            return minutes * 60 + seconds
+        }
+        return Double(trimmed)
     }
 }

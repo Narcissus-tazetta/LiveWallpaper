@@ -113,7 +113,7 @@ final class PackageImporterEditValidationTests: XCTestCase {
 
         let validVideo = packageVideo(
             id: "good-edit",
-            edit: .init(trimStart: 1, trimEnd: 9, loopStart: 3)
+            edit: .init(trimStart: 1, trimEnd: 9, loopStart: nil)
         )
         let packageURL = try makePackage(videos: [validVideo], in: workDir)
 
@@ -127,6 +127,22 @@ final class PackageImporterEditValidationTests: XCTestCase {
         let edit = try XCTUnwrap(model.wallpaperEdit(for: path))
         XCTAssertEqual(edit.trimStart, 1)
         XCTAssertEqual(edit.trimEnd, 9)
-        XCTAssertEqual(edit.loopStart, 3)
+    }
+
+    // MARK: - ループ開始位置の取り込み
+
+    func testLoopStartOutsideTheCutRangeIsDropped() {
+        XCTAssertNil(
+            PackageImporter.loopSafeLoopStart(12, trimStart: 1, trimEnd: 9),
+            "a loop start past the cut end must be dropped rather than rounded"
+        )
+        XCTAssertNil(
+            PackageImporter.loopSafeLoopStart(0.5, trimStart: 1, trimEnd: 9),
+            "a loop start before the cut start must be dropped"
+        )
+    }
+
+    func testLoopStartInsideTheCutRangeSurvives() {
+        XCTAssertEqual(PackageImporter.loopSafeLoopStart(4, trimStart: 1, trimEnd: 9), 4)
     }
 }

@@ -146,7 +146,7 @@ extension WallpaperModel {
         // layers is preserved until the fresh item is ready to render.
         // installPlayerItem calls stopAllPlayers (which resets isDeepResuming),
         // so mark the resume in flight only afterward.
-        installPlayerItem(url: resolvedPlaybackURL(for: path), attach: false)
+        reinstallPlayerItemContinuingPlayback(url: resolvedPlaybackURL(for: path), attach: false)
         isDeepResuming = true
         finishDeepResume(requestedTime: requestedTime, attemptsRemaining: 40)
     }
@@ -175,16 +175,18 @@ extension WallpaperModel {
             return
         }
 
-        guard let requestedTime, requestedTime.isNumeric, requestedTime.seconds > 0 else {
+        // 記憶位置がトリム編集のループ区間の外(カットで捨てた領域)なら復元シークを
+        // 見送り、ループ開始位置のまま復帰させる。区間外へ seek すると
+        // AVPlayerLooper のループに戻れずそのフレームで止まる。
+        guard let requestedTime, requestedTime.isNumeric,
+              let safeSeconds = clampedResumeSeconds(
+                  requestedTime.seconds,
+                  path: currentVideoPath,
+                  itemDurationSeconds: item.duration.seconds
+              )
+        else {
             attachLivePlayerAfterDeepResume()
             return
-        }
-        let durationSeconds = item.duration.seconds
-        let safeSeconds: Double
-        if durationSeconds.isFinite, durationSeconds > 0.05 {
-            safeSeconds = min(max(requestedTime.seconds, 0), durationSeconds - 0.05)
-        } else {
-            safeSeconds = max(requestedTime.seconds, 0)
         }
         let safeTime = CMTime(
             seconds: safeSeconds,

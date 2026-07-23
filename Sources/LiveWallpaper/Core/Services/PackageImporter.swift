@@ -89,20 +89,30 @@ final class PackageImporter {
                 }
 
                 if let edit = video.edit {
+                    // パッケージは他人の環境で作られたものであり得るため、取り込んだ
+                    // ファイルの実尺で検証・クランプする。trimEnd が実尺をはみ出した
+                    // まま保存されると AVPlayerLooper が .failed になり、その壁紙が
+                    // 一切再生されなくなる(WallpaperLoopBuilder.makeLooper 参照)。
+                    let assetDuration = await Self.assetDurationSeconds(path: videoPath)
+                    let trimEnd = Self.loopSafeTrimEnd(
+                        edit.trimEnd,
+                        assetDuration: assetDuration
+                    )
+                    let loopStart = Self.loopSafeLoopStart(
+                        edit.loopStart,
+                        trimStart: edit.trimStart,
+                        trimEnd: trimEnd
+                    )
                     let metadata = WallpaperEditMetadata(
                         trimStart: edit.trimStart,
-                        trimEnd: edit.trimEnd,
-                        loopStart: edit.loopStart
+                        trimEnd: trimEnd,
+                        loopStart: loopStart
                     )
-                    // assetDuration: nil -> 尺に依存しないチェック(trimEnd<=trimStart、
-                    // ループ開始位置の順序など)のみ行う。パッケージは他人の環境で
-                    // 作られたものであり得るため、ここで弾かないと不正な値が
-                    // そのまま再生パスのCMTimeRangeへ渡ってしまう。
-                    if metadata.isValid(assetDuration: nil) {
+                    if metadata.isValid(assetDuration: assetDuration) {
                         model.setWallpaperEdit(
                             trimStart: edit.trimStart,
-                            trimEnd: edit.trimEnd,
-                            loopStart: edit.loopStart,
+                            trimEnd: trimEnd,
+                            loopStart: loopStart,
                             path: videoPath
                         )
                     } else {
@@ -193,6 +203,43 @@ final class PackageImporter {
         guard Self.supportedVersions.contains(manifest.version) else {
             throw ImportError.unsupportedPackageVersion
         }
+    }
+
+    /// 取り込んだ動画ファイルの実尺(読めなければ nil)。
+    static func assetDurationSeconds(path: String) async -> Double? {
+        let asset = AVURLAsset(url: URL(fileURLWithPath: path))
+        guard let duration = try? await asset.load(.duration) else {
+            return nil
+        }
+        let seconds = duration.seconds
+        return seconds.isFinite && seconds > 0 ? seconds : nil
+    }
+
+    /// パッケージ由来の trimEnd を、ローカルの実尺の内側へ収める。尺が読めなければ
+    /// そのまま通す(その場合の最終防衛線は `WallpaperLoopBuilder.makeLooper` の
+    /// 全体ループへのフォールバック)。
+    static func loopSafeTrimEnd(_ trimEnd: Double?, assetDuration: Double?) -> Double? {
+        guard let trimEnd, let assetDuration else {
+            return trimEnd
+        }
+        return min(trimEnd, assetDuration - WallpaperLoopBuilder.loopEndGuard)
+    }
+
+    /// パッケージ由来のループ開始位置を、クランプ後のカット範囲の内側に収める。
+    /// 収まらなければ捨てる(= 途中ループなし)。半端な位置へ丸めるより、他人の
+    /// 環境で決めた演出を落とす方が事故が少ない。
+    static func loopSafeLoopStart(
+        _ loopStart: Double?,
+        trimStart: Double,
+        trimEnd: Double?
+    ) -> Double? {
+        guard let loopStart, loopStart > trimStart else {
+            return nil
+        }
+        guard let trimEnd else {
+            return loopStart
+        }
+        return loopStart < trimEnd ? loopStart : nil
     }
 
     private func importVideo(

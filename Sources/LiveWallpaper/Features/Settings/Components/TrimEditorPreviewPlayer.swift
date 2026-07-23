@@ -8,8 +8,11 @@ import SwiftUI
 /// (ジオメトリのpan/zoomではなく時間範囲のスクラブ/ループが主眼)ため別コンポーネントにする。
 struct TrimEditorPreviewPlayer: NSViewRepresentable {
     let videoPath: String
-    let loopRange: ClosedRange<Double>
+    let trimStart: Double
+    let trimEnd: Double?
+    let loopStart: Double?
     let isPlaying: Bool
+    let seekRequest: SeekToken?
     @Binding var currentTime: Double
 
     func makeCoordinator() -> Coordinator {
@@ -21,29 +24,52 @@ struct TrimEditorPreviewPlayer: NSViewRepresentable {
         view.wantsLayer = true
         view.playerLayer.videoGravity = .resizeAspect
         view.playerLayer.backgroundColor = NSColor.black.cgColor
-        context.coordinator.attach(to: view.playerLayer, path: videoPath, range: loopRange)
+        context.coordinator.attach(
+            to: view.playerLayer, path: videoPath,
+            spec: .init(trimStart: trimStart, trimEnd: trimEnd, loopStart: loopStart)
+        )
         context.coordinator.setPlaying(isPlaying)
+        context.coordinator.applySeekIfNeeded(seekRequest)
         return view
     }
 
     func updateNSView(_ nsView: PreviewContainerView, context: Context) {
-        context.coordinator.attach(to: nsView.playerLayer, path: videoPath, range: loopRange)
+        context.coordinator.attach(
+            to: nsView.playerLayer, path: videoPath,
+            spec: .init(trimStart: trimStart, trimEnd: trimEnd, loopStart: loopStart)
+        )
         context.coordinator.setPlaying(isPlaying)
+        context.coordinator.applySeekIfNeeded(seekRequest)
     }
 
-    static func dismantleNSView(_ nsView: PreviewContainerView, coordinator: Coordinator) {
+    static func dismantleNSView(_: PreviewContainerView, coordinator: Coordinator) {
         coordinator.stop()
+    }
+
+    /// `WallpaperLoopBuilder` に渡すループ条件。`ClosedRange<Double>` ではなく
+    /// trimStart/trimEnd/loopStartをそのまま保持するのは、trimEndがnilの場合
+    /// (ファイル終端まで再生)や「初回だけカット開始位置から」の情報を1本のrangeへ
+    /// 潰さずに本番と同じ形で渡すため。
+    struct LoopSpec: Equatable {
+        let trimStart: Double
+        let trimEnd: Double?
+        let loopStart: Double?
     }
 
     final class Coordinator {
         private var currentPath: String?
-        private var currentRange: ClosedRange<Double>?
+        private var currentSpec: LoopSpec?
         private var player: AVQueuePlayer?
         private var looper: AVPlayerLooper?
         private var timeObserver: Any?
         private let currentTimeBinding: Binding<Double>
-        private var pendingRangeUpdate: Task<Void, Never>?
+        private var pendingRangeUpdate: DispatchWorkItem?
         private var desiredPlaying = true
+        private var lastAppliedSeekID: UUID?
+        /// 直近に要求されたシーク先。デバウンス中や player 再構築の直後でも、
+        /// 再構築が終わり次第この時刻へ飛べるよう保持しておく(でないと
+        /// trimStart/trimEnd のドラッグ中に毎回 range 先頭へ戻ってしまう)。
+        private var lastSeekTime: Double?
 
         init(currentTime: Binding<Double>) {
             currentTimeBinding = currentTime
@@ -54,10 +80,16 @@ struct TrimEditorPreviewPlayer: NSViewRepresentable {
         /// 一式を作り直すとプレビューがカクつくため、動きが落ち着くまで
         /// 実際の再構築を遅らせる(パスが変わったとき=別の動画を選んだときは
         /// 即座に反映する)。
-        private static let rangeUpdateDebounce: UInt64 = 150_000_000
+        ///
+        /// - Important: `DispatchQueue.main.asyncAfter` で必ずメインスレッドで
+        ///   実行すること。`Coordinator` は `@MainActor` ではないため、以前ここを
+        ///   `Task { try? await Task.sleep(...) }` にしていたときはバックグラウンド
+        ///   スレッドで `layer.player` 代入や `queue.play()` を呼んでしまい、
+        ///   AVPlayerLayer が描画されない(プレビューが黒画面のまま)不具合になった。
+        private static let rangeUpdateDebounce: DispatchTimeInterval = .milliseconds(150)
 
-        func attach(to layer: AVPlayerLayer, path: String, range: ClosedRange<Double>) {
-            if currentPath == path, currentRange == range, let player {
+        func attach(to layer: AVPlayerLayer, path: String, spec: LoopSpec) {
+            if currentPath == path, currentSpec == spec, let player {
                 if layer.player !== player {
                     layer.player = player
                 }
@@ -67,21 +99,28 @@ struct TrimEditorPreviewPlayer: NSViewRepresentable {
             guard currentPath == path else {
                 pendingRangeUpdate?.cancel()
                 pendingRangeUpdate = nil
-                performAttach(to: layer, path: path, range: range)
+                // 別の動画に切り替わった場合、前の動画向けのシーク先を引き継がない。
+                lastSeekTime = nil
+                performAttach(to: layer, path: path, spec: spec)
                 return
             }
 
             pendingRangeUpdate?.cancel()
-            pendingRangeUpdate = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: Self.rangeUpdateDebounce)
-                guard !Task.isCancelled else {
-                    return
-                }
-                self?.performAttach(to: layer, path: path, range: range)
+            let workItem = DispatchWorkItem { [weak self] in
+                self?.performAttach(to: layer, path: path, spec: spec)
             }
+            pendingRangeUpdate = workItem
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + Self.rangeUpdateDebounce,
+                execute: workItem
+            )
         }
 
-        private func performAttach(to layer: AVPlayerLayer, path: String, range: ClosedRange<Double>) {
+        private func performAttach(
+            to layer: AVPlayerLayer,
+            path: String,
+            spec: LoopSpec
+        ) {
             stop()
 
             let url = URL(fileURLWithPath: path)
@@ -91,11 +130,14 @@ struct TrimEditorPreviewPlayer: NSViewRepresentable {
             queue.isMuted = true
             queue.volume = 0
 
-            let timeRange = CMTimeRange(
-                start: CMTime(seconds: range.lowerBound, preferredTimescale: 600),
-                end: CMTime(seconds: range.upperBound, preferredTimescale: 600)
+            looper = WallpaperLoopBuilder.makeLooper(
+                player: queue,
+                templateItem: item,
+                trimStart: spec.trimStart,
+                trimEnd: spec.trimEnd,
+                loopStart: spec.loopStart,
+                context: "preview"
             )
-            looper = AVPlayerLooper(player: queue, templateItem: item, timeRange: timeRange)
 
             let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
             timeObserver = queue.addPeriodicTimeObserver(forInterval: interval, queue: .main) {
@@ -104,12 +146,40 @@ struct TrimEditorPreviewPlayer: NSViewRepresentable {
             }
 
             currentPath = path
-            currentRange = range
+            currentSpec = spec
             player = queue
             layer.player = queue
+            if let lastSeekTime {
+                let upperBound = spec.trimEnd ?? lastSeekTime
+                let clamped = min(max(lastSeekTime, spec.trimStart), upperBound)
+                queue.seek(
+                    to: CMTime(seconds: clamped, preferredTimescale: 600),
+                    toleranceBefore: .zero,
+                    toleranceAfter: .zero
+                )
+            }
             if desiredPlaying {
                 queue.play()
             }
+        }
+
+        /// ハンドル/トラック操作による明示的なシーク要求を反映する。同じトークンを
+        /// 二重適用しないよう id で去重し、再生中の currentTime レポート(一方向)とは
+        /// 独立させる。
+        func applySeekIfNeeded(_ token: SeekToken?) {
+            guard let token, token.id != lastAppliedSeekID else {
+                return
+            }
+            lastAppliedSeekID = token.id
+            lastSeekTime = token.time
+            guard let player else {
+                return
+            }
+            player.seek(
+                to: CMTime(seconds: token.time, preferredTimescale: 600),
+                toleranceBefore: .zero,
+                toleranceAfter: .zero
+            )
         }
 
         func setPlaying(_ playing: Bool) {
@@ -131,12 +201,13 @@ struct TrimEditorPreviewPlayer: NSViewRepresentable {
                 player.removeTimeObserver(timeObserver)
             }
             timeObserver = nil
+            looper?.disableLooping()
+            looper = nil
             player?.pause()
             player?.removeAllItems()
-            looper = nil
             player = nil
             currentPath = nil
-            currentRange = nil
+            currentSpec = nil
         }
     }
 }

@@ -45,6 +45,8 @@ struct PackageManifest: Codable {
         struct EditMetadata: Codable {
             let trimStart: Double
             let trimEnd: Double?
+            /// 任意。取り込み側はローカルの実尺で必ず検証し、範囲外なら捨てる
+            /// (`PackageImporter.loopSafeLoopStart`)。
             let loopStart: Double?
         }
     }

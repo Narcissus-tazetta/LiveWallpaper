@@ -54,7 +54,7 @@ extension WallpaperModel {
                     return
                 }
                 let resumeTime = self.sharedPlayer?.currentTime() ?? .zero
-                self.playVideo(url: proxyURL)
+                self.reinstallPlayerItemContinuingPlayback(url: proxyURL, attach: true)
                 self.restorePlaybackPositionAfterProxySwap(resumeTime)
             case .passthrough:
                 self.lightweightProxyState = .ready
@@ -103,12 +103,14 @@ extension WallpaperModel {
             return
         }
 
-        let durationSeconds = item.duration.seconds
-        let safeSeconds: Double
-        if durationSeconds.isFinite, durationSeconds > 0.05 {
-            safeSeconds = min(max(requestedTime.seconds, 0), durationSeconds - 0.05)
-        } else {
-            safeSeconds = max(requestedTime.seconds, 0)
+        // トリム編集のループ区間の外を指していたら復元シークを見送る(区間外へ
+        // seek すると AVPlayerLooper のループへ戻れずそのフレームで止まる)。
+        guard let safeSeconds = clampedResumeSeconds(
+            requestedTime.seconds,
+            path: currentVideoPath,
+            itemDurationSeconds: item.duration.seconds
+        ) else {
+            return
         }
         let safeTime = CMTime(
             seconds: safeSeconds,

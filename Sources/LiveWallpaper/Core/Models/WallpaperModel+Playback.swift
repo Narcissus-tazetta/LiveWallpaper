@@ -439,6 +439,14 @@ extension WallpaperModel {
         installPlayerItem(url: url, attach: true)
     }
 
+    /// 直前の再生位置を復元する呼び出し(deep suspend からの復帰・軽量プロキシ
+    /// 差し替え)専用の入り口。「途中からループする」のイントロは *再生の開始* の
+    /// 演出なので、続きから戻すときは出さない。両方が readyToPlay 待ちで seek を
+    /// 投げると、どちらが後に着地するかで再生位置が揺れる。
+    func reinstallPlayerItemContinuingPlayback(url: URL, attach: Bool) {
+        installPlayerItem(url: url, attach: attach, playsIntro: false)
+    }
+
     /// Builds and installs a fresh AVPlayerItem for `url` on the shared player.
     ///
     /// With `attach: true` (the normal path) this reproduces the original
@@ -447,7 +455,7 @@ extension WallpaperModel {
     /// (used by deep-suspend resume) the item is built in the background without
     /// touching the layers, so the freeze frame stays visible until the caller
     /// decides the item is ready and performs the attach itself.
-    func installPlayerItem(url: URL, attach: Bool) {
+    func installPlayerItem(url: URL, attach: Bool, playsIntro: Bool = true) {
         let effectiveDecode = resolvedDecodeMode()
         let asset = AVURLAsset(
             url: url,
@@ -471,8 +479,11 @@ extension WallpaperModel {
 
         let edit = currentVideoPath.flatMap { wallpaperEditByPath[$0] }
         if shouldUsePlaybackLooper() {
+            // AVPlayerLooper がテンプレートのコピー挿入まで行うため、ここでは
+            // insert しない。
             sharedLooper = makeWallpaperLooper(
-                player: player, templateItem: item, path: currentVideoPath
+                player: player, templateItem: item, path: currentVideoPath,
+                playsIntro: playsIntro
             )
         } else {
             if let edit, !edit.isNoOp, let trimEnd = edit.trimEnd {
@@ -480,11 +491,8 @@ extension WallpaperModel {
             }
             player.insert(item, after: nil)
             sharedLooper = nil
-            if let edit, !edit.isNoOp {
-                let seekSeconds = edit.effectiveLoopStart
-                if seekSeconds > 0 {
-                    player.seek(to: CMTime(seconds: seekSeconds, preferredTimescale: 600))
-                }
+            if let edit, !edit.isNoOp, edit.trimStart > 0 {
+                player.seek(to: CMTime(seconds: edit.trimStart, preferredTimescale: 600))
             }
         }
         applyAudioSettings()
@@ -636,7 +644,7 @@ extension WallpaperModel {
         }
 
         if batteryAwareQualityEnabled,
-            let battery = Self.currentBatteryInfo(), battery.onBatteryPower, battery.percentage <= 10
+           let battery = Self.currentBatteryInfo(), battery.onBatteryPower, battery.percentage <= 10
         {
             nextBitRateFactor *= 0.6
             nextBufferAdjustment -= 0.3
@@ -658,14 +666,14 @@ extension WallpaperModel {
 
     private static func currentBatteryInfo() -> (percentage: Int, onBatteryPower: Bool)? {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-            let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef]
+              let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef]
         else {
             return nil
         }
         for source in sources {
             guard
                 let description = IOPSGetPowerSourceDescription(snapshot, source)?
-                    .takeUnretainedValue() as? [String: Any],
+                .takeUnretainedValue() as? [String: Any],
                 let currentCapacity = description[kIOPSCurrentCapacityKey] as? Int,
                 let maxCapacity = description[kIOPSMaxCapacityKey] as? Int,
                 maxCapacity > 0
@@ -673,7 +681,8 @@ extension WallpaperModel {
                 continue
             }
             let percentage = Int((Double(currentCapacity) / Double(maxCapacity)) * 100)
-            let onBattery = description[kIOPSPowerSourceStateKey] as? String == kIOPSBatteryPowerValue
+            let onBattery = description[kIOPSPowerSourceStateKey] as? String ==
+                kIOPSBatteryPowerValue
             return (percentage, onBattery)
         }
         return nil

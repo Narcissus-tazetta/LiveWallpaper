@@ -265,7 +265,19 @@ extension WallpaperModel {
         item.preferredPeakBitRate = profile.bitRate
         item.preferredForwardBufferDuration = profile.buffer
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
-        let looper = makeWallpaperLooper(player: player, templateItem: item, path: path)
+        // 直前の再生位置を復元するスロットでは「途中からループする」のイントロを
+        // 出さない(復元シークと撃ち合って再生位置が揺れるため。イントロは再生を
+        // 新しく始めるときの演出であって、続きから戻すときのものではない)。
+        let resumeKey = ScreenPathKey(screenID: screenID, path: path)
+        let restoresPosition = dedicatedPlaybackContinuityEnabled
+            && dedicatedResumeTimeByKey[resumeKey] != nil
+        let looper = makeWallpaperLooper(
+            player: player,
+            templateItem: item,
+            path: path,
+            playsIntro: !restoresPosition,
+            context: "dedicated display=\(screenID)"
+        )
         // isActive: false (温存/ウォームスロット)でもここでは play() しない。常時再生
         // しておけばアクティブ昇格時のデコード開始待ちが無くなり体感ラグはほぼ消えるが、
         // 画面に出ていない動画をディスプレイ数×隣接数ぶん常時デコードし続けることになり
@@ -281,9 +293,7 @@ extension WallpaperModel {
             activeDedicatedPathByScreenID[screenID] = path
         }
 
-        if dedicatedPlaybackContinuityEnabled,
-           let remembered = dedicatedResumeTimeByKey[ScreenPathKey(screenID: screenID, path: path)]
-        {
+        if restoresPosition, let remembered = dedicatedResumeTimeByKey[resumeKey] {
             AppLog.continuity.debug(
                 "restore requested display=\(screenID, privacy: .public) seconds=\(remembered.seconds) path=\((path as NSString).lastPathComponent, privacy: .public)"
             )
@@ -304,7 +314,10 @@ extension WallpaperModel {
     /// ウォームキャッシュとして残る場合は一時停止する。これをしないと、旧スロットは
     /// 再生されたまま画面から外れるだけになり、表示されていない動画をデコードし
     /// 続けて CPU/バッテリーを浪費する。
-    private func demotePreviousActiveSlotIfNeeded(forScreenID screenID: String, newActivePath: String) {
+    private func demotePreviousActiveSlotIfNeeded(
+        forScreenID screenID: String,
+        newActivePath: String
+    ) {
         guard let previousPath = activeDedicatedPathByScreenID[screenID],
               previousPath != newActivePath,
               let previousSlot = dedicatedSlotsByScreenID[screenID]?[previousPath]
@@ -367,7 +380,9 @@ extension WallpaperModel {
     /// 「現在」以外の温存スロットだけを破棄する(安全弁が働いたときに使う)。
     func evictDedicatedSlotsOtherThanActive(forScreenID screenID: String) {
         let activePath = activeDedicatedPathByScreenID[screenID]
-        for path in Array((dedicatedSlotsByScreenID[screenID] ?? [:]).keys) where path != activePath {
+        for path in Array((dedicatedSlotsByScreenID[screenID] ?? [:]).keys)
+            where path != activePath
+        {
             evictDedicatedSlot(forScreenID: screenID, path: path)
         }
     }
@@ -392,10 +407,20 @@ extension WallpaperModel {
         }
     }
 
-    func allDedicatedSlotEntries() -> [(screenID: String, path: String, slot: DedicatedPlayerSlot, isActive: Bool)] {
+    func allDedicatedSlotEntries() -> [(
+        screenID: String,
+        path: String,
+        slot: DedicatedPlayerSlot,
+        isActive: Bool
+    )] {
         dedicatedSlotsByScreenID.flatMap { screenID, slots in
             slots.map { path, slot in
-                (screenID: screenID, path: path, slot: slot, isActive: activeDedicatedPathByScreenID[screenID] == path)
+                (
+                    screenID: screenID,
+                    path: path,
+                    slot: slot,
+                    isActive: activeDedicatedPathByScreenID[screenID] == path
+                )
             }
         }
     }
@@ -482,7 +507,12 @@ extension WallpaperModel {
                 guard let self, let player else {
                     return
                 }
-                self.seekDedicatedSlot(player: player, screenID: screenID, path: path, elapsed: elapsed + interval)
+                seekDedicatedSlot(
+                    player: player,
+                    screenID: screenID,
+                    path: path,
+                    elapsed: elapsed + interval
+                )
             }
         }
         guard let item = player.currentItem else {
@@ -499,15 +529,23 @@ extension WallpaperModel {
             retryAfterInterval()
             return
         }
-        guard let requestedTime = dedicatedResumeTimeByKey[ScreenPathKey(screenID: screenID, path: path)] else {
+        guard let requestedTime = dedicatedResumeTimeByKey[ScreenPathKey(
+            screenID: screenID,
+            path: path
+        )] else {
             return
         }
-        let durationSeconds = item.duration.seconds
-        let safeSeconds: Double
-        if durationSeconds.isFinite, durationSeconds > 0.05 {
-            safeSeconds = min(max(requestedTime.seconds, 0), durationSeconds - 0.05)
-        } else {
-            safeSeconds = max(requestedTime.seconds, 0)
+        // トリム編集で切り捨てた領域を指していた記憶位置へは戻さない(戻すと
+        // ループ区間の外へ出てそのフレームで止まる)。clampedResumeSeconds 参照。
+        guard let safeSeconds = clampedResumeSeconds(
+            requestedTime.seconds,
+            path: path,
+            itemDurationSeconds: item.duration.seconds
+        ) else {
+            AppLog.continuity.debug(
+                "restore skipped (outside loop range) display=\(screenID, privacy: .public) seconds=\(requestedTime.seconds) path=\((path as NSString).lastPathComponent, privacy: .public)"
+            )
+            return
         }
         let safeTime = CMTime(
             seconds: safeSeconds,
@@ -523,21 +561,29 @@ extension WallpaperModel {
     /// 今この画面を支配しているのが Space かディスプレイ別固定かを判定し、現在の
     /// パスと隣接候補パス(最大2つ)を返す。どちらでもなければ nil(専用プレイヤー
     /// 自体が不要 = 共有プレイヤー管轄)。
-    private func dedicatedWarmWindowContext(forScreenID screenID: String) -> (current: String, neighbors: [String])? {
+    private func dedicatedWarmWindowContext(forScreenID screenID: String)
+        -> (current: String, neighbors: [String])?
+    {
         if spaceWallpaperFeatureEnabled, isSpaceWallpaperAvailable,
            let spaceUUID = currentSpaceUUIDByDisplayID[screenID],
            let currentPath = videoBySpaceUUID[spaceUUID],
            FileManager.default.fileExists(atPath: currentPath)
         {
             let order = orderedSpaceUUIDsByDisplayID[screenID] ?? []
-            let (left, right) = DedicatedPlayerWarmWindow.neighbors(current: spaceUUID, order: order)
+            let (left, right) = DedicatedPlayerWarmWindow.neighbors(
+                current: spaceUUID,
+                order: order
+            )
             let neighborPaths = [left, right].compactMap { $0.flatMap { videoBySpaceUUID[$0] } }
             return (currentPath, neighborPaths)
         }
         if let currentPath = videoOverrideByScreenID[screenID] {
             let order = screenVideoPaths(forScreenID: screenID)
-            let (left, right) = DedicatedPlayerWarmWindow.neighbors(current: currentPath, order: order)
-            return (currentPath, [left, right].compactMap { $0 })
+            let (left, right) = DedicatedPlayerWarmWindow.neighbors(
+                current: currentPath,
+                order: order
+            )
+            return (currentPath, [left, right].compactMap(\.self))
         }
         return nil
     }
