@@ -1,6 +1,13 @@
 import SwiftUI
 
 extension SettingsView {
+  static let updateSearchKeywords: [String] = [
+    "アップデート",
+    "アップデートを自動で確認する（起動時にも通知）",
+    "今すぐ確認",
+    "手動ダウンロード",
+  ]
+
   var updateSettingsSection: some View {
     Section(
       header: Label(

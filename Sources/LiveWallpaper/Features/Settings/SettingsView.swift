@@ -23,11 +23,32 @@ struct SettingsView: View {
     /// 無視するだけだと選択が残り、機能を戻した瞬間に古いスコープへ復帰する。
     @State var selectedScope: WallpaperScope = .shared
     @StateObject var fitEditor: FitEditorController
+    @StateObject var wallpaperEditor: WallpaperEditorController
+    @StateObject var storeCatalog: StoreCatalogController
+    @StateObject var storeMySubmissions: StoreMySubmissionsController
+    @StateObject var remoteThumbnailCache: RemoteThumbnailCache
+    @State var editorSubMode: EditorSubMode = .fit
     @State var isResetSettingsDialogPresented: Bool = false
     @State var librarySearchText: String = ""
     @State var isWallpaperShareSheetPresented: Bool = false
+    @State var isStoreSharePickerPresented: Bool = false
+    @State var isStoreShareSheetPresented: Bool = false
+    @State var storeTabMode: StoreTabMode = .browse
+    /// Storeへの共有シートが対象にしている動画。共有シートはトリム編集タブの選択状態
+    /// (wallpaperEditor.selectedVideoPath)には依存しない — 右クリックメニューや
+    /// Storeタブのピッカーなど、編集タブを開かずに共有を始めた場合でも、選んだ動画を
+    /// 誤りなく送るため専用の状態として保持する。
+    @State var storeShareTargetPath: String?
+    @State var storeShareTitle: String = ""
+    @State var storeShareAuthor: String = ""
+    @State var storeShareLicense: String = ""
+    @State var storeShareStatus: StoreShareStatus = .idle
     @State var isSuspendExclusionAppPickerPresented: Bool = false
     @State var suspendExclusionAppPickerSearchText: String = ""
+    @State var storeReportTargetEntry: StoreEntry?
+    /// 取り下げ確認ダイアログを出している「自分の投稿」。誤タップでの即時取り下げを
+    /// 防ぐため、ゴミ箱ボタンでは即実行せずここに立ててからダイアログで確定させる。
+    @State var storeWithdrawTargetSubmission: StoreMySubmission?
     @State var currentWallpaperPreviewThumbnailPath: String?
     @State var currentLockScreenPreviewThumbnailPath: String?
     @State var webURLInput: String = ""
@@ -38,9 +59,11 @@ struct SettingsView: View {
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
     @FocusState var focusedWebWallpaperID: UUID?
-    @State var isLibrarySearchFocused: Bool = false
+    @FocusState var isLibrarySearchFocused: Bool
     @State var settingsSearchText: String = ""
-    @State var isSettingsSearchFocused: Bool = false
+    @FocusState var isSettingsSearchFocused: Bool
+    @FocusState var isStoreSearchFocused: Bool
+    @FocusState var isSuspendExclusionSearchFocused: Bool
     /// スケジュールのターゲット壁紙ピッカーを開いている対象(ルールIDまたは簡易UIの
     /// 固定キー)。nil ならどのポップオーバーも表示しない。
     @State var scheduleTargetPickerContext: ScheduleTargetPickerContext?
@@ -63,6 +86,10 @@ struct SettingsView: View {
         _thumbnailCache = StateObject(wrappedValue: DiskThumbnailCache())
         _webThumbnailStore = StateObject(wrappedValue: WebWallpaperThumbnailStore())
         _fitEditor = StateObject(wrappedValue: FitEditorController(model: model))
+        _wallpaperEditor = StateObject(wrappedValue: WallpaperEditorController(model: model))
+        _storeCatalog = StateObject(wrappedValue: StoreCatalogController())
+        _storeMySubmissions = StateObject(wrappedValue: StoreMySubmissionsController())
+        _remoteThumbnailCache = StateObject(wrappedValue: RemoteThumbnailCache())
     }
 
     func wallpaperGridLayout(for availableWidth: CGFloat) -> ([GridItem], CGFloat) {
@@ -207,8 +234,10 @@ struct SettingsView: View {
                 }
                 if tab == .wallpaperFit {
                     fitEditor.activate()
+                    wallpaperEditor.activate()
                 } else {
                     fitEditor.deactivate()
+                    wallpaperEditor.deactivate()
                 }
             }
             .onChange(of: model.lockScreenVideoPath) { _ in
@@ -217,6 +246,7 @@ struct SettingsView: View {
             .onChange(of: model.currentVideoPath) { _ in
                 requestCurrentWallpaperThumbnailIfNeeded()
                 fitEditor.handleCurrentVideoPathChange()
+                wallpaperEditor.handleCurrentVideoPathChange()
             }
             .onChange(of: model.currentWebWallpaperID) { _ in
                 if let source = model.activeWebWallpaperSource {
@@ -237,12 +267,14 @@ struct SettingsView: View {
                 processThumbnailQueue()
                 if selectedTab == .wallpaperFit {
                     fitEditor.activate()
+                    wallpaperEditor.activate()
                 }
             }
             .onDisappear {
                 releaseCurrentWallpaperThumbnailVisibility()
                 releaseLockScreenWallpaperThumbnailVisibility()
                 fitEditor.deactivate()
+                wallpaperEditor.deactivate()
             }
     }
 
@@ -250,6 +282,12 @@ struct SettingsView: View {
         view
             .sheet(isPresented: $isWallpaperShareSheetPresented) {
                 shareWallpaperPickerSheet
+            }
+            .sheet(isPresented: $isStoreSharePickerPresented) {
+                storeSharePickerSheet
+            }
+            .sheet(isPresented: $isStoreShareSheetPresented) {
+                storeShareSheet
             }
             .confirmationDialog(
                 model.localizedString("設定を初期化"),
@@ -264,6 +302,60 @@ struct SettingsView: View {
             } message: {
                 Text(model.localizedString("表示・再生に関する設定を初期値へ戻します"))
             }
+            .confirmationDialog(
+                model.localizedString("この動画を通報"),
+                isPresented: Binding(
+                    get: { storeReportTargetEntry != nil },
+                    set: { if !$0 { storeReportTargetEntry = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                ForEach(StoreReportReason.allCases) { reason in
+                    Button(model.localizedString(reason.localizationKey)) {
+                        if let entry = storeReportTargetEntry {
+                            Task {
+                                await storeCatalog.report(entry: entry, reason: reason.localizationKey)
+                            }
+                        }
+                        storeReportTargetEntry = nil
+                    }
+                }
+                Button(model.localizedString("キャンセル"), role: .cancel) {
+                    storeReportTargetEntry = nil
+                }
+            } message: {
+                if let entry = storeReportTargetEntry {
+                    Text(entry.title)
+                } else {
+                    Text(model.localizedString("通報の理由を選択してください"))
+                }
+            }
+            .confirmationDialog(
+                model.localizedString("投稿を取り下げますか?"),
+                isPresented: Binding(
+                    get: { storeWithdrawTargetSubmission != nil },
+                    set: { if !$0 { storeWithdrawTargetSubmission = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button(model.localizedString("取り下げる"), role: .destructive) {
+                    if let submission = storeWithdrawTargetSubmission {
+                        Task {
+                            await storeMySubmissions.withdraw(id: submission.id)
+                        }
+                    }
+                    storeWithdrawTargetSubmission = nil
+                }
+                Button(model.localizedString("キャンセル"), role: .cancel) {
+                    storeWithdrawTargetSubmission = nil
+                }
+            } message: {
+                if let submission = storeWithdrawTargetSubmission {
+                    Text(submission.title)
+                } else {
+                    Text(model.localizedString("この操作は取り消せません"))
+                }
+            }
     }
 
     private var tabBarSection: some View {
@@ -276,8 +368,13 @@ struct SettingsView: View {
                 )
                 tabButton(
                     .wallpaperFit,
-                    title: model.localizedString("配置"),
+                    title: model.localizedString("編集"),
                     systemImage: "viewfinder"
+                )
+                tabButton(
+                    .store,
+                    title: model.localizedString("Store"),
+                    systemImage: "square.grid.2x2.fill"
                 )
                 tabButton(
                     .settings,
@@ -285,10 +382,6 @@ struct SettingsView: View {
                     systemImage: "gearshape"
                 )
                 Spacer(minLength: 0)
-
-                if selectedTab == .settings {
-                    settingsSearchField
-                }
             }
             .padding(8)
             .frame(minHeight: 72)
@@ -315,15 +408,46 @@ struct SettingsView: View {
                         wallpaperScheduleCard
                     }
                 }
+                .background(
+                    Button("") { isLibrarySearchFocused = true }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .hidden()
+                )
             }
         case .wallpaperFit:
-            WallpaperFitTabView(title: model.localizedString("配置")) {
-                wallpaperFitEditorPanel
+            WallpaperFitTabView(title: model.localizedString("編集")) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Picker("", selection: $editorSubMode) {
+                        Text(model.localizedString("フィット編集")).tag(EditorSubMode.fit)
+                        Text(model.localizedString("トリム編集")).tag(EditorSubMode.trim)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+
+                    switch editorSubMode {
+                    case .fit:
+                        wallpaperFitEditorPanel
+                    case .trim:
+                        wallpaperTrimEditorPanel
+                    }
+                }
             } library: {
                 wallpaperFitLibraryPanel
             }
+        case .store:
+            WallpaperTabView(title: model.localizedString("Store")) {
+                storeTabContent
+            }
         case .settings:
             SettingsTabView {
+                Section {
+                    settingsSearchField
+                        .background(
+                            Button("") { isSettingsSearchFocused = true }
+                                .keyboardShortcut("f", modifiers: .command)
+                                .hidden()
+                        )
+                }
                 Group {
                     if let message = model.persistenceFailureMessage {
                         Section {
@@ -335,15 +459,19 @@ struct SettingsView: View {
                     }
                     if settingsSectionMatches(.video) {
                         videoSettingsSection
+                        settingsSectionMatchHint(.video)
                     }
                     if settingsSectionMatches(.share) {
                         shareSettingsSection
+                        settingsSectionMatchHint(.share)
                     }
                     if settingsSectionMatches(.webWallpaper) {
                         webWallpaperSettingsSection
+                        settingsSectionMatchHint(.webWallpaper)
                     }
                     if settingsSectionMatches(.display) {
                         displaySettingsSection
+                        settingsSectionMatchHint(.display)
                     }
                     // スケジュール本体は壁紙タブへ移動済み。検索でヒットしたとき
                     // だけ案内行を出す(非検索時は何も出さない)。
@@ -355,28 +483,39 @@ struct SettingsView: View {
                     }
                     if settingsSectionMatches(.language) {
                         languageSettingsSection
+                        settingsSectionMatchHint(.language)
                     }
                     if settingsSectionMatches(.cache) {
                         cacheSettingsSection
+                        settingsSectionMatchHint(.cache)
                     }
                 }
                 Group {
                     if settingsSectionMatches(.reset) {
                         resetSettingsSection
+                        settingsSectionMatchHint(.reset)
                     }
                     if settingsSectionMatches(.update) {
                         updateSettingsSection
+                        settingsSectionMatchHint(.update)
                     }
                     if isSettingsSearchActive, !anySettingsSectionMatches {
                         Section {
-                            Text(model.localizedString("該当する設定がありません"))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            SearchEmptyState(
+                                isSearchActive: true,
+                                noContentText: "",
+                                noMatchText: model.localizedString("該当する設定がありません"),
+                                clearButtonTitle: model.localizedString("検索をクリア"),
+                                onClearSearch: { settingsSearchText = ""; isSettingsSearchFocused = true }
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 }
             }
+            #if DEBUG
+            .onAppear { SettingsView.assertAllSettingsSectionsHaveSearchKeywords() }
+            #endif
         }
     }
 

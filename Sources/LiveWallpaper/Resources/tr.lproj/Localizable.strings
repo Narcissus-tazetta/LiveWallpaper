@@ -102,6 +102,7 @@
 "次へ" = "Sonraki";
 "このプレイリストに動画がありません" = "Bu oynatma listesinde video yok.";
 "まず壁紙を追加すると、ここで配置を調整できます" = "Önce bir duvar kağıdı ekleyin, ardından düzeni burada ayarlayabilirsiniz.";
+"編集" = "Düzenle";
 "フィット編集" = "Sığdırma Düzenleme";
 "保存して再適用" = "Kaydet ve yeniden uygula";
 "この画面ではプレビューのみ更新されます。『保存して再適用』で壁紙に反映されます" = "Bu ekran yalnızca önizlemeyi günceller. Duvar kağıdına uygulamak için \"Kaydet ve yeniden uygula\"yı kullanın.";
@@ -195,10 +196,32 @@
 "新規プレイリストを作成して追加" = "Yeni oynatma listesi oluştur ve ekle";
 "共有" = "Paylaş";
 "共有…" = "Paylaş…";
+"Storeに共有…" = "Store'a paylaş…";
+"Storeに共有" = "Store'a paylaş";
+"動画を共有" = "Video paylaş";
+"Storeに共有する壁紙を選択" = "Store'a paylaşılacak duvar kağıdını seç";
+"保存済みのトリム・フィット設定と一緒に、選んだ動画をコミュニティStoreに送信します(公開には審査が必要です)" = "Seçilen videoyu, kaydedilmiş kırpma ve sığdırma ayarlarıyla birlikte inceleme için topluluk Store'una gönderir.";
+"この動画(トリム/ループ設定を含む)をコミュニティStoreに送信します(公開には審査が必要です)" = "Bu videoyu (kırpma/döngü ayarları dahil) yayınlanmadan önce inceleme için topluluk Store'una gönderir.";
+"タイトル" = "Başlık";
+"作者名" = "Yazar adı";
+"ライセンス(任意、例: CC-BY-4.0)" = "Lisans (isteğe bağlı, örn. CC-BY-4.0)";
+"アップロード中…" = "Yükleniyor…";
+"公開しました" = "Yayınlandı";
+"申請しました。審査状況は「自分の投稿」から確認できます" = "Gönderildi. İnceleme durumunu \"Gönderilerim\" bölümünden kontrol edebilirsiniz.";
+"送信する" = "Gönder";
+"Store" = "Store";
+"まだ公開されている壁紙がありません" = "Henüz yayınlanmış duvar kağıdı yok.";
+"トリム編集" = "Kırpma Düzenleyici";
+"下の壁紙一覧から動画を選択すると、カットとループ開始位置を編集できます" = "Kesme ve döngü başlangıç noktasını düzenlemek için aşağıdaki kitaplıktan bir video seçin.";
+"途中からループする" = "Belirli bir noktadan döngüye başla";
+"オレンジのハンドルでループの開始位置を指定できます。オフのときはカット開始位置からループします" = "Döngü başlangıç noktasını turuncu tutamaçla belirleyebilirsiniz. Kapalıyken döngü, kesme başlangıç noktasından başlar.";
+"カット・ループ範囲を初期値に戻します（保存するまで壁紙には反映されません）" = "Kesme ve döngü aralığını varsayılana sıfırlar (kaydedilene kadar duvar kağıdına uygulanmaz).";
+"この動画のカット・ループ設定を削除して、全体再生に戻します" = "Bu videonun kesme ve döngü ayarlarını kaldırır ve videoyu tamamen oynatır.";
 "共有に失敗しました" = "Paylaşım başarısız";
 "プレビューなし" = "Önizleme yok";
 "壁紙設定" = "Duvar kağıdı ayarları";
 "追加" = "Ekle";
+"追加しました" = "Eklendi";
 "LiveWallpaper" = "LiveWallpaper";
 "現在の壁紙プレビュー" = "Geçerli duvar kağıdı önizlemesi";
 "設定を初期化" = "Ayarları sıfırla";
@@ -412,3 +435,53 @@
 "集中モードで壁紙を切り替える" = "Duvar kağıdını Odak modlarıyla değiştir";
 "オフの間は、集中モードによる壁紙の切り替えを行いません。" = "Kapalıyken Odak modları duvar kağıdını değiştirmez.";
 "集中モードとの連携は「壁紙」タブにあります" = "Odak Modu entegrasyonu Duvar Kâğıdı sekmesinde";
+
+// Store共有エラー
+"(詳細: %@)" = "(Ayrıntı: %@)";
+"Storeサーバーから不正な応答が返されました。しばらくしてから再度お試しください" = "Store sunucusu geçersiz bir yanıt döndürdü. Lütfen daha sonra tekrar deneyin";
+"ダウンロードしたファイルの検証に失敗しました。もう一度お試しください" = "İndirilen dosya doğrulanamadı. Lütfen tekrar deneyin";
+"ファイルサイズが大きすぎます(%@ / 上限%@)" = "Dosya çok büyük (%@ / sınır %@)";
+"入力内容に問題があります。タイトルや作者名を確認してください" = "Girdiğiniz bilgilerde bir sorun var. Lütfen başlığı ve yazar adını kontrol edin";
+"アップロードした動画がStore上で見つかりませんでした。もう一度お試しください" = "Yüklenen video Store'da bulunamadı. Lütfen tekrar deneyin";
+"アップロード中にデータの不整合が起きました。もう一度お試しください" = "Yükleme sırasında bir veri tutarsızlığı oluştu. Lütfen tekrar deneyin";
+"アップロードデータの送信に失敗しました。もう一度お試しください" = "Yükleme verisi gönderilemedi. Lütfen tekrar deneyin";
+"アクセスが集中しています。しばらく待ってから再度お試しください" = "Şu anda yoğun talep var. Lütfen bekleyip tekrar deneyin";
+"Storeサーバーで問題が発生しています。しばらくしてから再度お試しください" = "Store sunucusunda bir sorun var. Lütfen daha sonra tekrar deneyin";
+"Storeへのリクエストに失敗しました" = "Store isteği başarısız oldu";
+
+// Store bildirme
+"この動画を通報" = "Bu videoyu bildir";
+"通報の理由を選択してください" = "Bildirme nedenini seçin";
+"不適切なコンテンツ" = "Uygunsuz içerik";
+"著作権侵害の疑い" = "Telif hakkı ihlali şüphesi";
+"スパムまたは無関係なコンテンツ" = "Spam veya alakasız içerik";
+"通報しました。ご協力ありがとうございます" = "Bildirildi. Yardımınız için teşekkürler";
+"通報に失敗しました。もう一度お試しください" = "Bildirme başarısız oldu. Lütfen tekrar deneyin";
+"ダウンロードURLが不正です" = "Geçersiz indirme URL'si";
+"通報済み" = "Zaten bildirildi";
+
+// Store: gönderilerim, arama ve sıralama
+"みんなの投稿" = "Gözat";
+"自分の投稿" = "Gönderilerim";
+"タイトルで検索" = "Başlığa göre ara";
+"新着順" = "En Yeni";
+"人気順" = "Popüler";
+"まだ投稿がありません" = "Henüz gönderi yok";
+"リストから削除(投稿自体は削除されません)" = "Listeden kaldır (gönderinin kendisini silmez)";
+"審査中" = "İncelemede";
+"公開済み" = "Yayınlandı";
+"却下されました" = "Reddedildi";
+"ステータスの取得に失敗しました。しばらくしてから再度お試しください" = "Durum alınamadı. Lütfen daha sonra tekrar deneyin";
+"投稿を取り下げますか?" = "Bu gönderiyi geri çekmek istiyor musunuz?";
+"取り下げる" = "Geri Çek";
+"この操作は取り消せません" = "Bu işlem geri alınamaz";
+"この投稿は取り下げに対応していません。リストから削除のみ行えます" = "Bu gönderi geri çekmeyi desteklemiyor. Yalnızca listeden kaldırabilirsiniz";
+"取り下げに失敗しました。もう一度お試しください" = "Geri çekilemedi. Lütfen tekrar deneyin";
+
+// 検索バーUX改善(共通コンポーネント化)
+"タイトルや名前で壁紙を検索" = "Başlığa veya ada göre duvar kağıdı ara";
+"検索をクリア" = "Aramayı temizle";
+"検索条件に一致する壁紙がありません" = "Aramanızla eşleşen duvar kağıdı yok";
+"アプリ名で検索" = "Uygulama adına göre ara";
+"除外できるアプリがありません" = "Hariç tutulabilecek uygulama yok";
+"一致" = "Eşleşme";

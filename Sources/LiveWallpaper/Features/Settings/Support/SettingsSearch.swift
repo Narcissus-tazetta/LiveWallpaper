@@ -17,110 +17,28 @@ extension SettingsView {
         case update
     }
 
-    private static let settingsSectionKeywords: [SettingsSection: [String]] = [
-        .video: [
-            "動画",
-            "メディアを追加",
-            "GIF",
-            "WebP",
-            "APNG",
-            "アニメ画像",
-            "クリック貫通を有効にする",
-            "ログイン時に自動起動する",
-            "音声を再生する",
-            "音量"
-        ],
-        .share: [
-            "共有",
-            "高度な共有を有効にする",
-            ".lwpkg"
-        ],
-        .webWallpaper: [
-            "Web壁紙",
-            "Web壁紙機能を有効にする",
-            "URL"
-        ],
-        .display: [
-            "表示",
-            "デスクトップ切り替え",
-            "パフォーマンス・省電力",
-            "メニューバー",
-            "壁紙の表示先",
-            "メインのみ",
-            "全ディスプレイ",
-            "動画のフィット",
-            "デスクトップの見やすさ",
-            "デスクトップのアイコンを表示",
-            "再生の軽量モード（省電力）",
-            "作業中は壁紙の再生を自動停止",
-            "ほかのアプリを使っている間は再生を停止",
-            "画面がほぼ隠れたら停止（高精度）",
-            "再生を止めないアプリ",
-            "自動停止しないディスプレイ",
-            "デスクトップ（Space）ごとに壁紙を切り替える",
-            "メニューバーにデスクトップ番号を表示",
-            "デスクトップ・画面切替時に再生位置を記憶する",
-            "Space",
-            "Mission Control",
-            "メニューバーを不透明にする",
-            "詳細設定",
-            "画質",
-            "動作プロファイル",
-            "再生負荷",
-            "デコード",
-            "デスクトップレベル",
-            "環境に応じて再生負荷を自動調整",
-            "バッテリー残量に応じて画質を自動調整",
-            "fullScreenAuxiliary を有効化"
-        ],
+    /// キーワードの実体は各セクションのファイル(VideoSection.swift の `videoSearchKeywords` 等)
+    /// に、そのセクションが描く行ラベルと同居させている。ここは種類ごとに参照するだけの
+    /// 薄いディスパッチ ― ラベル文言を編集する人とキーワードを編集する人を同じファイル・
+    /// 同じスクロール範囲に強制的に同居させ、変更漏れに気付きやすくするため。
+    private static func searchKeywords(for section: SettingsSection) -> [String] {
+        switch section {
+        case .video: return videoSearchKeywords
+        case .share: return shareSearchKeywords
+        case .webWallpaper: return webWallpaperSearchKeywords
+        case .display: return displaySearchKeywords
         // スケジュール本体は壁紙タブに住んでいる。ここでヒットしても設定タブには
         // セクションを描かず、壁紙タブへ飛ぶ案内行(scheduleSearchRedirectSection)を出す。
-        .schedule: [
-            "スケジュール",
-            "システムの外観設定に従う",
-            "ライトモード用の壁紙",
-            "ダークモード用の壁紙",
-            "曜日スケジュール",
-            "ルールを追加",
-            "終日",
-            "毎日",
-            "適用中",
-            "複製"
-        ],
+        case .schedule: return scheduleSearchKeywords
         // 集中モードカード本体も壁紙タブに住んでいる。scheduleと同じ理由で
         // 案内行(focusFilterSearchRedirectSection)を出す。
-        .focusFilter: [
-            "集中モード",
-            "集中モードで壁紙を切り替える",
-            "集中モードごとに表示する壁紙を選べます。",
-            "フルディスクアクセス",
-            "おやすみモード",
-            "Focus"
-        ],
-        .language: [
-            "言語",
-            "アプリの言語"
-        ],
-        .cache: [
-            "キャッシュ",
-            "保存先を開く",
-            "キャッシュ削除"
-        ],
-        .reset: [
-            "設定の管理",
-            "再生をリフレッシュ",
-            "設定をリセット",
-            "設定を書き出す…",
-            "設定を読み込む…",
-            "バックアップ"
-        ],
-        .update: [
-            "アップデート",
-            "アップデートを自動で確認する（起動時にも通知）",
-            "今すぐ確認",
-            "手動ダウンロード"
-        ]
-    ]
+        case .focusFilter: return focusFilterSearchKeywords
+        case .language: return languageSearchKeywords
+        case .cache: return cacheSearchKeywords
+        case .reset: return resetSearchKeywords
+        case .update: return updateSearchKeywords
+        }
+    }
 
     private var trimmedSettingsSearchQuery: String {
         settingsSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -130,63 +48,60 @@ extension SettingsView {
         !trimmedSettingsSearchQuery.isEmpty
     }
 
-    func settingsSectionMatches(_ section: SettingsSection) -> Bool {
+    /// 一致したかどうかに加え、どのキーワードで一致したかも返す。一致理由をUIに出すことで、
+    /// セクション丸ごと表示という粗い粒度でも「なぜこのセクションが出てきたか」が分かるようにする。
+    func settingsSectionMatch(_ section: SettingsSection) -> (matches: Bool, matchedKeyword: String?) {
         let query = trimmedSettingsSearchQuery
         guard !query.isEmpty else {
-            return true
+            return (true, nil)
         }
-        guard let keywords = Self.settingsSectionKeywords[section] else {
-            return true
-        }
-        return keywords.contains { keyword in
+        let keywords = Self.searchKeywords(for: section)
+        let matched = keywords.first { keyword in
             keyword.localizedCaseInsensitiveContains(query)
                 || model.localizedString(keyword).localizedCaseInsensitiveContains(query)
         }
+        return (matched != nil, matched)
+    }
+
+    func settingsSectionMatches(_ section: SettingsSection) -> Bool {
+        settingsSectionMatch(section).matches
     }
 
     var anySettingsSectionMatches: Bool {
         SettingsSection.allCases.contains { settingsSectionMatches($0) }
     }
 
-    var settingsSearchField: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "magnifyingglass")
-                .font(.caption)
+    /// セクション見出し直下に小さく出す「この検索語に一致した理由」。非検索時や
+    /// 一致キーワードがない場合(空クエリ時など)は何も表示しない。
+    @ViewBuilder
+    func settingsSectionMatchHint(_ section: SettingsSection) -> some View {
+        if isSettingsSearchActive, let keyword = settingsSectionMatch(section).matchedKeyword {
+            Text("\(model.localizedString("一致")): \(model.localizedString(keyword))")
+                .font(.caption2)
                 .foregroundColor(.secondary)
-                .onTapGesture {
-                    isSettingsSearchFocused = true
-                }
-            LibrarySearchField(
-                text: $settingsSearchText,
-                placeholder: model.localizedString("設定を検索"),
-                isFocused: $isSettingsSearchFocused
-            )
-            .frame(width: 170)
-            Button {
-                settingsSearchText = ""
-                isSettingsSearchFocused = true
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
-            .opacity(settingsSearchText.isEmpty ? 0 : 1)
-            .disabled(settingsSearchText.isEmpty)
-            .allowsHitTesting(!settingsSearchText.isEmpty)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.secondary.opacity(0.12))
+    }
+
+    var settingsSearchField: some View {
+        SearchField(
+            placeholder: model.localizedString("設定を検索"),
+            text: $settingsSearchText,
+            isFocused: $isSettingsSearchFocused
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(
-                    isSettingsSearchFocused ? Color.accentColor : Color.clear,
-                    lineWidth: 1.5
-                )
-        )
+        .frame(minWidth: 120, maxWidth: .infinity)
     }
 }
+
+#if DEBUG
+extension SettingsView {
+    /// 新セクション追加時にキーワード登録を丸ごと忘れるケースを検出する軽量チェック。
+    static func assertAllSettingsSectionsHaveSearchKeywords() {
+        for section in SettingsSection.allCases {
+            assert(
+                !searchKeywords(for: section).isEmpty,
+                "SettingsSection.\(section) has no search keywords registered"
+            )
+        }
+    }
+}
+#endif

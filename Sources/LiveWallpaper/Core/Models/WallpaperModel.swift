@@ -8,6 +8,7 @@ import Darwin
 final class WallpaperModel: ObservableObject {
     private let maxPlaylistCount: Int = 10
     let wallpaperPresentationStorageKey: String = "wallpaperPresentationByPath"
+    let wallpaperEditStorageKey: String = "wallpaperEditByPath"
 
     struct ScreenSignature: Equatable {
         let displayID: UInt32
@@ -178,6 +179,8 @@ final class WallpaperModel: ObservableObject {
     @Published var lockScreenSyncStatus: LockScreenSyncStatus = .disabled
     @Published var wallpaperPresentationByPath:
         [String: [String: WallpaperPresentation]] = [:]
+    /// 動画パス → トリム/ループ編集。画面ごとではなく動画ファイルごとの性質なのでパスのみでキーする。
+    @Published var wallpaperEditByPath: [String: WallpaperEditMetadata] = [:]
     /// 画面ID → その画面に固定表示する動画パス。空ならオーバーライドなし。
     @Published var videoOverrideByScreenID: [String: String] = [:]
     /// 自動停止(作業中の停止など)の対象から除外する画面ID。ここに含まれる画面は

@@ -12,6 +12,8 @@ struct PackageManifest: Codable {
         let author: String
         let createdAt: String
         let description: String
+        /// 投稿者が意図するライセンス表記(例: "CC-BY-4.0")。nil = 著作権者に一任。
+        var license: String?
     }
 
     struct PackageVideo: Codable {
@@ -21,6 +23,12 @@ struct PackageManifest: Codable {
         let sha256: String?
         let thumbnail: String?
         let presentations: [String: ScreenPresentation]
+        /// 非破壊のトリム/ループ編集。既存(1.0)パッケージにはキー自体が無く nil になる。
+        var edit: EditMetadata?
+        /// 動画の長さ(秒)。ダウンロード前のStoreカタログ表示や編集範囲の検証に使う。
+        var duration: Double?
+        /// 音声トラックの有無。ダウンロード後の音声デフォルト挙動の判断材料。
+        var hasAudio: Bool?
 
         struct VideoSource: Codable {
             let fileName: String
@@ -32,6 +40,12 @@ struct PackageManifest: Codable {
             let zoom: Double
             let offsetX: Double
             let offsetY: Double
+        }
+
+        struct EditMetadata: Codable {
+            let trimStart: Double
+            let trimEnd: Double?
+            let loopStart: Double?
         }
     }
 

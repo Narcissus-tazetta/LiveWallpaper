@@ -1,6 +1,19 @@
 import SwiftUI
 
 extension SettingsView {
+  static let videoSearchKeywords: [String] = [
+    "動画",
+    "メディアを追加",
+    "GIF",
+    "WebP",
+    "APNG",
+    "アニメ画像",
+    "クリック貫通を有効にする",
+    "ログイン時に自動起動する",
+    "音声を再生する",
+    "音量",
+  ]
+
   var videoSettingsSection: some View {
     Section(header: Label(model.localizedString("動画"), systemImage: "film")) {
       Toggle(model.localizedString("クリック貫通を有効にする"), isOn: clickThroughBinding)

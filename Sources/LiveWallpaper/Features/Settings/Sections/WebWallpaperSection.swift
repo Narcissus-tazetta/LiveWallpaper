@@ -1,6 +1,12 @@
 import SwiftUI
 
 extension SettingsView {
+    static let webWallpaperSearchKeywords: [String] = [
+        "Web壁紙",
+        "Web壁紙機能を有効にする",
+        "URL",
+    ]
+
     var webWallpaperSettingsSection: some View {
         Section(header: Label(model.localizedString("Web壁紙"), systemImage: "globe")) {
             Toggle(

@@ -2,6 +2,15 @@ import AppKit
 import SwiftUI
 
 extension SettingsView {
+    static let focusFilterSearchKeywords: [String] = [
+        "集中モード",
+        "集中モードで壁紙を切り替える",
+        "集中モードごとに表示する壁紙を選べます。",
+        "フルディスクアクセス",
+        "おやすみモード",
+        "Focus",
+    ]
+
     /// 壁紙タブの一覧ペインの下・スケジュールカードの上に置く、集中モード連携カード。
     ///
     /// このMacの集中モード一覧(FocusModeMonitor がDoNotDisturb DBから読む)を表示し、

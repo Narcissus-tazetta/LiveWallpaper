@@ -87,6 +87,30 @@ final class PackageImporter {
                         screenID: screenId
                     )
                 }
+
+                if let edit = video.edit {
+                    let metadata = WallpaperEditMetadata(
+                        trimStart: edit.trimStart,
+                        trimEnd: edit.trimEnd,
+                        loopStart: edit.loopStart
+                    )
+                    // assetDuration: nil -> 尺に依存しないチェック(trimEnd<=trimStart、
+                    // ループ開始位置の順序など)のみ行う。パッケージは他人の環境で
+                    // 作られたものであり得るため、ここで弾かないと不正な値が
+                    // そのまま再生パスのCMTimeRangeへ渡ってしまう。
+                    if metadata.isValid(assetDuration: nil) {
+                        model.setWallpaperEdit(
+                            trimStart: edit.trimStart,
+                            trimEnd: edit.trimEnd,
+                            loopStart: edit.loopStart,
+                            path: videoPath
+                        )
+                    } else {
+                        AppLog.persistence.error(
+                            "skipped invalid edit metadata for imported video id=\(video.id, privacy: .public)"
+                        )
+                    }
+                }
             }
         }
 
@@ -163,8 +187,10 @@ final class PackageImporter {
         }
     }
 
-    private func validateManifest(_ manifest: PackageManifest) throws {
-        guard manifest.version == "1.0" else {
+    static let supportedVersions: Set<String> = ["1.0", "1.1"]
+
+    func validateManifest(_ manifest: PackageManifest) throws {
+        guard Self.supportedVersions.contains(manifest.version) else {
             throw ImportError.unsupportedPackageVersion
         }
     }

@@ -176,6 +176,14 @@ extension WallpaperModel {
         {
             wallpaperPresentationByPath = decoded.filter { allPaths.contains($0.key) }
         }
+        if let editData = UserDefaults.standard.data(forKey: wallpaperEditStorageKey),
+           let decodedEdits = try? JSONDecoder().decode(
+               [String: WallpaperEditMetadata].self,
+               from: editData
+           )
+        {
+            wallpaperEditByPath = decodedEdits.filter { allPaths.contains($0.key) }
+        }
         persistPlaylistStateImmediately()
     }
 
@@ -249,6 +257,19 @@ extension WallpaperModel {
     }
 
     func persistWallpaperPresentationState() {
+        schedulePersistedStateFlush()
+    }
+
+    func pruneWallpaperEditsForExistingPaths() {
+        let validPaths = Set(libraryVideoPaths)
+        let pruned = wallpaperEditByPath.filter { validPaths.contains($0.key) }
+        if pruned != wallpaperEditByPath {
+            wallpaperEditByPath = pruned
+            persistWallpaperEditState()
+        }
+    }
+
+    func persistWallpaperEditState() {
         schedulePersistedStateFlush()
     }
 

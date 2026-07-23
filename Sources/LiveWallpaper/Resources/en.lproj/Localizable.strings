@@ -95,6 +95,27 @@
 "現在の壁紙プレビュー" = "Current wallpaper preview";
 "共有" = "Share";
 "共有…" = "Share…";
+"Storeに共有…" = "Share to Store…";
+"Storeに共有" = "Share to Store";
+"動画を共有" = "Share a Video";
+"Storeに共有する壁紙を選択" = "Choose a wallpaper to share to the Store";
+"保存済みのトリム・フィット設定と一緒に、選んだ動画をコミュニティStoreに送信します(公開には審査が必要です)" = "Submits the selected video to the community Store for review, including its saved trim and fit settings.";
+"この動画(トリム/ループ設定を含む)をコミュニティStoreに送信します(公開には審査が必要です)" = "Submits this video (including its trim/loop settings) to the community Store for review before publishing.";
+"タイトル" = "Title";
+"作者名" = "Author";
+"ライセンス(任意、例: CC-BY-4.0)" = "License (optional, e.g. CC-BY-4.0)";
+"アップロード中…" = "Uploading…";
+"公開しました" = "Published";
+"申請しました。審査状況は「自分の投稿」から確認できます" = "Submitted. You can check the review status from \"My Submissions\".";
+"送信する" = "Submit";
+"Store" = "Store";
+"まだ公開されている壁紙がありません" = "No wallpapers have been published yet.";
+"トリム編集" = "Trim Editor";
+"下の壁紙一覧から動画を選択すると、カットとループ開始位置を編集できます" = "Select a video from the library below to edit its cut and loop start point.";
+"途中からループする" = "Loop from a custom point";
+"オレンジのハンドルでループの開始位置を指定できます。オフのときはカット開始位置からループします" = "Use the orange handle to set the loop start point. When off, looping starts from the cut start point.";
+"カット・ループ範囲を初期値に戻します（保存するまで壁紙には反映されません）" = "Reset the cut and loop range to defaults (not applied to the wallpaper until saved).";
+"この動画のカット・ループ設定を削除して、全体再生に戻します" = "Remove the cut and loop settings for this video and play it in full.";
 "共有に失敗しました" = "Failed to share";
 "プレビューなし" = "No Preview";
 "アプリを選択して追加" = "Choose app to add";
@@ -102,6 +123,7 @@
 "プレイリスト" = "Playlist";
 "アップデート" = "Update";
 "追加" = "Add";
+"追加しました" = "Added";
 "LiveWallpaper" = "LiveWallpaper";
 "壁紙を読み込む" = "Import wallpaper";
 "壁紙を共有" = "Share wallpaper";
@@ -134,6 +156,7 @@
 "次へ" = "Next";
 "このプレイリストに動画がありません" = "No videos in this playlist.";
 "まず壁紙を追加すると、ここで配置を調整できます" = "Add a wallpaper first to adjust its layout here.";
+"編集" = "Edit";
 "フィット編集" = "Fit Editor";
 "保存して再適用" = "Save and Reapply";
 "プレビュー" = "Preview";
@@ -288,7 +311,7 @@
 "Web壁紙機能を有効にする" = "Enable web wallpaper feature";
 "オンにすると壁紙タブにWeb壁紙セクションが表示されます。実験的な機能です。" = "When on, a Web Wallpaper section appears in the Wallpaper tab. This is an experimental feature.";
 
-"設定を検索" = "Search settings";
+"設定を検索" = "Search";
 "該当する設定がありません" = "No matching settings";
 "設定を書き出す…" = "Export Settings…";
 "設定を読み込む…" = "Import Settings…";
@@ -408,3 +431,53 @@
 "集中モードで壁紙を切り替える" = "Switch wallpaper with Focus modes";
 "オフの間は、集中モードによる壁紙の切り替えを行いません。" = "While off, Focus modes won't switch the wallpaper.";
 "集中モードとの連携は「壁紙」タブにあります" = "Focus Mode integration is in the Wallpaper tab";
+
+// Store共有エラー
+"(詳細: %@)" = "(Details: %@)";
+"Storeサーバーから不正な応答が返されました。しばらくしてから再度お試しください" = "Store server returned an invalid response. Please try again later";
+"ダウンロードしたファイルの検証に失敗しました。もう一度お試しください" = "The downloaded file failed verification. Please try again";
+"ファイルサイズが大きすぎます(%@ / 上限%@)" = "File is too large (%@ / limit %@)";
+"入力内容に問題があります。タイトルや作者名を確認してください" = "There's a problem with your input. Please check the title and author name";
+"アップロードした動画がStore上で見つかりませんでした。もう一度お試しください" = "The uploaded video wasn't found on the Store. Please try again";
+"アップロード中にデータの不整合が起きました。もう一度お試しください" = "A data mismatch occurred during upload. Please try again";
+"アップロードデータの送信に失敗しました。もう一度お試しください" = "Failed to send the upload data. Please try again";
+"アクセスが集中しています。しばらく待ってから再度お試しください" = "Too many requests right now. Please wait and try again";
+"Storeサーバーで問題が発生しています。しばらくしてから再度お試しください" = "The Store server is having problems. Please try again later";
+"Storeへのリクエストに失敗しました" = "The request to the Store failed";
+
+// Store report
+"この動画を通報" = "Report this video";
+"通報の理由を選択してください" = "Select a reason for reporting";
+"不適切なコンテンツ" = "Inappropriate content";
+"著作権侵害の疑い" = "Suspected copyright infringement";
+"スパムまたは無関係なコンテンツ" = "Spam or irrelevant content";
+"通報しました。ご協力ありがとうございます" = "Reported. Thank you for your help";
+"通報に失敗しました。もう一度お試しください" = "Failed to report. Please try again";
+"ダウンロードURLが不正です" = "Invalid download URL";
+"通報済み" = "Already reported";
+
+// Store: my submissions, search & sort
+"みんなの投稿" = "Browse";
+"自分の投稿" = "My Submissions";
+"タイトルで検索" = "Search by title";
+"新着順" = "Newest";
+"人気順" = "Popular";
+"まだ投稿がありません" = "No submissions yet";
+"リストから削除(投稿自体は削除されません)" = "Remove from list (doesn't delete the submission itself)";
+"審査中" = "Under review";
+"公開済み" = "Published";
+"却下されました" = "Rejected";
+"ステータスの取得に失敗しました。しばらくしてから再度お試しください" = "Failed to fetch status. Please try again later";
+"投稿を取り下げますか?" = "Withdraw this submission?";
+"取り下げる" = "Withdraw";
+"この操作は取り消せません" = "This can't be undone";
+"この投稿は取り下げに対応していません。リストから削除のみ行えます" = "This submission doesn't support withdrawal. You can only remove it from the list";
+"取り下げに失敗しました。もう一度お試しください" = "Failed to withdraw. Please try again";
+
+// 検索バーUX改善(共通コンポーネント化)
+"タイトルや名前で壁紙を検索" = "Search wallpapers by title or name";
+"検索をクリア" = "Clear search";
+"検索条件に一致する壁紙がありません" = "No wallpapers match your search";
+"アプリ名で検索" = "Search by app name";
+"除外できるアプリがありません" = "No apps available to exclude";
+"一致" = "Match";

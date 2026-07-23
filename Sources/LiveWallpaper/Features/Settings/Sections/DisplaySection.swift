@@ -2,6 +2,40 @@ import AppKit
 import SwiftUI
 
 extension SettingsView {
+  static let displaySearchKeywords: [String] = [
+    "表示",
+    "デスクトップ切り替え",
+    "パフォーマンス・省電力",
+    "メニューバー",
+    "壁紙の表示先",
+    "メインのみ",
+    "全ディスプレイ",
+    "動画のフィット",
+    "デスクトップの見やすさ",
+    "デスクトップのアイコンを表示",
+    "再生の軽量モード（省電力）",
+    "作業中は壁紙の再生を自動停止",
+    "ほかのアプリを使っている間は再生を停止",
+    "画面がほぼ隠れたら停止（高精度）",
+    "再生を止めないアプリ",
+    "自動停止しないディスプレイ",
+    "デスクトップ（Space）ごとに壁紙を切り替える",
+    "メニューバーにデスクトップ番号を表示",
+    "デスクトップ・画面切替時に再生位置を記憶する",
+    "Space",
+    "Mission Control",
+    "メニューバーを不透明にする",
+    "詳細設定",
+    "画質",
+    "動作プロファイル",
+    "再生負荷",
+    "デコード",
+    "デスクトップレベル",
+    "環境に応じて再生負荷を自動調整",
+    "バッテリー残量に応じて画質を自動調整",
+    "fullScreenAuxiliary を有効化",
+  ]
+
   @ViewBuilder
   var displaySettingsSection: some View {
     Section(header: Label(model.localizedString("表示"), systemImage: "display.2")) {
@@ -368,13 +402,27 @@ extension SettingsView {
         .font(.caption)
         .foregroundColor(.secondary)
 
-      TextField(model.localizedString("検索"), text: $suspendExclusionAppPickerSearchText)
-        .textFieldStyle(.roundedBorder)
+      SearchField(
+        placeholder: model.localizedString("アプリ名で検索"),
+        text: $suspendExclusionAppPickerSearchText,
+        isFocused: $isSuspendExclusionSearchFocused
+      )
+      .background(
+        Button("") { isSuspendExclusionSearchFocused = true }
+          .keyboardShortcut("f", modifiers: .command)
+          .hidden()
+      )
 
       let candidates = runningAppExclusionCandidates
       if candidates.isEmpty {
-        settingsFootnote(model.localizedString("一致するアプリがありません"))
-          .frame(width: 260)
+        SearchEmptyState(
+          isSearchActive: !suspendExclusionAppPickerSearchText.isEmpty,
+          noContentText: model.localizedString("除外できるアプリがありません"),
+          noMatchText: model.localizedString("一致するアプリがありません"),
+          clearButtonTitle: model.localizedString("検索をクリア"),
+          onClearSearch: { suspendExclusionAppPickerSearchText = ""; isSuspendExclusionSearchFocused = true }
+        )
+        .frame(width: 260)
       } else {
         ScrollView(.vertical, showsIndicators: true) {
           VStack(alignment: .leading, spacing: 2) {
@@ -416,6 +464,7 @@ extension SettingsView {
       .controlSize(.small)
     }
     .padding(12)
+    .onAppear { isSuspendExclusionSearchFocused = true }
   }
 
   func settingsInsetCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {

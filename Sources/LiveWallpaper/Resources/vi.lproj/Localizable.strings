@@ -102,6 +102,7 @@
 "次へ" = "Sau";
 "このプレイリストに動画がありません" = "Danh sách này không có video";
 "まず壁紙を追加すると、ここで配置を調整できます" = "Hãy thêm hình nền trước, sau đó bạn có thể chỉnh bố trí tại đây";
+"編集" = "Chỉnh sửa";
 "フィット編集" = "Chỉnh căn khít";
 "保存して再適用" = "Lưu và áp dụng lại";
 "この画面ではプレビューのみ更新されます。『保存して再適用』で壁紙に反映されます" = "Màn hình này chỉ cập nhật hình ảnh xem trước. Vui lòng dùng \"Lưu và áp dụng lại\" để áp dụng vào hình nền.";
@@ -195,10 +196,32 @@
 "新規プレイリストを作成して追加" = "Tạo danh sách phát mới và thêm";
 "共有" = "Chia sẻ";
 "共有…" = "Chia sẻ…";
+"Storeに共有…" = "Chia sẻ lên Store…";
+"Storeに共有" = "Chia sẻ lên Store";
+"動画を共有" = "Chia sẻ video";
+"Storeに共有する壁紙を選択" = "Chọn hình nền để chia sẻ lên Store";
+"保存済みのトリム・フィット設定と一緒に、選んだ動画をコミュニティStoreに送信します(公開には審査が必要です)" = "Gửi video đã chọn lên Store cộng đồng để xét duyệt, cùng với cài đặt cắt và vừa khung đã lưu.";
+"この動画(トリム/ループ設定を含む)をコミュニティStoreに送信します(公開には審査が必要です)" = "Gửi video này (bao gồm cài đặt cắt/lặp) lên Store cộng đồng để xét duyệt trước khi xuất bản.";
+"タイトル" = "Tiêu đề";
+"作者名" = "Tên tác giả";
+"ライセンス(任意、例: CC-BY-4.0)" = "Giấy phép (tùy chọn, ví dụ: CC-BY-4.0)";
+"アップロード中…" = "Đang tải lên…";
+"公開しました" = "Đã xuất bản";
+"申請しました。審査状況は「自分の投稿」から確認できます" = "Đã gửi. Bạn có thể kiểm tra trạng thái xét duyệt trong \"Bài đã gửi\".";
+"送信する" = "Gửi";
+"Store" = "Store";
+"まだ公開されている壁紙がありません" = "Chưa có hình nền nào được xuất bản.";
+"トリム編集" = "Trình chỉnh sửa cắt";
+"下の壁紙一覧から動画を選択すると、カットとループ開始位置を編集できます" = "Chọn một video từ thư viện bên dưới để chỉnh sửa điểm cắt và điểm bắt đầu lặp.";
+"途中からループする" = "Lặp từ một điểm tùy chỉnh";
+"オレンジのハンドルでループの開始位置を指定できます。オフのときはカット開始位置からループします" = "Dùng tay cầm màu cam để đặt điểm bắt đầu lặp. Khi tắt, vòng lặp sẽ bắt đầu từ điểm cắt.";
+"カット・ループ範囲を初期値に戻します（保存するまで壁紙には反映されません）" = "Đặt lại phạm vi cắt và lặp về mặc định (chưa áp dụng cho hình nền cho đến khi lưu).";
+"この動画のカット・ループ設定を削除して、全体再生に戻します" = "Xóa cài đặt cắt và lặp của video này và phát toàn bộ video.";
 "共有に失敗しました" = "Chia sẻ thất bại";
 "プレビューなし" = "Không có xem trước";
 "壁紙設定" = "Cài đặt hình nền";
 "追加" = "Thêm";
+"追加しました" = "Đã thêm";
 "LiveWallpaper" = "LiveWallpaper";
 "現在の壁紙プレビュー" = "Xem trước hình nền hiện tại";
 "アクセシビリティ権限が必要です。システム設定でLiveWallpaperを許可してください。" = "Cần quyền Trợ năng. Hãy cho phép LiveWallpaper trong Cài đặt hệ thống > Quyền riêng tư và bảo mật > Trợ năng.";
@@ -412,3 +435,53 @@
 "集中モードで壁紙を切り替える" = "Chuyển hình nền theo Chế độ Tập trung";
 "オフの間は、集中モードによる壁紙の切り替えを行いません。" = "Khi tắt, Chế độ Tập trung sẽ không chuyển đổi hình nền.";
 "集中モードとの連携は「壁紙」タブにあります" = "Tích hợp Chế độ Tập trung nằm ở thẻ Hình nền";
+
+// Store共有エラー
+"(詳細: %@)" = "(Chi tiết: %@)";
+"Storeサーバーから不正な応答が返されました。しばらくしてから再度お試しください" = "Máy chủ Store trả về phản hồi không hợp lệ. Vui lòng thử lại sau";
+"ダウンロードしたファイルの検証に失敗しました。もう一度お試しください" = "Tệp đã tải xuống không vượt qua bước xác minh. Vui lòng thử lại";
+"ファイルサイズが大きすぎます(%@ / 上限%@)" = "Tệp quá lớn (%@ / giới hạn %@)";
+"入力内容に問題があります。タイトルや作者名を確認してください" = "Có vấn đề với nội dung bạn nhập. Vui lòng kiểm tra tiêu đề và tên tác giả";
+"アップロードした動画がStore上で見つかりませんでした。もう一度お試しください" = "Không tìm thấy video đã tải lên trên Store. Vui lòng thử lại";
+"アップロード中にデータの不整合が起きました。もう一度お試しください" = "Đã xảy ra lỗi không khớp dữ liệu trong quá trình tải lên. Vui lòng thử lại";
+"アップロードデータの送信に失敗しました。もう一度お試しください" = "Gửi dữ liệu tải lên không thành công. Vui lòng thử lại";
+"アクセスが集中しています。しばらく待ってから再度お試しください" = "Hiện đang có quá nhiều yêu cầu. Vui lòng đợi rồi thử lại";
+"Storeサーバーで問題が発生しています。しばらくしてから再度お試しください" = "Máy chủ Store đang gặp sự cố. Vui lòng thử lại sau";
+"Storeへのリクエストに失敗しました" = "Yêu cầu tới Store không thành công";
+
+// Store báo cáo
+"この動画を通報" = "Báo cáo video này";
+"通報の理由を選択してください" = "Chọn lý do báo cáo";
+"不適切なコンテンツ" = "Nội dung không phù hợp";
+"著作権侵害の疑い" = "Nghi ngờ vi phạm bản quyền";
+"スパムまたは無関係なコンテンツ" = "Spam hoặc nội dung không liên quan";
+"通報しました。ご協力ありがとうございます" = "Đã báo cáo. Cảm ơn bạn đã hỗ trợ";
+"通報に失敗しました。もう一度お試しください" = "Báo cáo không thành công. Vui lòng thử lại";
+"ダウンロードURLが不正です" = "URL tải xuống không hợp lệ";
+"通報済み" = "Đã báo cáo";
+
+// Store: bài đã gửi, tìm kiếm và sắp xếp
+"みんなの投稿" = "Duyệt";
+"自分の投稿" = "Bài đã gửi";
+"タイトルで検索" = "Tìm theo tiêu đề";
+"新着順" = "Mới nhất";
+"人気順" = "Phổ biến";
+"まだ投稿がありません" = "Chưa có bài đăng nào";
+"リストから削除(投稿自体は削除されません)" = "Xóa khỏi danh sách (không xóa bài đăng)";
+"審査中" = "Đang xét duyệt";
+"公開済み" = "Đã xuất bản";
+"却下されました" = "Đã bị từ chối";
+"ステータスの取得に失敗しました。しばらくしてから再度お試しください" = "Không thể lấy trạng thái. Vui lòng thử lại sau";
+"投稿を取り下げますか?" = "Rút lại bài đăng này?";
+"取り下げる" = "Rút lại";
+"この操作は取り消せません" = "Không thể hoàn tác thao tác này";
+"この投稿は取り下げに対応していません。リストから削除のみ行えます" = "Bài đăng này không hỗ trợ rút lại. Bạn chỉ có thể xóa khỏi danh sách";
+"取り下げに失敗しました。もう一度お試しください" = "Rút lại không thành công. Vui lòng thử lại";
+
+// 検索バーUX改善(共通コンポーネント化)
+"タイトルや名前で壁紙を検索" = "Tìm hình nền theo tiêu đề hoặc tên";
+"検索をクリア" = "Xóa tìm kiếm";
+"検索条件に一致する壁紙がありません" = "Không có hình nền nào khớp với tìm kiếm của bạn";
+"アプリ名で検索" = "Tìm theo tên ứng dụng";
+"除外できるアプリがありません" = "Không có ứng dụng nào để loại trừ";
+"一致" = "Khớp";

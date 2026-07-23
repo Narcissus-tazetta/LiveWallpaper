@@ -468,11 +468,24 @@ extension WallpaperModel {
         item.preferredForwardBufferDuration = profile.buffer
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
         item.videoComposition = nil
+
+        let edit = currentVideoPath.flatMap { wallpaperEditByPath[$0] }
         if shouldUsePlaybackLooper() {
-            sharedLooper = AVPlayerLooper(player: player, templateItem: item)
+            sharedLooper = makeWallpaperLooper(
+                player: player, templateItem: item, path: currentVideoPath
+            )
         } else {
+            if let edit, !edit.isNoOp, let trimEnd = edit.trimEnd {
+                item.forwardPlaybackEndTime = CMTime(seconds: trimEnd, preferredTimescale: 600)
+            }
             player.insert(item, after: nil)
             sharedLooper = nil
+            if let edit, !edit.isNoOp {
+                let seekSeconds = edit.effectiveLoopStart
+                if seekSeconds > 0 {
+                    player.seek(to: CMTime(seconds: seekSeconds, preferredTimescale: 600))
+                }
+            }
         }
         applyAudioSettings()
         if attach {

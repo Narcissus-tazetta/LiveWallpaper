@@ -36,3 +36,9 @@ xcuserdata/
 # macOS
 .AppleDouble
 .LSOverride
+
+# store-worker (Node/Cloudflare Worker)
+store-worker/node_modules/
+store-worker/.wrangler/
+store-worker/.dev.vars
+store-worker/packages/

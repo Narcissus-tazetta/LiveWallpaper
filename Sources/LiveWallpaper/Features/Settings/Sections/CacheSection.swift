@@ -1,6 +1,12 @@
 import SwiftUI
 
 extension SettingsView {
+  static let cacheSearchKeywords: [String] = [
+    "キャッシュ",
+    "保存先を開く",
+    "キャッシュ削除",
+  ]
+
   var cacheSettingsSection: some View {
     Section(header: Label(model.localizedString("キャッシュ"), systemImage: "externaldrive")) {
       HStack(spacing: 10) {
