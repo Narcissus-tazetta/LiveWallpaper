@@ -42,7 +42,7 @@ extension SettingsView {
     enum StoreShareStatus: Equatable {
         case idle
         case submitting
-        case success(downloadURL: URL)
+        case success(status: String)
         case failure(message: String)
     }
 

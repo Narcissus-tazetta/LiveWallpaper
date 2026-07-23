@@ -1,4 +1,5 @@
 import { AwsClient } from "aws4fetch";
+import { unzipSync } from "fflate";
 
 export interface Env {
 	STORE_BUCKET: R2Bucket;
@@ -17,8 +18,17 @@ const ALLOWED_CONTENT_TYPES = new Set(["application/octet-stream"]);
 const MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024; // 2MB, plenty above the ~15-40KB expected size
 const ALLOWED_THUMBNAIL_CONTENT_TYPES = new Set(["image/jpeg"]);
 const PRESIGNED_URL_TTL_SECONDS = 900;
+// .lwpkg はZIPなので審査用プレビューはWorker内でメモリ展開してから動画部分だけを
+// 返す。ZIP本体(この値まで)と展開後の動画バッファ(ほぼ同サイズ、metadata/previews
+// は無視できるほど小さい)が同時にメモリ上に載るため、ピークはこの値のおよそ2倍になる。
+// Workers Isolateのメモリ上限(128MB)に対して十分な余裕(JS実行時オーバーヘッド分)を
+// 残すため、2倍しても128MBを大きく下回るこの値を上限に据える(超える投稿はプレビュー
+// 不可とし、/admin/review/:token/download での生ファイルダウンロードに倒す)。
+const MAX_VIDEO_PREVIEW_BYTES = 48 * 1024 * 1024;
 const REPORT_THRESHOLD = 3;
-const REPORT_NOTIFY_EMAIL = "ibaragiakira2007@gmail.com";
+// 通報通知と審査依頼の両方の送信先(運営本人のメールアドレス)。
+const ADMIN_NOTIFY_EMAIL = "ibaragiakira2007@gmail.com";
+const REVIEW_TOKEN_TTL_MS = 48 * 60 * 60 * 1000; // 48時間
 
 function jsonResponse(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -208,7 +218,43 @@ async function resolveThumbnailKey(
 	return thumbnailKey;
 }
 
-async function handleSubmit(request: Request, env: Env): Promise<Response> {
+function base64UrlEncode(bytes: Uint8Array): string {
+	let binary = "";
+	for (const byte of bytes) {
+		binary += String.fromCharCode(byte);
+	}
+	return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/// 審査用ワンタイムトークンの生トークンを生成する(256bit)。この文字列自体が
+/// 認証情報になるため、DBにはハッシュのみ保存しメール本文にのみ埋め込む。
+function generateRawToken(): string {
+	return base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+async function hashToken(raw: string): Promise<string> {
+	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+	return Array.from(new Uint8Array(digest))
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join("");
+}
+
+/// 審査ページ(HTML)に投稿者由来の文字列(タイトル/作者名など)を埋め込む前に
+/// 必ず通す。投稿時点では未審査のため、stored XSSを防ぐ目的で必須。
+function escapeHtml(s: string): string {
+	return s
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;");
+}
+
+async function handleSubmit(
+	request: Request,
+	env: Env,
+	ctx: ExecutionContext,
+): Promise<Response> {
 	let body: SubmitRequest;
 	try {
 		body = await request.json();
@@ -236,13 +282,20 @@ async function handleSubmit(request: Request, env: Env): Promise<Response> {
 	const thumbnailKey = await resolveThumbnailKey(env, objectKey, body);
 
 	const createdAt = new Date().toISOString();
-	await env.STORE_DB.prepare(
-		`INSERT INTO store_entries
-			(id, title, author, description, object_key, thumbnail_key, sha256, size_bytes,
-			 duration_seconds, has_audio, license, created_at, status)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published')`,
-	)
-		.bind(
+	const tokenId = crypto.randomUUID();
+	const rawToken = generateRawToken();
+	const tokenHash = await hashToken(rawToken);
+	const expiresAt = new Date(Date.now() + REVIEW_TOKEN_TTL_MS).toISOString();
+
+	// エントリ作成と初回審査トークンの発行を1つのバッチ(D1の暗黙トランザクション)
+	// にまとめ、片方だけ書き込まれる状態を避ける。
+	await env.STORE_DB.batch([
+		env.STORE_DB.prepare(
+			`INSERT INTO store_entries
+				(id, title, author, description, object_key, thumbnail_key, sha256, size_bytes,
+				 duration_seconds, has_audio, license, created_at, status)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested')`,
+		).bind(
 			id,
 			title,
 			author,
@@ -255,12 +308,34 @@ async function handleSubmit(request: Request, env: Env): Promise<Response> {
 			body.hasAudio === undefined ? null : body.hasAudio ? 1 : 0,
 			body.license ?? null,
 			createdAt,
-		)
-		.run();
+		),
+		env.STORE_DB.prepare(
+			`INSERT INTO store_review_tokens (id, entry_id, token_hash, created_at, expires_at)
+			 VALUES (?, ?, ?, ?, ?)`,
+		).bind(tokenId, id, tokenHash, createdAt, expiresAt),
+	]);
+
+	// 審査メール送信はレスポンスをブロックしない(Resendへの往復でアップロード完了の
+	// レスポンスを遅らせないため)。ctx.waitUntilでWorkerの実行を継続させる。
+	const origin = new URL(request.url).origin;
+	ctx.waitUntil(
+		sendReviewRequestEmail(env, origin, { id, title, author }, rawToken).then(
+			async (resendEmailId) => {
+				if (!resendEmailId) {
+					return;
+				}
+				await env.STORE_DB.prepare(
+					"UPDATE store_review_tokens SET resend_email_id = ? WHERE id = ?",
+				)
+					.bind(resendEmailId, tokenId)
+					.run();
+			},
+		),
+	);
 
 	return jsonResponse({
 		ok: true,
-		entry: { id, title, author, createdAt, status: "published" },
+		entry: { id, title, author, createdAt, status: "requested" },
 	});
 }
 
@@ -414,7 +489,7 @@ async function notifyReport(
 			},
 			body: JSON.stringify({
 				from: "LiveWallpaper Store <onboarding@resend.dev>",
-				to: [REPORT_NOTIFY_EMAIL],
+				to: [ADMIN_NOTIFY_EMAIL],
 				subject: hidden
 					? `[Store] 通報により非公開化: ${title}`
 					: `[Store] 新しい通報: ${title}`,
@@ -439,6 +514,69 @@ async function notifyReport(
 		// ネットワークエラー等。ベストエフォートなので通報処理自体は継続するが、
 		// ログには残す(Cloudflareのログ/wrangler tailで確認できる)。
 		console.error(`notifyReport: failed to reach Resend for entry ${entryId}:`, err);
+	}
+}
+
+/// 新規投稿の審査依頼メール。Resend成功時はメールIDを返す(呼び出し側が
+/// store_review_tokens.resend_email_id に保存し、/admin/email-status で追跡できるように
+/// するため)。notifyReportと同様ベストエフォート — 送信失敗はsubmit自体を失敗させない。
+async function sendReviewRequestEmail(
+	env: Env,
+	origin: string,
+	entry: { id: string; title: string; author: string },
+	rawToken: string,
+): Promise<string | null> {
+	const reviewURL = new URL(`/admin/review/${rawToken}`, origin).toString();
+	const thumbnailURL = new URL(`/admin/review/${rawToken}/thumbnail`, origin).toString();
+	const expiresInHours = Math.round(REVIEW_TOKEN_TTL_MS / (60 * 60 * 1000));
+
+	try {
+		const res = await fetch("https://api.resend.com/emails", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				authorization: `Bearer ${env.RESEND_API_KEY}`,
+			},
+			body: JSON.stringify({
+				from: "LiveWallpaper Store <onboarding@resend.dev>",
+				to: [ADMIN_NOTIFY_EMAIL],
+				subject: `[LiveWallpaper Store] 審査依頼: ${entry.title}`,
+				html: [
+					"<p>新しい投稿の審査依頼です。</p>",
+					"<ul>",
+					`<li>タイトル: ${escapeHtml(entry.title)}</li>`,
+					`<li>作者: ${escapeHtml(entry.author)}</li>`,
+					`<li>投稿ID: ${escapeHtml(entry.id)}</li>`,
+					"</ul>",
+					`<p><img src="${thumbnailURL}" alt="thumbnail" style="max-width:320px"></p>`,
+					`<p><a href="${reviewURL}">審査画面を開く</a></p>`,
+					`<p style="color:#666;font-size:0.9em">このリンクは${expiresInHours}時間で失効します。心当たりがない場合は対応しないでください。</p>`,
+				].join(""),
+				text: [
+					"新しい投稿の審査依頼です。",
+					`タイトル: ${entry.title}`,
+					`作者: ${entry.author}`,
+					`投稿ID: ${entry.id}`,
+					`審査画面: ${reviewURL}`,
+					`このリンクは${expiresInHours}時間で失効します。心当たりがない場合は対応しないでください。`,
+				].join("\n"),
+			}),
+		});
+		const bodyText = await res.text();
+		if (!res.ok) {
+			console.error(`sendReviewRequestEmail: Resend API returned ${res.status} for entry ${entry.id}: ${bodyText}`);
+			return null;
+		}
+		console.log(`sendReviewRequestEmail: Resend accepted for entry ${entry.id}: ${bodyText}`);
+		try {
+			const parsed = JSON.parse(bodyText) as { id?: string };
+			return parsed.id ?? null;
+		} catch {
+			return null;
+		}
+	} catch (err) {
+		console.error(`sendReviewRequestEmail: failed to reach Resend for entry ${entry.id}:`, err);
+		return null;
 	}
 }
 
@@ -605,8 +743,611 @@ async function handleAdminEmailStatus(
 	});
 }
 
+/// requested → published/rejected の状態遷移をこの1関数に集約する。トークン経由の
+/// decide とADMIN_KEY直叩きのapprove/rejectの両方がここだけを呼ぶことで、二重承認や
+/// 取りこぼしを防ぐ。WHERE status='requested' のガードにより、既に決定済みの
+/// エントリを誤って上書きすることはない(meta.changesで判定)。
+///
+/// 決定が実際に反映された場合、この関数の中で副作用を集約して行う:
+///   - このエントリに紐づく未消費の審査トークンを全て consumed 済みにし、action に
+///     「実際の結果」を記録する。これにより decide(トークン経由)/approve・reject
+///     (ADMIN_KEY直叩き)のどちらで決定されても /admin/requests の監査結果が一致する
+///     (片方だけがaction列を更新する非対称を避ける)。
+///   - rejected になった場合、R2上の動画/サムネイルを削除する(却下したのに実体が
+///     オブジェクトキーを知る誰からも読めてしまう状態を残さないため)。
+///
+/// 呼び出し元(decide)がこのエントリの特定トークンを先に消費済み(consumed_at設定済み、
+/// actionは未設定)にしていた場合でも、「action IS NULL」の条件でここから拾われて
+/// 実際の結果が書き込まれる。これにより「トークンを消費したのに、他経路の決定と
+/// 競合して実際には何も変わらなかった」ケースでも、記録されるactionは意図した
+/// approve/rejectではなく実際のステータスになる(#4/#7 で指摘された不整合の解消)。
+async function applyReviewDecision(
+	env: Env,
+	entryId: string,
+	action: "approve" | "reject",
+): Promise<{ changed: boolean; status: string | null }> {
+	const requestedStatus = action === "approve" ? "published" : "rejected";
+	const result = await env.STORE_DB.prepare(
+		"UPDATE store_entries SET status = ? WHERE id = ? AND status = 'requested'",
+	)
+		.bind(requestedStatus, entryId)
+		.run();
+	const changed = result.meta.changes === 1;
+
+	// changed===false の場合、実際のステータス(既に決定済みならそれ、entryIdが
+	// 存在しなければnull)を読み直す。呼び出し元(handleAdminDecision)がこれで
+	// 「既に決定済み」と「そもそも存在しない」を区別できるようにする。
+	let status: string | null = requestedStatus;
+	if (!changed) {
+		const row = await env.STORE_DB.prepare("SELECT status FROM store_entries WHERE id = ?")
+			.bind(entryId)
+			.first<{ status: string }>();
+		status = row?.status ?? null;
+	}
+
+	if (status === null) {
+		// entryIdが存在しない(呼び出し元のバグ以外では起きないはず)。トークンや
+		// R2への副作用は行わずそのまま返し、呼び出し元に404判定させる。
+		return { changed, status };
+	}
+
+	const nowISO = new Date().toISOString();
+	await env.STORE_DB.prepare(
+		`UPDATE store_review_tokens SET consumed_at = COALESCE(consumed_at, ?), action = ?
+		 WHERE entry_id = ? AND (consumed_at IS NULL OR action IS NULL)`,
+	)
+		.bind(nowISO, status, entryId)
+		.run();
+
+	if (changed && status === "rejected") {
+		const row = await env.STORE_DB.prepare(
+			"SELECT object_key, thumbnail_key FROM store_entries WHERE id = ?",
+		)
+			.bind(entryId)
+			.first<{ object_key: string; thumbnail_key: string | null }>();
+		if (row) {
+			await env.STORE_BUCKET.delete(row.object_key);
+			if (row.thumbnail_key) {
+				await env.STORE_BUCKET.delete(row.thumbnail_key);
+			}
+		}
+	}
+
+	return { changed, status };
+}
+
+interface ReviewPageEntry {
+	id: string;
+	title: string;
+	author: string;
+	description: string | null;
+	createdAt: string;
+	status: string;
+	sizeBytes: number;
+}
+
+/// 審査ページのHTML。テンプレートエンジンなしの手書きビルダーなので、投稿者由来の
+/// 文字列は必ずescapeHtmlを通す(stored XSS対策)。表示は常にDB上の最新
+/// entry.status を見る(トークン自身のconsumed_at/actionではなく) —
+/// ADMIN_KEY直叩きで先に決定された場合でも、このページが古い状態を誤表示しないため。
+function renderReviewPage(opts: {
+	token: string;
+	entry: ReviewPageEntry;
+	tokenExpired: boolean;
+}): string {
+	const { token, entry, tokenExpired } = opts;
+	const style = `body{font-family:-apple-system,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
+img,video{max-width:100%;border-radius:8px;margin:1rem 0}
+button{font-size:1rem;padding:0.6rem 1.2rem;border-radius:6px;border:none;cursor:pointer;margin-right:0.5rem}
+.approve{background:#2e7d32;color:#fff}
+.reject{background:#c62828;color:#fff}
+.notice{color:#666;font-size:0.9em}`;
+
+	let body: string;
+	if (entry.status !== "requested") {
+		body = `<p>審査済みです。現在のステータス: <strong>${escapeHtml(entry.status)}</strong></p>`;
+	} else if (tokenExpired) {
+		body = `<p class="notice">このリンクは失効しました。admin.sh または /admin/requests から直接操作してください。</p>`;
+	} else {
+		// サムネイルをposterにしておくと、動画本体の展開(ZIP解凍)を待たずに
+		// まず静止画が出るので体感が速い。再生ボタンを押すと初めて/videoを叩く。
+		const preview =
+			entry.sizeBytes > MAX_VIDEO_PREVIEW_BYTES
+				? `<img src="/admin/review/${token}/thumbnail" alt="thumbnail">
+<p class="notice">動画が大きいためプレビューできません(サイズ上限${Math.round(MAX_VIDEO_PREVIEW_BYTES / (1024 * 1024))}MB)。
+<a href="/admin/review/${token}/download">元ファイルをダウンロードして確認</a>してください。</p>`
+				: `<video controls preload="metadata" poster="/admin/review/${token}/thumbnail">
+	<source src="/admin/review/${token}/video" type="video/mp4">
+</video>`;
+		body = `${preview}
+<form method="post" action="/admin/review/${token}/decide">
+	<button class="approve" name="action" value="approve">承認する</button>
+	<button class="reject" name="action" value="reject">却下する</button>
+</form>`;
+	}
+
+	return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>審査: ${escapeHtml(entry.title)}</title><style>${style}</style></head><body>
+<h1>${escapeHtml(entry.title)}</h1>
+<p>作者: ${escapeHtml(entry.author)} / 投稿ID: ${escapeHtml(entry.id)} / 申請日時: ${escapeHtml(entry.createdAt)}</p>
+${entry.description ? `<p>${escapeHtml(entry.description)}</p>` : ""}
+${body}
+</body></html>`;
+}
+
+async function handleAdminReviewPage(
+	request: Request,
+	env: Env,
+	token: string,
+): Promise<Response> {
+	// ページ/サムネイル/動画/decideでバケットを分ける(#5): 動画の<video>要素だけで
+	// 複数回のRangeリクエストが飛ぶため、同一バケットだと動画プレビューだけで
+	// レビュー担当者自身のdecideクリックがレート制限に引っかかってしまう。
+	if (!(await checkRateLimit(env, "review-page", request))) {
+		return errorResponse("too many requests", 429);
+	}
+
+	const tokenHash = await hashToken(token);
+	const row = await env.STORE_DB.prepare(
+		`SELECT srt.expires_at as expires_at, se.id as id, se.title as title, se.author as author,
+			se.description as description, se.created_at as created_at, se.status as status,
+			se.size_bytes as size_bytes
+		 FROM store_review_tokens srt JOIN store_entries se ON se.id = srt.entry_id
+		 WHERE srt.token_hash = ?`,
+	)
+		.bind(tokenHash)
+		.first<{
+			expires_at: string;
+			id: string;
+			title: string;
+			author: string;
+			description: string | null;
+			created_at: string;
+			status: string;
+			size_bytes: number;
+		}>();
+	if (!row) {
+		return errorResponse("review link not found", 404);
+	}
+
+	const tokenExpired = new Date(row.expires_at).getTime() <= Date.now();
+	const html = renderReviewPage({
+		token,
+		tokenExpired,
+		entry: {
+			id: row.id,
+			title: row.title,
+			author: row.author,
+			description: row.description,
+			createdAt: row.created_at,
+			status: row.status,
+			sizeBytes: row.size_bytes,
+		},
+	});
+	return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+}
+
+/// レビューページ/メールに埋め込むサムネイル画像。トークンの有効期限のみで判定し
+/// (consumed_atは問わない) — decide後の303リダイレクト先でもページ自身のサムネイルを
+/// 表示できるようにするため。公開の /thumbnail/:id とは別に、未公開(requested)の
+/// エントリでもトークンさえ有効なら見られるようにする専用ルート。
+async function handleAdminReviewThumbnail(
+	request: Request,
+	env: Env,
+	token: string,
+): Promise<Response> {
+	if (!(await checkRateLimit(env, "review-thumbnail", request))) {
+		return errorResponse("too many requests", 429);
+	}
+
+	const tokenHash = await hashToken(token);
+	const row = await env.STORE_DB.prepare(
+		`SELECT srt.expires_at as expires_at, se.thumbnail_key as thumbnail_key
+		 FROM store_review_tokens srt JOIN store_entries se ON se.id = srt.entry_id
+		 WHERE srt.token_hash = ?`,
+	)
+		.bind(tokenHash)
+		.first<{ expires_at: string; thumbnail_key: string | null }>();
+	if (!row || !row.thumbnail_key || new Date(row.expires_at).getTime() <= Date.now()) {
+		return errorResponse("thumbnail not found", 404);
+	}
+
+	const object = await env.STORE_BUCKET.get(row.thumbnail_key);
+	if (!object) {
+		return errorResponse("thumbnail missing from storage", 404);
+	}
+	return new Response(object.body, {
+		headers: {
+			"content-type": "image/jpeg",
+			"content-length": object.size.toString(),
+		},
+	});
+}
+
+/// Rangeヘッダ("bytes=start-end"等)を解釈する。ブラウザの<video>は再生開始時や
+/// シーク時に必ずRangeで問い合わせてくる(特にSafariはRange非対応のサーバーからは
+/// 動画そのものを再生してくれない)ため、プレビューエンドポイントは対応必須。
+/// 不正な形式やtotalLengthを超える範囲は無視して全体を返す(仕様上のフォールバック)。
+function parseRangeHeader(
+	rangeHeader: string | null,
+	totalLength: number,
+): { start: number; end: number } | null {
+	if (!rangeHeader) {
+		return null;
+	}
+	const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
+	if (!match || (match[1] === "" && match[2] === "")) {
+		return null;
+	}
+	let start: number;
+	let end: number;
+	if (match[1] === "") {
+		// "bytes=-500" 形式: 末尾500バイト。
+		const suffixLength = Number.parseInt(match[2], 10);
+		start = Math.max(totalLength - suffixLength, 0);
+		end = totalLength - 1;
+	} else {
+		start = Number.parseInt(match[1], 10);
+		end = match[2] === "" ? totalLength - 1 : Number.parseInt(match[2], 10);
+	}
+	if (
+		!Number.isFinite(start) ||
+		!Number.isFinite(end) ||
+		start < 0 ||
+		end < start ||
+		start >= totalLength
+	) {
+		return null;
+	}
+	return { start, end: Math.min(end, totalLength - 1) };
+}
+
+/// .lwpkg(ZIP)の中から動画本体(content/videos/<id>.mp4)だけを取り出して返す。
+/// unzipSyncのfilterで動画エントリ以外(metadata.json/previews/*.png)の展開を
+/// スキップさせ、Worker内メモリ使用量を動画本体分だけに抑える。
+function extractVideoEntry(zipBytes: Uint8Array): Uint8Array | null {
+	const videoPathRe = /^content\/videos\/[^/]+$/i;
+	let matchedKey: string | null = null;
+	const unzipped = unzipSync(zipBytes, {
+		filter(file) {
+			if (matchedKey) {
+				// 単一動画パッケージ想定なので最初に見つかった1件だけを対象にする。
+				return false;
+			}
+			if (videoPathRe.test(file.name)) {
+				matchedKey = file.name;
+				return true;
+			}
+			return false;
+		},
+	});
+	if (!matchedKey) {
+		return null;
+	}
+	return unzipped[matchedKey] ?? null;
+}
+
+/// R2から取得したZIPをまるごとメモリ展開するのはピークメモリも計算量も大きいため、
+/// 一度展開した動画バイト列をエッジのCache APIに載せて使い回す(#3)。同じ動画に対する
+/// <video>タグからの複数回のRangeリクエストが、毎回R2フェッチ+unzipをやり直さずに
+/// 済むようにする(初回のみR2+unzipのコストを払う)。Range処理自体はここでは行わず
+/// 常に「展開済みの動画全体」を返す(呼び出し元がparseRangeHeaderでスライスする)。
+async function getCachedExtractedVideo(env: Env, objectKey: string): Promise<Uint8Array | null> {
+	const cache = caches.default;
+	// R2のオブジェクトキーをそのままキャッシュキーにする、実在しないhttps URLで
+	// (Cache APIはRequest/URLをキーにする必要があるための便宜上のもの)。
+	const cacheKey = new Request(`https://review-video-cache.internal/${encodeURIComponent(objectKey)}`);
+
+	const cached = await cache.match(cacheKey);
+	if (cached) {
+		return new Uint8Array(await cached.arrayBuffer());
+	}
+
+	const object = await env.STORE_BUCKET.get(objectKey);
+	if (!object) {
+		return null;
+	}
+	const zipBytes = new Uint8Array(await object.arrayBuffer());
+	const video = extractVideoEntry(zipBytes);
+	if (!video) {
+		return null;
+	}
+
+	await cache.put(
+		cacheKey,
+		new Response(video, {
+			headers: {
+				"content-type": "video/mp4",
+				"content-length": video.byteLength.toString(),
+				"cache-control": "private, max-age=3600",
+			},
+		}),
+	);
+	return video;
+}
+
+/// 審査ページに埋め込む動画プレビュー。サムネイルと同様トークンの有効期限のみで
+/// 判定する(consumed_at後のdecideリダイレクト先でも表示できるようにするため)。
+async function handleAdminReviewVideo(
+	request: Request,
+	env: Env,
+	token: string,
+): Promise<Response> {
+	if (!(await checkRateLimit(env, "review-video", request))) {
+		return errorResponse("too many requests", 429);
+	}
+
+	const tokenHash = await hashToken(token);
+	const row = await env.STORE_DB.prepare(
+		`SELECT srt.expires_at as expires_at, se.object_key as object_key, se.size_bytes as size_bytes
+		 FROM store_review_tokens srt JOIN store_entries se ON se.id = srt.entry_id
+		 WHERE srt.token_hash = ?`,
+	)
+		.bind(tokenHash)
+		.first<{ expires_at: string; object_key: string; size_bytes: number }>();
+	if (!row || new Date(row.expires_at).getTime() <= Date.now()) {
+		return errorResponse("video not found", 404);
+	}
+	if (row.size_bytes > MAX_VIDEO_PREVIEW_BYTES) {
+		return errorResponse(
+			`package too large to preview inline; use /admin/review/${token}/download instead`,
+			413,
+		);
+	}
+
+	const video = await getCachedExtractedVideo(env, row.object_key);
+	if (!video) {
+		return errorResponse("no video found inside package", 404);
+	}
+
+	const range = parseRangeHeader(request.headers.get("range"), video.byteLength);
+	if (range) {
+		const chunk = video.subarray(range.start, range.end + 1);
+		return new Response(chunk, {
+			status: 206,
+			headers: {
+				"content-type": "video/mp4",
+				"content-length": chunk.byteLength.toString(),
+				"content-range": `bytes ${range.start}-${range.end}/${video.byteLength}`,
+				"accept-ranges": "bytes",
+			},
+		});
+	}
+
+	return new Response(video, {
+		headers: {
+			"content-type": "video/mp4",
+			"content-length": video.byteLength.toString(),
+			"accept-ranges": "bytes",
+		},
+	});
+}
+
+/// MAX_VIDEO_PREVIEW_BYTESを超える(インラインプレビュー不可の)投稿を、審査担当者が
+/// 承認/却下前に確認できるようにする手段(#6)。/download と違い status='published'
+/// を要求せず、有効な審査トークンだけをゲートにする。ZIPの展開はせず、R2オブジェクトの
+/// 生バイト列をそのままストリームするので、handleAdminReviewVideoのような
+/// メモリ展開コストは発生しない。
+async function handleAdminReviewDownload(
+	request: Request,
+	env: Env,
+	token: string,
+): Promise<Response> {
+	if (!(await checkRateLimit(env, "review-download", request))) {
+		return errorResponse("too many requests", 429);
+	}
+
+	const tokenHash = await hashToken(token);
+	const row = await env.STORE_DB.prepare(
+		`SELECT srt.expires_at as expires_at, se.object_key as object_key
+		 FROM store_review_tokens srt JOIN store_entries se ON se.id = srt.entry_id
+		 WHERE srt.token_hash = ?`,
+	)
+		.bind(tokenHash)
+		.first<{ expires_at: string; object_key: string }>();
+	if (!row || new Date(row.expires_at).getTime() <= Date.now()) {
+		return errorResponse("package not found", 404);
+	}
+
+	const object = await env.STORE_BUCKET.get(row.object_key);
+	if (!object) {
+		return errorResponse("package missing from storage", 404);
+	}
+	return new Response(object.body, {
+		headers: {
+			"content-type": "application/octet-stream",
+			"content-length": object.size.toString(),
+		},
+	});
+}
+
+async function handleAdminReviewDecide(
+	request: Request,
+	env: Env,
+	token: string,
+): Promise<Response> {
+	if (!(await checkRateLimit(env, "review-decide", request))) {
+		return errorResponse("too many requests", 429);
+	}
+
+	const form = await request.formData();
+	const action = form.get("action");
+	if (action !== "approve" && action !== "reject") {
+		return errorResponse("invalid action");
+	}
+
+	const tokenHash = await hashToken(token);
+	const nowISO = new Date().toISOString();
+
+	// トークンの一回限り消費をこの1文のUPDATEで保証する。meta.changes===1なら
+	// このリクエストが「勝った」ことが分かる(GETは消費しない。メールセキュリティ
+	// スキャナの自動プリフェッチでリンクが死なないようにするため)。
+	const consumeResult = await env.STORE_DB.prepare(
+		`UPDATE store_review_tokens SET consumed_at = ?, action = ?
+		 WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
+	)
+		.bind(nowISO, action, tokenHash, nowISO)
+		.run();
+
+	if (consumeResult.meta.changes !== 1) {
+		const exists = await env.STORE_DB.prepare(
+			"SELECT 1 FROM store_review_tokens WHERE token_hash = ?",
+		)
+			.bind(tokenHash)
+			.first();
+		return errorResponse(
+			exists ? "review link already used or expired" : "review link not found",
+			exists ? 410 : 404,
+		);
+	}
+
+	const tokenRow = await env.STORE_DB.prepare(
+		"SELECT entry_id FROM store_review_tokens WHERE token_hash = ?",
+	)
+		.bind(tokenHash)
+		.first<{ entry_id: string }>();
+	if (tokenRow) {
+		await applyReviewDecision(env, tokenRow.entry_id, action);
+	}
+
+	return new Response(null, {
+		status: 303,
+		headers: { location: `/admin/review/${token}` },
+	});
+}
+
+/// 通報と同様、審査メールもベストエフォート通知に過ぎず見逃される可能性がある。
+/// メールに依存しない確認手段として一覧APIを用意する。
+async function handleAdminRequests(request: Request, env: Env): Promise<Response> {
+	const denied = await requireAdmin(request, env);
+	if (denied) {
+		return denied;
+	}
+
+	const { results: entries } = await env.STORE_DB.prepare(
+		`SELECT id, title, author, created_at FROM store_entries
+		 WHERE status = 'requested' ORDER BY created_at DESC`,
+	).all();
+
+	const { results: tokens } = await env.STORE_DB.prepare(
+		`SELECT entry_id, created_at, expires_at, consumed_at, action, resend_email_id
+		 FROM store_review_tokens ORDER BY created_at DESC`,
+	).all();
+
+	const latestTokenByEntry = new Map<string, Record<string, unknown>>();
+	for (const row of tokens as Record<string, unknown>[]) {
+		const entryId = row.entry_id as string;
+		if (!latestTokenByEntry.has(entryId)) {
+			latestTokenByEntry.set(entryId, row);
+		}
+	}
+
+	const result = (entries as Record<string, unknown>[]).map((e) => {
+		const t = latestTokenByEntry.get(e.id as string);
+		return {
+			id: e.id,
+			title: e.title,
+			author: e.author,
+			createdAt: e.created_at,
+			latestToken: t
+				? {
+						expiresAt: t.expires_at,
+						consumedAt: t.consumed_at,
+						action: t.action,
+						resendEmailId: t.resend_email_id,
+					}
+				: null,
+		};
+	});
+
+	return jsonResponse({ entries: result });
+}
+
+async function handleAdminDecision(
+	request: Request,
+	env: Env,
+	id: string,
+	action: "approve" | "reject",
+): Promise<Response> {
+	const denied = await requireAdmin(request, env);
+	if (denied) {
+		return denied;
+	}
+
+	const { changed, status } = await applyReviewDecision(env, id, action);
+	if (!changed) {
+		if (status === null) {
+			return errorResponse("entry not found", 404);
+		}
+		return errorResponse(`entry is not in 'requested' state (current: ${status})`, 409);
+	}
+
+	return jsonResponse({ ok: true, status });
+}
+
+/// 未消費トークンを強制失効(expires_atのみ更新。consumed_atは「このトークン経由で
+/// 決定が行われたか」を意味するため触らない)させ、新しいトークンを発行して
+/// 審査メールを再送する。Resendのspam判定等でメールが届かなかった場合の手段。
+async function handleAdminResendReview(
+	request: Request,
+	env: Env,
+	ctx: ExecutionContext,
+	id: string,
+): Promise<Response> {
+	const denied = await requireAdmin(request, env);
+	if (denied) {
+		return denied;
+	}
+
+	const entry = await env.STORE_DB.prepare(
+		"SELECT id, title, author, status FROM store_entries WHERE id = ?",
+	)
+		.bind(id)
+		.first<{ id: string; title: string; author: string; status: string }>();
+	if (!entry) {
+		return errorResponse("entry not found", 404);
+	}
+	if (entry.status !== "requested") {
+		return errorResponse(`entry is not in 'requested' state (current: ${entry.status})`, 409);
+	}
+
+	const nowISO = new Date().toISOString();
+	await env.STORE_DB.prepare(
+		`UPDATE store_review_tokens SET expires_at = ?
+		 WHERE entry_id = ? AND consumed_at IS NULL AND expires_at > ?`,
+	)
+		.bind(nowISO, id, nowISO)
+		.run();
+
+	const tokenId = crypto.randomUUID();
+	const rawToken = generateRawToken();
+	const tokenHash = await hashToken(rawToken);
+	const expiresAt = new Date(Date.now() + REVIEW_TOKEN_TTL_MS).toISOString();
+	await env.STORE_DB.prepare(
+		`INSERT INTO store_review_tokens (id, entry_id, token_hash, created_at, expires_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+	)
+		.bind(tokenId, id, tokenHash, nowISO, expiresAt)
+		.run();
+
+	const origin = new URL(request.url).origin;
+	ctx.waitUntil(
+		sendReviewRequestEmail(env, origin, entry, rawToken).then(async (resendEmailId) => {
+			if (!resendEmailId) {
+				return;
+			}
+			await env.STORE_DB.prepare(
+				"UPDATE store_review_tokens SET resend_email_id = ? WHERE id = ?",
+			)
+				.bind(resendEmailId, tokenId)
+				.run();
+		}),
+	);
+
+	return jsonResponse({ ok: true, expiresAt });
+}
+
 export default {
-	async fetch(request: Request, env: Env): Promise<Response> {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
 		const { pathname } = url;
 		const method = request.method;
@@ -615,7 +1356,7 @@ export default {
 			return handleUploadUrl(request, env);
 		}
 		if (method === "POST" && pathname === "/submit") {
-			return handleSubmit(request, env);
+			return handleSubmit(request, env, ctx);
 		}
 		if (method === "GET" && pathname === "/catalog") {
 			return handleCatalog(request, env);
@@ -642,7 +1383,65 @@ export default {
 		if (method === "GET" && emailStatusMatch) {
 			return handleAdminEmailStatus(request, env, emailStatusMatch[1]);
 		}
+		if (method === "GET" && pathname === "/admin/requests") {
+			return handleAdminRequests(request, env);
+		}
+		const adminApproveMatch = pathname.match(/^\/admin\/entries\/([\w-]+)\/approve$/);
+		if (method === "POST" && adminApproveMatch) {
+			return handleAdminDecision(request, env, adminApproveMatch[1], "approve");
+		}
+		const adminRejectMatch = pathname.match(/^\/admin\/entries\/([\w-]+)\/reject$/);
+		if (method === "POST" && adminRejectMatch) {
+			return handleAdminDecision(request, env, adminRejectMatch[1], "reject");
+		}
+		const adminResendReviewMatch = pathname.match(/^\/admin\/entries\/([\w-]+)\/resend-review$/);
+		if (method === "POST" && adminResendReviewMatch) {
+			return handleAdminResendReview(request, env, ctx, adminResendReviewMatch[1]);
+		}
+		const reviewDecideMatch = pathname.match(/^\/admin\/review\/([\w-]+)\/decide$/);
+		if (method === "POST" && reviewDecideMatch) {
+			return handleAdminReviewDecide(request, env, reviewDecideMatch[1]);
+		}
+		const reviewThumbnailMatch = pathname.match(/^\/admin\/review\/([\w-]+)\/thumbnail$/);
+		if (method === "GET" && reviewThumbnailMatch) {
+			return handleAdminReviewThumbnail(request, env, reviewThumbnailMatch[1]);
+		}
+		const reviewVideoMatch = pathname.match(/^\/admin\/review\/([\w-]+)\/video$/);
+		if (method === "GET" && reviewVideoMatch) {
+			return handleAdminReviewVideo(request, env, reviewVideoMatch[1]);
+		}
+		const reviewDownloadMatch = pathname.match(/^\/admin\/review\/([\w-]+)\/download$/);
+		if (method === "GET" && reviewDownloadMatch) {
+			return handleAdminReviewDownload(request, env, reviewDownloadMatch[1]);
+		}
+		const reviewPageMatch = pathname.match(/^\/admin\/review\/([\w-]+)$/);
+		if (method === "GET" && reviewPageMatch) {
+			return handleAdminReviewPage(request, env, reviewPageMatch[1]);
+		}
 
 		return errorResponse("not found", 404);
+	},
+
+	/// 審査依頼の全トークンが失効しても管理者が決定しなかった投稿を自動的に却下する
+	/// (#2)。resend-reviewで新トークンを発行すると各トークンのexpires_atが更新される
+	/// ため、この条件は実質「最後に発行された審査リンクが失効してから」を意味し、
+	/// クライアント側の文言(48時間以内に承認されなかった場合は却下されたものとみなす)
+	/// と一致する。wrangler.tomlの[triggers].cronsで定期実行される。
+	async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+		const nowISO = new Date().toISOString();
+		const { results } = await env.STORE_DB.prepare(
+			`SELECT se.id as id FROM store_entries se
+			 WHERE se.status = 'requested'
+			 AND NOT EXISTS (
+				 SELECT 1 FROM store_review_tokens srt
+				 WHERE srt.entry_id = se.id AND srt.expires_at > ?
+			 )`,
+		)
+			.bind(nowISO)
+			.all();
+
+		await Promise.all(
+			(results as { id: string }[]).map((row) => applyReviewDecision(env, row.id, "reject")),
+		);
 	},
 } satisfies ExportedHandler<Env>;

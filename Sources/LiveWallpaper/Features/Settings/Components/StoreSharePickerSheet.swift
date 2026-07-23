@@ -21,7 +21,7 @@ extension SettingsView {
                         .font(.system(size: 18, weight: .semibold))
                     Text(
                         model.localizedString(
-                            "保存済みのトリム・フィット設定と一緒に、選んだ動画をコミュニティStoreに公開します"
+                            "保存済みのトリム・フィット設定と一緒に、選んだ動画をコミュニティStoreに送信します(公開には審査が必要です)"
                         )
                     )
                     .font(.caption)

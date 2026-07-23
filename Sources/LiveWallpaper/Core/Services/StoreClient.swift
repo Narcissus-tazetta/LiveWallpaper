@@ -4,7 +4,12 @@ import Foundation
 
 struct StoreSubmissionResult: Equatable {
     let id: String
-    let downloadURL: URL
+    /// サーバー側の審査状態("requested"は審査待ち、"published"は公開済み)。
+    let status: String
+    /// status == "published" の場合のみ取得できる実際のダウンロードURL。
+    /// requested の間はまだ非公開(サーバーの /download は status='published' の
+    /// エントリしか返さない)ため、誤って使われないよう nil にしておく。
+    let downloadURL: URL?
 }
 
 enum StoreClientError: LocalizedError {
@@ -159,7 +164,10 @@ final class StoreClient {
 
         return StoreSubmissionResult(
             id: entry.id,
-            downloadURL: Self.baseURL.appendingPathComponent("download/\(entry.id)")
+            status: entry.status,
+            downloadURL: entry.status == "published"
+                ? Self.baseURL.appendingPathComponent("download/\(entry.id)")
+                : nil
         )
     }
 

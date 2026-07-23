@@ -9,7 +9,7 @@ extension SettingsView {
                         .font(.system(size: 18, weight: .semibold))
                     Text(
                         model.localizedString(
-                            "この動画(トリム/ループ設定を含む)をコミュニティStoreに公開します"
+                            "この動画(トリム/ループ設定を含む)をコミュニティStoreに送信します(公開には審査が必要です)"
                         )
                     )
                     .font(.caption)
@@ -42,9 +42,13 @@ extension SettingsView {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-            case .success:
+            case let .success(status):
                 Label(
-                    model.localizedString("公開しました"),
+                    model.localizedString(
+                        status == "published"
+                            ? "公開しました"
+                            : "申請しました。審査後に公開されます(48時間以内に承認されなかった場合は却下されたものとみなしてください)"
+                    ),
                     systemImage: "checkmark.circle.fill"
                 )
                 .foregroundColor(.green)
@@ -56,7 +60,7 @@ extension SettingsView {
 
             HStack {
                 Spacer(minLength: 0)
-                Button(model.localizedString("公開する")) {
+                Button(model.localizedString("送信する")) {
                     submitCurrentVideoToStore()
                 }
                 .buttonStyle(.borderedProminent)
@@ -90,7 +94,7 @@ extension SettingsView {
                     license: license.isEmpty ? nil : license,
                     thumbnailCache: thumbnailCache
                 )
-                storeShareStatus = .success(downloadURL: result.downloadURL)
+                storeShareStatus = .success(status: result.status)
             } catch {
                 storeShareStatus = .failure(message: error.localizedDescription)
             }

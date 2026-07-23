@@ -28,3 +28,20 @@ CREATE TABLE store_reports (
 
 -- 同一IPからの同一エントリへの重複報告を防ぐ(素朴な多重投票対策)。
 CREATE UNIQUE INDEX idx_store_reports_entry_reporter ON store_reports(entry_id, reporter_ip);
+
+-- status='requested' なエントリの審査用ワンタイムトークン。生トークンは保存せず
+-- token_hash (SHA-256) のみ保存する。consumed_at は「このトークン経由で決定が
+-- 行われたか」を意味し、resend-review による強制失効では expires_at のみ更新する。
+CREATE TABLE store_review_tokens (
+    id TEXT PRIMARY KEY,
+    entry_id TEXT NOT NULL REFERENCES store_entries(id),
+    token_hash TEXT NOT NULL,
+    action TEXT,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    consumed_at TEXT,
+    resend_email_id TEXT
+);
+
+CREATE UNIQUE INDEX idx_store_review_tokens_hash ON store_review_tokens(token_hash);
+CREATE INDEX idx_store_review_tokens_entry ON store_review_tokens(entry_id);

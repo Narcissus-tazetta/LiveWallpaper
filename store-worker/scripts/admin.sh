@@ -4,9 +4,17 @@
 # 使い方:
 #   ADMIN_KEY=xxx STORE_WORKER_URL=https://your-worker.example.com ./scripts/admin.sh list
 #   ADMIN_KEY=xxx STORE_WORKER_URL=https://your-worker.example.com ./scripts/admin.sh delete <entry-id>
+#   ADMIN_KEY=xxx STORE_WORKER_URL=https://your-worker.example.com ./scripts/admin.sh requests
+#   ADMIN_KEY=xxx STORE_WORKER_URL=https://your-worker.example.com ./scripts/admin.sh approve <entry-id>
+#   ADMIN_KEY=xxx STORE_WORKER_URL=https://your-worker.example.com ./scripts/admin.sh reject <entry-id>
+#   ADMIN_KEY=xxx STORE_WORKER_URL=https://your-worker.example.com ./scripts/admin.sh resend-review <entry-id>
 #   ./scripts/admin.sh purge-all
 #
-# list / delete は Worker の /admin/reports, /admin/entries/:id を curl で叩くだけ(ADMIN_KEY必須)。
+# list / delete / requests / approve / reject / resend-review は Worker の /admin/* を
+# curl で叩くだけ(ADMIN_KEY必須)。審査依頼メールが迷惑メール判定等で届かない場合、
+# requests で申請中の投稿を確認し、approve/reject で直接決定できる(メール非依存の
+# フォールバック)。reject しても R2 上のオブジェクトは残るので、不要なら delete で
+# ストレージを解放すること。
 # purge-all は wrangler で直接 D1/R2 を操作するため ADMIN_KEY は不要だが、
 # wrangler のCloudflareログインが必要(`wrangler login`済みであること)。
 
@@ -16,7 +24,7 @@ D1_DATABASE="${STORE_D1_DATABASE:-livewallpaper-store-db}"
 R2_BUCKET="${STORE_R2_BUCKET:-livewallpaper-store}"
 
 usage() {
-	echo "usage: $0 <list|delete <entry-id>|purge-all>" >&2
+	echo "usage: $0 <list|delete <entry-id>|requests|approve <entry-id>|reject <entry-id>|resend-review <entry-id>|purge-all>" >&2
 	exit 1
 }
 
@@ -38,6 +46,36 @@ cmd_delete() {
 	[[ -n "$id" ]] || usage
 	require_admin_env
 	curl -sS -X DELETE "${STORE_WORKER_URL%/}/admin/entries/${id}" -H "x-admin-key: ${ADMIN_KEY}"
+	echo
+}
+
+cmd_requests() {
+	require_admin_env
+	curl -sS "${STORE_WORKER_URL%/}/admin/requests" -H "x-admin-key: ${ADMIN_KEY}" | \
+		(command -v jq >/dev/null 2>&1 && jq . || cat)
+}
+
+cmd_approve() {
+	local id="${1:-}"
+	[[ -n "$id" ]] || usage
+	require_admin_env
+	curl -sS -X POST "${STORE_WORKER_URL%/}/admin/entries/${id}/approve" -H "x-admin-key: ${ADMIN_KEY}"
+	echo
+}
+
+cmd_reject() {
+	local id="${1:-}"
+	[[ -n "$id" ]] || usage
+	require_admin_env
+	curl -sS -X POST "${STORE_WORKER_URL%/}/admin/entries/${id}/reject" -H "x-admin-key: ${ADMIN_KEY}"
+	echo
+}
+
+cmd_resend_review() {
+	local id="${1:-}"
+	[[ -n "$id" ]] || usage
+	require_admin_env
+	curl -sS -X POST "${STORE_WORKER_URL%/}/admin/entries/${id}/resend-review" -H "x-admin-key: ${ADMIN_KEY}"
 	echo
 }
 
@@ -76,6 +114,10 @@ cmd_purge_all() {
 case "${1:-}" in
 	list) cmd_list ;;
 	delete) cmd_delete "${2:-}" ;;
+	requests) cmd_requests ;;
+	approve) cmd_approve "${2:-}" ;;
+	reject) cmd_reject "${2:-}" ;;
+	resend-review) cmd_resend_review "${2:-}" ;;
 	purge-all) cmd_purge_all ;;
 	*) usage ;;
 esac

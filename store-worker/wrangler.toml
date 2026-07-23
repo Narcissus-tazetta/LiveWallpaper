@@ -21,6 +21,12 @@ namespace_id = "1001"
   limit = 20
   period = 60
 
+# 審査依頼の全トークンが失効しても管理者が決定しなかった投稿を自動的に却下する
+# (scheduled()参照)。ユーザー向け文言(48時間以内に承認されなかった場合は却下された
+# ものとみなす)を実際に保証するため、1時間おきにチェックする。
+[triggers]
+crons = ["0 * * * *"]
+
 [vars]
 # Cloudflare account ID (dashboard right sidebar, or `wrangler whoami`).
 R2_ACCOUNT_ID = "8cccd37f8611ab68926721072c2ae958"
