@@ -106,7 +106,7 @@ cmd_purge_all() {
 	fi
 
 	npx wrangler d1 execute "$D1_DATABASE" --remote \
-		--command "DELETE FROM store_reports; DELETE FROM store_entries;"
+		--command "DELETE FROM store_reports; DELETE FROM store_review_tokens; DELETE FROM store_entries;"
 
 	echo "purge-all complete."
 }
