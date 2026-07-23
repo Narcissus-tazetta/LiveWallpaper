@@ -13,8 +13,8 @@
 # list / delete / requests / approve / reject / resend-review は Worker の /admin/* を
 # curl で叩くだけ(ADMIN_KEY必須)。審査依頼メールが迷惑メール判定等で届かない場合、
 # requests で申請中の投稿を確認し、approve/reject で直接決定できる(メール非依存の
-# フォールバック)。reject しても R2 上のオブジェクトは残るので、不要なら delete で
-# ストレージを解放すること。
+# フォールバック)。reject すると R2 上のオブジェクト(パッケージ/サムネイル)も
+# 削除される(delete と同じ後始末)。
 # purge-all は wrangler で直接 D1/R2 を操作するため ADMIN_KEY は不要だが、
 # wrangler のCloudflareログインが必要(`wrangler login`済みであること)。
 
@@ -80,6 +80,11 @@ cmd_resend_review() {
 }
 
 cmd_purge_all() {
+	if ! command -v jq >/dev/null 2>&1; then
+		echo "purge-all requires jq to parse the D1 row list (brew install jq)." >&2
+		exit 1
+	fi
+
 	echo "This will PERMANENTLY delete ALL store entries (D1 rows + R2 objects) in:"
 	echo "  D1 database: ${D1_DATABASE}"
 	echo "  R2 bucket:   ${R2_BUCKET}"

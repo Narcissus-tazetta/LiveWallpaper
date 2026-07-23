@@ -453,6 +453,7 @@
 "スパムまたは無関係なコンテンツ" = "Spam or irrelevant content";
 "通報しました。ご協力ありがとうございます" = "Reported. Thank you for your help";
 "通報に失敗しました。もう一度お試しください" = "Failed to report. Please try again";
+"ダウンロードURLが不正です" = "Invalid download URL";
 "通報済み" = "Already reported";
 
 // Store: my submissions, search & sort

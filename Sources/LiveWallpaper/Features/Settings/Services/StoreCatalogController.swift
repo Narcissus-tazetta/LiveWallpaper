@@ -128,7 +128,7 @@ final class StoreCatalogController: ObservableObject {
         defer { downloadingEntryID = nil }
 
         guard let url = URL(string: entry.downloadURL) else {
-            downloadResultMessage = "invalid download URL"
+            downloadResultMessage = Self.localized("ダウンロードURLが不正です")
             return
         }
 
@@ -136,22 +136,37 @@ final class StoreCatalogController: ObservableObject {
             .appendingPathComponent("\(UUID().uuidString).lwpkg")
 
         do {
-            let (data, response) = try await session.data(from: url)
+            // .lwpkgは最大500MBまで許容するため、data(from:)で全体をメモリに
+            // バッファせず、download(from:)でディスクへストリーミングしてから
+            // チャンク単位でハッシュを計算する。
+            let (downloadedFile, response) = try await session.download(from: url)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                try? fileManager.removeItem(at: downloadedFile)
                 throw StoreClientError.invalidResponse
             }
-            let actualSHA256 = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            try fileManager.moveItem(at: downloadedFile, to: tempFile)
+            defer { try? fileManager.removeItem(at: tempFile) }
+
+            let actualSHA256 = try Self.sha256Hex(ofFileAt: tempFile)
             guard actualSHA256.caseInsensitiveCompare(entry.sha256) == .orderedSame else {
                 throw StoreClientError.checksumMismatch
             }
-            try data.write(to: tempFile)
-            defer { try? fileManager.removeItem(at: tempFile) }
 
             try await PackageImporter().importPackage(from: tempFile, into: model)
             downloadResultMessage = model.localizedString("追加しました")
         } catch {
             downloadResultMessage = error.localizedDescription
         }
+    }
+
+    private static func sha256Hex(ofFileAt url: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     func report(entry: StoreEntry, reason: String) async {

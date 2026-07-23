@@ -457,6 +457,7 @@
 "スパムまたは無関係なコンテンツ" = "Spam hoặc nội dung không liên quan";
 "通報しました。ご協力ありがとうございます" = "Đã báo cáo. Cảm ơn bạn đã hỗ trợ";
 "通報に失敗しました。もう一度お試しください" = "Báo cáo không thành công. Vui lòng thử lại";
+"ダウンロードURLが不正です" = "URL tải xuống không hợp lệ";
 "通報済み" = "Đã báo cáo";
 
 // Store: bài đã gửi, tìm kiếm và sắp xếp

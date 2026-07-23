@@ -70,7 +70,8 @@ extension SettingsView {
     }
 
     /// サーバーが "requested" のまま48時間応答がない投稿は、UI上は却下扱いにする。
-    /// サーバー側に自動却下処理はなく、あくまで表示上のみなし(次回refreshAllで
+    /// サーバー側のcron(scheduled())も同じ48時間基準で自動却下するが、次回の
+    /// 実行までタイムラグがあるため、こちらは表示上のみなし(次回refreshAllで
     /// 実際のステータスが取得できればそちらを優先する)。
     private static let submissionReviewTimeout: TimeInterval = 48 * 60 * 60
 

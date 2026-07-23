@@ -457,6 +457,7 @@
 "スパムまたは無関係なコンテンツ" = "Spam veya alakasız içerik";
 "通報しました。ご協力ありがとうございます" = "Bildirildi. Yardımınız için teşekkürler";
 "通報に失敗しました。もう一度お試しください" = "Bildirme başarısız oldu. Lütfen tekrar deneyin";
+"ダウンロードURLが不正です" = "Geçersiz indirme URL'si";
 "通報済み" = "Zaten bildirildi";
 
 // Store: gönderilerim, arama ve sıralama
