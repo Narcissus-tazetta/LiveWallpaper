@@ -6,6 +6,14 @@ extension SettingsView {
             HStack {
                 Label(model.localizedString("Store"), systemImage: "square.grid.2x2.fill")
                     .font(.system(size: 13, weight: .semibold))
+
+                Picker("", selection: $storeTabMode) {
+                    Text(model.localizedString("みんなの投稿")).tag(StoreTabMode.browse)
+                    Text(model.localizedString("自分の投稿")).tag(StoreTabMode.mine)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 220)
+
                 Spacer(minLength: 0)
                 if let message = storeCatalog.reportResultMessage {
                     Text(message)
@@ -26,13 +34,72 @@ extension SettingsView {
 
                 Button {
                     Task {
-                        await storeCatalog.reload()
+                        switch storeTabMode {
+                        case .browse:
+                            await storeCatalog.reload()
+                        case .mine:
+                            await storeMySubmissions.refreshAll()
+                        }
                     }
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.bordered)
-                .disabled(storeCatalog.isLoading)
+                .disabled(storeTabMode == .browse ? storeCatalog.isLoading : storeMySubmissions.isRefreshing)
+            }
+
+            switch storeTabMode {
+            case .browse:
+                storeBrowseContent
+            case .mine:
+                storeMySubmissionsList
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.secondary.opacity(0.08))
+        )
+        .task {
+            await storeCatalog.loadIfNeeded()
+        }
+        .onChange(of: storeTabMode) { mode in
+            guard mode == .mine else {
+                return
+            }
+            Task {
+                await storeMySubmissions.refreshAll()
+            }
+        }
+    }
+
+    private var storeBrowseContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                TextField(
+                    model.localizedString("タイトルで検索"),
+                    text: Binding(
+                        get: { storeCatalog.searchQuery },
+                        set: { storeCatalog.setSearchQuery($0) }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 220)
+
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { storeCatalog.sortOption },
+                        set: { storeCatalog.setSortOption($0) }
+                    )
+                ) {
+                    Text(model.localizedString("新着順")).tag(StoreSortOption.newest)
+                    Text(model.localizedString("人気順")).tag(StoreSortOption.popular)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 160)
+
+                Spacer(minLength: 0)
             }
 
             if let errorMessage = storeCatalog.errorMessage {
@@ -70,14 +137,6 @@ extension SettingsView {
                 }
                 .frame(minHeight: 320, maxHeight: 560)
             }
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.secondary.opacity(0.08))
-        )
-        .task {
-            await storeCatalog.loadIfNeeded()
         }
     }
 }

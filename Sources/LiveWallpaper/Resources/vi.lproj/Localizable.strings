@@ -458,3 +458,16 @@
 "通報しました。ご協力ありがとうございます" = "Đã báo cáo. Cảm ơn bạn đã hỗ trợ";
 "通報に失敗しました。もう一度お試しください" = "Báo cáo không thành công. Vui lòng thử lại";
 "通報済み" = "Đã báo cáo";
+
+// Store: bài đã gửi, tìm kiếm và sắp xếp
+"みんなの投稿" = "Duyệt";
+"自分の投稿" = "Bài đã gửi";
+"タイトルで検索" = "Tìm theo tiêu đề";
+"新着順" = "Mới nhất";
+"人気順" = "Phổ biến";
+"まだ投稿がありません" = "Chưa có bài đăng nào";
+"リストから削除(投稿自体は削除されません)" = "Xóa khỏi danh sách (không xóa bài đăng)";
+"審査中" = "Đang xét duyệt";
+"公開済み" = "Đã xuất bản";
+"却下されました" = "Đã bị từ chối";
+"ステータスの取得に失敗しました。しばらくしてから再度お試しください" = "Không thể lấy trạng thái. Vui lòng thử lại sau";

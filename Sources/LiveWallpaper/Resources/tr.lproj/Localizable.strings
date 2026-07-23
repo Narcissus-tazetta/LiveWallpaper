@@ -458,3 +458,16 @@
 "通報しました。ご協力ありがとうございます" = "Bildirildi. Yardımınız için teşekkürler";
 "通報に失敗しました。もう一度お試しください" = "Bildirme başarısız oldu. Lütfen tekrar deneyin";
 "通報済み" = "Zaten bildirildi";
+
+// Store: gönderilerim, arama ve sıralama
+"みんなの投稿" = "Gözat";
+"自分の投稿" = "Gönderilerim";
+"タイトルで検索" = "Başlığa göre ara";
+"新着順" = "En Yeni";
+"人気順" = "Popüler";
+"まだ投稿がありません" = "Henüz gönderi yok";
+"リストから削除(投稿自体は削除されません)" = "Listeden kaldır (gönderinin kendisini silmez)";
+"審査中" = "İncelemede";
+"公開済み" = "Yayınlandı";
+"却下されました" = "Reddedildi";
+"ステータスの取得に失敗しました。しばらくしてから再度お試しください" = "Durum alınamadı. Lütfen daha sonra tekrar deneyin";

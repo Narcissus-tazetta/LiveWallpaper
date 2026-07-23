@@ -13,9 +13,12 @@ final class StoreCatalogController: ObservableObject {
     @Published var downloadResultMessage: String?
     @Published var reportResultMessage: String?
     @Published var reportedEntryIDs: Set<String> = []
+    @Published private(set) var searchQuery: String = ""
+    @Published private(set) var sortOption: StoreSortOption = .newest
 
     private var nextCursor: String?
     private var hasLoadedOnce: Bool = false
+    private var searchDebounceTask: Task<Void, Never>?
     private let session: URLSession
     private let fileManager: FileManager
 
@@ -29,6 +32,32 @@ final class StoreCatalogController: ObservableObject {
             return
         }
         await reload()
+    }
+
+    /// 検索欄の入力ごとに即リロードすると打鍵のたびにリクエストが飛ぶため、
+    /// 入力が止まって一定時間経ってから実際のリロードを行う。
+    func setSearchQuery(_ query: String) {
+        guard searchQuery != query else {
+            return
+        }
+        searchQuery = query
+        searchDebounceTask?.cancel()
+        searchDebounceTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard let self, !Task.isCancelled else {
+                return
+            }
+            await self.reload()
+        }
+    }
+
+    func setSortOption(_ option: StoreSortOption) {
+        guard sortOption != option else {
+            return
+        }
+        sortOption = option
+        searchDebounceTask?.cancel()
+        Task { await reload() }
     }
 
     func reload() async {
@@ -69,6 +98,13 @@ final class StoreCatalogController: ObservableObject {
         var queryItems = [URLQueryItem(name: "limit", value: "20")]
         if let cursor {
             queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        let trimmedQuery = searchQuery.trimmingCharacters(in: .whitespaces)
+        if !trimmedQuery.isEmpty {
+            queryItems.append(URLQueryItem(name: "q", value: trimmedQuery))
+        }
+        if sortOption == .popular {
+            queryItems.append(URLQueryItem(name: "sort", value: sortOption.rawValue))
         }
         components.queryItems = queryItems
 

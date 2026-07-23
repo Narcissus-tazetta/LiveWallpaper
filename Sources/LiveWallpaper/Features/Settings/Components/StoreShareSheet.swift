@@ -95,6 +95,7 @@ extension SettingsView {
                     thumbnailCache: thumbnailCache
                 )
                 storeShareStatus = .success(status: result.status)
+                storeMySubmissions.record(id: result.id, title: title, createdAt: result.createdAt)
             } catch {
                 storeShareStatus = .failure(message: error.localizedDescription)
             }

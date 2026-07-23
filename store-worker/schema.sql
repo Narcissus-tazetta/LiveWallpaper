@@ -18,6 +18,9 @@ CREATE TABLE store_entries (
 
 CREATE INDEX idx_store_entries_status_created ON store_entries(status, created_at DESC);
 
+-- /catalog?sort=popular (download_count DESC, created_at DESC でのカーソルページング) 用。
+CREATE INDEX idx_store_entries_status_downloads ON store_entries(status, download_count DESC, created_at DESC);
+
 CREATE TABLE store_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entry_id TEXT NOT NULL REFERENCES store_entries(id),

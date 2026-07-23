@@ -25,6 +25,7 @@ struct SettingsView: View {
     @StateObject var fitEditor: FitEditorController
     @StateObject var wallpaperEditor: WallpaperEditorController
     @StateObject var storeCatalog: StoreCatalogController
+    @StateObject var storeMySubmissions: StoreMySubmissionsController
     @StateObject var remoteThumbnailCache: RemoteThumbnailCache
     @State var editorSubMode: EditorSubMode = .fit
     @State var isResetSettingsDialogPresented: Bool = false
@@ -32,6 +33,7 @@ struct SettingsView: View {
     @State var isWallpaperShareSheetPresented: Bool = false
     @State var isStoreSharePickerPresented: Bool = false
     @State var isStoreShareSheetPresented: Bool = false
+    @State var storeTabMode: StoreTabMode = .browse
     /// Storeへの共有シートが対象にしている動画。共有シートはトリム編集タブの選択状態
     /// (wallpaperEditor.selectedVideoPath)には依存しない — 右クリックメニューや
     /// Storeタブのピッカーなど、編集タブを開かずに共有を始めた場合でも、選んだ動画を
@@ -81,6 +83,7 @@ struct SettingsView: View {
         _fitEditor = StateObject(wrappedValue: FitEditorController(model: model))
         _wallpaperEditor = StateObject(wrappedValue: WallpaperEditorController(model: model))
         _storeCatalog = StateObject(wrappedValue: StoreCatalogController())
+        _storeMySubmissions = StateObject(wrappedValue: StoreMySubmissionsController())
         _remoteThumbnailCache = StateObject(wrappedValue: RemoteThumbnailCache())
     }
 

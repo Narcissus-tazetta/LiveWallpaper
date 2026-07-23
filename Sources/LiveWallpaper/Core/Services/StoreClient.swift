@@ -4,6 +4,7 @@ import Foundation
 
 struct StoreSubmissionResult: Equatable {
     let id: String
+    let createdAt: String
     /// サーバー側の審査状態("requested"は審査待ち、"published"は公開済み)。
     let status: String
     /// status == "published" の場合のみ取得できる実際のダウンロードURL。
@@ -164,6 +165,7 @@ final class StoreClient {
 
         return StoreSubmissionResult(
             id: entry.id,
+            createdAt: entry.createdAt,
             status: entry.status,
             downloadURL: entry.status == "published"
                 ? Self.baseURL.appendingPathComponent("download/\(entry.id)")

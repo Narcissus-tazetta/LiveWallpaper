@@ -454,3 +454,16 @@
 "通報しました。ご協力ありがとうございます" = "Reported. Thank you for your help";
 "通報に失敗しました。もう一度お試しください" = "Failed to report. Please try again";
 "通報済み" = "Already reported";
+
+// Store: my submissions, search & sort
+"みんなの投稿" = "Browse";
+"自分の投稿" = "My Submissions";
+"タイトルで検索" = "Search by title";
+"新着順" = "Newest";
+"人気順" = "Popular";
+"まだ投稿がありません" = "No submissions yet";
+"リストから削除(投稿自体は削除されません)" = "Remove from list (doesn't delete the submission itself)";
+"審査中" = "Under review";
+"公開済み" = "Published";
+"却下されました" = "Rejected";
+"ステータスの取得に失敗しました。しばらくしてから再度お試しください" = "Failed to fetch status. Please try again later";

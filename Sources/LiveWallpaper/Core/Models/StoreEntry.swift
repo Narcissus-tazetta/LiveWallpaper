@@ -21,6 +21,33 @@ struct StoreCatalogResponse: Decodable {
     let nextCursor: String?
 }
 
+enum StoreSortOption: String, CaseIterable, Identifiable {
+    case newest
+    case popular
+
+    var id: String { rawValue }
+}
+
+/// GET /entries/:id/status のレスポンス。/catalog と違いstatus='published'に
+/// 限定されない(投稿者自身が審査中/却下も確認できるように)。
+struct StoreEntryStatusResponse: Decodable {
+    let id: String
+    let title: String
+    let author: String
+    let status: String
+    let createdAt: String
+}
+
+/// この端末から送信したStore投稿のローカル記録。サーバー側は投稿者アカウントの
+/// 概念を持たないため、「自分の投稿」一覧はこの端末が覚えているidをキーに
+/// /entries/:id/status を都度引いて表示する。
+struct StoreMySubmission: Codable, Identifiable, Equatable {
+    let id: String
+    let title: String
+    let createdAt: String
+    var lastKnownStatus: String
+}
+
 /// store-worker側は理由を自由文字列として保存するのみ(store-worker/src/index.ts の
 /// handleReport)なので、UIから送るローカライズキーをそのままreasonとして送信する。
 enum StoreReportReason: String, CaseIterable, Identifiable {

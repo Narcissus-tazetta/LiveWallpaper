@@ -46,6 +46,13 @@ extension SettingsView {
         case failure(message: String)
     }
 
+    /// Storeタブ内の表示モード。みんなの投稿を眺める「ブラウズ」と、この端末から
+    /// 投稿した分の審査状況を確認する「自分の投稿」を切り替える。
+    enum StoreTabMode: String, CaseIterable, Hashable {
+        case browse
+        case mine
+    }
+
     /// 壁紙の設定先。将来「サブディスプレイ」タブを足す場合はここに case を追加し、
     /// availableAssignmentTargets に並べるだけでタブが増える。
     enum WallpaperAssignmentTarget: String, CaseIterable, Hashable {
