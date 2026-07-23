@@ -350,7 +350,7 @@ final class StoreClient {
             return try JSONDecoder().decode(SubmitResponse.self, from: data)
         } catch {
             AppLog.store.error(
-                "submit decode failed: \(error, privacy: .public) body=\(String(decoding: data, as: UTF8.self), privacy: .public)"
+                "submit decode failed: \(error, privacy: .public) body=\(String(decoding: data, as: UTF8.self), privacy: .private)"
             )
             throw error
         }

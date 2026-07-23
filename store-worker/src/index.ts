@@ -134,6 +134,18 @@ async function handleUploadUrl(request: Request, env: Env): Promise<Response> {
 		if (!relatedId || !UUID_RE.test(relatedId)) {
 			return errorResponse("missing or invalid relatedId for thumbnail upload");
 		}
+		// relatedIdは/submit未実行の新規パッケージのidであるはずで、その時点では
+		// store_entriesに行が存在しない。既存の(公開済み含む)エントリのidが渡された
+		// 場合は、そのエントリの生きているサムネイルオブジェクトを無認証で
+		// 上書きされてしまうため拒否する。
+		const existing = await env.STORE_DB.prepare(
+			"SELECT 1 FROM store_entries WHERE id = ?",
+		)
+			.bind(relatedId)
+			.first();
+		if (existing) {
+			return errorResponse("relatedId already belongs to an existing entry", 409);
+		}
 		id = relatedId;
 		objectKey = `thumbnails/${id}.jpg`;
 	} else {
