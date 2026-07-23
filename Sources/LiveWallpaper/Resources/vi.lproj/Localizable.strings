@@ -476,3 +476,11 @@
 "この操作は取り消せません" = "Không thể hoàn tác thao tác này";
 "この投稿は取り下げに対応していません。リストから削除のみ行えます" = "Bài đăng này không hỗ trợ rút lại. Bạn chỉ có thể xóa khỏi danh sách";
 "取り下げに失敗しました。もう一度お試しください" = "Rút lại không thành công. Vui lòng thử lại";
+
+// 検索バーUX改善(共通コンポーネント化)
+"タイトルや名前で壁紙を検索" = "Tìm hình nền theo tiêu đề hoặc tên";
+"検索をクリア" = "Xóa tìm kiếm";
+"検索条件に一致する壁紙がありません" = "Không có hình nền nào khớp với tìm kiếm của bạn";
+"アプリ名で検索" = "Tìm theo tên ứng dụng";
+"除外できるアプリがありません" = "Không có ứng dụng nào để loại trừ";
+"一致" = "Khớp";

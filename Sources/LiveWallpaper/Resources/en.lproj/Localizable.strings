@@ -472,3 +472,11 @@
 "この操作は取り消せません" = "This can't be undone";
 "この投稿は取り下げに対応していません。リストから削除のみ行えます" = "This submission doesn't support withdrawal. You can only remove it from the list";
 "取り下げに失敗しました。もう一度お試しください" = "Failed to withdraw. Please try again";
+
+// 検索バーUX改善(共通コンポーネント化)
+"タイトルや名前で壁紙を検索" = "Search wallpapers by title or name";
+"検索をクリア" = "Clear search";
+"検索条件に一致する壁紙がありません" = "No wallpapers match your search";
+"アプリ名で検索" = "Search by app name";
+"除外できるアプリがありません" = "No apps available to exclude";
+"一致" = "Match";

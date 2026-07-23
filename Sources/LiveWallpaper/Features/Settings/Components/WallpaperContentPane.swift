@@ -107,46 +107,12 @@ extension SettingsView {
         HStack(spacing: 10) {
             playlistFilterControl
 
-            HStack(spacing: 4) {
-                Image(systemName: "magnifyingglass")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .onTapGesture {
-                        isLibrarySearchFocused = true
-                    }
-                LibrarySearchField(
-                    text: $librarySearchText,
-                    placeholder: model.localizedString("検索"),
-                    isFocused: $isLibrarySearchFocused
-                )
-                .frame(minWidth: 120, maxWidth: .infinity)
-                Button {
-                    librarySearchText = ""
-                    isLibrarySearchFocused = true
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-                .opacity(librarySearchText.isEmpty ? 0 : 1)
-                .disabled(librarySearchText.isEmpty)
-                .allowsHitTesting(!librarySearchText.isEmpty)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.secondary.opacity(0.12))
+            SearchField(
+                placeholder: model.localizedString("タイトルや名前で壁紙を検索"),
+                text: $librarySearchText,
+                isFocused: $isLibrarySearchFocused
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(
-                        isLibrarySearchFocused ? Color.accentColor : Color.clear,
-                        lineWidth: 1.5
-                    )
-            )
+            .frame(minWidth: 120, maxWidth: .infinity)
 
             Text("\(displayedItemCount) \(model.localizedString("本"))")
                 .font(.caption)
@@ -374,12 +340,18 @@ extension SettingsView {
     private var wallpaperListContent: some View {
         let hasAnySource = !model.libraryVideoPaths.isEmpty
             || (model.webWallpaperFeatureEnabled && !model.webWallpaperSources.isEmpty)
-        if !hasAnySource {
-            wallpaperEmptyStateText
-        } else if mergedListEntries.isEmpty {
-            Text(model.localizedString("該当する壁紙がありません"))
-                .font(.caption)
-                .foregroundColor(.secondary)
+        if !hasAnySource || mergedListEntries.isEmpty {
+            SearchEmptyState(
+                isSearchActive: hasAnySource && !librarySearchQuery.isEmpty,
+                clearButtonTitle: model.localizedString("検索をクリア"),
+                onClearSearch: { librarySearchText = ""; isLibrarySearchFocused = true },
+                noContent: { wallpaperEmptyStateText },
+                noMatch: {
+                    Text(model.localizedString("該当する壁紙がありません"))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            )
         } else {
             wallpaperGrid
         }

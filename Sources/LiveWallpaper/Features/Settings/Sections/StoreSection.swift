@@ -76,15 +76,21 @@ extension SettingsView {
     private var storeBrowseContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                TextField(
-                    model.localizedString("タイトルで検索"),
+                SearchField(
+                    placeholder: model.localizedString("タイトルで検索"),
                     text: Binding(
                         get: { storeCatalog.searchQuery },
                         set: { storeCatalog.setSearchQuery($0) }
-                    )
+                    ),
+                    isFocused: $isStoreSearchFocused,
+                    isSearching: storeCatalog.isSearching
                 )
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 220)
+                .frame(maxWidth: 260)
+                .background(
+                    Button("") { isStoreSearchFocused = true }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .hidden()
+                )
 
                 Picker(
                     "",
@@ -114,9 +120,13 @@ extension SettingsView {
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 40)
                 } else {
-                    Text(model.localizedString("まだ公開されている壁紙がありません"))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    SearchEmptyState(
+                        isSearchActive: !storeCatalog.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty,
+                        noContentText: model.localizedString("まだ公開されている壁紙がありません"),
+                        noMatchText: model.localizedString("検索条件に一致する壁紙がありません"),
+                        clearButtonTitle: model.localizedString("検索をクリア"),
+                        onClearSearch: { storeCatalog.setSearchQuery(""); isStoreSearchFocused = true }
+                    )
                 }
             } else {
                 GeometryReader { proxy in

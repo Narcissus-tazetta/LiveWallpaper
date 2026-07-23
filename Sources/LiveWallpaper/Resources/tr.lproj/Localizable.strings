@@ -476,3 +476,11 @@
 "この操作は取り消せません" = "Bu işlem geri alınamaz";
 "この投稿は取り下げに対応していません。リストから削除のみ行えます" = "Bu gönderi geri çekmeyi desteklemiyor. Yalnızca listeden kaldırabilirsiniz";
 "取り下げに失敗しました。もう一度お試しください" = "Geri çekilemedi. Lütfen tekrar deneyin";
+
+// 検索バーUX改善(共通コンポーネント化)
+"タイトルや名前で壁紙を検索" = "Başlığa veya ada göre duvar kağıdı ara";
+"検索をクリア" = "Aramayı temizle";
+"検索条件に一致する壁紙がありません" = "Aramanızla eşleşen duvar kağıdı yok";
+"アプリ名で検索" = "Uygulama adına göre ara";
+"除外できるアプリがありません" = "Hariç tutulabilecek uygulama yok";
+"一致" = "Eşleşme";

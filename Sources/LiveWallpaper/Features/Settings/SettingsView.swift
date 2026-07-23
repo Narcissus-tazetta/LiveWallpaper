@@ -59,9 +59,11 @@ struct SettingsView: View {
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
     @FocusState var focusedWebWallpaperID: UUID?
-    @State var isLibrarySearchFocused: Bool = false
+    @FocusState var isLibrarySearchFocused: Bool
     @State var settingsSearchText: String = ""
-    @State var isSettingsSearchFocused: Bool = false
+    @FocusState var isSettingsSearchFocused: Bool
+    @FocusState var isStoreSearchFocused: Bool
+    @FocusState var isSuspendExclusionSearchFocused: Bool
     /// スケジュールのターゲット壁紙ピッカーを開いている対象(ルールIDまたは簡易UIの
     /// 固定キー)。nil ならどのポップオーバーも表示しない。
     @State var scheduleTargetPickerContext: ScheduleTargetPickerContext?
@@ -406,6 +408,11 @@ struct SettingsView: View {
                         wallpaperScheduleCard
                     }
                 }
+                .background(
+                    Button("") { isLibrarySearchFocused = true }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .hidden()
+                )
             }
         case .wallpaperFit:
             WallpaperFitTabView(title: model.localizedString("編集")) {
@@ -435,6 +442,11 @@ struct SettingsView: View {
             SettingsTabView {
                 Section {
                     settingsSearchField
+                        .background(
+                            Button("") { isSettingsSearchFocused = true }
+                                .keyboardShortcut("f", modifiers: .command)
+                                .hidden()
+                        )
                 }
                 Group {
                     if let message = model.persistenceFailureMessage {
@@ -447,15 +459,19 @@ struct SettingsView: View {
                     }
                     if settingsSectionMatches(.video) {
                         videoSettingsSection
+                        settingsSectionMatchHint(.video)
                     }
                     if settingsSectionMatches(.share) {
                         shareSettingsSection
+                        settingsSectionMatchHint(.share)
                     }
                     if settingsSectionMatches(.webWallpaper) {
                         webWallpaperSettingsSection
+                        settingsSectionMatchHint(.webWallpaper)
                     }
                     if settingsSectionMatches(.display) {
                         displaySettingsSection
+                        settingsSectionMatchHint(.display)
                     }
                     // スケジュール本体は壁紙タブへ移動済み。検索でヒットしたとき
                     // だけ案内行を出す(非検索時は何も出さない)。
@@ -467,28 +483,39 @@ struct SettingsView: View {
                     }
                     if settingsSectionMatches(.language) {
                         languageSettingsSection
+                        settingsSectionMatchHint(.language)
                     }
                     if settingsSectionMatches(.cache) {
                         cacheSettingsSection
+                        settingsSectionMatchHint(.cache)
                     }
                 }
                 Group {
                     if settingsSectionMatches(.reset) {
                         resetSettingsSection
+                        settingsSectionMatchHint(.reset)
                     }
                     if settingsSectionMatches(.update) {
                         updateSettingsSection
+                        settingsSectionMatchHint(.update)
                     }
                     if isSettingsSearchActive, !anySettingsSectionMatches {
                         Section {
-                            Text(model.localizedString("該当する設定がありません"))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            SearchEmptyState(
+                                isSearchActive: true,
+                                noContentText: "",
+                                noMatchText: model.localizedString("該当する設定がありません"),
+                                clearButtonTitle: model.localizedString("検索をクリア"),
+                                onClearSearch: { settingsSearchText = ""; isSettingsSearchFocused = true }
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 }
             }
+            #if DEBUG
+            .onAppear { SettingsView.assertAllSettingsSectionsHaveSearchKeywords() }
+            #endif
         }
     }
 

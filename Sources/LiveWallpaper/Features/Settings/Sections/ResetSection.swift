@@ -3,6 +3,15 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 extension SettingsView {
+  static let resetSearchKeywords: [String] = [
+    "設定の管理",
+    "再生をリフレッシュ",
+    "設定をリセット",
+    "設定を書き出す…",
+    "設定を読み込む…",
+    "バックアップ",
+  ]
+
   var resetSettingsSection: some View {
     Section(
       header: Label(

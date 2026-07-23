@@ -15,6 +15,11 @@ final class StoreCatalogController: ObservableObject {
     @Published var reportedEntryIDs: Set<String> = []
     @Published private(set) var searchQuery: String = ""
     @Published private(set) var sortOption: StoreSortOption = .newest
+    /// 検索デバウンス待ち〜再検索完了までを表す、ページング読み込み(isLoading)とは
+    /// 独立したフラグ。既存の entries は reload() 完了まで書き換わらないため一覧の
+    /// ちらつきは元々発生していないが、「検索中」であることをフィールド脇の小さい
+    /// インジケータでユーザーに伝えるために使う。
+    @Published private(set) var isSearching: Bool = false
 
     private var nextCursor: String?
     private var hasLoadedOnce: Bool = false
@@ -47,7 +52,9 @@ final class StoreCatalogController: ObservableObject {
             guard let self, !Task.isCancelled else {
                 return
             }
+            self.isSearching = true
             await self.reload()
+            self.isSearching = false
         }
     }
 
