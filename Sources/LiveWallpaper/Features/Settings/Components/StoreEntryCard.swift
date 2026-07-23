@@ -31,6 +31,13 @@ extension SettingsView {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
 
+            if let license = entry.license, !license.trimmingCharacters(in: .whitespaces).isEmpty {
+                Text(license)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
             HStack(spacing: 6) {
                 if let duration = entry.durationSeconds {
                     Text(storeEntryDurationText(duration))
