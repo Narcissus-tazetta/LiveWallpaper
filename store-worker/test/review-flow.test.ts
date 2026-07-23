@@ -154,6 +154,30 @@ describe("store submission review flow", () => {
 		expect(new Date(tokenRow!.expires_at).getTime()).toBeGreaterThan(Date.now());
 	});
 
+	it("rejects a submit whose id doesn't match the objectKey's embedded uuid", async () => {
+		const realId = crypto.randomUUID();
+		const objectKey = `packages/${realId}.lwpkg`;
+		const bytes = new TextEncoder().encode("fake package bytes");
+		await env.STORE_BUCKET.put(objectKey, bytes);
+
+		const res = await callWorker(
+			new Request("https://store.example.com/submit", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					id: crypto.randomUUID(), // 別のuuid = objectKeyと不一致
+					title: "Test Title",
+					author: "Test Author",
+					sha256: "deadbeef",
+					sizeBytes: bytes.byteLength,
+					objectKey,
+				}),
+			}),
+		);
+		expect(res.status).toBe(400);
+		expect(await entryStatus(realId)).toBeUndefined();
+	});
+
 	it("hides 'requested' entries from catalog/download/thumbnail", async () => {
 		const { id } = await submitEntry();
 
@@ -170,6 +194,95 @@ describe("store submission review flow", () => {
 			new Request(`https://store.example.com/thumbnail/${id}`),
 		);
 		expect(thumbnailRes.status).toBe(404);
+	});
+
+	it("/entries/:id/status lets the submitter poll status without ADMIN_KEY, unlike /catalog", async () => {
+		const { id } = await submitEntry();
+
+		const requested = await callWorker(
+			new Request(`https://store.example.com/entries/${id}/status`),
+		);
+		expect(requested.status).toBe(200);
+		expect((await requested.json()) as { status: string }).toMatchObject({
+			id,
+			status: "requested",
+		});
+
+		await callWorker(
+			new Request(`https://store.example.com/admin/entries/${id}/approve`, {
+				method: "POST",
+				headers: { "x-admin-key": ADMIN_KEY },
+			}),
+		);
+		const published = await callWorker(
+			new Request(`https://store.example.com/entries/${id}/status`),
+		);
+		expect((await published.json()) as { status: string }).toMatchObject({ status: "published" });
+
+		const missing = await callWorker(
+			new Request(`https://store.example.com/entries/${crypto.randomUUID()}/status`),
+		);
+		expect(missing.status).toBe(404);
+	});
+
+	it("/catalog?q filters by title (case-insensitive substring, LIKE wildcards escaped)", async () => {
+		const { id: matchId } = await submitEntry({ title: "Sunset Beach Loop" });
+		const { id: otherId } = await submitEntry({ title: "Rainy City Night" });
+		for (const id of [matchId, otherId]) {
+			await callWorker(
+				new Request(`https://store.example.com/admin/entries/${id}/approve`, {
+					method: "POST",
+					headers: { "x-admin-key": ADMIN_KEY },
+				}),
+			);
+		}
+
+		const res = await callWorker(new Request("https://store.example.com/catalog?q=sunset"));
+		const json = (await res.json()) as { entries: { id: string }[] };
+		expect(json.entries.map((e) => e.id)).toEqual([matchId]);
+
+		// 検索語に含まれる%はLIKEのワイルドカードとしてではなくリテラルとして扱われる
+		// (エスケープしていないと"%"だけで全件ヒットしてしまう)。
+		const wildcardRes = await callWorker(new Request("https://store.example.com/catalog?q=%"));
+		const wildcardJson = (await wildcardRes.json()) as { entries: { id: string }[] };
+		expect(wildcardJson.entries).toHaveLength(0);
+	});
+
+	it("/catalog?sort=popular orders by download_count and paginates with a composite cursor", async () => {
+		const { id: lowId } = await submitEntry({ title: "Low Downloads" });
+		const { id: highId } = await submitEntry({ title: "High Downloads" });
+		for (const id of [lowId, highId]) {
+			await callWorker(
+				new Request(`https://store.example.com/admin/entries/${id}/approve`, {
+					method: "POST",
+					headers: { "x-admin-key": ADMIN_KEY },
+				}),
+			);
+		}
+		// R2オブジェクトのストリームを読み切らないまま次のテストに進むと、Workers
+		// テストランナーの isolated storage スナップショットが壊れる
+		// (see: https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/#isolated-storage)。
+		await (await callWorker(new Request(`https://store.example.com/download/${highId}`))).arrayBuffer();
+		await (await callWorker(new Request(`https://store.example.com/download/${highId}`))).arrayBuffer();
+		await (await callWorker(new Request(`https://store.example.com/download/${lowId}`))).arrayBuffer();
+
+		const page1 = await callWorker(
+			new Request("https://store.example.com/catalog?sort=popular&limit=1"),
+		);
+		const page1Json = (await page1.json()) as {
+			entries: { id: string }[];
+			nextCursor: string | null;
+		};
+		expect(page1Json.entries.map((e) => e.id)).toEqual([highId]);
+		expect(page1Json.nextCursor).toBeTruthy();
+
+		const page2 = await callWorker(
+			new Request(
+				`https://store.example.com/catalog?sort=popular&limit=1&cursor=${encodeURIComponent(page1Json.nextCursor!)}`,
+			),
+		);
+		const page2Json = (await page2.json()) as { entries: { id: string }[] };
+		expect(page2Json.entries.map((e) => e.id)).toEqual([lowId]);
 	});
 
 	it("decide is one-time use: a second decision on the same token is rejected", async () => {

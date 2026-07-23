@@ -270,6 +270,16 @@ async function handleSubmit(
 		return errorResponse("invalid sizeBytes");
 	}
 
+	// store_entries.id はクライアント申告値をそのまま主キーに使うため、objectKey
+	// (packages/<uuid>.lwpkg、/upload-url がサーバー側で発行した乱数)に埋め込まれた
+	// idと一致することを必須で検証する。これが無いと、任意の文字列をidに指定されて
+	// 既存エントリと主キー衝突させられたり(D1のUNIQUE制約違反で素の500になる)、
+	// UUID形式ですらない値がそのまま主キーとして永続化されてしまう。
+	const packageMatch = objectKey.match(/^packages\/([\w-]+)\.lwpkg$/);
+	if (!packageMatch || !UUID_RE.test(packageMatch[1]) || id !== packageMatch[1]) {
+		return errorResponse("id does not match objectKey");
+	}
+
 	const head = await env.STORE_BUCKET.head(objectKey);
 	if (!head) {
 		return errorResponse("object not found in storage", 404);
@@ -339,6 +349,13 @@ async function handleSubmit(
 	});
 }
 
+/// LIKEのワイルドカード(%, _)とエスケープ文字自体をリテラル扱いさせる。
+/// これが無いと検索語に含まれる%/_がユーザーの意図しないマッチ範囲を作ってしまう
+/// (SQLインジェクションではなく、あくまでLIKEの意味論上の問題)。
+function escapeLikePattern(s: string): string {
+	return s.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 async function handleCatalog(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
 	const limit = Math.min(
@@ -346,16 +363,44 @@ async function handleCatalog(request: Request, env: Env): Promise<Response> {
 		50,
 	);
 	const cursor = url.searchParams.get("cursor");
+	const q = url.searchParams.get("q")?.trim() || null;
+	const sort = url.searchParams.get("sort") === "popular" ? "popular" : "newest";
 
-	let query = `SELECT id, title, author, description, sha256, size_bytes,
-			duration_seconds, has_audio, license, created_at, download_count, thumbnail_key
-		FROM store_entries WHERE status = 'published'`;
+	const conditions = ["status = 'published'"];
 	const bindings: unknown[] = [];
-	if (cursor) {
-		query += " AND created_at < ?";
-		bindings.push(cursor);
+	if (q) {
+		conditions.push("title LIKE ? ESCAPE '\\'");
+		bindings.push(`%${escapeLikePattern(q)}%`);
 	}
-	query += " ORDER BY created_at DESC LIMIT ?";
+
+	// popular/newestでカーソルの意味が変わる: newestはcreated_atのみで一意な順序が
+	// 決まるが、popularはdownload_countが同点になり得るのでcreated_atをタイブレークに
+	// 加えた複合カーソル("<downloadCount>_<createdAt>")にしないとページ境界で
+	// 同点エントリが重複/欠落する。
+	let orderClause: string;
+	if (sort === "popular") {
+		orderClause = "download_count DESC, created_at DESC";
+		if (cursor) {
+			const sep = cursor.indexOf("_");
+			const count = sep >= 0 ? Number.parseInt(cursor.slice(0, sep), 10) : Number.NaN;
+			const createdAt = sep >= 0 ? cursor.slice(sep + 1) : "";
+			if (Number.isFinite(count) && createdAt) {
+				conditions.push("(download_count < ? OR (download_count = ? AND created_at < ?))");
+				bindings.push(count, count, createdAt);
+			}
+		}
+	} else {
+		orderClause = "created_at DESC";
+		if (cursor) {
+			conditions.push("created_at < ?");
+			bindings.push(cursor);
+		}
+	}
+
+	const query = `SELECT id, title, author, description, sha256, size_bytes,
+			duration_seconds, has_audio, license, created_at, download_count, thumbnail_key
+		FROM store_entries WHERE ${conditions.join(" AND ")}
+		ORDER BY ${orderClause} LIMIT ?`;
 	bindings.push(limit + 1);
 
 	const { results } = await env.STORE_DB.prepare(query)
@@ -365,7 +410,11 @@ async function handleCatalog(request: Request, env: Env): Promise<Response> {
 	const hasMore = results.length > limit;
 	const page = hasMore ? results.slice(0, limit) : results;
 	const nextCursor = hasMore
-		? (page[page.length - 1] as { created_at: string }).created_at
+		? sort === "popular"
+			? `${(page[page.length - 1] as { download_count: number }).download_count}_${
+					(page[page.length - 1] as { created_at: string }).created_at
+				}`
+			: (page[page.length - 1] as { created_at: string }).created_at
 		: null;
 
 	const entries = page.map((row) => {
@@ -578,6 +627,28 @@ async function sendReviewRequestEmail(
 		console.error(`sendReviewRequestEmail: failed to reach Resend for entry ${entry.id}:`, err);
 		return null;
 	}
+}
+
+/// 投稿者が自分の投稿の審査状況(requested/published/rejected)を確認するための
+/// 読み取り専用エンドポイント。/download・/thumbnail と同じ信頼モデルで、認証は
+/// せずid(推測不可能なUUID)を知っていること自体をアクセス権とする。status=
+/// 'published'に限定しないのが/catalogとの違い(投稿者自身は非公開状態も見たい)。
+async function handleEntryStatus(request: Request, env: Env, id: string): Promise<Response> {
+	const row = await env.STORE_DB.prepare(
+		"SELECT id, title, author, status, created_at FROM store_entries WHERE id = ?",
+	)
+		.bind(id)
+		.first<{ id: string; title: string; author: string; status: string; created_at: string }>();
+	if (!row) {
+		return errorResponse("entry not found", 404);
+	}
+	return jsonResponse({
+		id: row.id,
+		title: row.title,
+		author: row.author,
+		status: row.status,
+		createdAt: row.created_at,
+	});
 }
 
 async function handleReport(request: Request, env: Env): Promise<Response> {
@@ -1368,6 +1439,10 @@ export default {
 		const thumbnailMatch = pathname.match(/^\/thumbnail\/([\w-]+)$/);
 		if (method === "GET" && thumbnailMatch) {
 			return handleThumbnail(request, env, thumbnailMatch[1]);
+		}
+		const entryStatusMatch = pathname.match(/^\/entries\/([\w-]+)\/status$/);
+		if (method === "GET" && entryStatusMatch) {
+			return handleEntryStatus(request, env, entryStatusMatch[1]);
 		}
 		if (method === "POST" && pathname === "/report") {
 			return handleReport(request, env);
