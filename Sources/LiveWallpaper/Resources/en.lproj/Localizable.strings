@@ -467,3 +467,8 @@
 "公開済み" = "Published";
 "却下されました" = "Rejected";
 "ステータスの取得に失敗しました。しばらくしてから再度お試しください" = "Failed to fetch status. Please try again later";
+"投稿を取り下げますか?" = "Withdraw this submission?";
+"取り下げる" = "Withdraw";
+"この操作は取り消せません" = "This can't be undone";
+"この投稿は取り下げに対応していません。リストから削除のみ行えます" = "This submission doesn't support withdrawal. You can only remove it from the list";
+"取り下げに失敗しました。もう一度お試しください" = "Failed to withdraw. Please try again";

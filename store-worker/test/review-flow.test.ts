@@ -91,6 +91,37 @@ async function submitEntry(overrides: { title?: string; author?: string } = {}) 
 	return { res, id };
 }
 
+/// withdrawテスト用: /submitのレスポンスからwithdrawTokenを読み取って返す。
+/// submitEntry()はレスポンスボディを呼び出し側に委ねる(既存テストが自分で
+/// res.json()する前提)ため、ここでは別に自前でsubmitしてボディを消費する。
+async function submitEntryForWithdraw(): Promise<{
+	id: string;
+	objectKey: string;
+	withdrawToken: string;
+}> {
+	const id = crypto.randomUUID();
+	const objectKey = `packages/${id}.lwpkg`;
+	const bytes = new TextEncoder().encode("fake package bytes");
+	await env.STORE_BUCKET.put(objectKey, bytes);
+
+	const res = await callWorker(
+		new Request("https://store.example.com/submit", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				id,
+				title: "Withdraw Test",
+				author: "Test Author",
+				sha256: "deadbeef",
+				sizeBytes: bytes.byteLength,
+				objectKey,
+			}),
+		}),
+	);
+	const json = (await res.json()) as { withdrawToken: string };
+	return { id, objectKey, withdrawToken: json.withdrawToken };
+}
+
 /// /admin/review/:token/video のテスト用に、動画バイト列を含む本物のZIP(.lwpkg相当)
 /// を組み立ててsubmitする。PackageExporter/PackageArchiveWriter が実際に作る
 /// content/videos/<id>.mp4 という配置(--keepParentでcontent/を持つZIP)を再現する。
@@ -283,6 +314,73 @@ describe("store submission review flow", () => {
 		);
 		const page2Json = (await page2.json()) as { entries: { id: string }[] };
 		expect(page2Json.entries.map((e) => e.id)).toEqual([lowId]);
+	});
+
+	it("/submit issues a one-time withdraw token that lets the submitter self-delete without ADMIN_KEY", async () => {
+		const { id, objectKey, withdrawToken } = await submitEntryForWithdraw();
+
+		const withdrawRes = await callWorker(
+			new Request(`https://store.example.com/entries/${id}/withdraw`, {
+				method: "DELETE",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ token: withdrawToken }),
+			}),
+		);
+		expect(withdrawRes.status).toBe(200);
+
+		expect(await entryStatus(id)).toBeUndefined();
+		expect(await env.STORE_BUCKET.head(objectKey)).toBeNull();
+		const remainingTokens = await env.STORE_DB.prepare(
+			"SELECT COUNT(*) as n FROM store_review_tokens WHERE entry_id = ?",
+		)
+			.bind(id)
+			.first<{ n: number }>();
+		expect(remainingTokens?.n).toBe(0);
+	});
+
+	it("withdraw rejects a wrong token and leaves the entry untouched", async () => {
+		const { id, objectKey } = await submitEntryForWithdraw();
+
+		const withdrawRes = await callWorker(
+			new Request(`https://store.example.com/entries/${id}/withdraw`, {
+				method: "DELETE",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ token: "not-the-real-token" }),
+			}),
+		);
+		expect(withdrawRes.status).toBe(404);
+
+		expect(await entryStatus(id)).toBe("requested");
+		expect(await env.STORE_BUCKET.head(objectKey)).not.toBeNull();
+	});
+
+	it("withdraw works after publication too, and a second withdraw 404s once the entry is gone", async () => {
+		const { id, withdrawToken } = await submitEntryForWithdraw();
+		await callWorker(
+			new Request(`https://store.example.com/admin/entries/${id}/approve`, {
+				method: "POST",
+				headers: { "x-admin-key": ADMIN_KEY },
+			}),
+		);
+		expect(await entryStatus(id)).toBe("published");
+
+		const firstWithdraw = await callWorker(
+			new Request(`https://store.example.com/entries/${id}/withdraw`, {
+				method: "DELETE",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ token: withdrawToken }),
+			}),
+		);
+		expect(firstWithdraw.status).toBe(200);
+
+		const secondWithdraw = await callWorker(
+			new Request(`https://store.example.com/entries/${id}/withdraw`, {
+				method: "DELETE",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ token: withdrawToken }),
+			}),
+		);
+		expect(secondWithdraw.status).toBe(404);
 	});
 
 	it("decide is one-time use: a second decision on the same token is rejected", async () => {

@@ -7,6 +7,10 @@ struct StoreSubmissionResult: Equatable {
     let createdAt: String
     /// サーバー側の審査状態("requested"は審査待ち、"published"は公開済み)。
     let status: String
+    /// 自己サービスの取り下げ(DELETE /entries/:id/withdraw)に必要な秘密トークン。
+    /// サーバーはハッシュのみ保存し生の値は二度と返さないため、ローカルに保存し
+    /// 損ねるとその投稿は二度と自己サービスでは取り下げられなくなる。
+    let withdrawToken: String
     /// status == "published" の場合のみ取得できる実際のダウンロードURL。
     /// requested の間はまだ非公開(サーバーの /download は status='published' の
     /// エントリしか返さない)ため、誤って使われないよう nil にしておく。
@@ -148,7 +152,7 @@ final class StoreClient {
         try await packageUpload
         let thumbnailInfo = await thumbnailUpload
 
-        let entry = try await submitMetadata(
+        let response = try await submitMetadata(
             id: uploadSlot.id,
             title: title,
             author: author,
@@ -162,11 +166,13 @@ final class StoreClient {
             thumbnailSha256: thumbnailInfo?.sha256,
             thumbnailSizeBytes: thumbnailInfo?.sizeBytes
         )
+        let entry = response.entry
 
         return StoreSubmissionResult(
             id: entry.id,
             createdAt: entry.createdAt,
             status: entry.status,
+            withdrawToken: response.withdrawToken,
             downloadURL: entry.status == "published"
                 ? Self.baseURL.appendingPathComponent("download/\(entry.id)")
                 : nil
@@ -295,6 +301,7 @@ final class StoreClient {
         }
         let ok: Bool
         let entry: Entry
+        let withdrawToken: String
     }
 
     private func submitMetadata(
@@ -310,7 +317,7 @@ final class StoreClient {
         thumbnailKey: String?,
         thumbnailSha256: String?,
         thumbnailSizeBytes: Int?
-    ) async throws -> SubmitResponse.Entry {
+    ) async throws -> SubmitResponse {
         var request = URLRequest(url: Self.baseURL.appendingPathComponent("submit"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "content-type")
@@ -332,7 +339,7 @@ final class StoreClient {
         )
         let (data, response) = try await session.data(for: request)
         try Self.checkOK(response, data: data)
-        return try JSONDecoder().decode(SubmitResponse.self, from: data).entry
+        return try JSONDecoder().decode(SubmitResponse.self, from: data)
     }
 
     private static func checkOK(_ response: URLResponse, data: Data) throws {

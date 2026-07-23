@@ -46,6 +46,9 @@ struct SettingsView: View {
     @State var isSuspendExclusionAppPickerPresented: Bool = false
     @State var suspendExclusionAppPickerSearchText: String = ""
     @State var storeReportTargetEntry: StoreEntry?
+    /// 取り下げ確認ダイアログを出している「自分の投稿」。誤タップでの即時取り下げを
+    /// 防ぐため、ゴミ箱ボタンでは即実行せずここに立ててからダイアログで確定させる。
+    @State var storeWithdrawTargetSubmission: StoreMySubmission?
     @State var currentWallpaperPreviewThumbnailPath: String?
     @State var currentLockScreenPreviewThumbnailPath: String?
     @State var webURLInput: String = ""
@@ -323,6 +326,32 @@ struct SettingsView: View {
                     Text(entry.title)
                 } else {
                     Text(model.localizedString("通報の理由を選択してください"))
+                }
+            }
+            .confirmationDialog(
+                model.localizedString("投稿を取り下げますか?"),
+                isPresented: Binding(
+                    get: { storeWithdrawTargetSubmission != nil },
+                    set: { if !$0 { storeWithdrawTargetSubmission = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button(model.localizedString("取り下げる"), role: .destructive) {
+                    if let submission = storeWithdrawTargetSubmission {
+                        Task {
+                            await storeMySubmissions.withdraw(id: submission.id)
+                        }
+                    }
+                    storeWithdrawTargetSubmission = nil
+                }
+                Button(model.localizedString("キャンセル"), role: .cancel) {
+                    storeWithdrawTargetSubmission = nil
+                }
+            } message: {
+                if let submission = storeWithdrawTargetSubmission {
+                    Text(submission.title)
+                } else {
+                    Text(model.localizedString("この操作は取り消せません"))
                 }
             }
     }

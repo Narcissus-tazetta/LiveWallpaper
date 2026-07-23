@@ -471,3 +471,8 @@
 "公開済み" = "Đã xuất bản";
 "却下されました" = "Đã bị từ chối";
 "ステータスの取得に失敗しました。しばらくしてから再度お試しください" = "Không thể lấy trạng thái. Vui lòng thử lại sau";
+"投稿を取り下げますか?" = "Rút lại bài đăng này?";
+"取り下げる" = "Rút lại";
+"この操作は取り消せません" = "Không thể hoàn tác thao tác này";
+"この投稿は取り下げに対応していません。リストから削除のみ行えます" = "Bài đăng này không hỗ trợ rút lại. Bạn chỉ có thể xóa khỏi danh sách";
+"取り下げに失敗しました。もう一度お試しください" = "Rút lại không thành công. Vui lòng thử lại";

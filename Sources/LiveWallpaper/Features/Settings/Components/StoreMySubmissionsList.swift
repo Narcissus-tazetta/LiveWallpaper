@@ -43,13 +43,23 @@ extension SettingsView {
                 .foregroundColor(.secondary)
             }
             Spacer(minLength: 8)
-            Button {
-                storeMySubmissions.remove(id: submission.id)
-            } label: {
-                Image(systemName: "trash")
+            if submission.withdrawToken != nil {
+                Button(role: .destructive) {
+                    storeWithdrawTargetSubmission = submission
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help(model.localizedString("取り下げる"))
+            } else {
+                Button {
+                    storeMySubmissions.remove(id: submission.id)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help(model.localizedString("リストから削除(投稿自体は削除されません)"))
             }
-            .buttonStyle(.borderless)
-            .help(model.localizedString("リストから削除(投稿自体は削除されません)"))
         }
         .padding(10)
         .background(

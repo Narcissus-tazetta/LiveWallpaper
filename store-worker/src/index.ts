@@ -297,14 +297,20 @@ async function handleSubmit(
 	const tokenHash = await hashToken(rawToken);
 	const expiresAt = new Date(Date.now() + REVIEW_TOKEN_TTL_MS).toISOString();
 
+	// 投稿者本人が自己サービスで取り下げる(DELETE /entries/:id/withdraw)ための
+	// 秘密トークン。審査トークンと同様、生の値はDBに残さずハッシュだけ保存し、
+	// このレスポンスで一度だけ返す(サーバー側は二度と生の値を知らない)。
+	const withdrawRawToken = generateRawToken();
+	const withdrawTokenHash = await hashToken(withdrawRawToken);
+
 	// エントリ作成と初回審査トークンの発行を1つのバッチ(D1の暗黙トランザクション)
 	// にまとめ、片方だけ書き込まれる状態を避ける。
 	await env.STORE_DB.batch([
 		env.STORE_DB.prepare(
 			`INSERT INTO store_entries
 				(id, title, author, description, object_key, thumbnail_key, sha256, size_bytes,
-				 duration_seconds, has_audio, license, created_at, status)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested')`,
+				 duration_seconds, has_audio, license, created_at, status, withdraw_token_hash)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?)`,
 		).bind(
 			id,
 			title,
@@ -318,6 +324,7 @@ async function handleSubmit(
 			body.hasAudio === undefined ? null : body.hasAudio ? 1 : 0,
 			body.license ?? null,
 			createdAt,
+			withdrawTokenHash,
 		),
 		env.STORE_DB.prepare(
 			`INSERT INTO store_review_tokens (id, entry_id, token_hash, created_at, expires_at)
@@ -346,6 +353,7 @@ async function handleSubmit(
 	return jsonResponse({
 		ok: true,
 		entry: { id, title, author, createdAt, status: "requested" },
+		withdrawToken: withdrawRawToken,
 	});
 }
 
@@ -715,9 +723,26 @@ async function handleReport(request: Request, env: Env): Promise<Response> {
 	return jsonResponse({ ok: true, reportCount: newCount });
 }
 
-/// 自己サービスの削除機能(誰でも削除できてしまう)は設けず、運営がADMIN_KEYを
-/// 使って削除する管理者専用エンドポイント。D1の行とR2上の実体(動画/サムネイル)
-/// を両方消す。
+/// R2上の動画本体/サムネイル実体を削除する。handleAdminDelete・
+/// applyReviewDecision(reject時)・handleWithdrawの3箇所から呼ばれる共通処理。
+/// 既に削除済み(またはそもそも存在しない)キーに対するR2 delete は無害
+/// (エラーにならない)なので、呼び出し側で存在チェックを二重に行う必要はない。
+async function deleteEntryObjects(
+	env: Env,
+	objectKey: string,
+	thumbnailKey: string | null,
+): Promise<void> {
+	await env.STORE_BUCKET.delete(objectKey);
+	if (thumbnailKey) {
+		await env.STORE_BUCKET.delete(thumbnailKey);
+	}
+}
+
+/// 運営がADMIN_KEYを使って(投稿者の同意なく)削除する管理者専用エンドポイント。
+/// 投稿者自身による自己サービスの取り下げは handleWithdraw
+/// (DELETE /entries/:id/withdraw、投稿時に発行した秘密トークンが必須)が別途担う
+/// — 誰でも削除できてしまう無認証の自己サービス削除は依然として設けていない。
+/// D1の行とR2上の実体(動画/サムネイル)、および紐づく審査トークンを消す。
 async function handleAdminDelete(
 	request: Request,
 	env: Env,
@@ -737,11 +762,59 @@ async function handleAdminDelete(
 		return errorResponse("entry not found", 404);
 	}
 
-	await env.STORE_DB.prepare("DELETE FROM store_entries WHERE id = ?").bind(id).run();
-	await env.STORE_BUCKET.delete(row.object_key);
-	if (row.thumbnail_key) {
-		await env.STORE_BUCKET.delete(row.thumbnail_key);
+	// store_review_tokens.entry_id は store_entries(id) への外部キーなので、親行
+	// (store_entries)を先に消すとFOREIGN KEY制約違反になる。子(store_review_tokens)
+	// を先に消す。
+	await env.STORE_DB.batch([
+		env.STORE_DB.prepare("DELETE FROM store_review_tokens WHERE entry_id = ?").bind(id),
+		env.STORE_DB.prepare("DELETE FROM store_entries WHERE id = ?").bind(id),
+	]);
+	await deleteEntryObjects(env, row.object_key, row.thumbnail_key);
+
+	return jsonResponse({ ok: true });
+}
+
+interface WithdrawRequest {
+	token?: string;
+}
+
+/// 投稿者本人による自己サービスの取り下げ。/submitのレスポンスで一度だけ渡した
+/// 秘密トークンをこの端末がローカルに持っている前提で、ハッシュが一致した場合のみ
+/// 実行する(=idを知っているだけでは取り下げられない。/entries/:id/statusとは
+/// 異なりidは公開情報同然なので、こちらは真の秘密であるトークンをゲートにする)。
+/// 審査状態(requested/published/rejected)を問わず、いつでも取り下げ可能。
+async function handleWithdraw(request: Request, env: Env, id: string): Promise<Response> {
+	if (!(await checkRateLimit(env, "withdraw", request))) {
+		return errorResponse("too many requests", 429);
 	}
+
+	let body: WithdrawRequest;
+	try {
+		body = await request.json();
+	} catch {
+		return errorResponse("invalid JSON body");
+	}
+	if (!body.token) {
+		return errorResponse("missing token");
+	}
+
+	const tokenHash = await hashToken(body.token);
+	const row = await env.STORE_DB.prepare(
+		`SELECT object_key, thumbnail_key FROM store_entries
+		 WHERE id = ? AND withdraw_token_hash IS NOT NULL AND withdraw_token_hash = ?`,
+	)
+		.bind(id, tokenHash)
+		.first<{ object_key: string; thumbnail_key: string | null }>();
+	if (!row) {
+		return errorResponse("entry not found or invalid token", 404);
+	}
+
+	// handleAdminDeleteと同様、親(store_entries)より先に子(store_review_tokens)を消す。
+	await env.STORE_DB.batch([
+		env.STORE_DB.prepare("DELETE FROM store_review_tokens WHERE entry_id = ?").bind(id),
+		env.STORE_DB.prepare("DELETE FROM store_entries WHERE id = ?").bind(id),
+	]);
+	await deleteEntryObjects(env, row.object_key, row.thumbnail_key);
 
 	return jsonResponse({ ok: true });
 }
@@ -877,10 +950,7 @@ async function applyReviewDecision(
 			.bind(entryId)
 			.first<{ object_key: string; thumbnail_key: string | null }>();
 		if (row) {
-			await env.STORE_BUCKET.delete(row.object_key);
-			if (row.thumbnail_key) {
-				await env.STORE_BUCKET.delete(row.thumbnail_key);
-			}
+			await deleteEntryObjects(env, row.object_key, row.thumbnail_key);
 		}
 	}
 
@@ -1443,6 +1513,10 @@ export default {
 		const entryStatusMatch = pathname.match(/^\/entries\/([\w-]+)\/status$/);
 		if (method === "GET" && entryStatusMatch) {
 			return handleEntryStatus(request, env, entryStatusMatch[1]);
+		}
+		const withdrawMatch = pathname.match(/^\/entries\/([\w-]+)\/withdraw$/);
+		if (method === "DELETE" && withdrawMatch) {
+			return handleWithdraw(request, env, withdrawMatch[1]);
 		}
 		if (method === "POST" && pathname === "/report") {
 			return handleReport(request, env);

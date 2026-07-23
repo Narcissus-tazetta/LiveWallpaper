@@ -46,6 +46,11 @@ struct StoreMySubmission: Codable, Identifiable, Equatable {
     let title: String
     let createdAt: String
     var lastKnownStatus: String
+    /// DELETE /entries/:id/withdraw に必要な秘密トークン。この機能を追加する前に
+    /// 保存されたローカル記録には無い(Codableの合成デコードでキー欠落時は自動的に
+    /// nilになる)ため、nilの場合はサーバー側での取り下げができず、ローカルの
+    /// リストから消すことしかできない。
+    var withdrawToken: String?
 }
 
 /// store-worker側は理由を自由文字列として保存するのみ(store-worker/src/index.ts の

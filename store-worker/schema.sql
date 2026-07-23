@@ -13,7 +13,12 @@ CREATE TABLE store_entries (
     created_at TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'published',
     report_count INTEGER NOT NULL DEFAULT 0,
-    download_count INTEGER NOT NULL DEFAULT 0
+    download_count INTEGER NOT NULL DEFAULT 0,
+    -- 投稿者本人が自己サービスで取り下げる(DELETE /entries/:id/withdraw)ための
+    -- 秘密トークンのSHA-256ハッシュ。生トークンは/submitのレスポンスで一度だけ返し、
+    -- サーバー側には保存しない(store_review_tokens.token_hashと同じ方針)。
+    -- このカラム追加前に投稿されたエントリはNULLのままで、取り下げ不可。
+    withdraw_token_hash TEXT
 );
 
 CREATE INDEX idx_store_entries_status_created ON store_entries(status, created_at DESC);

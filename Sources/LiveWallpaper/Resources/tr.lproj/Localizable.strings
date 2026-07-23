@@ -471,3 +471,8 @@
 "公開済み" = "Yayınlandı";
 "却下されました" = "Reddedildi";
 "ステータスの取得に失敗しました。しばらくしてから再度お試しください" = "Durum alınamadı. Lütfen daha sonra tekrar deneyin";
+"投稿を取り下げますか?" = "Bu gönderiyi geri çekmek istiyor musunuz?";
+"取り下げる" = "Geri Çek";
+"この操作は取り消せません" = "Bu işlem geri alınamaz";
+"この投稿は取り下げに対応していません。リストから削除のみ行えます" = "Bu gönderi geri çekmeyi desteklemiyor. Yalnızca listeden kaldırabilirsiniz";
+"取り下げに失敗しました。もう一度お試しください" = "Geri çekilemedi. Lütfen tekrar deneyin";

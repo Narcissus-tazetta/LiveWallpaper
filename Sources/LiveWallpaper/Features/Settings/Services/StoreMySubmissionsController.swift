@@ -23,18 +23,47 @@ final class StoreMySubmissionsController: ObservableObject {
 
     /// Store投稿が成功した直後に呼ぶ。同じidの既存レコードがあれば先頭に上書き
     /// (再投稿はしない設計だが、将来的な再送信に備えて重複させない)。
-    func record(id: String, title: String, createdAt: String) {
+    func record(id: String, title: String, createdAt: String, withdrawToken: String) {
         submissions.removeAll { $0.id == id }
         submissions.insert(
-            StoreMySubmission(id: id, title: title, createdAt: createdAt, lastKnownStatus: "requested"),
+            StoreMySubmission(
+                id: id,
+                title: title,
+                createdAt: createdAt,
+                lastKnownStatus: "requested",
+                withdrawToken: withdrawToken
+            ),
             at: 0
         )
         persist()
     }
 
+    /// ローカルの一覧から消すだけで、サーバー側の投稿には触れない。withdrawTokenを
+    /// 持たない古い記録(この機能を追加する前に送信したもの)向けのフォールバック。
     func remove(id: String) {
         submissions.removeAll { $0.id == id }
         persist()
+    }
+
+    /// サーバー側に自己サービスの取り下げ(DELETE /entries/:id/withdraw)を要求し、
+    /// 成功した場合のみローカルの一覧からも消す。withdrawTokenを持たない記録は
+    /// サーバー側で取り下げようがないため、呼び出し側(UI)でボタンを出し分ける。
+    func withdraw(id: String) async {
+        guard let submission = submissions.first(where: { $0.id == id }),
+              let token = submission.withdrawToken
+        else {
+            errorMessage = Self.localized("この投稿は取り下げに対応していません。リストから削除のみ行えます")
+            return
+        }
+        isRefreshing = true
+        errorMessage = nil
+        defer { isRefreshing = false }
+        do {
+            try await performWithdraw(id: id, token: token)
+            remove(id: id)
+        } catch {
+            errorMessage = Self.localized("取り下げに失敗しました。もう一度お試しください")
+        }
     }
 
     /// 全投稿のステータスを順番に問い合わせる。件数は個人の投稿数程度で多くならない
@@ -68,6 +97,20 @@ final class StoreMySubmissionsController: ObservableObject {
             throw StoreClientError.invalidResponse
         }
         return try JSONDecoder().decode(StoreEntryStatusResponse.self, from: data).status
+    }
+
+    private func performWithdraw(id: String, token: String) async throws {
+        struct WithdrawRequestBody: Encodable {
+            let token: String
+        }
+        var request = URLRequest(url: StoreClient.baseURL.appendingPathComponent("entries/\(id)/withdraw"))
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.httpBody = try JSONEncoder().encode(WithdrawRequestBody(token: token))
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw StoreClientError.invalidResponse
+        }
     }
 
     private func persist() {
