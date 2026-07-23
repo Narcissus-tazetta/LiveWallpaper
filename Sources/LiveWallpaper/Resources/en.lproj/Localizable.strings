@@ -106,7 +106,7 @@
 "ライセンス(任意、例: CC-BY-4.0)" = "License (optional, e.g. CC-BY-4.0)";
 "アップロード中…" = "Uploading…";
 "公開しました" = "Published";
-"申請しました。審査後に公開されます(48時間以内に承認されなかった場合は却下されたものとみなしてください)" = "Submitted. It will be published after review. If it hasn't been approved within 48 hours, please assume it was rejected.";
+"申請しました。審査状況は「自分の投稿」から確認できます" = "Submitted. You can check the review status from \"My Submissions\".";
 "送信する" = "Submit";
 "Store" = "Store";
 "まだ公開されている壁紙がありません" = "No wallpapers have been published yet.";

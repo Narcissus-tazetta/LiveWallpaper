@@ -207,7 +207,7 @@
 "ライセンス(任意、例: CC-BY-4.0)" = "Giấy phép (tùy chọn, ví dụ: CC-BY-4.0)";
 "アップロード中…" = "Đang tải lên…";
 "公開しました" = "Đã xuất bản";
-"申請しました。審査後に公開されます(48時間以内に承認されなかった場合は却下されたものとみなしてください)" = "Đã gửi. Sẽ được xuất bản sau khi xét duyệt. Nếu không được duyệt trong vòng 48 giờ, vui lòng xem như đã bị từ chối.";
+"申請しました。審査状況は「自分の投稿」から確認できます" = "Đã gửi. Bạn có thể kiểm tra trạng thái xét duyệt trong \"Bài đã gửi\".";
 "送信する" = "Gửi";
 "Store" = "Store";
 "まだ公開されている壁紙がありません" = "Chưa có hình nền nào được xuất bản.";

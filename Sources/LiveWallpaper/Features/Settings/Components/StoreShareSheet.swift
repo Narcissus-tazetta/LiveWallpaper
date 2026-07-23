@@ -47,7 +47,7 @@ extension SettingsView {
                     model.localizedString(
                         status == "published"
                             ? "公開しました"
-                            : "申請しました。審査後に公開されます(48時間以内に承認されなかった場合は却下されたものとみなしてください)"
+                            : "申請しました。審査状況は「自分の投稿」から確認できます"
                     ),
                     systemImage: "checkmark.circle.fill"
                 )

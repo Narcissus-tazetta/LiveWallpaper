@@ -261,7 +261,14 @@ final class StoreClient {
         } catch StoreClientError.serverError(413, _) where kind == .package {
             throw StoreClientError.fileTooLarge(sizeBytes: sizeBytes, maxBytes: Self.maxUploadBytes)
         }
-        return try JSONDecoder().decode(UploadURLResponse.self, from: data)
+        do {
+            return try JSONDecoder().decode(UploadURLResponse.self, from: data)
+        } catch {
+            AppLog.store.error(
+                "upload-url decode failed: \(error, privacy: .public) body=\(String(decoding: data, as: UTF8.self), privacy: .public)"
+            )
+            throw error
+        }
     }
 
     private func uploadData(_ data: Data, to urlString: String, contentType: String) async throws {
@@ -339,7 +346,14 @@ final class StoreClient {
         )
         let (data, response) = try await session.data(for: request)
         try Self.checkOK(response, data: data)
-        return try JSONDecoder().decode(SubmitResponse.self, from: data)
+        do {
+            return try JSONDecoder().decode(SubmitResponse.self, from: data)
+        } catch {
+            AppLog.store.error(
+                "submit decode failed: \(error, privacy: .public) body=\(String(decoding: data, as: UTF8.self), privacy: .public)"
+            )
+            throw error
+        }
     }
 
     private static func checkOK(_ response: URLResponse, data: Data) throws {

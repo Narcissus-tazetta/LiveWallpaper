@@ -35,9 +35,10 @@ extension SettingsView {
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                 HStack(spacing: 4) {
-                    Image(systemName: storeMySubmissionStatusIcon(submission.lastKnownStatus))
-                        .foregroundColor(storeMySubmissionStatusColor(submission.lastKnownStatus))
-                    Text(storeMySubmissionStatusLabel(submission.lastKnownStatus))
+                    let status = storeMySubmissionEffectiveStatus(submission)
+                    Image(systemName: storeMySubmissionStatusIcon(status))
+                        .foregroundColor(storeMySubmissionStatusColor(status))
+                    Text(storeMySubmissionStatusLabel(status))
                 }
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -67,6 +68,31 @@ extension SettingsView {
                 .fill(Color.secondary.opacity(0.06))
         )
     }
+
+    /// サーバーが "requested" のまま48時間応答がない投稿は、UI上は却下扱いにする。
+    /// サーバー側に自動却下処理はなく、あくまで表示上のみなし(次回refreshAllで
+    /// 実際のステータスが取得できればそちらを優先する)。
+    private static let submissionReviewTimeout: TimeInterval = 48 * 60 * 60
+
+    private func storeMySubmissionEffectiveStatus(_ submission: StoreMySubmission) -> String {
+        guard submission.lastKnownStatus == "requested",
+              let createdAt = Self.submissionDateFormatter.date(from: submission.createdAt)
+                ?? Self.submissionDateFormatterNoFraction.date(from: submission.createdAt)
+        else {
+            return submission.lastKnownStatus
+        }
+        return Date().timeIntervalSince(createdAt) >= Self.submissionReviewTimeout
+            ? "rejected"
+            : submission.lastKnownStatus
+    }
+
+    private static let submissionDateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let submissionDateFormatterNoFraction = ISO8601DateFormatter()
 
     private func storeMySubmissionStatusLabel(_ status: String) -> String {
         switch status {
