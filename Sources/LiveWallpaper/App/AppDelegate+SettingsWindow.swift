@@ -37,6 +37,12 @@ extension AppDelegate {
         settingsWindowController = NSWindowController(window: window)
         settingsKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
             [weak self] event in
+            // グローバルショートカットの録音中は Cmd+W/Cmd+Q もそのまま録音対象に
+            // 渡す。ここで横取りすると、その組み合わせを録音する前にウィンドウが
+            // 閉じて(あるいはアプリが終了して)しまう。
+            guard HotKeyRecorderButton.activeRecorder == nil else {
+                return event
+            }
             guard let characters = event.charactersIgnoringModifiers?.lowercased() else {
                 return event
             }

@@ -141,6 +141,14 @@ extension SettingsView {
         modelBinding(model.desktopIconsVisible) { model.setDesktopIconsVisible($0) }
     }
 
+    var respectReduceMotionBinding: Binding<Bool> {
+        modelBinding(model.respectReduceMotionEnabled) { model.setRespectReduceMotionEnabled($0) }
+    }
+
+    var hotKeysEnabledBinding: Binding<Bool> {
+        modelBinding(model.hotKeysEnabled) { model.setHotKeysEnabled($0) }
+    }
+
     var followSystemAppearanceBinding: Binding<Bool> {
         modelBinding(model.followSystemAppearanceEnabled) { model.setFollowSystemAppearanceEnabled($0) }
     }

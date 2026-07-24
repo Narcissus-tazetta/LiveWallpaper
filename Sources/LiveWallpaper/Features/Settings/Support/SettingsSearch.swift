@@ -9,6 +9,7 @@ extension SettingsView {
         case share
         case webWallpaper
         case display
+        case hotKeys
         case schedule
         case focusFilter
         case language
@@ -27,6 +28,7 @@ extension SettingsView {
         case .share: return shareSearchKeywords
         case .webWallpaper: return webWallpaperSearchKeywords
         case .display: return displaySearchKeywords
+        case .hotKeys: return hotKeysSearchKeywords
         // スケジュール本体は壁紙タブに住んでいる。ここでヒットしても設定タブには
         // セクションを描かず、壁紙タブへ飛ぶ案内行(scheduleSearchRedirectSection)を出す。
         case .schedule: return scheduleSearchKeywords

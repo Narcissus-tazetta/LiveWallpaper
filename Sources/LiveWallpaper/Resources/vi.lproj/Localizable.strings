@@ -544,3 +544,23 @@
 "カット開始位置を今の再生位置にします(I)" = "Đặt điểm bắt đầu cắt tại vị trí phát hiện tại (I)";
 "カット終了位置を今の再生位置にします(O)" = "Đặt điểm kết thúc cắt tại vị trí phát hiện tại (O)";
 "ループ開始位置を今の再生位置にします(L)" = "Đặt điểm bắt đầu lặp tại vị trí phát hiện tại (L)";
+
+// グローバルショートカット / Reduce Motion(追加機能)
+"視差効果を減らす設定に合わせて壁紙を静止" = "Dừng hình nền khi bật Giảm chuyển động";
+"システム設定の「アクセシビリティ > 表示 > 視差効果を減らす」がオンのとき、壁紙の再生を静止フレームで止めます。オフにするとこの設定に関わらず常に再生します。" = "Khi “Trợ năng → Hiển thị → Giảm chuyển động” được bật trong Cài đặt hệ thống, hình nền sẽ dừng ở khung hình tĩnh. Tắt tùy chọn này để luôn phát bất kể cài đặt đó.";
+"システムの「視差効果を減らす」が有効なため、壁紙を静止しています。" = "Hình nền đang được dừng vì “Giảm chuyển động” của hệ thống đang bật.";
+"グローバルショートカット" = "Phím tắt toàn cục";
+"グローバルショートカットを有効にする" = "Bật phím tắt toàn cục";
+"アプリが前面になくても、システム全体でキー操作を受け付けます。既存のショートカットと重複しない組み合わせを割り当ててください。" = "Tổ hợp phím hoạt động trên toàn hệ thống, ngay cả khi ứng dụng không ở phía trước. Hãy gán các tổ hợp không trùng với phím tắt hiện có.";
+"次の壁紙に切り替え" = "Chuyển sang hình nền tiếp theo";
+"前の壁紙に切り替え" = "Chuyển về hình nền trước";
+"音声のオン/オフ" = "Bật/tắt âm thanh";
+"デスクトップアイコンの表示/非表示" = "Hiện/ẩn biểu tượng trên bàn làm việc";
+"未設定" = "Chưa đặt";
+"キーを入力…" = "Nhập phím tắt…";
+"既定に戻す" = "Đặt lại về mặc định";
+"ショートカット" = "Phím tắt";
+"ホットキー" = "Phím nóng";
+"キーボードショートカット" = "Phím tắt bàn phím";
+"このショートカットは他のアプリまたはシステムと重複しているため無効です。" = "Phím tắt này không hoạt động vì trùng với một ứng dụng khác hoặc hệ thống.";
+"視差効果を減らす設定が有効な間は、この画面も静止します。" = "Màn hình này cũng sẽ dừng khi Giảm chuyển động đang bật.";

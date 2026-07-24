@@ -186,6 +186,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <string>ja</string>
     <string>en</string>
     <string>zh-Hant</string>
+    <string>vi</string>
+    <string>tr</string>
   </array>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
@@ -193,6 +195,19 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <true/>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>${BUNDLE_ID}.url</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>livewallpaper</string>
+      </array>
+    </dict>
+  </array>
   <key>SUFeedURL</key>
   <string>${SPARKLE_APPCAST_URL}</string>
   <key>SUPublicEDKey</key>

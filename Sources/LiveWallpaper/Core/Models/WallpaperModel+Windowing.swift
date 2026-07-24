@@ -580,6 +580,11 @@ extension WallpaperModel {
     private func syncSuspendedDisplays(for screens: [NSScreen]) {
         let validDisplayIDs = Set(screens.map { displayIDString(for: $0) })
         suspendedDisplayIDs = suspendedDisplayIDs.intersection(validDisplayIDs)
+        // Reduce Motion 中は、ウィンドウ再構築で追加/変化した画面も含めて
+        // すべて静止させたままにする(intersection で消えた分を戻す)。
+        if reduceMotionFreezeActive {
+            suspendedDisplayIDs.formUnion(validDisplayIDs)
+        }
     }
 
     private func makeBorderlessWallpaperWindow(

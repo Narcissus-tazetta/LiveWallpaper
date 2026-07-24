@@ -313,8 +313,11 @@ extension WallpaperModel {
 
     private func applyCoveringAppSuspension(_ displayIDs: Set<String>) {
         // ユーザーが「自動停止の対象にしない」と選んだ画面は、どの信号(占有・
-        // 高精度検出・前面アプリ)が示していようと常に除外する。
+        // 高精度検出・前面アプリ)が示していようと常に除外する。その上で、
+        // Reduce Motion が有効なら全画面の静止を上乗せする(アクセシビリティ
+        // 設定は「自動停止しないディスプレイ」の除外よりも優先する)。
         let filtered = displayIDs.subtracting(suspendDisabledDisplayIDs)
+            .union(reduceMotionFreezeDisplayIDs())
         guard suspendedDisplayIDs != filtered else {
             return
         }

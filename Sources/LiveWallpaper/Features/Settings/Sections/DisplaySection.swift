@@ -14,6 +14,7 @@ extension SettingsView {
     "デスクトップの見やすさ",
     "デスクトップのアイコンを表示",
     "再生の軽量モード（省電力）",
+    "視差効果を減らす設定に合わせて壁紙を静止",
     "作業中は壁紙の再生を自動停止",
     "ほかのアプリを使っている間は再生を停止",
     "画面がほぼ隠れたら停止（高精度）",
@@ -139,6 +140,20 @@ extension SettingsView {
           color: .orange
         )
       }
+      toggleWithHelp(
+        model.localizedString("視差効果を減らす設定に合わせて壁紙を静止"),
+        isOn: respectReduceMotionBinding,
+        helpTopic: .reduceMotion,
+        helpText: model.localizedString(
+          "システム設定の「アクセシビリティ > 表示 > 視差効果を減らす」がオンのとき、壁紙の再生を静止フレームで止めます。オフにするとこの設定に関わらず常に再生します。"
+        )
+      )
+      if model.respectReduceMotionEnabled, model.systemReduceMotionEnabled {
+        settingsFootnote(
+          model.localizedString("システムの「視差効果を減らす」が有効なため、壁紙を静止しています。")
+        )
+      }
+
       Toggle(model.localizedString("作業中は壁紙の再生を自動停止"), isOn: suspendWhenFullScreenBinding)
 
       if model.suspendWhenOtherAppFullScreen {
@@ -263,14 +278,24 @@ extension SettingsView {
   }
 
   func displaySuspendToggleRow(for screen: WallpaperModel.DisplayScreenInfo) -> some View {
-    Toggle(isOn: suspendDisabledBinding(forScreenID: screen.id)) {
-      Text(screen.name)
-        .lineLimit(1)
-        .truncationMode(.tail)
+    VStack(alignment: .leading, spacing: 2) {
+      Toggle(isOn: suspendDisabledBinding(forScreenID: screen.id)) {
+        Text(screen.name)
+          .lineLimit(1)
+          .truncationMode(.tail)
+      }
+      .toggleStyle(.checkbox)
+      .controlSize(.small)
+      .help(model.localizedString("オンにすると、この画面はメイン画面での作業やウィンドウの被覆に関わらず再生を続けます"))
+
+      if model.isSuspendDisabled(forScreenID: screen.id),
+        model.respectReduceMotionEnabled, model.systemReduceMotionEnabled
+      {
+        settingsFootnote(
+          model.localizedString("視差効果を減らす設定が有効な間は、この画面も静止します。")
+        )
+      }
     }
-    .toggleStyle(.checkbox)
-    .controlSize(.small)
-    .help(model.localizedString("オンにすると、この画面はメイン画面での作業やウィンドウの被覆に関わらず再生を続けます"))
   }
 
   func suspendDisabledBinding(forScreenID screenID: String) -> Binding<Bool> {

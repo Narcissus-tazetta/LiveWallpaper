@@ -540,3 +540,23 @@
 "カット開始位置を今の再生位置にします(I)" = "Sets the cut start to the current playback position (I)";
 "カット終了位置を今の再生位置にします(O)" = "Sets the cut end to the current playback position (O)";
 "ループ開始位置を今の再生位置にします(L)" = "Sets the loop start to the current playback position (L)";
+
+// グローバルショートカット / Reduce Motion(追加機能)
+"視差効果を減らす設定に合わせて壁紙を静止" = "Freeze wallpaper when Reduce Motion is on";
+"システム設定の「アクセシビリティ > 表示 > 視差効果を減らす」がオンのとき、壁紙の再生を静止フレームで止めます。オフにするとこの設定に関わらず常に再生します。" = "When “Accessibility → Display → Reduce Motion” is turned on in System Settings, wallpaper playback is frozen on a still frame. Turn this off to always play regardless of that setting.";
+"システムの「視差効果を減らす」が有効なため、壁紙を静止しています。" = "Wallpaper is frozen because the system’s Reduce Motion is enabled.";
+"グローバルショートカット" = "Global Shortcuts";
+"グローバルショートカットを有効にする" = "Enable global shortcuts";
+"アプリが前面になくても、システム全体でキー操作を受け付けます。既存のショートカットと重複しない組み合わせを割り当ててください。" = "Key combinations work system-wide, even when the app isn’t in front. Assign combinations that don’t conflict with existing shortcuts.";
+"次の壁紙に切り替え" = "Switch to next wallpaper";
+"前の壁紙に切り替え" = "Switch to previous wallpaper";
+"音声のオン/オフ" = "Toggle audio on/off";
+"デスクトップアイコンの表示/非表示" = "Show/hide desktop icons";
+"未設定" = "Not set";
+"キーを入力…" = "Type a shortcut…";
+"既定に戻す" = "Reset to default";
+"ショートカット" = "Shortcut";
+"ホットキー" = "Hotkey";
+"キーボードショートカット" = "Keyboard shortcut";
+"このショートカットは他のアプリまたはシステムと重複しているため無効です。" = "This shortcut is inactive because it conflicts with another app or the system.";
+"視差効果を減らす設定が有効な間は、この画面も静止します。" = "While Reduce Motion is on, this display is frozen too.";

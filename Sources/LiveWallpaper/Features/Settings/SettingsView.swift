@@ -532,6 +532,10 @@ struct SettingsView: View {
                         displaySettingsSection
                         settingsSectionMatchHint(.display)
                     }
+                    if settingsSectionMatches(.hotKeys) {
+                        hotKeysSettingsSection
+                        settingsSectionMatchHint(.hotKeys)
+                    }
                     // スケジュール本体は壁紙タブへ移動済み。検索でヒットしたとき
                     // だけ案内行を出す(非検索時は何も出さない)。
                     if isSettingsSearchActive, settingsSectionMatches(.schedule) {

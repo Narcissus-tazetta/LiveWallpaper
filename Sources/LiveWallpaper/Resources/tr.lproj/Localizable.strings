@@ -544,3 +544,23 @@
 "カット開始位置を今の再生位置にします(I)" = "Kesme başlangıcını geçerli oynatma konumuna ayarlar (I)";
 "カット終了位置を今の再生位置にします(O)" = "Kesme bitişini geçerli oynatma konumuna ayarlar (O)";
 "ループ開始位置を今の再生位置にします(L)" = "Döngü başlangıcını geçerli oynatma konumuna ayarlar (L)";
+
+// グローバルショートカット / Reduce Motion(追加機能)
+"視差効果を減らす設定に合わせて壁紙を静止" = "Hareketi Azalt açıkken duvar kağıdını dondur";
+"システム設定の「アクセシビリティ > 表示 > 視差効果を減らす」がオンのとき、壁紙の再生を静止フレームで止めます。オフにするとこの設定に関わらず常に再生します。" = "Sistem Ayarları’nda “Erişilebilirlik → Ekran → Hareketi Azalt” açıkken duvar kağıdı sabit bir karede dondurulur. Bu ayardan bağımsız olarak her zaman oynatmak için bunu kapatın.";
+"システムの「視差効果を減らす」が有効なため、壁紙を静止しています。" = "Sistemin “Hareketi Azalt” ayarı etkin olduğu için duvar kağıdı donduruldu.";
+"グローバルショートカット" = "Genel Kısayollar";
+"グローバルショートカットを有効にする" = "Genel kısayolları etkinleştir";
+"アプリが前面になくても、システム全体でキー操作を受け付けます。既存のショートカットと重複しない組み合わせを割り当ててください。" = "Tuş kombinasyonları, uygulama önde olmasa bile sistem genelinde çalışır. Mevcut kısayollarla çakışmayan kombinasyonlar atayın.";
+"次の壁紙に切り替え" = "Sonraki duvar kağıdına geç";
+"前の壁紙に切り替え" = "Önceki duvar kağıdına geç";
+"音声のオン/オフ" = "Sesi aç/kapat";
+"デスクトップアイコンの表示/非表示" = "Masaüstü simgelerini göster/gizle";
+"未設定" = "Ayarlanmadı";
+"キーを入力…" = "Kısayol girin…";
+"既定に戻す" = "Varsayılana sıfırla";
+"ショートカット" = "Kısayol";
+"ホットキー" = "Kısayol tuşu";
+"キーボードショートカット" = "Klavye kısayolu";
+"このショートカットは他のアプリまたはシステムと重複しているため無効です。" = "Bu kısayol başka bir uygulama veya sistemle çakıştığı için devre dışı.";
+"視差効果を減らす設定が有効な間は、この画面も静止します。" = "Hareketi Azalt açıkken bu ekran da donar.";

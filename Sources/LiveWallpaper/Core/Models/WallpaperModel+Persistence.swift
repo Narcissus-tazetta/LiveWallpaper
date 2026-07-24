@@ -42,6 +42,9 @@ extension WallpaperModel {
         }
         pinCurrentVideo = false
         lightweightMode = UserDefaults.standard.object(forKey: "lightweightMode") as? Bool ?? false
+        respectReduceMotionEnabled =
+            UserDefaults.standard.object(forKey: "respectReduceMotionEnabled") as? Bool ?? true
+        restoreHotKeysState()
         audioEnabled = UserDefaults.standard.object(forKey: "audioEnabled") as? Bool ?? false
         restorePlaybackSettingState()
         if let qualityValue = UserDefaults.standard.string(forKey: "qualityPreset"),

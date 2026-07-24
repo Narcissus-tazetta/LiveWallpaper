@@ -76,6 +76,7 @@ extension SettingsView {
         case decode
         case desktopLevel
         case desktopIcons
+        case reduceMotion
         case fullScreenAuxiliary
         case batteryAwareQuality
         case videoLoop

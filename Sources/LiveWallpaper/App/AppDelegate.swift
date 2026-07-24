@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var launchAtLoginEnabled: Bool = false
     var autoUpdateEnabled: Bool = true
     var cancellables = Set<AnyCancellable>()
+    var hotKeyCenter: GlobalHotKeyCenter?
     var settingsKeyMonitor: Any?
     var screenUnlockObserver: NSObjectProtocol?
     var appearanceObserver: NSKeyValueObservation?
@@ -43,6 +44,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let assignToCurrentSpace = 1014
     }
 
+    func applicationWillFinishLaunching(_: Notification) {
+        // A cold launch triggered by a livewallpaper:// URL can deliver the
+        // triggering kAEGetURL Apple Event as soon as this method returns, so
+        // the handler must be registered here rather than in
+        // applicationDidFinishLaunching or the launch-triggering event can be
+        // silently dropped.
+        setupURLSchemeHandler()
+    }
+
     func applicationDidFinishLaunching(_: Notification) {
         NSApp.setActivationPolicy(.accessory)
         wallpaperModel.startFocusModeMonitoring()
@@ -58,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         setupStatusBar()
         setupSettingsWindow()
+        setupGlobalHotKeys()
         setupScreenUnlockObserver()
         setupAppearanceObserver()
         verifyUpdatePrerequisites()

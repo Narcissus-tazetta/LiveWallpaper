@@ -74,6 +74,7 @@ final class WallpaperModel: ObservableObject {
     var windowOcclusionObserver: NSObjectProtocol?
     var spaceTransitionGuardObserver: NSObjectProtocol?
     var playerItemEndObserver: NSObjectProtocol?
+    var reduceMotionObserver: NSObjectProtocol?
     var suspendedDisplayIDs: Set<String> = []
     var lastCapturedFreezeFrameVideoPath: String?
     var lastCapturedFreezeFrameTime: CMTime?
@@ -136,6 +137,18 @@ final class WallpaperModel: ObservableObject {
     @Published var currentVideoIndex: Int?
     @Published var desktopLevelOffset: DesktopLevelOffset = .zero
     @Published var desktopIconsVisible: Bool = true
+    /// システムの「視差効果を減らす(Reduce Motion)」がONのとき、壁紙を静止
+    /// フレームに固定する(既定ON)。アクセシビリティ設定を尊重するための項目。
+    @Published var respectReduceMotionEnabled: Bool = true
+    /// システムの現在の Reduce Motion 状態(NSWorkspaceから取得・監視)。
+    @Published var systemReduceMotionEnabled: Bool = false
+    /// グローバルホットキー機能のマスタースイッチ(既定OFF・オプトイン)。
+    @Published var hotKeysEnabled: Bool = false
+    /// 操作ごとのキー割り当て。未登録の操作は既定の組み合わせを使う。
+    @Published var hotKeyCombos: [HotKeyAction: HotKeyCombo] = [:]
+    /// Carbon への登録に失敗した操作(他アプリ/システムが同じ組み合わせを
+    /// 既に使用している等)。AppDelegate.reloadGlobalHotKeys が更新する。
+    @Published var hotKeyRegistrationFailures: Set<HotKeyAction> = []
     @Published var useFullScreenAuxiliary: Bool = false
     @Published var menuBarOpaqueEnabled: Bool = false
     @Published var menuBarAutoHideDetected: Bool = false
@@ -343,6 +356,7 @@ final class WallpaperModel: ObservableObject {
         }
         configureWallpaperWindowRefreshMonitoring()
         configureForegroundCoverageMonitoring()
+        configureReduceMotionMonitoring()
         startAutoFrameRateMonitoring()
         // 復元では実在確認を省いているので、壁紙を出した後で確認して間引く。
         verifyRestoredVideoPaths()
@@ -382,6 +396,9 @@ final class WallpaperModel: ObservableObject {
         }
         if let observer = windowOcclusionObserver {
             NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = reduceMotionObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
         if let observer: any NSObjectProtocol = playerItemEndObserver {
             NotificationCenter.default.removeObserver(observer)
