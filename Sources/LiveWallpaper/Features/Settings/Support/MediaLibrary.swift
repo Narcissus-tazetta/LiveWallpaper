@@ -20,7 +20,7 @@ extension SettingsView {
         thumbnailCache.prune(validPaths: valid)
         fitEditor.pruneMissing(validPaths: valid)
         wallpaperEditor.pruneMissing(validPaths: valid)
-        if let editingPath = editingWallpaperPath, !valid.contains(editingPath) {
+        if let editingPath = wallpaperNameEdit?.id, !valid.contains(editingPath) {
             cancelWallpaperNameEdit()
         }
     }
@@ -88,49 +88,5 @@ extension SettingsView {
     func resetLibrarySearchState() {
         librarySearchText = ""
         isLibrarySearchFocused = false
-    }
-
-    /// 動画名・プレイリスト名・Web壁紙名、いずれかの編集を開始する前に他の編集を閉じる。
-    /// 複数の名前編集フィールドが同時に開いたままになるのを防ぐ。
-    func cancelAllNameEdits() {
-        cancelPlaylistNameEdit()
-        cancelWallpaperNameEdit()
-        cancelWebWallpaperNameEdit()
-    }
-
-    func startWallpaperNameEdit(path: String) {
-        cancelAllNameEdits()
-        editingWallpaperPath = path
-        editingWallpaperNameInput = model.registeredVideoDisplayName(for: path)
-        focusedWallpaperPath = path
-    }
-
-    func startPlaylistNameEdit(playlistID: UUID) {
-        cancelAllNameEdits()
-        editingPlaylistID = playlistID
-        editingPlaylistNameInput = model.playlistName(for: playlistID)
-        focusedPlaylistID = playlistID
-    }
-
-    func commitPlaylistNameEdit(playlistID: UUID) {
-        model.setPlaylistName(editingPlaylistNameInput, for: playlistID)
-        cancelPlaylistNameEdit()
-    }
-
-    func cancelPlaylistNameEdit() {
-        editingPlaylistID = nil
-        editingPlaylistNameInput = ""
-        focusedPlaylistID = nil
-    }
-
-    func commitWallpaperNameEdit(path: String) {
-        model.setRegisteredVideoDisplayName(editingWallpaperNameInput, for: path)
-        cancelWallpaperNameEdit()
-    }
-
-    func cancelWallpaperNameEdit() {
-        editingWallpaperPath = nil
-        editingWallpaperNameInput = ""
-        focusedWallpaperPath = nil
     }
 }

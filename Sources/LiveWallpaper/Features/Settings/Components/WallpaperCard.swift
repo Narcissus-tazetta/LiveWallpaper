@@ -93,38 +93,16 @@ extension SettingsView {
         return VStack(alignment: .leading, spacing: 8) {
             thumbnailButton
 
-            if editingWallpaperPath == path {
-                HStack(spacing: 4) {
-                    TextField(
-                        model.localizedString("名前"),
-                        text: $editingWallpaperNameInput
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    .controlSize(.small)
-                    .font(.system(size: 10))
-                    .focused($focusedWallpaperPath, equals: path)
-                    .onSubmit {
-                        commitWallpaperNameEdit(path: path)
-                    }
-
-                    Button {
-                        commitWallpaperNameEdit(path: path)
-                    } label: {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .semibold))
-                    }
-                    .controlSize(.mini)
-                    .buttonStyle(.borderless)
-
-                    Button {
-                        cancelWallpaperNameEdit()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .semibold))
-                    }
-                    .controlSize(.mini)
-                    .buttonStyle(.borderless)
-                }
+            if wallpaperNameEdit?.id == path {
+                inlineNameEditField(
+                    placeholder: model.localizedString("名前"),
+                    text: inlineNameEditInputBinding($wallpaperNameEdit),
+                    font: .system(size: 10),
+                    id: path,
+                    focus: $focusedWallpaperPath,
+                    onCommit: { commitWallpaperNameEdit(path: path) },
+                    onCancel: { cancelWallpaperNameEdit() }
+                )
             } else {
                 HStack(spacing: 4) {
                     Text(model.registeredVideoDisplayName(for: path))

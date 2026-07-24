@@ -135,7 +135,7 @@ extension SettingsView {
     /// 選択=そのプレイリストの編集(チェックボックス表示)と再生対象の切り替え。
     @ViewBuilder
     private var playlistFilterControl: some View {
-        if let editingID = editingPlaylistID {
+        if let editingID = playlistNameEdit?.id {
             playlistInlineNameEditor(playlistID: editingID)
         } else if let screenID = activeDisplayOverrideScreenID {
             screenPlaylistFilterControl(forScreenID: screenID)
@@ -305,35 +305,16 @@ extension SettingsView {
     }
 
     private func playlistInlineNameEditor(playlistID: UUID) -> some View {
-        HStack(spacing: 4) {
-            TextField(model.localizedString("プレイリスト名"), text: $editingPlaylistNameInput)
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.small)
-                .font(.system(size: 12, weight: .medium))
-                .frame(width: 160)
-                .focused($focusedPlaylistID, equals: playlistID)
-                .onSubmit {
-                    commitPlaylistNameEdit(playlistID: playlistID)
-                }
-
-            Button {
-                commitPlaylistNameEdit(playlistID: playlistID)
-            } label: {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .controlSize(.mini)
-            .buttonStyle(.borderless)
-
-            Button {
-                cancelPlaylistNameEdit()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .controlSize(.mini)
-            .buttonStyle(.borderless)
-        }
+        inlineNameEditField(
+            placeholder: model.localizedString("プレイリスト名"),
+            text: inlineNameEditInputBinding($playlistNameEdit),
+            font: .system(size: 12, weight: .medium),
+            fieldWidth: 160,
+            id: playlistID,
+            focus: $focusedPlaylistID,
+            onCommit: { commitPlaylistNameEdit(playlistID: playlistID) },
+            onCancel: { cancelPlaylistNameEdit() }
+        )
     }
 
     @ViewBuilder
