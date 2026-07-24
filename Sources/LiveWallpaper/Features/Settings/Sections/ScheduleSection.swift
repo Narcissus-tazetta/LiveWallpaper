@@ -36,29 +36,12 @@ extension SettingsView {
     }
 
     private var scheduleCardHeader: some View {
-        HStack(spacing: 8) {
-            Label(model.localizedString("スケジュール"), systemImage: "clock.badge")
-                .font(.system(size: 12, weight: .semibold))
-            Text(scheduleCardSummary)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(.secondary)
-                .rotationEffect(.degrees(isScheduleCardExpanded ? 90 : 0))
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isScheduleCardExpanded.toggle()
-            }
-        }
-        .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(model.localizedString("スケジュール"))
-        .accessibilityValue(scheduleCardSummary)
+        collapsibleCardHeader(
+            title: model.localizedString("スケジュール"),
+            systemImage: "clock.badge",
+            summary: scheduleCardSummary,
+            isExpanded: $isScheduleCardExpanded
+        )
     }
 
     /// 「適用中: 夜用」>「2件のルールが有効」>「オフ」の順で最も情報量の多い
@@ -660,10 +643,17 @@ extension SettingsView {
                         }
                         if allowsWeb {
                             ForEach(model.webWallpaperSources) { source in
-                                scheduleWebTargetButton(
+                                webWallpaperTargetButton(
                                     source: source,
-                                    rule: rule,
-                                    cardWidth: cardWidth
+                                    isSelected: rule.target.kind == .web
+                                        && rule.target.webWallpaperID == source.id,
+                                    cardWidth: cardWidth,
+                                    onSelect: {
+                                        model.updateScheduleRule(
+                                            scheduleRule(rule, withTarget: .web(source.id))
+                                        )
+                                        scheduleTargetPickerContext = nil
+                                    }
                                 )
                             }
                         }
@@ -675,30 +665,6 @@ extension SettingsView {
         } else {
             EmptyView()
         }
-    }
-
-    private func scheduleWebTargetButton(
-        source: WebWallpaperSource, rule: ScheduleRule, cardWidth: CGFloat
-    ) -> some View {
-        let isSelected = rule.target.kind == .web && rule.target.webWallpaperID == source.id
-        return Button {
-            model.updateScheduleRule(scheduleRule(rule, withTarget: .web(source.id)))
-            scheduleTargetPickerContext = nil
-        } label: {
-            VStack(spacing: 4) {
-                WebWallpaperThumbnailView(
-                    source: source,
-                    isActive: isSelected,
-                    thumbnailStore: webThumbnailStore,
-                    width: cardWidth,
-                    height: (cardWidth * 9 / 16).rounded()
-                )
-                Text(source.displayName)
-                    .font(.system(size: 10))
-                    .lineLimit(1)
-            }
-        }
-        .buttonStyle(.plain)
     }
 
     private func scheduleRule(

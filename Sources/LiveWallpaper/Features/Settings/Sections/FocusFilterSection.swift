@@ -41,19 +41,16 @@ extension SettingsView {
         )
     }
 
-    /// スケジュールカード(scheduleCardHeader)と同じ折りたたみヘッダー。マスター
-    /// スイッチだけは閉じたまま操作したいので、シェブロンの左に常時出す。Toggleが
-    /// 自前でタップを消費するため、行全体のonTapGestureとは競合しない。
+    /// スケジュールカード(scheduleCardHeader)と同じ折りたたみヘッダー(collapsibleCardHeader)。
+    /// マスタースイッチだけは閉じたまま操作したいので、シェブロンの左にtrailingとして常時出す。
+    /// Toggleが自前でタップを消費するため、行全体のonTapGestureとは競合しない。
     private var focusCardHeader: some View {
-        HStack(spacing: 8) {
-            Label(model.localizedString("集中モード"), systemImage: "moon.circle")
-                .font(.system(size: 12, weight: .semibold))
-            Text(focusCardSummary)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer()
+        collapsibleCardHeader(
+            title: model.localizedString("集中モード"),
+            systemImage: "moon.circle",
+            summary: focusCardSummary,
+            isExpanded: $isFocusCardExpanded
+        ) {
             Toggle(
                 model.localizedString("集中モードで壁紙を切り替える"),
                 isOn: Binding(
@@ -64,20 +61,7 @@ extension SettingsView {
             .labelsHidden()
             .toggleStyle(.switch)
             .controlSize(.mini)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(.secondary)
-                .rotationEffect(.degrees(isFocusCardExpanded ? 90 : 0))
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isFocusCardExpanded.toggle()
-            }
-        }
-        .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(model.localizedString("集中モード"))
-        .accessibilityValue(focusCardSummary)
     }
 
     /// 閉じたまま状態が分かる1行サマリー。スケジュールカードと同じ思想で、
@@ -275,9 +259,15 @@ extension SettingsView {
                             )
                         }
                         ForEach(model.webWallpaperSources) { source in
-                            focusModeWebTargetButton(
-                                source: source, modeID: modeID, assignment: assignment,
-                                cardWidth: cardWidth
+                            webWallpaperTargetButton(
+                                source: source,
+                                isSelected: assignment?.kind == .web
+                                    && assignment?.webWallpaperID == source.id,
+                                cardWidth: cardWidth,
+                                onSelect: {
+                                    model.setFocusModeAssignment(.web(source.id), forModeID: modeID)
+                                    scheduleTargetPickerContext = nil
+                                }
                             )
                         }
                     }
@@ -286,31 +276,6 @@ extension SettingsView {
                 .frame(width: 360, height: 300)
             }
         }
-    }
-
-    private func focusModeWebTargetButton(
-        source: WebWallpaperSource, modeID: String, assignment: ScheduleTarget?,
-        cardWidth: CGFloat
-    ) -> some View {
-        let isSelected = assignment?.kind == .web && assignment?.webWallpaperID == source.id
-        return Button {
-            model.setFocusModeAssignment(.web(source.id), forModeID: modeID)
-            scheduleTargetPickerContext = nil
-        } label: {
-            VStack(spacing: 4) {
-                WebWallpaperThumbnailView(
-                    source: source,
-                    isActive: isSelected,
-                    thumbnailStore: webThumbnailStore,
-                    width: cardWidth,
-                    height: (cardWidth * 9 / 16).rounded()
-                )
-                Text(source.displayName)
-                    .font(.system(size: 10))
-                    .lineLimit(1)
-            }
-        }
-        .buttonStyle(.plain)
     }
 
     /// 設定タブの検索で集中モード関連のキーワードにヒットしたときの案内行。
