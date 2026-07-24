@@ -366,6 +366,14 @@ final class WallpaperEditorController: ObservableObject {
             if let trimEnd = draft.trimEnd, trimEnd > draft.maximumTrimEnd {
                 draft.trimEnd = draft.maximumTrimEnd
             }
+            // 同じパスへ短い動画が上書きされた後(例: パッケージ再インポートの
+            // 置き換え)は、旧尺前提の trimStart が新しい実尺をはみ出しうる。
+            // trimEnd と同様にここで実尺の内側へ収めないと、commit() が
+            // trimStart > trimEnd の壊れた編集をそのまま保存してしまう。
+            let maxStart = max(draft.effectiveTrimEnd - minimumSegmentDuration, 0)
+            if draft.trimStart > maxStart {
+                draft.trimStart = maxStart
+            }
             if let loopStart = draft.loopStart, loopStart >= draft.effectiveTrimEnd {
                 draft.loopStart = nil
             }
