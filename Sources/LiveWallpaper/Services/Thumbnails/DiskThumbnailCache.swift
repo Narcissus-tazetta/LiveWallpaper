@@ -11,7 +11,7 @@ final class DiskThumbnailCache: ObservableObject {
     case ready
   }
 
-  struct Entry: Codable {
+  struct Entry: Codable, SourceTrackedCacheEntry {
     var fileName: String
     var sourcePath: String
     var sourceSize: UInt64

@@ -11,10 +11,11 @@ struct SettingsView: View {
     @State var hoveredHelpTopic: HelpTopic?
     @StateObject var thumbnailCache: DiskThumbnailCache
     @StateObject var webThumbnailStore: WebWallpaperThumbnailStore
-    @State var editingPlaylistID: UUID?
-    @State var editingPlaylistNameInput: String = ""
-    @State var editingWallpaperPath: String?
-    @State var editingWallpaperNameInput: String = ""
+    /// プレイリスト/動画/Web壁紙の名前編集は同じ形の状態(識別子+入力文字列)を
+    /// 3箇所で使うため、`InlineNameEdit<ID>`(Support/InlineNameEdit.swift)へ
+    /// 共通化してある。
+    @State var playlistNameEdit: InlineNameEdit<UUID>?
+    @State var wallpaperNameEdit: InlineNameEdit<String>?
     @State var isDropTargeted: Bool = false
     @State var selectedAssignmentTarget: WallpaperAssignmentTarget = .desktop
     /// 「デスクトップ」タブが今見せているスコープ(共有 / 画面別 / Space別)。
@@ -57,8 +58,7 @@ struct SettingsView: View {
     @State var currentLockScreenPreviewThumbnailPath: String?
     @State var webURLInput: String = ""
     @State var isWebWallpaperURLPopoverPresented: Bool = false
-    @State var editingWebWallpaperID: UUID?
-    @State var editingWebWallpaperNameInput: String = ""
+    @State var webWallpaperNameEdit: InlineNameEdit<UUID>?
     @FocusState var isVolumeInputFocused: Bool
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
@@ -167,7 +167,7 @@ struct SettingsView: View {
         view
             .onChange(of: model.webWallpaperSources) { sources in
                 webThumbnailStore.prune(validSourceIDs: Set(sources.map(\.id)))
-                if let editingID = editingWebWallpaperID,
+                if let editingID = webWallpaperNameEdit?.id,
                    !sources.contains(where: { $0.id == editingID })
                 {
                     cancelWebWallpaperNameEdit()
@@ -183,7 +183,7 @@ struct SettingsView: View {
             }
             .onChange(of: model.playlists) { _ in
                 pruneMissingWallpaperThumbnails()
-                guard let editingID = editingPlaylistID else {
+                guard let editingID = playlistNameEdit?.id else {
                     return
                 }
                 if !model.playlists.contains(where: { $0.id == editingID }) {

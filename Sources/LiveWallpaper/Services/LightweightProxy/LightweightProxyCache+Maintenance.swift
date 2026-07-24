@@ -1,19 +1,6 @@
 import AppKit
-import CryptoKit
 
 extension LightweightProxyCache {
-    nonisolated static func isSourceValid(path: String, entry: Entry) -> Bool {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-              let fileSize = attributes[.size] as? NSNumber,
-              let modifiedDate = attributes[.modificationDate] as? Date
-        else {
-            return false
-        }
-        let sizeMatches = fileSize.uint64Value == entry.sourceSize
-        let mtimeMatches = abs(modifiedDate.timeIntervalSince1970 - entry.sourceModifiedAt) < 0.001
-        return sizeMatches && mtimeMatches
-    }
-
     func touch(_ path: String) {
         guard var entry = metadata.entries[path] else {
             return
@@ -180,33 +167,14 @@ extension LightweightProxyCache {
     }
 
     nonisolated static func rootDirectoryURL() -> URL? {
-        guard let support = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
-            return nil
-        }
-        return support
-            .appendingPathComponent("LiveWallpaper", isDirectory: true)
-            .appendingPathComponent("LightweightProxyCache", isDirectory: true)
+        DiskCacheLayout.rootDirectoryURL(subfolder: "LightweightProxyCache")
     }
 
     nonisolated static func dataDirectoryURL() -> URL? {
-        guard let rootDirectoryURL = rootDirectoryURL() else {
-            return nil
-        }
-        return rootDirectoryURL.appendingPathComponent("data", isDirectory: true)
+        DiskCacheLayout.dataDirectoryURL(subfolder: "LightweightProxyCache")
     }
 
     nonisolated static func metadataFileURL() -> URL? {
-        guard let rootDirectoryURL = rootDirectoryURL() else {
-            return nil
-        }
-        return rootDirectoryURL.appendingPathComponent(Self.metadataFileName)
-    }
-
-    nonisolated static func hashed(_ value: String) -> String {
-        let digest = SHA256.hash(data: Data(value.utf8))
-        return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
+        DiskCacheLayout.metadataFileURL(subfolder: "LightweightProxyCache", metadataFileName: metadataFileName)
     }
 }

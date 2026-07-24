@@ -20,6 +20,7 @@ final class PackageImporter {
         case corruptedVideoFile(String)
         case invalidChecksum(String)
         case extractionFailed
+        case unsafeFileReference(String)
 
         var errorDescription: String? {
             switch self {
@@ -41,6 +42,8 @@ final class PackageImporter {
                 return "ビデオファイルのチェックサムが一致しません: \(name)"
             case .extractionFailed:
                 return "パッケージの展開に失敗しました"
+            case let .unsafeFileReference(name):
+                return "不正なファイル参照が含まれています: \(name)"
             }
         }
     }
@@ -242,12 +245,28 @@ final class PackageImporter {
         return loopStart < trimEnd ? loopStart : nil
     }
 
+    /// パッケージの metadata.json はパッケージ製作者(第三者)が自由に書ける値なので、
+    /// video.id や source.fileName をそのままファイルパス構築に使うとパストラバーサル
+    /// (例: "../../Library/LaunchAgents/evil.plist")の入力になり得る。単一のファイル名
+    /// 構成要素として妥当な値だけを許可する。
+    private static func isSafePathComponent(_ value: String) -> Bool {
+        !value.isEmpty
+            && value != "."
+            && value != ".."
+            && !value.contains("/")
+            && !value.contains("\\")
+            && !value.contains("\0")
+    }
+
     private func importVideo(
         _ video: PackageManifest.PackageVideo,
         from tempDir: URL,
         duplicateResolution: DuplicateResolution
     ) throws -> String? {
         let sourceFileName = video.source.fileName
+        guard Self.isSafePathComponent(video.id), Self.isSafePathComponent(sourceFileName) else {
+            throw ImportError.unsafeFileReference(sourceFileName)
+        }
         let videosDir = tempDir.appendingPathComponent("videos")
         let videoFile = videosDir.appendingPathComponent("\(video.id).mp4")
 

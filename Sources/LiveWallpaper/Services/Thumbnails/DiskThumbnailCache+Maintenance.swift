@@ -1,5 +1,4 @@
 import AppKit
-import CryptoKit
 
 extension DiskThumbnailCache {
   nonisolated enum DiskReadResult {
@@ -13,26 +12,13 @@ extension DiskThumbnailCache {
     entry: Entry,
     fileURL: URL
   ) -> DiskReadResult {
-    guard isSourceValid(path: sourcePath, entry: entry) else {
+    guard SourceValidityCheck.isValid(path: sourcePath, entry: entry) else {
       return .invalidSource
     }
     guard let data = try? Data(contentsOf: fileURL) else {
       return .missingData
     }
     return .data(data)
-  }
-
-  nonisolated static func isSourceValid(path: String, entry: Entry) -> Bool {
-    guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-      let fileSize = attributes[.size] as? NSNumber,
-      let modifiedDate = attributes[.modificationDate] as? Date
-    else {
-      return false
-    }
-
-    let sizeMatches = fileSize.uint64Value == entry.sourceSize
-    let mtimeMatches = abs(modifiedDate.timeIntervalSince1970 - entry.sourceModifiedAt) < 0.001
-    return sizeMatches && mtimeMatches
   }
 
   func touch(_ path: String) {
@@ -233,37 +219,15 @@ extension DiskThumbnailCache {
   }
 
   nonisolated static func rootDirectoryURL() -> URL? {
-    guard
-      let support = FileManager.default.urls(
-        for: .applicationSupportDirectory,
-        in: .userDomainMask
-      ).first
-    else {
-      return nil
-    }
-    return
-      support
-      .appendingPathComponent("LiveWallpaper", isDirectory: true)
-      .appendingPathComponent("ThumbnailCache", isDirectory: true)
+    DiskCacheLayout.rootDirectoryURL(subfolder: "ThumbnailCache")
   }
 
   nonisolated static func dataDirectoryURL() -> URL? {
-    guard let rootDirectoryURL = rootDirectoryURL() else {
-      return nil
-    }
-    return rootDirectoryURL.appendingPathComponent("data", isDirectory: true)
+    DiskCacheLayout.dataDirectoryURL(subfolder: "ThumbnailCache")
   }
 
   nonisolated static func metadataFileURL() -> URL? {
-    guard let rootDirectoryURL = rootDirectoryURL() else {
-      return nil
-    }
-    return rootDirectoryURL.appendingPathComponent(Self.metadataFileName)
-  }
-
-  nonisolated static func hashed(_ value: String) -> String {
-    let digest = SHA256.hash(data: Data(value.utf8))
-    return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
+    DiskCacheLayout.metadataFileURL(subfolder: "ThumbnailCache", metadataFileName: metadataFileName)
   }
 
   nonisolated static func imageData(_ image: NSImage) -> Data? {

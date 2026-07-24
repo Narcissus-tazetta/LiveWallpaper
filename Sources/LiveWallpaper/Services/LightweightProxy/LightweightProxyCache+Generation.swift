@@ -61,7 +61,7 @@ extension LightweightProxyCache {
 
         let outputFileType: AVFileType = exportSession.supportedFileTypes.contains(.mp4) ? .mp4 : .mov
         let fileExtension = outputFileType == .mp4 ? "mp4" : "mov"
-        let fileName = "\(Self.hashed(path)).\(fileExtension)"
+        let fileName = "\(CacheKeyHashing.hashed(path)).\(fileExtension)"
         let finalURL = dataURL.appendingPathComponent(fileName)
         let tmpURL = dataURL.appendingPathComponent("\(fileName).tmp")
         try? FileManager.default.removeItem(at: tmpURL)

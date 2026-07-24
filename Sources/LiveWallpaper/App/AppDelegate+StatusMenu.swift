@@ -446,15 +446,11 @@ extension AppDelegate {
     }
 
     func assignToCurrentSpaceMenuIcon() -> NSImage? {
-        let image = NSImage(
+        menuIcon(
             systemSymbolName: isCurrentVideoAssignedToCurrentSpace
                 ? "square.on.square.fill" : "square.on.square",
             accessibilityDescription: localized("デスクトップに割り当て")
         )
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let configured = image?.withSymbolConfiguration(config)
-        configured?.isTemplate = true
-        return configured
     }
 
     /// メニューバーアイコンの右に現在のデスクトップ番号を表示する(オプション)。
@@ -482,111 +478,62 @@ extension AppDelegate {
         button.title = String(ordinal)
     }
 
-    func audioMenuIcon(_ enabled: Bool) -> NSImage? {
-        let symbolName: String = enabled ? "speaker.wave.2" : "speaker.slash"
-        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "音声")
+    /// ステータスメニューのアイコンはどれも「SF Symbol → 13pt/regular → template化」
+    /// という同じ組み立て方をするため、ここへ集約する。
+    func menuIcon(systemSymbolName: String, accessibilityDescription: String) -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: systemSymbolName,
+            accessibilityDescription: accessibilityDescription
+        )
         let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
         let configured = image?.withSymbolConfiguration(config)
         configured?.isTemplate = true
         return configured
+    }
+
+    func audioMenuIcon(_ enabled: Bool) -> NSImage? {
+        menuIcon(
+            systemSymbolName: enabled ? "speaker.wave.2" : "speaker.slash",
+            accessibilityDescription: localized("音声")
+        )
     }
 
     func updateMenuIcon() -> NSImage? {
-        let image = NSImage(
+        menuIcon(
             systemSymbolName: "arrow.triangle.2.circlepath",
             accessibilityDescription: localized("アップデート")
         )
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let configured = image?.withSymbolConfiguration(config)
-        configured?.isTemplate = true
-        return configured
     }
 
     func wallpaperMenuIcon() -> NSImage? {
-        let image = NSImage(
-            systemSymbolName: "photo.on.rectangle",
-            accessibilityDescription: localized("壁紙")
-        )
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let configured = image?.withSymbolConfiguration(config)
-        configured?.isTemplate = true
-        return configured
+        menuIcon(systemSymbolName: "photo.on.rectangle", accessibilityDescription: localized("壁紙"))
     }
 
     func playlistMenuIcon() -> NSImage? {
-        let image = NSImage(
-            systemSymbolName: "rectangle.stack",
-            accessibilityDescription: localized("プレイリスト")
-        )
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let configured = image?.withSymbolConfiguration(config)
-        configured?.isTemplate = true
-        return configured
+        menuIcon(systemSymbolName: "rectangle.stack", accessibilityDescription: localized("プレイリスト"))
     }
 
     func pinCurrentVideoMenuIcon() -> NSImage? {
-        let image = NSImage(
-            systemSymbolName: "pin.fill",
-            accessibilityDescription: localized("この動画で固定")
-        )
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let configured = image?.withSymbolConfiguration(config)
-        configured?.isTemplate = true
-        return configured
+        menuIcon(systemSymbolName: "pin.fill", accessibilityDescription: localized("この動画で固定"))
     }
 
     func shuffleMenuIcon() -> NSImage? {
-        let image = NSImage(
-            systemSymbolName: "shuffle",
-            accessibilityDescription: localized("シャッフル")
-        )
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let configured = image?.withSymbolConfiguration(config)
-        configured?.isTemplate = true
-        return configured
+        menuIcon(systemSymbolName: "shuffle", accessibilityDescription: localized("シャッフル"))
     }
 
     func previousVideoMenuIcon() -> NSImage? {
-        let image = NSImage(
-            systemSymbolName: "backward.fill",
-            accessibilityDescription: localized("前の動画")
-        )
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let configured = image?.withSymbolConfiguration(config)
-        configured?.isTemplate = true
-        return configured
+        menuIcon(systemSymbolName: "backward.fill", accessibilityDescription: localized("前の動画"))
     }
 
     func nextVideoMenuIcon() -> NSImage? {
-        let image = NSImage(
-            systemSymbolName: "forward.fill",
-            accessibilityDescription: localized("次の動画")
-        )
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let configured = image?.withSymbolConfiguration(config)
-        configured?.isTemplate = true
-        return configured
+        menuIcon(systemSymbolName: "forward.fill", accessibilityDescription: localized("次の動画"))
     }
 
     func wallpaperFitMenuIcon() -> NSImage? {
-        let image = NSImage(
-            systemSymbolName: "viewfinder",
-            accessibilityDescription: localized("壁紙設定")
-        )
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let configured = image?.withSymbolConfiguration(config)
-        configured?.isTemplate = true
-        return configured
+        menuIcon(systemSymbolName: "viewfinder", accessibilityDescription: localized("壁紙設定"))
     }
 
     func refreshMenuIcon() -> NSImage? {
-        let image = NSImage(
-            systemSymbolName: "arrow.clockwise",
-            accessibilityDescription: localized("再生をリフレッシュ")
-        )
-        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        let configured = image?.withSymbolConfiguration(config)
-        configured?.isTemplate = true
-        return configured
+        menuIcon(systemSymbolName: "arrow.clockwise", accessibilityDescription: localized("再生をリフレッシュ"))
     }
 }

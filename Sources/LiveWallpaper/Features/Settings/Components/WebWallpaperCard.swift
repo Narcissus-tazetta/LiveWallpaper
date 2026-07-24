@@ -47,38 +47,16 @@ extension SettingsView {
         return VStack(alignment: .leading, spacing: 8) {
             thumbnailButton
 
-            if editingWebWallpaperID == source.id {
-                HStack(spacing: 4) {
-                    TextField(
-                        model.localizedString("名前"),
-                        text: $editingWebWallpaperNameInput
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    .controlSize(.small)
-                    .font(.system(size: 10))
-                    .focused($focusedWebWallpaperID, equals: source.id)
-                    .onSubmit {
-                        commitWebWallpaperNameEdit(sourceID: source.id)
-                    }
-
-                    Button {
-                        commitWebWallpaperNameEdit(sourceID: source.id)
-                    } label: {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .semibold))
-                    }
-                    .controlSize(.mini)
-                    .buttonStyle(.borderless)
-
-                    Button {
-                        cancelWebWallpaperNameEdit()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .semibold))
-                    }
-                    .controlSize(.mini)
-                    .buttonStyle(.borderless)
-                }
+            if webWallpaperNameEdit?.id == source.id {
+                inlineNameEditField(
+                    placeholder: model.localizedString("名前"),
+                    text: inlineNameEditInputBinding($webWallpaperNameEdit),
+                    font: .system(size: 10),
+                    id: source.id,
+                    focus: $focusedWebWallpaperID,
+                    onCommit: { commitWebWallpaperNameEdit(sourceID: source.id) },
+                    onCancel: { cancelWebWallpaperNameEdit() }
+                )
             } else {
                 HStack(spacing: 2) {
                     Text(source.displayName)
@@ -138,7 +116,7 @@ extension SettingsView {
             Button(role: .destructive) {
                 webThumbnailStore.remove(sourceID: source.id)
                 model.removeWebWallpaper(id: source.id)
-                if editingWebWallpaperID == source.id {
+                if webWallpaperNameEdit?.id == source.id {
                     cancelWebWallpaperNameEdit()
                 }
             } label: {
@@ -153,27 +131,6 @@ extension SettingsView {
         }
         _ = model.addWebWallpaper(sourceID: sourceID, to: playlistID)
         model.selectPlaylist(playlistID)
-    }
-
-    func startWebWallpaperNameEdit(sourceID: UUID) {
-        guard let source = model.webWallpaperSources.first(where: { $0.id == sourceID }) else {
-            return
-        }
-        cancelAllNameEdits()
-        editingWebWallpaperID = sourceID
-        editingWebWallpaperNameInput = source.displayName
-        focusedWebWallpaperID = sourceID
-    }
-
-    func commitWebWallpaperNameEdit(sourceID: UUID) {
-        model.setWebWallpaperDisplayName(editingWebWallpaperNameInput, for: sourceID)
-        cancelWebWallpaperNameEdit()
-    }
-
-    func cancelWebWallpaperNameEdit() {
-        editingWebWallpaperID = nil
-        editingWebWallpaperNameInput = ""
-        focusedWebWallpaperID = nil
     }
 
     /// プレイリスト編集中に名前行へ出すチェックボックス。ON=そのプレイリストに含まれる。
