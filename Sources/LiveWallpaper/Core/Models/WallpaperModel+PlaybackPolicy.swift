@@ -23,8 +23,13 @@ extension WallpaperModel {
     /// 動画が自然終了したときにループするか、次のエントリ(動画・Web壁紙どちらも
     /// あり得る)へ進むかの判定。キューの総数で見る必要があるため
     /// registeredVideoPaths ではなく registeredPlaybackEntries を使う。
-    func playbackEndBehavior() -> PlaybackEndBehavior {
-        if registeredPlaybackEntries.count <= 1 {
+    static func playbackEndBehavior(
+        entryCount: Int,
+        pinCurrentVideo: Bool,
+        playlistPlaybackEnabled: Bool,
+        videoLoopEnabled: Bool
+    ) -> PlaybackEndBehavior {
+        if entryCount <= 1 {
             return .loopCurrent
         }
         if pinCurrentVideo {
@@ -37,6 +42,15 @@ extension WallpaperModel {
             return .loopCurrent
         }
         return .playOnce
+    }
+
+    func playbackEndBehavior() -> PlaybackEndBehavior {
+        Self.playbackEndBehavior(
+            entryCount: registeredPlaybackEntries.count,
+            pinCurrentVideo: pinCurrentVideo,
+            playlistPlaybackEnabled: playlistPlaybackEnabled,
+            videoLoopEnabled: videoLoopEnabled
+        )
     }
 
     func shouldUsePlaybackLooper() -> Bool {

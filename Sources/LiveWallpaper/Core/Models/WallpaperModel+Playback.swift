@@ -277,50 +277,6 @@ extension WallpaperModel {
         return widths.max() ?? 1920
     }
 
-    private func baseBitRate(for width: Double, preset: QualityPreset) -> Double {
-        if width < 2560 {
-            switch preset {
-            case .auto:
-                return 2_200_000
-            case .efficiency:
-                return 1_500_000
-            case .quality:
-                return 3_000_000
-            }
-        }
-
-        if width < 3840 {
-            switch preset {
-            case .auto:
-                return 6_000_000
-            case .efficiency:
-                return 4_000_000
-            case .quality:
-                return 8_000_000
-            }
-        }
-
-        switch preset {
-        case .auto:
-            return 12_000_000
-        case .efficiency:
-            return 8_000_000
-        case .quality:
-            return 16_000_000
-        }
-    }
-
-    private func frameRateBitRateFactor() -> Double {
-        switch frameRateLimit {
-        case .off:
-            return 1.0
-        case .fps30:
-            return 0.85
-        case .fps60:
-            return 1.3
-        }
-    }
-
     static func detectPlaybackEnvironment() -> PlaybackEnvironment {
         var isArm64: Int32 = 0
         var size = MemoryLayout<Int32>.size
@@ -336,103 +292,33 @@ extension WallpaperModel {
         )
     }
 
-    private func resolvedDecodeMode() -> DecodeMode {
-        switch decodeMode {
-        case .automatic, .gpuAdaptive:
-            switch playbackEnvironment.chipClass {
-            case .appleSilicon:
-                return .balanced
-            case .intel:
-                return playbackEnvironment.logicalCores >= 8 ? .balanced : .efficiency
-            }
-        default:
-            return decodeMode
-        }
+    private func playbackProfileInputs() -> PlaybackProfileResolver.Inputs {
+        PlaybackProfileResolver.Inputs(
+            workProfile: workProfile,
+            lightweightMode: lightweightMode,
+            targetMaxPixelWidth: targetMaxPixelWidth(),
+            qualityPreset: qualityPreset,
+            decodeMode: decodeMode,
+            chipClass: playbackEnvironment.chipClass,
+            logicalCores: playbackEnvironment.logicalCores,
+            frameRateLimit: frameRateLimit,
+            autoFrameRateBitRateFactor: autoFrameRateBitRateFactor,
+            autoFrameRateBufferAdjustment: autoFrameRateBufferAdjustment
+        )
     }
 
     private func resolvedWorkProfile() -> WorkProfile {
-        if lightweightMode {
-            return .ultraLight
-        }
-        if workProfile != .normal {
-            return workProfile
-        }
-        if targetMaxPixelWidth() <= 1920, qualityPreset != .quality, frameRateLimit != .fps60 {
-            return .lowPower
-        }
-        return .normal
+        PlaybackProfileResolver.resolvedWorkProfile(playbackProfileInputs())
     }
 
-    private func decodeBitRateFactor() -> Double {
-        switch resolvedDecodeMode() {
-        case .automatic, .gpuAdaptive:
-            return 1.0
-        case .balanced:
-            return 1.05
-        case .efficiency:
-            return 0.75
-        }
-    }
-
-    private func baseBufferDuration() -> TimeInterval {
-        switch resolvedDecodeMode() {
-        case .automatic, .gpuAdaptive:
-            return 1.0
-        case .balanced:
-            return 1.5
-        case .efficiency:
-            return 0.25
-        }
-    }
-
-    private func qualityAdjustedBuffer(_ base: TimeInterval) -> TimeInterval {
-        switch qualityPreset {
-        case .auto:
-            return base
-        case .efficiency:
-            return max(0, base - 0.5)
-        case .quality:
-            return base + 0.5
-        }
+    private func resolvedDecodeMode() -> DecodeMode {
+        PlaybackProfileResolver.resolvedDecodeMode(playbackProfileInputs())
     }
 
     func resolvePlaybackProfile(
         role: DedicatedPlayerRole = .active
     ) -> (bitRate: Double, buffer: TimeInterval) {
-        let base = resolveActivePlaybackProfile()
-        guard role == .warmStandby else {
-            return base
-        }
-        // 一時停止中で画面に出ていないアイテムは、即座に昇格できる最小限の準備
-        // だけで足りる(Apple推奨: preferredForwardBufferDuration を絞る)。
-        // ビットレートは維持し、昇格直後の初期画質が落ちないようにする。
-        return (bitRate: base.bitRate, buffer: min(base.buffer, 0.2))
-    }
-
-    private func resolveActivePlaybackProfile() -> (bitRate: Double, buffer: TimeInterval) {
-        switch resolvedWorkProfile() {
-        case .ultraLight:
-            return (bitRate: 900_000, buffer: 0.08)
-        case .lowPower:
-            return (bitRate: 1_350_000, buffer: 0.15)
-        case .normal:
-            break
-        }
-
-        let width = targetMaxPixelWidth()
-        let baseRate = baseBitRate(for: width, preset: qualityPreset)
-        var bitRate =
-            baseRate * decodeBitRateFactor() * frameRateBitRateFactor()
-                * autoFrameRateBitRateFactor
-        var buffer = qualityAdjustedBuffer(baseBufferDuration())
-        buffer += autoFrameRateBufferAdjustment
-
-        if lightweightMode {
-            bitRate = min(bitRate, 1_500_000)
-            buffer = min(buffer, 0.25)
-        }
-
-        return (bitRate: max(bitRate, 500_000), buffer: max(buffer, 0))
+        PlaybackProfileResolver.resolve(playbackProfileInputs(), role: role)
     }
 
     func playVideo(url: URL) {
@@ -612,46 +498,16 @@ extension WallpaperModel {
             return
         }
 
-        var nextBitRateFactor = 1.0
-        var nextBufferAdjustment: TimeInterval = 0
-
-        if autoFrameRateEnabled {
-            let processInfo = ProcessInfo.processInfo
-            let thermalState = processInfo.thermalState
-            let lowPower = processInfo.isLowPowerModeEnabled
-            let displayCount = max(targetScreens().count, 1)
-
-            if lowPower {
-                nextBitRateFactor *= 0.82
-                nextBufferAdjustment -= 0.25
-            }
-
-            if displayCount >= 2 {
-                nextBitRateFactor *= 0.88
-                nextBufferAdjustment -= 0.15
-            }
-
-            switch thermalState {
-            case .serious:
-                nextBitRateFactor *= 0.8
-                nextBufferAdjustment -= 0.2
-            case .critical:
-                nextBitRateFactor *= 0.65
-                nextBufferAdjustment -= 0.3
-            default:
-                break
-            }
-        }
-
-        if batteryAwareQualityEnabled,
-           let battery = Self.currentBatteryInfo(), battery.onBatteryPower, battery.percentage <= 10
-        {
-            nextBitRateFactor *= 0.6
-            nextBufferAdjustment -= 0.3
-        }
-
-        nextBitRateFactor = min(max(nextBitRateFactor, 0.55), 1.0)
-        nextBufferAdjustment = min(max(nextBufferAdjustment, -0.5), 0)
+        let (nextBitRateFactor, nextBufferAdjustment) = AutoFrameRatePolicy.resolve(
+            AutoFrameRatePolicy.Inputs(
+                autoFrameRateEnabled: autoFrameRateEnabled,
+                batteryAwareQualityEnabled: batteryAwareQualityEnabled,
+                thermalState: ProcessInfo.processInfo.thermalState,
+                isLowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                displayCount: max(targetScreens().count, 1),
+                batteryInfo: Self.currentBatteryInfo()
+            )
+        )
 
         let bitRateChanged = abs(nextBitRateFactor - autoFrameRateBitRateFactor) > 0.02
         let bufferChanged = abs(nextBufferAdjustment - autoFrameRateBufferAdjustment) > 0.02

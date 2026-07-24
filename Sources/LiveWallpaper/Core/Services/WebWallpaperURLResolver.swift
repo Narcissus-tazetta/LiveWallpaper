@@ -1,5 +1,22 @@
 import Foundation
 
+enum WebWallpaperURLError: LocalizedError, Equatable {
+    case emptyInput
+    case invalidURL
+    case unsupportedScheme
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyInput:
+            return "URLを入力してください"
+        case .invalidURL:
+            return "有効なURLを入力してください"
+        case .unsupportedScheme:
+            return "http または https のURLのみ対応しています"
+        }
+    }
+}
+
 enum WebWallpaperLayoutMode: Equatable {
     case generic
     case videoEmbed
@@ -52,6 +69,35 @@ enum WebWallpaperURLResolver {
 
     static func canonicalKey(for url: URL) -> String {
         resolve(originalURL: url, audioEnabled: false).canonicalKey
+    }
+
+    static func normalizeURLString(_ input: String) throws -> URL {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw WebWallpaperURLError.emptyInput
+        }
+
+        let candidate: URL? =
+            if let direct = URL(string: trimmed), direct.scheme != nil {
+                direct
+            } else {
+                URL(string: "https://\(trimmed)")
+            }
+
+        guard let url = candidate else {
+            throw WebWallpaperURLError.invalidURL
+        }
+        try validateURL(url)
+        return url
+    }
+
+    static func validateURL(_ url: URL) throws {
+        guard let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme) else {
+            throw WebWallpaperURLError.unsupportedScheme
+        }
+        guard let host = url.host, !host.isEmpty else {
+            throw WebWallpaperURLError.invalidURL
+        }
     }
 
     static func requiresReloadForAudioChange(_ url: URL) -> Bool {

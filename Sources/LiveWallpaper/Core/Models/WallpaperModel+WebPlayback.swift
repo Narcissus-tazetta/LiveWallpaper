@@ -1,22 +1,5 @@
 import Foundation
 
-enum WebWallpaperURLError: LocalizedError {
-    case emptyInput
-    case invalidURL
-    case unsupportedScheme
-
-    var errorDescription: String? {
-        switch self {
-        case .emptyInput:
-            return "URLを入力してください"
-        case .invalidURL:
-            return "有効なURLを入力してください"
-        case .unsupportedScheme:
-            return "http または https のURLのみ対応しています"
-        }
-    }
-}
-
 @MainActor
 extension WallpaperModel {
     var activeWebWallpaperSource: WebWallpaperSource? {
@@ -30,38 +13,9 @@ extension WallpaperModel {
         wallpaperKind == .web && activeWebWallpaperSource != nil
     }
 
-    static func normalizeWebWallpaperURLString(_ input: String) throws -> URL {
-        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            throw WebWallpaperURLError.emptyInput
-        }
-
-        let candidate: URL? =
-            if let direct = URL(string: trimmed), direct.scheme != nil {
-                direct
-            } else {
-                URL(string: "https://\(trimmed)")
-            }
-
-        guard let url = candidate else {
-            throw WebWallpaperURLError.invalidURL
-        }
-        try validateWebWallpaperURL(url)
-        return url
-    }
-
-    static func validateWebWallpaperURL(_ url: URL) throws {
-        guard let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme) else {
-            throw WebWallpaperURLError.unsupportedScheme
-        }
-        guard let host = url.host, !host.isEmpty else {
-            throw WebWallpaperURLError.invalidURL
-        }
-    }
-
     @discardableResult
     func addWebWallpaper(urlString: String) throws -> WebWallpaperSource {
-        let url = try Self.normalizeWebWallpaperURLString(urlString)
+        let url = try WebWallpaperURLResolver.normalizeURLString(urlString)
         let canonicalKey = WebWallpaperURLResolver.canonicalKey(for: url)
         if let existing = webWallpaperSources.first(where: {
             WebWallpaperURLResolver.canonicalKey(for: $0.url) == canonicalKey
@@ -231,7 +185,7 @@ extension WallpaperModel {
            let decoded = try? JSONDecoder().decode([WebWallpaperSource].self, from: data)
         {
             webWallpaperSources = decoded.filter { source in
-                (try? Self.validateWebWallpaperURL(source.url)) != nil
+                (try? WebWallpaperURLResolver.validateURL(source.url)) != nil
             }
         }
 
