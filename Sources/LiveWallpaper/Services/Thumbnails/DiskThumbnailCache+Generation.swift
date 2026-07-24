@@ -25,7 +25,7 @@ extension DiskThumbnailCache {
     guard let dataDirectoryURL = Self.dataDirectoryURL() else {
       return
     }
-    let fileName = "\(Self.hashed(path)).jpg"
+    let fileName = "\(CacheKeyHashing.hashed(path)).jpg"
     let fileURL = dataDirectoryURL.appendingPathComponent(fileName)
     ioQueue.async { [weak self] in
       guard let entry = DiskThumbnailCache.buildEntryForWrite(

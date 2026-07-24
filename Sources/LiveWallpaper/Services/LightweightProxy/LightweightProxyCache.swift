@@ -23,7 +23,7 @@ final class LightweightProxyCache {
         case ready
     }
 
-    struct Entry: Codable {
+    struct Entry: Codable, SourceTrackedCacheEntry {
         var fileName: String?
         var isPassthrough: Bool
         var sourceSize: UInt64
@@ -90,7 +90,7 @@ final class LightweightProxyCache {
         guard let entry = metadata.entries[path], !entry.isPassthrough else {
             return nil
         }
-        guard Self.isSourceValid(path: path, entry: entry) else {
+        guard SourceValidityCheck.isValid(path: path, entry: entry) else {
             return nil
         }
         guard let fileName = entry.fileName,
@@ -126,7 +126,7 @@ final class LightweightProxyCache {
         }
         if let entry = metadata.entries[path],
            entry.isPassthrough,
-           Self.isSourceValid(path: path, entry: entry)
+           SourceValidityCheck.isValid(path: path, entry: entry)
         {
             completion(.passthrough)
             return

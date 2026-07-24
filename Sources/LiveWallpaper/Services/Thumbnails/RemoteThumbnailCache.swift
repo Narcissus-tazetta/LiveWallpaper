@@ -230,7 +230,7 @@ final class RemoteThumbnailCache: ObservableObject {
     guard let dataDirectoryURL = Self.dataDirectoryURL() else {
       return
     }
-    let fileName = "\(DiskThumbnailCache.hashed(entryID)).jpg"
+    let fileName = "\(CacheKeyHashing.hashed(entryID)).jpg"
     let fileURL = dataDirectoryURL.appendingPathComponent(fileName)
     ioQueue.async { [weak self] in
       do {
@@ -449,26 +449,14 @@ final class RemoteThumbnailCache: ObservableObject {
   }
 
   private nonisolated static func rootDirectoryURL() -> URL? {
-    guard
-      let support = FileManager.default.urls(
-        for: .applicationSupportDirectory,
-        in: .userDomainMask
-      ).first
-    else {
-      return nil
-    }
-    return
-      support
-      .appendingPathComponent("LiveWallpaper", isDirectory: true)
-      .appendingPathComponent("ThumbnailCache", isDirectory: true)
-      .appendingPathComponent("remote", isDirectory: true)
+    DiskCacheLayout.rootDirectoryURL(subfolder: "ThumbnailCache/remote")
   }
 
   private nonisolated static func dataDirectoryURL() -> URL? {
-    rootDirectoryURL()?.appendingPathComponent("data", isDirectory: true)
+    DiskCacheLayout.dataDirectoryURL(subfolder: "ThumbnailCache/remote")
   }
 
   private nonisolated static func metadataFileURL() -> URL? {
-    rootDirectoryURL()?.appendingPathComponent(Self.metadataFileName)
+    DiskCacheLayout.metadataFileURL(subfolder: "ThumbnailCache/remote", metadataFileName: metadataFileName)
   }
 }
