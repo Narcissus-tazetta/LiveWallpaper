@@ -14,19 +14,24 @@ enum TrimHandleTarget: Equatable {
 /// (以前は各ハンドルが個別に `.gesture` を持ち、重なった領域は常に最後に描画された
 /// ハンドルへ吸われて掴めなかった)。
 enum TrimHandleHitTester {
-    /// - Parameter loopStartX: 「途中からループする」がOFFのときは nil
-    ///   (ハンドル自体が無いので候補にも入れない)。
+    /// 座標が nil のハンドルは候補に入れない。「途中からループする」がOFFで
+    /// ハンドル自体が無い場合と、タイムラインを拡大していてハンドルが画面外に
+    /// ある場合の両方がある — どちらも掴めない以上、そこを掴んだ操作は
+    /// トラックのスクラブとして扱うのが正しい。
     static func resolve(
         at x: CGFloat,
-        trimStartX: CGFloat,
-        trimEndX: CGFloat,
+        trimStartX: CGFloat?,
+        trimEndX: CGFloat?,
         loopStartX: CGFloat? = nil,
         hitRadius: CGFloat
     ) -> TrimHandleTarget {
-        var candidates: [(TrimHandleTarget, CGFloat)] = [
-            (.start, trimStartX),
-            (.end, trimEndX)
-        ]
+        var candidates: [(TrimHandleTarget, CGFloat)] = []
+        if let trimStartX {
+            candidates.append((.start, trimStartX))
+        }
+        if let trimEndX {
+            candidates.append((.end, trimEndX))
+        }
         if let loopStartX {
             candidates.append((.loopStart, loopStartX))
         }

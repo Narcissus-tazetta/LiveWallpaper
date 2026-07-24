@@ -8,11 +8,16 @@ import Foundation
 /// 1枚ずつ同期デコードするのではなく `generateCGImagesAsynchronously` の一括
 /// リクエストを使う。
 enum TrimFilmstripGenerator {
-    /// `duration` を `frameCount` 個の時刻に等分してフレームを抽出する。
-    /// 配列のインデックスは要求した時刻の順序と一致し、デコードに失敗した
-    /// コマは nil のまま返す(呼び出し側がプレースホルダ表示を継続できるように)。
+    /// `startTime ..< startTime + duration` を `frameCount` 個の時刻に等分して
+    /// フレームを抽出する。配列のインデックスは要求した時刻の順序と一致し、
+    /// デコードに失敗したコマは nil のまま返す(呼び出し側がプレースホルダ表示を
+    /// 継続できるように)。
+    ///
+    /// - Parameter startTime: 帯の左端が指す時刻。タイムラインを拡大している
+    ///   ときは動画の先頭ではなく、今映している窓の開始位置になる。
     static func generateFilmstrip(
         path: String,
+        startTime: Double = 0,
         duration: Double,
         frameCount: Int,
         thumbnailHeight: CGFloat
@@ -24,6 +29,7 @@ enum TrimFilmstripGenerator {
             DispatchQueue.global(qos: .userInitiated).async {
                 let images = generateFramesSynchronously(
                     path: path,
+                    startTime: startTime,
                     duration: duration,
                     frameCount: frameCount,
                     thumbnailHeight: thumbnailHeight
@@ -35,6 +41,7 @@ enum TrimFilmstripGenerator {
 
     private nonisolated static func generateFramesSynchronously(
         path: String,
+        startTime: Double,
         duration: Double,
         frameCount: Int,
         thumbnailHeight: CGFloat
@@ -46,9 +53,12 @@ enum TrimFilmstripGenerator {
         generator.requestedTimeToleranceBefore = .positiveInfinity
         generator.requestedTimeToleranceAfter = .positiveInfinity
 
+        // 各コマは「そのタイルが表す区間の中央」を狙う。等分点(0/n, 1/n, …)に
+        // すると帯の左端が窓の開始位置ちょうどになり、1タイルぶん右へずれて
+        // 見えるため。
         let cmTimes = (0 ..< frameCount).map { index -> CMTime in
-            let ratio = frameCount > 1 ? Double(index) / Double(frameCount - 1) : 0
-            let seconds = min(ratio * duration, max(duration - 0.05, 0))
+            let ratio = (Double(index) + 0.5) / Double(frameCount)
+            let seconds = max(startTime + ratio * duration, 0)
             return CMTime(seconds: seconds, preferredTimescale: 600)
         }
 

@@ -90,6 +90,12 @@ struct TrimEditorPreviewPlayer: NSViewRepresentable {
 
         func attach(to layer: AVPlayerLayer, path: String, spec: LoopSpec) {
             if currentPath == path, currentSpec == spec, let player {
+                // 要求が「今まさに鳴っている構成」に戻ってきた。デバウンス待ちの
+                // 再構築が残っていれば、それは既に古い中間状態なので必ず捨てる。
+                // 捨て忘れると、ドラッグで A→B→A と戻した150ms後に B の範囲で
+                // 再構築が走り、UIはAなのにプレビューだけBをループし続ける。
+                pendingRangeUpdate?.cancel()
+                pendingRangeUpdate = nil
                 if layer.player !== player {
                     layer.player = player
                 }
@@ -142,6 +148,12 @@ struct TrimEditorPreviewPlayer: NSViewRepresentable {
             let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
             timeObserver = queue.addPeriodicTimeObserver(forInterval: interval, queue: .main) {
                 [weak self] time in
+                // 非数(準備中・シーク直後)をそのまま流すと、再生位置から
+                // 計算しているタイムラインの座標が NaN になり、SwiftUIの
+                // レイアウトが壊れる。
+                guard time.isNumeric, time.seconds.isFinite else {
+                    return
+                }
                 self?.currentTimeBinding.wrappedValue = time.seconds
             }
 
@@ -152,14 +164,92 @@ struct TrimEditorPreviewPlayer: NSViewRepresentable {
             if let lastSeekTime {
                 let upperBound = spec.trimEnd ?? lastSeekTime
                 let clamped = min(max(lastSeekTime, spec.trimStart), upperBound)
-                queue.seek(
-                    to: CMTime(seconds: clamped, preferredTimescale: 600),
-                    toleranceBefore: .zero,
-                    toleranceAfter: .zero
-                )
-            }
-            if desiredPlaying {
+                seekThenPlay(queue, to: clamped)
+            } else if desiredPlaying {
                 queue.play()
+            }
+        }
+
+        /// 作り立てのプレイヤーを目的の位置へシークしてから再生する。
+        ///
+        /// ここで `play()` を待たずに呼ぶと、新しいプレイヤーはシークが
+        /// 着地するまでの一瞬をタイムレンジの先頭(トリム編集ではタイムラインの
+        /// 左端)から再生してしまい、目的の位置へ「後から追いつく」ように
+        /// 見える。ドラッグ中に毎回作り直すこのプレイヤーでは特に目立つ。
+        ///
+        /// - Important: アイテムがまだ `readyToPlay` になっていない状態で
+        ///   シークすると、AVFoundation は反映しないまま `finished: false`
+        ///   で即座にコールバックを返すことがある(実測で確認済み)。これを
+        ///   「着地した」と早合点して即 `play()` すると、結局0秒(タイムレンジの
+        ///   先頭)から再生してしまい、この関数の意味がなくなる。ready になる
+        ///   まで待ってからシークし、`finished` が false ならもう一度だけ
+        ///   やり直す(`WallpaperLoopBuilder.beginIntroPass` と同じ考え方)。
+        private func seekThenPlay(
+            _ queue: AVQueuePlayer,
+            to time: Double,
+            elapsed: TimeInterval = 0,
+            retriedAfterFailure: Bool = false
+        ) {
+            let pollInterval: TimeInterval = 0.03
+            let giveUpAfter: TimeInterval = 3
+
+            func retry() {
+                guard elapsed + pollInterval < giveUpAfter else {
+                    // 待っても ready にならない(壊れたファイルなど)。
+                    // シークは諦めて、せめて再生だけは始める。
+                    if desiredPlaying, player === queue {
+                        queue.play()
+                    }
+                    return
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + pollInterval) {
+                    [weak self, weak queue] in
+                    guard let self, let queue else {
+                        return
+                    }
+                    seekThenPlay(
+                        queue, to: time, elapsed: elapsed + pollInterval,
+                        retriedAfterFailure: retriedAfterFailure
+                    )
+                }
+            }
+
+            guard let item = queue.currentItem, item.status != .failed else {
+                retry()
+                return
+            }
+            guard item.status == .readyToPlay else {
+                retry()
+                return
+            }
+            queue.seek(
+                to: CMTime(seconds: time, preferredTimescale: 600),
+                toleranceBefore: .zero,
+                toleranceAfter: .zero
+            ) { [weak self, weak queue] finished in
+                // AVPlayer の seek 完了ハンドラは実行スレッドが保証されない。ここで
+                // `player`/`desiredPlaying` を読んだり `queue.play()` を呼んだりする
+                // 以上、必ずメインスレッドへ渡す(このファイル冒頭のデバウンスと同じ理由)。
+                DispatchQueue.main.async { [weak self, weak queue] in
+                    guard let self, let queue, player === queue else {
+                        return
+                    }
+                    guard finished else {
+                        guard !retriedAfterFailure else {
+                            // 2回連続で着地しない: これ以上待たず、位置は諦めて
+                            // 再生だけは始める(黙って止まったままより遥かにマシ)。
+                            if desiredPlaying {
+                                queue.play()
+                            }
+                            return
+                        }
+                        seekThenPlay(queue, to: time, elapsed: elapsed, retriedAfterFailure: true)
+                        return
+                    }
+                    if desiredPlaying {
+                        queue.play()
+                    }
+                }
             }
         }
 

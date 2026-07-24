@@ -79,4 +79,116 @@ final class TrimEditorPreviewPlayerCoordinatorTests: XCTestCase {
 
         coordinator.stop()
     }
+
+    /// デバウンス待ちの再構築は、要求が元の構成へ戻った時点で捨てなければ
+    /// ならない。捨て忘れると、ドラッグで A→B→A と戻した150ms後に B の
+    /// 範囲で再構築が走り、UIはAなのにプレビューだけBをループし続ける
+    /// (次に値を変えるまで直らない)。
+    func testReturningToTheAppliedSpecCancelsThePendingRebuild() throws {
+        guard let url = sampleVideoURL() else {
+            throw XCTSkip("no sample video available in Videos dir")
+        }
+        let asset = AVURLAsset(url: url)
+        try XCTSkipIf(CMTimeGetSeconds(asset.duration) < 2.0, "sample video is too short")
+
+        var observedTime: Double = 0
+        let binding = Binding<Double>(get: { observedTime }, set: { observedTime = $0 })
+        let coordinator = TrimEditorPreviewPlayer.Coordinator(currentTime: binding)
+        let layer = AVPlayerLayer()
+
+        let applied = TrimEditorPreviewPlayer.LoopSpec(
+            trimStart: 0, trimEnd: 1.5, loopStart: nil
+        )
+        coordinator.attach(to: layer, path: url.path, spec: applied)
+        let playerAfterFirstAttach = layer.player
+
+        // ドラッグ中の中間値 → デバウンス待ちに入る
+        coordinator.attach(
+            to: layer, path: url.path,
+            spec: .init(trimStart: 0, trimEnd: 1.2, loopStart: nil)
+        )
+        // デバウンスが切れる前に元の値へ戻す
+        coordinator.attach(to: layer, path: url.path, spec: applied)
+
+        let settled = expectation(description: "debounce window elapsed")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { settled.fulfill() }
+        wait(for: [settled], timeout: 2)
+
+        XCTAssertIdentical(
+            layer.player, playerAfterFirstAttach,
+            "元の構成へ戻ったのに再構築が走ったということは、古い中間 spec が適用されている"
+        )
+
+        coordinator.stop()
+    }
+
+    /// 再構築後の再生が、シークが着地する前の位置(=新しいレンジの先頭付近、
+    /// 実質トリム開始位置)から一瞬始まってはいけない。これが起きると、UI上は
+    /// 「ハンドルを動かした先に一瞬戻ってから目的の位置へ飛ぶ」ように見える
+    /// (実際にユーザーが「開始にする」を押した直後にこの見え方を報告した)。
+    func testRebuildDoesNotFlashTheOldPositionBeforeTheSeekLands() throws {
+        guard let url = sampleVideoURL() else {
+            throw XCTSkip("no sample video available in Videos dir")
+        }
+        let asset = AVURLAsset(url: url)
+        let duration = CMTimeGetSeconds(asset.duration)
+        try XCTSkipIf(duration < 6.0, "sample video is too short for this timing test")
+
+        var observedTime: Double = 0
+        let binding = Binding<Double>(get: { observedTime }, set: { observedTime = $0 })
+        let coordinator = TrimEditorPreviewPlayer.Coordinator(currentTime: binding)
+        let layer = AVPlayerLayer()
+
+        // 頭出し: 4秒地点にいる状態を作る。
+        coordinator.attach(
+            to: layer, path: url.path,
+            spec: .init(trimStart: 0, trimEnd: nil, loopStart: nil)
+        )
+        coordinator.applySeekIfNeeded(SeekToken(time: 4))
+        coordinator.setPlaying(true)
+
+        // 「カット開始位置を今の再生位置にします」相当: trimStart を 4 へ
+        // 動かす。同一パスなのでデバウンス経路に入る。
+        coordinator.attach(
+            to: layer, path: url.path,
+            spec: .init(trimStart: 4, trimEnd: nil, loopStart: nil)
+        )
+        coordinator.applySeekIfNeeded(SeekToken(time: 4))
+
+        // デバウンス(150ms)が解けて再構築・シーク・再生が始まる区間を、
+        // 細かく連続サンプリングする。新しいプレイヤーは生成直後・シーク
+        // 着地前は 0 付近を指すのが正常(まだ再生していないので実害はない)。
+        // バグがあるとそこから **前進し続ける**(= シークの着地を待たずに
+        // 0 から再生してしまっている)ため、「0付近から連続して増え続ける
+        // 区間」の有無で判定する。単発の 0 読み取りは初期化の副作用として
+        // 許容する。
+        var samples: [Double] = []
+        for _ in 0 ..< 25 {
+            let tick = expectation(description: "tick")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { tick.fulfill() }
+            wait(for: [tick], timeout: 1)
+            samples.append(observedTime)
+        }
+
+        var creepingFromNearZero = false
+        for index in 1 ..< samples.count {
+            let previous = samples[index - 1]
+            let current = samples[index]
+            if previous < 1.0, current > previous + 0.05, current < 3.0 {
+                creepingFromNearZero = true
+                break
+            }
+        }
+
+        XCTAssertFalse(
+            creepingFromNearZero,
+            """
+            0秒付近から前進し続ける区間が観測された(\(samples))。これは \
+            シークの着地を待たずに0秒から再生を始めてしまい、着地するまで \
+            の間そのまま動画が進んでいることを意味する
+            """
+        )
+
+        coordinator.stop()
+    }
 }

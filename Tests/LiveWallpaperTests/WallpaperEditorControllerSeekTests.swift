@@ -110,7 +110,16 @@ final class WallpaperEditorControllerSeekTests: XCTestCase {
         controller.setDraftTrimEnd(50)
 
         controller.setDraftLoopStart(5)
-        XCTAssertEqual(controller.draft.loopStart, 10, "before the cut start is not allowed")
+        XCTAssertEqual(
+            controller.draft.loopStart ?? 0,
+            10 + WallpaperLoopBuilder.introMinimumLeadIn,
+            accuracy: 0.0001,
+            """
+            カット開始位置ちょうどは許さない。同じ値だと保存時に \
+            loopSafeLoopStart が捨ててしまい、「保存したのにチェックが外れる」 \
+            という食い違いになる
+            """
+        )
 
         controller.setDraftLoopStart(999)
         XCTAssertEqual(

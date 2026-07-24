@@ -28,6 +28,10 @@ struct SettingsView: View {
     @StateObject var storeMySubmissions: StoreMySubmissionsController
     @StateObject var remoteThumbnailCache: RemoteThumbnailCache
     @State var editorSubMode: EditorSubMode = .fit
+    /// 「他の壁紙へコピー」ピッカーの状態。
+    @State var isTrimCopyPickerPresented: Bool = false
+    @State var trimCopySelection: Set<String> = []
+    @State var trimCopySearchText: String = ""
     @State var isResetSettingsDialogPresented: Bool = false
     @State var librarySearchText: String = ""
     @State var isWallpaperShareSheetPresented: Bool = false
@@ -64,6 +68,7 @@ struct SettingsView: View {
     @FocusState var isSettingsSearchFocused: Bool
     @FocusState var isStoreSearchFocused: Bool
     @FocusState var isSuspendExclusionSearchFocused: Bool
+    @FocusState var isTrimCopySearchFocused: Bool
     /// スケジュールのターゲット壁紙ピッカーを開いている対象(ルールIDまたは簡易UIの
     /// 固定キー)。nil ならどのポップオーバーも表示しない。
     @State var scheduleTargetPickerContext: ScheduleTargetPickerContext?
@@ -235,10 +240,17 @@ struct SettingsView: View {
                 if tab == .wallpaperFit {
                     fitEditor.activate()
                     wallpaperEditor.activate()
+                    syncEditorSubMode()
                 } else {
                     fitEditor.deactivate()
                     wallpaperEditor.deactivate()
                 }
+            }
+            // キーボード操作(矢印キー)はフィット編集とトリム編集の両方が使う。
+            // 両者とも「編集」タブで同時に activate されるため、前面にいる方だけが
+            // キーを拾うようサブモードを伝える。
+            .onChange(of: editorSubMode) { _ in
+                syncEditorSubMode()
             }
             .onChange(of: model.lockScreenVideoPath) { _ in
                 requestLockScreenWallpaperThumbnailIfNeeded()
@@ -255,6 +267,12 @@ struct SettingsView: View {
             }
     }
 
+    /// 「編集」タブの前面がフィットかトリムかを両コントローラへ伝える。
+    func syncEditorSubMode() {
+        fitEditor.setSubModeActive(editorSubMode == .fit)
+        wallpaperEditor.setSubModeActive(editorSubMode == .trim)
+    }
+
     private func applyLifecycleModifiers<V: View>(_ view: V) -> some View {
         view
             .onAppear {
@@ -268,6 +286,7 @@ struct SettingsView: View {
                 if selectedTab == .wallpaperFit {
                     fitEditor.activate()
                     wallpaperEditor.activate()
+                    syncEditorSubMode()
                 }
             }
             .onDisappear {
@@ -356,6 +375,46 @@ struct SettingsView: View {
                     Text(model.localizedString("この操作は取り消せません"))
                 }
             }
+            // トリム編集の未保存確認は、フィット編集サブモード表示中でも
+            // ライブラリからの動画選択で発生しうる(`FitLibraryPanel.selectEditorVideo`)。
+            // `wallpaperTrimEditorPanel` はトリムサブモードのときしかツリーに乗らないため、
+            // そこに付けるとフィット編集中は確認ダイアログが一切出ず、選択が
+            // 無反応に見えてしまう。常にマウントされるこの階層へ置く。
+            .confirmationDialog(
+                model.localizedString("未保存のトリム編集があります"),
+                isPresented: Binding(
+                    get: { wallpaperEditor.pendingSelectionPath != nil },
+                    set: { presented in
+                        if !presented {
+                            wallpaperEditor.cancelPendingSelection()
+                        }
+                    }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button(model.localizedString("保存して切り替える")) {
+                    confirmTrimEditorSelectionChange(savingFirst: true)
+                }
+                Button(model.localizedString("破棄して切り替える"), role: .destructive) {
+                    confirmTrimEditorSelectionChange(savingFirst: false)
+                }
+                Button(model.localizedString("キャンセル"), role: .cancel) {
+                    wallpaperEditor.cancelPendingSelection()
+                }
+            } message: {
+                Text(model.localizedString("別の壁紙に切り替えると、編集中の内容は失われます"))
+            }
+    }
+
+    /// 確認ダイアログで切り替えを確定したとき。トリム側の選択が動いた後、
+    /// 保留していたフィット編集の選択も追従させる(`selectEditorVideo` は
+    /// 確認待ちの間フィット側を止めている)。
+    private func confirmTrimEditorSelectionChange(savingFirst: Bool) {
+        let pending = wallpaperEditor.pendingSelectionPath
+        wallpaperEditor.confirmPendingSelection(savingFirst: savingFirst)
+        if let pending {
+            fitEditor.selectVideo(path: pending)
+        }
     }
 
     private var tabBarSection: some View {

@@ -28,6 +28,11 @@ final class FitEditorController: ObservableObject {
     /// フィット編集タブが表示されているか。タブ外ではキー操作・静止画生成を止める。
     private(set) var isActive: Bool = false
 
+    /// 「編集」タブの中でフィット編集が前面にいるか。トリム編集も同じタブで
+    /// 同時に activate されており、矢印キーを両方が拾うと壁紙のパンと
+    /// タイムライン送りが同時に起きてしまうため、前面の方だけに効かせる。
+    private(set) var isSubModeActive: Bool = true
+
     private var stillImageOrder: [String] = []
     private var stillImageInFlight: Set<String> = []
     private var stillImageTasks: [String: Task<Void, Never>] = [:]
@@ -70,6 +75,11 @@ final class FitEditorController: ObservableObject {
         }
         syncDraftWithCurrentSelection()
         prepareStillImageIfNeeded()
+    }
+
+    /// 「編集」タブのサブモード切り替え。
+    func setSubModeActive(_ active: Bool) {
+        isSubModeActive = active
     }
 
     // MARK: - 画面の選択
@@ -689,7 +699,7 @@ final class FitEditorController: ObservableObject {
         keyEventMonitor =
             NSEvent
             .addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self, isActive else {
+                guard let self, isActive, isSubModeActive else {
                     return event
                 }
                 // A text field (name edit, search, ...) is being edited: let the

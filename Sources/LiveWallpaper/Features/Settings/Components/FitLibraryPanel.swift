@@ -1,6 +1,16 @@
 import SwiftUI
 
 extension SettingsView {
+    /// 一覧から編集対象を選ぶ。トリム編集に未保存の変更があるときは、
+    /// `requestSelectVideo` が確認を挟むので、確定するまでフィット側の選択も
+    /// 動かさない(片方だけ切り替わって表示が食い違うのを防ぐ)。
+    func selectEditorVideo(path: String) {
+        guard wallpaperEditor.requestSelectVideo(path: path) else {
+            return
+        }
+        fitEditor.selectVideo(path: path)
+    }
+
     var wallpaperFitLibraryPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -17,7 +27,12 @@ extension SettingsView {
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
-                let selectedPath = fitEditor.resolvedVideoPath()
+                // ハイライトは「いま前面にある編集タブ」の選択に合わせる。
+                // トリム編集は未保存の確認を挟むため、確定するまで選択が
+                // 動かないことがあり、フィット側の選択とは一致しない。
+                let selectedPath = editorSubMode == .trim
+                    ? wallpaperEditor.resolvedVideoPath()
+                    : fitEditor.resolvedVideoPath()
                 GeometryReader { proxy in
                     let layout = wallpaperGridLayout(for: proxy.size.width)
                     ScrollView {
@@ -33,8 +48,7 @@ extension SettingsView {
                                     switchToWallpaperTabOnSelect: false,
                                     isSelected: selectedPath == path,
                                     onSelect: {
-                                        fitEditor.selectVideo(path: path)
-                                        wallpaperEditor.selectVideo(path: path)
+                                        selectEditorVideo(path: path)
                                     }
                                 )
                             }
