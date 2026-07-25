@@ -6,10 +6,6 @@ on:
             version:
                 required: true
                 type: string
-            build_number:
-                required: false
-                default: "1"
-                type: string
 
 permissions:
     contents: write
@@ -49,7 +45,7 @@ jobs:
                   CREATE_DMG: true
               run: |
                   chmod +x scripts/package_zip.sh
-                  ./scripts/package_zip.sh "${{ inputs.version }}" "${{ inputs.build_number }}"
+                  ./scripts/package_zip.sh "${{ inputs.version }}"
 
             - name: Generate appcast
               env:
@@ -88,7 +84,7 @@ jobs:
                   ZIP_PATH="dist/LiveWallpaper-macos-v${{ inputs.version }}.zip"
                   DOWNLOAD_URL="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v${{ inputs.version }}/LiveWallpaper-macos-v${{ inputs.version }}.zip"
                   SPARKLE_ED_SIGNATURE="$(python scripts/sign_zip.py "$KEY_FILE" "$ZIP_PATH")"
-                  ./scripts/generate_appcast.sh "${{ inputs.version }}" "${{ inputs.build_number }}" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${{ inputs.version }}"
+                  ./scripts/generate_appcast.sh "${{ inputs.version }}" "" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${{ inputs.version }}"
 
             - name: Generate release notes from commits
               run: |

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 VERSION="${1:?version required}"
-BUILD_NUMBER="${2:?build number required}"
+BUILD_NUMBER="${2:-}"
 ZIP_PATH="${3:?zip path required}"
 DOWNLOAD_URL="${4:?download url required}"
 ED_SIGNATURE="${5:-${SPARKLE_ED_SIGNATURE:-}}"
@@ -19,8 +19,14 @@ if [[ -z "$ED_SIGNATURE" ]]; then
   exit 1
 fi
 
-if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
-  echo "build number must be numeric (e.g. 4): $BUILD_NUMBER" >&2
+# sparkle:versionはSparkleが唯一比較に使う値なので、表示用のVERSIONと
+# 食い違わないよう必ず導出値と一致させる。
+DERIVED_BUILD_NUMBER="$(bash "$(dirname "$0")/derive_build_number.sh" "$VERSION")"
+if [[ -z "$BUILD_NUMBER" ]]; then
+  BUILD_NUMBER="$DERIVED_BUILD_NUMBER"
+elif [[ "$BUILD_NUMBER" != "$DERIVED_BUILD_NUMBER" ]]; then
+  echo "build number ${BUILD_NUMBER} does not match version ${VERSION}." >&2
+  echo "expected ${DERIVED_BUILD_NUMBER}. Omit arg2 to derive it automatically." >&2
   exit 1
 fi
 

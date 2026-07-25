@@ -208,6 +208,36 @@ enum AnimatedImageTranscoder {
         }
     }
 
+    /// requestMediaDataWhenReadyのブロックは@Sendableだが、実際に呼ばれるのは
+    /// 渡した直列キューの上だけ。非SendableなAVFoundation/ImageIOのオブジェクトと
+    /// 書き込み位置はここへ閉じ込め、そのキュー上からのみ触る。
+    private final class AppendContext: @unchecked Sendable {
+        let source: CGImageSource
+        let writer: AVAssetWriter
+        let input: AVAssetWriterInput
+        let adaptor: AVAssetWriterInputPixelBufferAdaptor
+        let appends: [FrameAppend]
+        let canvas: CGSize
+        var cursor = 0
+        var finished = false
+
+        init(
+            source: CGImageSource,
+            writer: AVAssetWriter,
+            input: AVAssetWriterInput,
+            adaptor: AVAssetWriterInputPixelBufferAdaptor,
+            appends: [FrameAppend],
+            canvas: CGSize
+        ) {
+            self.source = source
+            self.writer = writer
+            self.input = input
+            self.adaptor = adaptor
+            self.appends = appends
+            self.canvas = canvas
+        }
+    }
+
     private static func appendFrames(
         source: CGImageSource,
         appends: [FrameAppend],
@@ -218,65 +248,87 @@ enum AnimatedImageTranscoder {
         progress: (@Sendable (Double) -> Void)?
     ) async throws {
         let cancelFlag = CancelFlag()
+        let context = AppendContext(
+            source: source,
+            writer: writer,
+            input: input,
+            adaptor: adaptor,
+            appends: appends,
+            canvas: canvas
+        )
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 let queue = DispatchQueue(label: "com.sakana.livewallpaper.animated-transcode")
-                var cursor = 0
-                var finished = false
                 input.requestMediaDataWhenReady(on: queue) {
-                    while input.isReadyForMoreMediaData {
-                        if finished {
-                            return
-                        }
-                        if cancelFlag.isCancelled {
-                            finished = true
-                            input.markAsFinished()
-                            continuation.resume(throwing: TranscodeError.cancelled)
-                            return
-                        }
-                        if cursor >= appends.count {
-                            finished = true
-                            input.markAsFinished()
-                            continuation.resume()
-                            return
-                        }
-
-                        let step = appends[cursor]
-                        var appendError: TranscodeError?
-                        autoreleasepool {
-                            guard let image = CGImageSourceCreateImageAtIndex(
-                                source,
-                                step.frameIndex,
-                                decodeOptions
-                            ) else {
-                                appendError = .frameDecodeFailed(index: step.frameIndex)
-                                return
-                            }
-                            guard let buffer = makePixelBuffer(adaptor: adaptor, canvas: canvas),
-                                  draw(image, into: buffer, canvas: canvas)
-                            else {
-                                appendError = .writerFailed(underlying: writer.error)
-                                return
-                            }
-                            let time = CMTime(seconds: step.time, preferredTimescale: 600)
-                            if adaptor.append(buffer, withPresentationTime: time) == false {
-                                appendError = .writerFailed(underlying: writer.error)
-                            }
-                        }
-                        if let appendError {
-                            finished = true
-                            input.markAsFinished()
-                            continuation.resume(throwing: appendError)
-                            return
-                        }
-
-                        cursor += 1
-                        progress?(Double(cursor) / Double(appends.count))
-                    }
+                    drainFrames(
+                        context: context,
+                        cancelFlag: cancelFlag,
+                        continuation: continuation,
+                        progress: progress
+                    )
                 }
             }
         } onCancel: {
             cancelFlag.cancel()
+        }
+    }
+
+    /// AppendContextを渡した直列キュー上でのみ呼ばれる。
+    private static func drainFrames(
+        context: AppendContext,
+        cancelFlag: CancelFlag,
+        continuation: CheckedContinuation<Void, Error>,
+        progress: (@Sendable (Double) -> Void)?
+    ) {
+        let input = context.input
+        while input.isReadyForMoreMediaData {
+            if context.finished {
+                return
+            }
+            if cancelFlag.isCancelled {
+                context.finished = true
+                input.markAsFinished()
+                continuation.resume(throwing: TranscodeError.cancelled)
+                return
+            }
+            if context.cursor >= context.appends.count {
+                context.finished = true
+                input.markAsFinished()
+                continuation.resume()
+                return
+            }
+
+            let step = context.appends[context.cursor]
+            var appendError: TranscodeError?
+            autoreleasepool {
+                guard let image = CGImageSourceCreateImageAtIndex(
+                    context.source,
+                    step.frameIndex,
+                    decodeOptions
+                ) else {
+                    appendError = .frameDecodeFailed(index: step.frameIndex)
+                    return
+                }
+                guard let buffer = makePixelBuffer(adaptor: context.adaptor, canvas: context.canvas),
+                      draw(image, into: buffer, canvas: context.canvas)
+                else {
+                    appendError = .writerFailed(underlying: context.writer.error)
+                    return
+                }
+                let time = CMTime(seconds: step.time, preferredTimescale: 600)
+                if context.adaptor.append(buffer, withPresentationTime: time) == false {
+                    appendError = .writerFailed(underlying: context.writer.error)
+                }
+            }
+            if let appendError {
+                context.finished = true
+                input.markAsFinished()
+                continuation.resume(throwing: appendError)
+                return
+            }
+
+            context.cursor += 1
+            progress?(Double(context.cursor) / Double(context.appends.count))
         }
     }
 

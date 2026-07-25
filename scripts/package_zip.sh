@@ -4,7 +4,7 @@ set -euo pipefail
 APP_NAME="LiveWallpaper"
 BUNDLE_ID="com.sakana.livewallpaper"
 VERSION="${1:-0.0.1}"
-BUILD_NUMBER="${2:-1}"
+BUILD_NUMBER="${2:-}"
 SPARKLE_APPCAST_URL="${SPARKLE_APPCAST_URL:-https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml}"
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-}"
 ARCH_MODE="${ARCH_MODE:-universal}"
@@ -27,6 +27,18 @@ ICON_PATH="$ROOT_DIR/Sources/LiveWallpaper/Resources/AppIcon.icns"
 SPARKLE_FRAMEWORK_PATH="$ROOT_DIR/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 PUBLIC_KEY_FILE="$ROOT_DIR/sparkle-public.pem"
 DMG_BACKGROUND_SOURCE="$ROOT_DIR/docs/background.tiff"
+
+# ビルド番号は必ずバージョンから導出する。手入力を許すと、ローカルビルドが
+# リリース済みのビルド番号を追い越し、Sparkleが「最新版です(でも新しい版が
+# あります)」という矛盾したダイアログを出す状態に陥る。
+DERIVED_BUILD_NUMBER="$(bash "$ROOT_DIR/scripts/derive_build_number.sh" "$VERSION")"
+if [[ -z "$BUILD_NUMBER" ]]; then
+  BUILD_NUMBER="$DERIVED_BUILD_NUMBER"
+elif [[ "$BUILD_NUMBER" != "$DERIVED_BUILD_NUMBER" ]]; then
+  echo "build number ${BUILD_NUMBER} does not match version ${VERSION}." >&2
+  echo "expected ${DERIVED_BUILD_NUMBER}. Omit arg2 to derive it automatically." >&2
+  exit 1
+fi
 
 normalize_public_key() {
   local raw="$1"
