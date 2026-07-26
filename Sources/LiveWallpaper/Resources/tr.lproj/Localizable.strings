@@ -1,14 +1,14 @@
-"壁紙" = "Duvar Kağıdı";
+"壁紙" = "Duvar Kâğıdı";
 "配置" = "Düzen";
 "設定" = "Ayarlar";
-"現在の壁紙" = "Geçerli Duvar Kağıdı";
+"現在の壁紙" = "Geçerli Duvar Kâğıdı";
 "プレイリスト" = "Oynatma Listesi";
 "表示" = "Görüntü";
 "デスクトップ切り替え" = "Masaüstü geçişi";
 "パフォーマンス・省電力" = "Performans ve enerji tasarrufu";
 "メニューバー" = "Menü çubuğu";
 "メディアを追加" = "Medya Ekle";
-"壁紙を共有" = "Duvar Kağıdını Paylaş";
+"壁紙を共有" = "Duvar Kâğıdını Paylaş";
 "新規プレイリスト" = "Yeni Oynatma Listesi";
 "プレイリスト・設定" = "Oynatma Listesi ve Ayarlar";
 "選択中" = "Seçili";
@@ -18,16 +18,16 @@
 "音声を再生する" = "Sesi oynat";
 "音量" = "Ses Düzeyi";
 "%" = "%";
-"壁紙の表示先" = "Duvar kağıdı görüntüleme hedefi";
+"壁紙の表示先" = "Duvar kâğıdı görüntüleme hedefi";
 "メインのみ" = "Yalnızca ana ekran";
 "全ディスプレイ" = "Tüm ekranlar";
 "動画のフィット" = "Video sığdırma";
 "拡大" = "Doldur";
 "全体" = "Sığdır";
 "デスクトップの見やすさ" = "Masaüstü okunabilirliği";
-"壁紙全体を暗くして、デスクトップのアイコンやファイル名を読みやすくします。0%でオフになります。" = "Simgeleri ve dosya adlarını daha okunabilir kılmak için tüm duvar kağıdını karartır. %0 kapalı anlamına gelir.";
+"壁紙全体を暗くして、デスクトップのアイコンやファイル名を読みやすくします。0%でオフになります。" = "Simgeleri ve dosya adlarını daha okunabilir kılmak için tüm duvar kâğıdını karartır. %0 kapalı anlamına gelir.";
 "再生の軽量モード（省電力）" = "Hafif oynatma modu (enerji tasarrufu)";
-"作業中は壁紙の再生を自動停止" = "Çalışırken duvar kağıdını otomatik duraklat";
+"作業中は壁紙の再生を自動停止" = "Çalışırken duvar kâğıdını otomatik duraklat";
 "画面収録の許可を開く" = "Ekran Kaydı iznini aç";
 "アプリを追加" = "Uygulama ekle";
 "起動中のアプリから選択" = "Çalışan uygulamalardan seç";
@@ -54,13 +54,13 @@
 "キャンセル" = "İptal";
 "アップデート" = "Güncelleme";
 "手動ダウンロード" = "Manuel indirme";
-"壁紙を開く" = "Duvar kağıdını aç";
-"壁紙設定を開く" = "Duvar kağıdı ayarlarını aç";
+"壁紙を開く" = "Duvar kâğıdını aç";
+"壁紙設定を開く" = "Duvar kâğıdı ayarlarını aç";
 "設定を開く" = "Ayarları aç";
 "前の動画" = "Önceki video";
 "次の動画" = "Sonraki video";
 "再生をリフレッシュ" = "Oynatmayı yenile";
-"壁紙を読み込む" = "Duvar kağıdını yükle";
+"壁紙を読み込む" = "Duvar kâğıdını yükle";
 "音声オフ" = "Ses kapalı";
 "音声オン" = "Ses açık";
 "プレイリスト再生オフ" = "Oynatma listesi kapalı";
@@ -72,12 +72,12 @@
 "未作成" = "Oluşturulmadı";
 "(選択なし)" = "(Seçim yok)";
 "1. 「動画を追加」を押して動画を選ぶ" = "1. Video seçmek için \"Video Ekle\"ye basın";
-"2. 選んだ動画がそのまま壁紙として再生されます" = "2. Seçilen video doğrudan duvar kağıdı olarak oynatılır";
-"壁紙一覧" = "Duvar Kağıdı Kitaplığı";
-"すべての壁紙" = "Tüm Duvar Kağıtları";
+"2. 選んだ動画がそのまま壁紙として再生されます" = "2. Seçilen video doğrudan duvar kâğıdı olarak oynatılır";
+"壁紙一覧" = "Duvar Kâğıdı Kitaplığı";
+"すべての壁紙" = "Tüm Duvar Kâğıtları";
 "クリックでデスクトップに設定、🔒でロック画面に設定" = "Masaüstü için tıklayın, kilit ekranı için 🔒";
-"該当するWeb壁紙がありません" = "Eşleşen web duvar kağıdı yok";
-"該当する壁紙がありません" = "Eşleşen duvar kağıdı yok";
+"該当するWeb壁紙がありません" = "Eşleşen web duvar kâğıdı yok";
+"該当する壁紙がありません" = "Eşleşen duvar kâğıdı yok";
 "映像の配置を編集" = "Görüntü yerleşimini düzenle";
 "フィットエディタ" = "Sığdırma Düzenleyicisi";
 "動画" = "Video";
@@ -101,14 +101,14 @@
 "前へ" = "Önceki";
 "次へ" = "Sonraki";
 "このプレイリストに動画がありません" = "Bu oynatma listesinde video yok.";
-"まず壁紙を追加すると、ここで配置を調整できます" = "Önce bir duvar kağıdı ekleyin, ardından düzeni burada ayarlayabilirsiniz.";
+"まず壁紙を追加すると、ここで配置を調整できます" = "Önce bir duvar kâğıdı ekleyin, ardından düzeni burada ayarlayabilirsiniz.";
 "編集" = "Düzenle";
 "フィット編集" = "Sığdırma Düzenleme";
 "保存して再適用" = "Kaydet ve yeniden uygula";
-"この画面ではプレビューのみ更新されます。『保存して再適用』で壁紙に反映されます" = "Bu ekran yalnızca önizlemeyi günceller. Duvar kağıdına uygulamak için \"Kaydet ve yeniden uygula\"yı kullanın.";
+"この画面ではプレビューのみ更新されます。『保存して再適用』で壁紙に反映されます" = "Bu ekran yalnızca önizlemeyi günceller. Duvar kâğıdına uygulamak için \"Kaydet ve yeniden uygula\"yı kullanın.";
 "ドラッグまたは矢印キーで位置を調整できます（Shift 併用で速く移動）。ピンチまたは Option+スクロールでカーソル位置を中心にズームします" = "Konumu sürükleyerek veya ok tuşlarıyla ayarlayın (Shift ile daha hızlı). Kıstırma veya Option+kaydırma imleç merkezli yakınlaştırır.";
 "リアルタイム反映" = "Anında Uygula";
-"オンにすると、編集内容が保存操作なしで自動的に壁紙へ反映されます" = "Açıkken düzenlemeler kaydetmeye gerek olmadan duvar kağıdına otomatik uygulanır.";
+"オンにすると、編集内容が保存操作なしで自動的に壁紙へ反映されます" = "Açıkken düzenlemeler kaydetmeye gerek olmadan duvar kâğıdına otomatik uygulanır.";
 "反映しました" = "Uygulandı";
 "変更を破棄" = "Değişiklikleri At";
 "未保存の編集を取り消して、保存済みの状態に戻します" = "Kaydedilmemiş düzenlemeleri geri alır ve son kaydedilen duruma döner.";
@@ -116,28 +116,28 @@
 "この動画・この画面の個別設定を削除して、設定タブの既定値を使います" = "Bu video ve ekran için özel ayarları siler, Ayarlar sekmesindeki varsayılanı kullanır.";
 "全ての画面へ適用" = "Tüm Ekranlara Uygula";
 "現在の編集内容を保存して、接続中のすべての画面へコピーします" = "Geçerli düzenlemeleri kaydeder ve bağlı tüm ekranlara kopyalar.";
-"ズームと位置を初期値に戻します（保存するまで壁紙には反映されません）" = "Yakınlaştırma ve konumu varsayılana döndürür (kaydedilene kadar duvar kağıdına uygulanmaz).";
+"ズームと位置を初期値に戻します（保存するまで壁紙には反映されません）" = "Yakınlaştırma ve konumu varsayılana döndürür (kaydedilene kadar duvar kâğıdına uygulanmaz).";
 "横位置" = "Yatay";
 "縦位置" = "Dikey";
 "ダブルクリックで初期値に戻します" = "Varsayılana dönmek için çift tıklayın.";
 "今の表示設定では動かせる余白がありません。ズームを上げるか「拡大」表示にすると位置を調整できます" = "Geçerli görüntüleme ayarlarıyla oynatma payı yok. Yakınlaştırmayı artırın veya \"Doldur\" görünümünü kullanın.";
-"変更は自動的に壁紙へ反映されます" = "Değişiklikler duvar kağıdına otomatik uygulanır.";
+"変更は自動的に壁紙へ反映されます" = "Değişiklikler duvar kâğıdına otomatik uygulanır.";
 "クリックして編集を開始" = "Düzenlemeye başlamak için tıklayın";
 "下の壁紙一覧から動画を選択すると、画面ごとにフィット設定を編集できます" = "Aşağıdaki kitaplıktan bir video seçerek ekran başına sığdırma ayarlarını düzenleyebilirsiniz.";
 "名前" = "Ad";
 "プレイリストに追加…" = "Oynatma listesine ekle…";
-"この壁紙に切り替え" = "Bu duvar kağıdına geç";
+"この壁紙に切り替え" = "Bu duvar kâğıdına geç";
 "名前を編集" = "Adı düzenle";
 "登録から削除" = "Kitaplıktan kaldır";
 "プレイリスト名" = "Oynatma listesi adı";
 "このプレイリストに切り替え" = "Bu oynatma listesine geç";
 "プレイリストを削除" = "Oynatma listesini sil";
 "fullScreenAuxiliary を有効化" = "fullScreenAuxiliary etkinleştir";
-"フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。" = "Tam ekran alanlarında duvar kağıdını korumayı kolaylaştırır. Ortama bağlı olarak görüntü kararsız olabilir.";
+"フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。" = "Tam ekran alanlarında duvar kâğıdını korumayı kolaylaştırır. Ortama bağlı olarak görüntü kararsız olabilir.";
 "メニューバーを不透明にする" = "Menü çubuğunu opak yap";
-"メニューバーの裏側に不透明な帯を重ねて、壁紙が透けて見えないようにします。システムのメニューバー自体を直接変更するものではないため、環境によっては完全に一致した見た目にならない場合があります。" = "Duvar kağıdının görünmemesi için menü çubuğunun arkasına opak bir şerit yerleştirir. Sistemin menü çubuğunu doğrudan değiştirmediği için görünüm bazı ortamlarda tam olarak eşleşmeyebilir.";
+"メニューバーの裏側に不透明な帯を重ねて、壁紙が透けて見えないようにします。システムのメニューバー自体を直接変更するものではないため、環境によっては完全に一致した見た目にならない場合があります。" = "Duvar kâğıdının görünmemesi için menü çubuğunun arkasına opak bir şerit yerleştirir. Sistemin menü çubuğunu doğrudan değiştirmediği için görünüm bazı ortamlarda tam olarak eşleşmeyebilir.";
 "メニューバーの自動的に表示/非表示がONのため、この設定は使用できません。" = "\"Menü çubuğunu otomatik gizle ve göster\" açık olduğundan bu ayar kullanılamıyor.";
-"macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "macOS Space (Mission Control) değiştirirken duvar kağıdı nadiren komşu bir Space'e geçebilir. Açık uygulamalı bir Space'ten boş bir Space'e geçerken daha sık görülür. Aynı Space'e geri dönmek genellikle sorunu giderir.";
+"macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "macOS Space (Mission Control) değiştirirken duvar kâğıdı nadiren komşu bir Space'e geçebilir. Açık uygulamalı bir Space'ten boş bir Space'e geçerken daha sık görülür. Aynı Space'e geri dönmek genellikle sorunu giderir.";
 "画質" = "Kalite";
 "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。" = "Kalite ile güç tüketimi arasındaki dengeyi seçin. Otomatik ortama göre optimize eder, güç tasarrufu pil ve ısınmayı azaltır, yüksek kalite görseli önceler.";
 "動作プロファイル" = "Performans Profili";
@@ -149,7 +149,7 @@
 "省電" = "Güç tasarrufu";
 "動画データのデコード方法を切り替えます。自動はハードウェア/ソフトウェアを状況に応じて選び、標準はGPUハードウェア優先で滑らかさを保ちます。省電力はソフトウェア再生を多用し、CPU負荷と消費電力を低く抑えますが再生品質が落ちる場合があります。" = "Video kod çözme yöntemini değiştirir. Otomatik duruma göre donanım/yazılım seçer, dengeli GPU donanımını tercih ederek akıcılığı korur. Güç tasarrufu daha çok yazılım kod çözme kullanır, CPU yükünü ve güç tüketimini düşürür ancak kalite düşebilir.";
 "デスクトップレベル" = "Masaüstü Katmanı";
-"壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。" = "Duvar kağıdı penceresinin masaüstündeki katmanını değiştirir. -1 diğer pencerelerin arkasında, 0 standart masaüstü katmanı, +1 diğer pencerelerin önünde görüntülenir. Önde simgeleri gizleyebilir; arkada diğer pencere işlemlerini engellemez.";
+"壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。" = "Duvar kâğıdı penceresinin masaüstündeki katmanını değiştirir. -1 diğer pencerelerin arkasında, 0 standart masaüstü katmanı, +1 diğer pencerelerin önünde görüntülenir. Önde simgeleri gizleyebilir; arkada diğer pencere işlemlerini engellemez.";
 "再生表示が崩れたときはリフレッシュを使って再初期化できます。設定リセットは表示・再生設定を初期値に戻します" = "Oynatma görüntüsü bozulduğunda yenile ile yeniden başlatabilirsiniz. Sıfırlama, görüntü ve oynatma ayarlarını varsayılana döndürür.";
 "アップデートを自動で確認する（起動時にも通知）" = "Güncellemeleri otomatik kontrol et (başlatmada da bildir)";
 "今すぐ確認" = "Şimdi kontrol et";
@@ -188,10 +188,10 @@
 "アップデートの前提条件を満たしていません。" = "Güncelleme ön koşulları karşılanmıyor.";
 "LiveWallpaper.app を /Applications に移動して再起動してから、もう一度お試しください。" = "LiveWallpaper.app dosyasını /Applications'a taşıyın, yeniden başlatın ve tekrar deneyin.";
 "アップデートを有効化するにはアプリをApplicationsに移動してください" = "Güncellemeleri etkinleştirmek için uygulamayı Applications'a taşıyın.";
-"共有する壁紙を選択" = "Paylaşılacak duvar kağıdını seç";
+"共有する壁紙を選択" = "Paylaşılacak duvar kâğıdını seç";
 "選ぶと保存先フォルダを指定して、.lwpkg と .mov を出力します" = "Seçtikten sonra bir klasör belirleyin; .lwpkg ve .mov dosyaları dışa aktarılır.";
 "閉じる" = "Kapat";
-"共有できる壁紙がありません" = "Paylaşılabilir duvar kağıdı yok.";
+"共有できる壁紙がありません" = "Paylaşılabilir duvar kâğıdı yok.";
 "追加先プレイリスト" = "Hedef oynatma listesi";
 "新規プレイリストを作成して追加" = "Yeni oynatma listesi oluştur ve ekle";
 "共有" = "Paylaş";
@@ -199,7 +199,7 @@
 "Storeに共有…" = "Store'a paylaş…";
 "Storeに共有" = "Store'a paylaş";
 "動画を共有" = "Video paylaş";
-"Storeに共有する壁紙を選択" = "Store'a paylaşılacak duvar kağıdını seç";
+"Storeに共有する壁紙を選択" = "Store'a paylaşılacak duvar kâğıdını seç";
 "保存済みのトリム・フィット設定と一緒に、選んだ動画をコミュニティStoreに送信します(公開には審査が必要です)" = "Seçilen videoyu, kaydedilmiş kırpma ve sığdırma ayarlarıyla birlikte inceleme için topluluk Store'una gönderir.";
 "この動画(トリム/ループ設定を含む)をコミュニティStoreに送信します(公開には審査が必要です)" = "Bu videoyu (kırpma/döngü ayarları dahil) yayınlanmadan önce inceleme için topluluk Store'una gönderir.";
 "タイトル" = "Başlık";
@@ -210,7 +210,7 @@
 "申請しました。審査状況は「自分の投稿」から確認できます" = "Gönderildi. İnceleme durumunu \"Gönderilerim\" bölümünden kontrol edebilirsiniz.";
 "送信する" = "Gönder";
 "Store" = "Store";
-"まだ公開されている壁紙がありません" = "Henüz yayınlanmış duvar kağıdı yok.";
+"まだ公開されている壁紙がありません" = "Henüz yayınlanmış duvar kâğıdı yok.";
 "トリム編集" = "Kırpma Düzenleyici";
 "下の壁紙一覧から動画を選択すると、カットとループ開始位置を編集できます" = "Kesme aralığını ve döngü başlangıç noktasını düzenlemek için aşağıdaki kitaplıktan bir video seçin.";
 "途中からループする" = "Belirli bir noktadan döngüye al";
@@ -223,15 +223,15 @@
 "ループ長" = "Döngü uzunluğu";
 "継ぎ目を確認" = "Dikişi kontrol et";
 "カット終了位置の少し手前へ再生位置を移動し、ループの継ぎ目を確認できます" = "Oynatma konumunu kesme bitiş noktasının hemen öncesine atlayarak döngü dikişini kontrol edin.";
-"カット・ループ範囲を初期値に戻します（保存するまで壁紙には反映されません）" = "Kesme ve döngü aralığını varsayılana sıfırlar (kaydedilene kadar duvar kağıdına uygulanmaz).";
+"カット・ループ範囲を初期値に戻します（保存するまで壁紙には反映されません）" = "Kesme ve döngü aralığını varsayılana sıfırlar (kaydedilene kadar duvar kâğıdına uygulanmaz).";
 "この動画のカット・ループ設定を削除して、全体再生に戻します" = "Bu videonun kesme ve döngü ayarlarını kaldırır ve videoyu tamamen oynatır.";
 "共有に失敗しました" = "Paylaşım başarısız";
 "プレビューなし" = "Önizleme yok";
-"壁紙設定" = "Duvar kağıdı ayarları";
+"壁紙設定" = "Duvar kâğıdı ayarları";
 "追加" = "Ekle";
 "追加しました" = "Eklendi";
 "LiveWallpaper" = "LiveWallpaper";
-"現在の壁紙プレビュー" = "Geçerli duvar kağıdı önizlemesi";
+"現在の壁紙プレビュー" = "Geçerli duvar kâğıdı önizlemesi";
 "設定を初期化" = "Ayarları sıfırla";
 "表示・再生に関する設定を初期値へ戻します" = "Görüntü ve oynatma ayarlarını varsayılan değerlerine sıfırlar.";
 "アクセシビリティ権限が必要です。システム設定でLiveWallpaperを許可してください。" = "Erişilebilirlik izni gerekli. Sistem Ayarları > Gizlilik ve Güvenlik > Erişilebilirlik bölümünden LiveWallpaper'a izin verin.";
@@ -245,16 +245,16 @@
 "軽量" = "Hafif";
 "高負荷" = "Yüksek";
 "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Video kod çözme yöntemini seçin. Otomatik ortama göre, Dengeli akıcılığı, Güç Tasarrufu CPU ve güç tüketimini azaltır.";
-"1. 「メディアを追加」を押して動画やGIFを選ぶ\n2. 選んだメディアがそのまま壁紙として再生されます" = "1. Video veya GIF seçmek için \"Medya Ekle\"ye basın.\n2. Seçilen medya doğrudan duvar kağıdı olarak oynatılır.";
+"1. 「メディアを追加」を押して動画やGIFを選ぶ\n2. 選んだメディアがそのまま壁紙として再生されます" = "1. Video veya GIF seçmek için \"Medya Ekle\"ye basın.\n2. Seçilen medya doğrudan duvar kâğıdı olarak oynatılır.";
 "動画やGIFなどのファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "Ayrıca bir videoyu veya GIF'i bu pencereye sürükleyerek de ekleyebilirsiniz.";
-"壁紙を保存するフォルダを選択してください" = "Duvar kağıdını kaydetmek için bir klasör seçin.";
+"壁紙を保存するフォルダを選択してください" = "Duvar kâğıdını kaydetmek için bir klasör seçin.";
 "高度な共有を有効にする" = "Gelişmiş paylaşımı etkinleştir";
 "オフのときは動画ファイルだけを書き出します。オンにすると配置情報を含む .lwpkg も一緒に書き出します。" = "Kapalıyken yalnızca video dosyası dışa aktarılır. Açıkken yerleşim bilgilerini içeren bir .lwpkg paketi de dışa aktarılır.";
 "選ぶと保存先フォルダを指定して、動画ファイルを書き出します" = "Video dosyasını dışa aktarmak için hedef klasör seçin.";
 "選ぶと保存先フォルダを指定して、動画ファイルと .lwpkg を出力します" = "Video dosyasını ve .lwpkg paketini dışa aktarmak için hedef klasör seçin.";
 "オフのときは動画ファイルだけを共有します。オンにすると配置情報を含む .lwpkg も一緒に共有します。" = "Kapalıyken yalnızca video dosyası paylaşılır. Açıkken yerleşim bilgilerini içeren bir .lwpkg paketi de paylaşılır.";
-"選ぶと macOS の共有シートを開き、動画ファイルを共有できます" = "Video dosyası için macOS paylaşım sayfasını açmak üzere bir duvar kağıdı seçin.";
-"選ぶと macOS の共有シートを開き、動画ファイルと .lwpkg を共有できます" = "Video dosyası ve .lwpkg paketi için macOS paylaşım sayfasını açmak üzere bir duvar kağıdı seçin.";
+"選ぶと macOS の共有シートを開き、動画ファイルを共有できます" = "Video dosyası için macOS paylaşım sayfasını açmak üzere bir duvar kâğıdı seçin.";
+"選ぶと macOS の共有シートを開き、動画ファイルと .lwpkg を共有できます" = "Video dosyası ve .lwpkg paketi için macOS paylaşım sayfasını açmak üzere bir duvar kâğıdı seçin.";
 "共有シートを開けませんでした" = "Paylaşım sayfası açılamadı.";
 "デスクトップのアイコンを表示" = "Masaüstü simgelerini göster";
 "System Settings の「デスクトップに項目を表示」と同じ設定です。OFF にすると Finder が再起動し、デスクトップ上のファイルとフォルダが非表示になります。" = "System Settings'teki \"Masaüstünde\" seçeneğiyle aynıdır. Kapatıldığında Finder yeniden başlar ve masaüstündeki dosya ve klasörler gizlenir.";
@@ -267,12 +267,12 @@
 "同期オフ" = "Senkron kapalı";
 "未設定" = "Ayarlanmadı";
 "未対応" = "Desteklenmiyor";
-"ロック画面壁紙プレビュー" = "Kilit ekranı duvar kağıdı önizlemesi";
-"オンにすると選択中のロック画面動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "Açıldığında seçili kilit ekranı videosu geçici olarak sistem Aerial duvar kağıdı olarak ayarlanır. Uygulama kapanınca önceki duvar kağıdına döner.";
-"Web壁紙" = "Web Duvar Kağıdı";
-"WebサイトのURLを入力すると、そのページを壁紙として表示できます" = "Bir web sitesi URL'si girerek o sayfayı duvar kağıdı olarak gösterebilirsiniz.";
+"ロック画面壁紙プレビュー" = "Kilit ekranı duvar kâğıdı önizlemesi";
+"オンにすると選択中のロック画面動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "Açıldığında seçili kilit ekranı videosu geçici olarak sistem Aerial duvar kâğıdı olarak ayarlanır. Uygulama kapanınca önceki duvar kâğıdına döner.";
+"Web壁紙" = "Web Duvar Kâğıdı";
+"WebサイトのURLを入力すると、そのページを壁紙として表示できます" = "Bir web sitesi URL'si girerek o sayfayı duvar kâğıdı olarak gösterebilirsiniz.";
 "https://example.com" = "https://example.com";
-"登録済みのWeb壁紙はありません" = "Kayıtlı web duvar kağıdı yok.";
+"登録済みのWeb壁紙はありません" = "Kayıtlı web duvar kâğıdı yok.";
 "読み込み中" = "Yükleniyor";
 "表示中" = "Etkin";
 "読み込み失敗" = "Yükleme başarısız";
@@ -286,28 +286,28 @@
 "チェックでこのプレイリストに追加・解除" = "Bu oynatma listesine eklemek veya çıkarmak için işaretleyin";
 "プレイリストから外す…" = "Oynatma listesinden çıkar…";
 "チェックした動画がこのプレイリストで再生されます" = "İşaretli videolar bu oynatma listesinde oynatılır";
-"Web壁紙機能を有効にする" = "Web duvar kağıdı özelliğini etkinleştir";
-"オンにすると壁紙タブにWeb壁紙セクションが表示されます。実験的な機能です。" = "Açıldığında Duvar Kağıdı sekmesinde Web duvar kağıdı bölümü görünür. Deneysel bir özelliktir.";
+"Web壁紙機能を有効にする" = "Web duvar kâğıdı özelliğini etkinleştir";
+"オンにすると壁紙タブにWeb壁紙セクションが表示されます。実験的な機能です。" = "Açıldığında Duvar Kâğıdı sekmesinde Web duvar kâğıdı bölümü görünür. Deneysel bir özelliktir.";
 
 "設定を検索" = "Ayarlarda ara";
 "該当する設定がありません" = "Eşleşen ayar yok";
 "設定を書き出す…" = "Ayarları Dışa Aktar…";
 "設定を読み込む…" = "Ayarları İçe Aktar…";
-"表示・再生などの設定をJSONファイルとして保存・復元できます。壁紙の動画ファイル自体は含まれません" = "Görüntüleme ve oynatma ayarlarını JSON dosyası olarak kaydedip geri yükleyebilirsiniz. Duvar kağıdı video dosyalarının kendisi dahil değildir";
+"表示・再生などの設定をJSONファイルとして保存・復元できます。壁紙の動画ファイル自体は含まれません" = "Görüntüleme ve oynatma ayarlarını JSON dosyası olarak kaydedip geri yükleyebilirsiniz. Duvar kâğıdı video dosyalarının kendisi dahil değildir";
 "設定を読み込みました" = "Ayarlar içe aktarıldı";
 "設定の読み込みに失敗しました" = "Ayarlar içe aktarılamadı";
 "設定の書き出しに失敗しました" = "Ayarlar dışa aktarılamadı";
 
-"壁紙がほかのアプリのウィンドウで完全に隠れている間は、再生を止めて消費電力を抑えます。権限の許可は不要です。" = "Duvar kağıdı diğer uygulamaların pencereleri tarafından tamamen gizlendiğinde, güç tasarrufu için oynatma duraklatılır. İzin gerekmez.";
+"壁紙がほかのアプリのウィンドウで完全に隠れている間は、再生を止めて消費電力を抑えます。権限の許可は不要です。" = "Duvar kâğıdı diğer uygulamaların pencereleri tarafından tamamen gizlendiğinde, güç tasarrufu için oynatma duraklatılır. İzin gerekmez.";
 "ほかのアプリを使っている間は再生を停止" = "Diğer uygulamaları kullanırken oynatmayı duraklat";
-"壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。" = "Duvar kağıdının görünür olup olmadığına bakılmaksızın, başka bir uygulama öndeyken oynatma duraklatılır.";
+"壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。" = "Duvar kâğıdının görünür olup olmadığına bakılmaksızın, başka bir uygulama öndeyken oynatma duraklatılır.";
 "画面がほぼ隠れたら停止（高精度）" = "Ekran büyük ölçüde kapandığında duraklat (hassas)";
-"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。" = "Duvar kağıdı az da olsa görünse bile, ekranın büyük bölümü pencerelerle kaplandığında oynatma duraklatılır. Bu algılama için Ekran Kaydı izni gerekir.";
+"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。" = "Duvar kâğıdı az da olsa görünse bile, ekranın büyük bölümü pencerelerle kaplandığında oynatma duraklatılır. Bu algılama için Ekran Kaydı izni gerekir.";
 "高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "Hassas algılama için Ekran Kaydı izni gerekir. İzin verilene kadar standart yöntem kullanılır.";
 "再生を止めないアプリ" = "Oynatmayı hiç duraklatmayan uygulamalar";
 "再生を止めないアプリはまだ登録されていません" = "Henüz hariç tutulan uygulama yok";
 
-"自動で次の壁紙へ" = "Duvar kağıdını otomatik değiştir";
+"自動で次の壁紙へ" = "Duvar kâğıdını otomatik değiştir";
 "オフ" = "Kapalı";
 "5分" = "5 dk";
 "15分" = "15 dk";
@@ -323,14 +323,14 @@
 "オンにすると、この画面はメイン画面での作業やウィンドウの被覆に関わらず再生を続けます" = "Açıldığında, bu ekran ana ekrandaki etkinlikten veya pencere kaplamasından bağımsız olarak oynatmaya devam eder";
 
 "デスクトップ（共有）" = "Masaüstü (Paylaşılan)";
-"画面ごとに壁紙を切り替え" = "Ekrana göre duvar kağıdını değiştir";
+"画面ごとに壁紙を切り替え" = "Ekrana göre duvar kâğıdını değiştir";
 
 "この画面専用のプレイリストです" = "Bu, yalnızca bu ekrana özel bir oynatma listesidir";
 
 "カードをクリックするとこの画面に割り当てられます" = "Bir karta tıklayarak bu ekrana atayın";
 
-"デスクトップ（Space）ごとに壁紙を切り替える" = "Masaüstü (Space) başına duvar kağıdını değiştir";
-"Mission Control のデスクトップごとに別の壁紙を割り当てられます。割り当ては壁紙タブのデスクトップタブ横のメニュー、または壁紙カードの右クリックから行えます。割り当てのないデスクトップは通常の壁紙を表示します。割り当てた壁紙の音声は再生されません。デスクトップ切り替え直後、壁紙の切り替わりが数百ミリ秒ほど遅れることがあります。これはmacOS側のデスクトップ切替通知が遅れて届くことによるもので、アプリの不具合ではありません。" = "Mission Control'deki her masaüstüne farklı bir duvar kağıdı atayabilirsiniz. Atama, Duvar Kağıdı sekmesindeki masaüstü sekmesinin yanındaki menüden veya bir duvar kağıdı kartına sağ tıklanarak yapılır. Ataması olmayan masaüstleri normal duvar kağıdını gösterir. Atanan duvar kağıtlarında ses çalınmaz. Masaüstü değiştirildikten hemen sonra duvar kağıdının güncellenmesi birkaç yüz milisaniye gecikebilir. Bu, macOS'un kendi masaüstü değişikliği bildiriminin gecikmesinden kaynaklanır, uygulama hatası değildir.";
+"デスクトップ（Space）ごとに壁紙を切り替える" = "Masaüstü (Space) başına duvar kâğıdını değiştir";
+"Mission Control のデスクトップごとに別の壁紙を割り当てられます。割り当ては壁紙タブのデスクトップタブ横のメニュー、または壁紙カードの右クリックから行えます。割り当てのないデスクトップは通常の壁紙を表示します。割り当てた壁紙の音声は再生されません。デスクトップ切り替え直後、壁紙の切り替わりが数百ミリ秒ほど遅れることがあります。これはmacOS側のデスクトップ切替通知が遅れて届くことによるもので、アプリの不具合ではありません。" = "Mission Control'deki her masaüstüne farklı bir duvar kâğıdı atayabilirsiniz. Atama, Duvar Kâğıdı sekmesindeki masaüstü sekmesinin yanındaki menüden veya bir duvar kâğıdı kartına sağ tıklanarak yapılır. Ataması olmayan masaüstleri normal duvar kâğıdını gösterir. Atanan duvar kâğıtlarında ses çalınmaz. Masaüstü değiştirildikten hemen sonra duvar kâğıdının güncellenmesi birkaç yüz milisaniye gecikebilir. Bu, macOS'un kendi masaüstü değişikliği bildiriminin gecikmesinden kaynaklanır, uygulama hatası değildir.";
 "この機能はご利用のmacOSでは利用できません。" = "Bu özellik, kullandığınız macOS sürümünde kullanılamıyor.";
 "デスクトップ%d" = "Masaüstü %d";
 "仮想デスクトップ" = "Sanal Masaüstleri";
@@ -338,7 +338,7 @@
 "デスクトップに割り当て…" = "Masaüstüne Ata…";
 "デスクトップに割り当て" = "Masaüstüne ata";
 "カードをクリックするとこのデスクトップに割り当てられます" = "Bir karta tıklayarak bu masaüstüne atayabilirsiniz";
-"このデスクトップに固定表示する動画です。未割り当てのデスクトップは通常の壁紙を表示します。" = "Bu masaüstünde sabit olarak gösterilen videodur. Ataması olmayan masaüstleri normal duvar kağıdını gösterir.";
+"このデスクトップに固定表示する動画です。未割り当てのデスクトップは通常の壁紙を表示します。" = "Bu masaüstünde sabit olarak gösterilen videodur. Ataması olmayan masaüstleri normal duvar kâğıdını gösterir.";
 "割り当てを解除" = "Atamayı kaldır";
 "この動画を現在のデスクトップに割り当て" = "Bu videoyu geçerli masaüstüne ata";
 "この動画をデスクトップ%dに割り当て" = "Bu videoyu Masaüstü %d'ye ata";
@@ -356,18 +356,18 @@
 
 // ロック画面同期・Aerial壁紙・バッテリー・アプリ選択
 "ロック画面にも動画を同期" = "Videoyu kilit ekranıyla da eşitle";
-"ロック画面用にシステム壁紙を一時設定" = "Kilit ekranı için sistem duvar kağıdını geçici olarak ayarla";
+"ロック画面用にシステム壁紙を一時設定" = "Kilit ekranı için sistem duvar kâğıdını geçici olarak ayarla";
 "System Settings を開く" = "Sistem Ayarları'nı Aç";
 "今すぐ設定" = "Şimdi Ayarla";
 "今すぐ同期" = "Şimdi Eşitle";
 "ロック画面同期を削除" = "Kilit Ekranı Eşitlemesini Kaldır";
 "元のAerialに戻す" = "Özgün Aerial'ı Geri Yükle";
 "壊れた設定を復元" = "Bozuk Ayarları Geri Yükle";
-"初回のみ System Settings の壁紙画面で「LiveWallpaper Video」を選び、「スクリーンセーバーとして表示」をオンにしてください。以降の動画変更は自動同期されます。" = "İlk kurulumda Sistem Ayarları'ndaki Duvar Kağıdı bölümünden \"LiveWallpaper Video\"yu seçin ve \"Ekran Koruyucu Olarak Göster\" seçeneğini açın. Sonraki video değişiklikleri otomatik eşitlenir.";
-"オンにすると現在の動画をロック画面用のシステム壁紙として設定します。以降の動画変更も自動同期されます。反映されない時は「ロック画面に設定」を押してください。" = "Açıldığında geçerli video kilit ekranı için sistem duvar kağıdı olarak ayarlanır. Sonraki video değişiklikleri otomatik eşitlenir. Uygulanmazsa \"Kilit ekranına ayarla\" düğmesine basın.";
+"初回のみ System Settings の壁紙画面で「LiveWallpaper Video」を選び、「スクリーンセーバーとして表示」をオンにしてください。以降の動画変更は自動同期されます。" = "İlk kurulumda Sistem Ayarları'ndaki Duvar Kâğıdı bölümünden \"LiveWallpaper Video\"yu seçin ve \"Ekran Koruyucu Olarak Göster\" seçeneğini açın. Sonraki video değişiklikleri otomatik eşitlenir.";
+"オンにすると現在の動画をロック画面用のシステム壁紙として設定します。以降の動画変更も自動同期されます。反映されない時は「ロック画面に設定」を押してください。" = "Açıldığında geçerli video kilit ekranı için sistem duvar kâğıdı olarak ayarlanır. Sonraki video değişiklikleri otomatik eşitlenir. Uygulanmazsa \"Kilit ekranına ayarla\" düğmesine basın.";
 "オンにすると現在の動画をロック画面へ設定します。動画変更後に反映されない時は「今すぐ設定」を押してください。" = "Açıldığında geçerli video kilit ekranına ayarlanır. Video değiştirdikten sonra uygulanmazsa \"Şimdi Ayarla\" düğmesine basın.";
-"オンにすると現在の動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "Açıldığında geçerli video geçici olarak sistem Aerial duvar kağıdı olarak ayarlanır. Uygulama kapanınca önceki duvar kağıdına döner.";
-"System Settings でダイナミック壁紙を1つダウンロードしてから、もう一度設定してください。" = "Sistem Ayarları'ndan bir dinamik duvar kağıdı indirin, ardından yeniden ayarlayın.";
+"オンにすると現在の動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "Açıldığında geçerli video geçici olarak sistem Aerial duvar kâğıdı olarak ayarlanır. Uygulama kapanınca önceki duvar kâğıdına döner.";
+"System Settings でダイナミック壁紙を1つダウンロードしてから、もう一度設定してください。" = "Sistem Ayarları'ndan bir dinamik duvar kâğıdı indirin, ardından yeniden ayarlayın.";
 "うまく反映されない時は、右のメニューから復元できます。System Settings は閉じてから実行してください。" = "Doğru uygulanmazsa sağdaki menüden geri yükleyebilirsiniz. Çalıştırmadan önce Sistem Ayarları'nı kapatın.";
 "ロック画面同期はオフです" = "Kilit ekranı eşitlemesi kapalı";
 "macOS 26 以降で利用できます" = "macOS 26 veya sonrasında kullanılabilir";
@@ -410,8 +410,7 @@
 "常に" = "Her zaman";
 "ライト" = "Açık";
 "ダーク" = "Koyu";
-"共有" = "Paylaşılan";
-"仮想デスクトップ" = "Sanal masaüstleri";
+"共通" = "Ortak";
 "壁紙を選択" = "Duvar kâğıdı seç";
 "Web壁紙は共有スコープのみで選択できます" = "Web duvar kâğıtları yalnızca paylaşılan kapsam için seçilebilir";
 "毎日" = "Her gün";
@@ -429,8 +428,8 @@
 
 // 集中モード(Focus Filter)
 "集中モード" = "Odak Modu";
-"集中モードごとに表示する壁紙を選べます。" = "Her Odak modu için gösterilecek duvar kağıdını seçebilirsiniz.";
-"集中モードごとに表示する壁紙を選べます。macOSは集中モードの情報をアプリに公開しないため、この機能には「フルディスクアクセス」の許可が必要です。" = "Her Odak modu için gösterilecek duvar kağıdını seçebilirsiniz. macOS, Odak bilgilerini uygulamalara açmadığından bu özellik Tam Disk Erişimi gerektirir.";
+"集中モードごとに表示する壁紙を選べます。" = "Her Odak modu için gösterilecek duvar kâğıdını seçebilirsiniz.";
+"集中モードごとに表示する壁紙を選べます。macOSは集中モードの情報をアプリに公開しないため、この機能には「フルディスクアクセス」の許可が必要です。" = "Her Odak modu için gösterilecek duvar kâğıdını seçebilirsiniz. macOS, Odak bilgilerini uygulamalara açmadığından bu özellik Tam Disk Erişimi gerektirir.";
 "1. 下のボタンからフルディスクアクセスの設定を開く" = "1. Aşağıdaki düğmeyle Tam Disk Erişimi ayarlarını açın";
 "2. 一覧にこのAppを追加してスイッチをオンにする" = "2. Bu uygulamayı listeye ekleyin ve açın";
 "3. このAppを再起動する" = "3. Uygulamayı yeniden başlatın";
@@ -440,8 +439,8 @@
 "変更しない" = "Değiştirme";
 "おやすみモード" = "Rahatsız Etmeyin";
 "さまたげ低減" = "Kesintileri Azalt";
-"集中モードで壁紙を切り替える" = "Duvar kağıdını Odak modlarıyla değiştir";
-"オフの間は、集中モードによる壁紙の切り替えを行いません。" = "Kapalıyken Odak modları duvar kağıdını değiştirmez.";
+"集中モードで壁紙を切り替える" = "Duvar kâğıdını Odak modlarıyla değiştir";
+"オフの間は、集中モードによる壁紙の切り替えを行いません。" = "Kapalıyken Odak modları duvar kâğıdını değiştirmez.";
 "集中モードとの連携は「壁紙」タブにあります" = "Odak Modu entegrasyonu Duvar Kâğıdı sekmesinde";
 
 // Store共有エラー
@@ -487,9 +486,9 @@
 "取り下げに失敗しました。もう一度お試しください" = "Geri çekilemedi. Lütfen tekrar deneyin";
 
 // 検索バーUX改善(共通コンポーネント化)
-"タイトルや名前で壁紙を検索" = "Başlığa veya ada göre duvar kağıdı ara";
+"タイトルや名前で壁紙を検索" = "Başlığa veya ada göre duvar kâğıdı ara";
 "検索をクリア" = "Aramayı temizle";
-"検索条件に一致する壁紙がありません" = "Aramanızla eşleşen duvar kağıdı yok";
+"検索条件に一致する壁紙がありません" = "Aramanızla eşleşen duvar kâğıdı yok";
 "アプリ名で検索" = "Uygulama adına göre ara";
 "除外できるアプリがありません" = "Hariç tutulabilecek uygulama yok";
 "一致" = "Eşleşme";
@@ -546,17 +545,16 @@
 "ループ開始位置を今の再生位置にします(L)" = "Döngü başlangıcını geçerli oynatma konumuna ayarlar (L)";
 
 // グローバルショートカット / Reduce Motion(追加機能)
-"視差効果を減らす設定に合わせて壁紙を静止" = "Hareketi Azalt açıkken duvar kağıdını dondur";
-"システム設定の「アクセシビリティ > 表示 > 視差効果を減らす」がオンのとき、壁紙の再生を静止フレームで止めます。オフにするとこの設定に関わらず常に再生します。" = "Sistem Ayarları’nda “Erişilebilirlik → Ekran → Hareketi Azalt” açıkken duvar kağıdı sabit bir karede dondurulur. Bu ayardan bağımsız olarak her zaman oynatmak için bunu kapatın.";
-"システムの「視差効果を減らす」が有効なため、壁紙を静止しています。" = "Sistemin “Hareketi Azalt” ayarı etkin olduğu için duvar kağıdı donduruldu.";
+"視差効果を減らす設定に合わせて壁紙を静止" = "Hareketi Azalt açıkken duvar kâğıdını dondur";
+"システム設定の「アクセシビリティ > 表示 > 視差効果を減らす」がオンのとき、壁紙の再生を静止フレームで止めます。オフにするとこの設定に関わらず常に再生します。" = "Sistem Ayarları’nda “Erişilebilirlik → Ekran → Hareketi Azalt” açıkken duvar kâğıdı sabit bir karede dondurulur. Bu ayardan bağımsız olarak her zaman oynatmak için bunu kapatın.";
+"システムの「視差効果を減らす」が有効なため、壁紙を静止しています。" = "Sistemin “Hareketi Azalt” ayarı etkin olduğu için duvar kâğıdı donduruldu.";
 "グローバルショートカット" = "Genel Kısayollar";
 "グローバルショートカットを有効にする" = "Genel kısayolları etkinleştir";
 "アプリが前面になくても、システム全体でキー操作を受け付けます。既存のショートカットと重複しない組み合わせを割り当ててください。" = "Tuş kombinasyonları, uygulama önde olmasa bile sistem genelinde çalışır. Mevcut kısayollarla çakışmayan kombinasyonlar atayın.";
-"次の壁紙に切り替え" = "Sonraki duvar kağıdına geç";
-"前の壁紙に切り替え" = "Önceki duvar kağıdına geç";
+"次の壁紙に切り替え" = "Sonraki duvar kâğıdına geç";
+"前の壁紙に切り替え" = "Önceki duvar kâğıdına geç";
 "音声のオン/オフ" = "Sesi aç/kapat";
 "デスクトップアイコンの表示/非表示" = "Masaüstü simgelerini göster/gizle";
-"未設定" = "Ayarlanmadı";
 "キーを入力…" = "Kısayol girin…";
 "既定に戻す" = "Varsayılana sıfırla";
 "ショートカット" = "Kısayol";

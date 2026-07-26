@@ -31,7 +31,6 @@
 "一致するアプリがありません" = "No matching apps";
 "Finderから他のアプリを選択…" = "Choose another app in Finder…";
 "詳細設定" = "Advanced settings";
-"自動" = "Automatic";
 "省電力" = "Power saving";
 "高画質" = "High quality";
 "通常" = "Normal";
@@ -89,7 +88,7 @@
 "設定を初期化" = "Reset settings";
 "表示・再生に関する設定を初期値へ戻します" = "Restore display and playback settings to their defaults.";
 "リセット" = "Reset";
-"未登録" = "Not registered";
+"未登録" = "Not in Library";
 "未再生" = "Not playing";
 "未作成" = "Not created";
 "現在の壁紙プレビュー" = "Current wallpaper preview";
@@ -133,17 +132,7 @@
 "追加" = "Add";
 "追加しました" = "Added";
 "LiveWallpaper" = "LiveWallpaper";
-"壁紙を読み込む" = "Import wallpaper";
-"壁紙を共有" = "Share wallpaper";
-"壁紙を開く" = "Open Wallpaper";
-"壁紙設定を開く" = "Open Wallpaper Fit";
-"設定を開く" = "Open Settings";
-"再生をリフレッシュ" = "Refresh playback";
-"メインのみ" = "Main display only";
-"全ディスプレイ" = "All displays";
 "現在の壁紙" = "Current wallpaper";
-"プレイリスト" = "Playlist";
-"表示" = "Display";
 "アプリの言語" = "App Language";
 "自動（システム設定に従う）" = "Automatic (Follow System Settings)";
 "English" = "English";
@@ -178,7 +167,7 @@
 "未保存の編集を取り消して、保存済みの状態に戻します" = "Revert unsaved edits to the last saved state.";
 "既定値に従う" = "Use Default";
 "この動画・この画面の個別設定を削除して、設定タブの既定値を使います" = "Remove the custom settings for this video and screen and use the default from the Settings tab.";
-"全ての画面へ適用" = "Apply to All Screens";
+"全ての画面へ適用" = "Apply to All Displays";
 "現在の編集内容を保存して、接続中のすべての画面へコピーします" = "Save the current edits and copy them to all connected screens.";
 "ズームと位置を初期値に戻します（保存するまで壁紙には反映されません）" = "Reset zoom and position to defaults (not applied to the wallpaper until saved).";
 "横位置" = "Horizontal";
@@ -214,7 +203,7 @@
 "省電" = "Power saving";
 "動画データのデコード方法を切り替えます。自動はハードウェア/ソフトウェアを状況に応じて選び、標準はGPUハードウェア優先で滑らかさを保ちます。省電力はソフトウェア再生を多用し、CPU負荷と消費電力を低く抑えますが再生品質が落ちる場合があります。" = "Switch video decoding. Automatic chooses hardware/software as needed, Balanced prefers GPU hardware for smoothness. Power saving uses software decoding more, reducing CPU/power but may lower quality.";
 "デスクトップレベル" = "Desktop Level";
-"壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。" = "Choose the wallpaper window layer. -1 puts it behind other windows, 0 is the standard desktop level, +1 puts it in front. Front can hide icons; back avoids blocking other window actions.";
+"壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。" = "Choose the wallpaper window layer. -1 puts it behind other windows, 0 is the standard desktop level, and +1 puts it in front. The front layer can cover your desktop icons, while the back layer is less likely to interfere with other windows.";
 "保存先を開く" = "Open Location";
 "キャッシュ削除" = "Clear Cache";
 "キャッシュ" = "Cache";
@@ -233,7 +222,7 @@
 "静止画" = "Still";
 "設定をリセット" = "Reset Settings";
 "手動ダウンロード" = "Manual Download";
-"画面" = "Screen";
+"画面" = "Display";
 "メイン" = "Main";
 "アクセシビリティ権限が必要です。システム設定でLiveWallpaperを許可してください。" = "Accessibility permission is required. Allow LiveWallpaper in System Settings > Privacy & Security > Accessibility.";
 "設定の保存に失敗しています。空き容量などを確認してください。" = "Failed to save settings. Check available storage and try again.";
@@ -261,12 +250,11 @@
 "System Settings を開く" = "Open System Settings";
 "今すぐ設定" = "Set Now";
 "今すぐ同期" = "Sync Now";
-"ロック画面に設定" = "Set Lock Screen";
 "ロック画面同期を削除" = "Remove Lock Screen Sync";
 "元のAerialに戻す" = "Restore Original Aerial";
 "壊れた設定を復元" = "Restore Broken Settings";
 "初回のみ System Settings の壁紙画面で「LiveWallpaper Video」を選び、「スクリーンセーバーとして表示」をオンにしてください。以降の動画変更は自動同期されます。" = "For first-time setup, open Wallpaper in System Settings, choose \"LiveWallpaper Video\", and enable \"Show as Screen Saver\". Future video changes sync automatically.";
-"オンにすると現在の動画をロック画面用のシステム壁紙として設定します。以降の動画変更も自動同期されます。反映されない時は「ロック画面に設定」を押してください。" = "When enabled, the current video is set as the system wallpaper for the Lock Screen. Future video changes sync automatically. If it does not apply, press \"Set Lock Screen\".";
+"オンにすると現在の動画をロック画面用のシステム壁紙として設定します。以降の動画変更も自動同期されます。反映されない時は「ロック画面に設定」を押してください。" = "When enabled, the current video is set as the system wallpaper for the Lock Screen. Future video changes sync automatically. If it does not apply, press \"Set as Lock Screen\".";
 "オンにすると現在の動画をロック画面へ設定します。動画変更後に反映されない時は「今すぐ設定」を押してください。" = "When enabled, the current video is set on the Lock Screen. If it does not apply after changing videos, press \"Set Now\".";
 "オンにすると現在の動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。" = "When enabled, the current video is temporarily set as the system Aerial wallpaper. The original wallpaper is restored when the app quits.";
 "System Settings でダイナミック壁紙を1つダウンロードしてから、もう一度設定してください。" = "Download one dynamic wallpaper in System Settings, then set it again.";
@@ -406,8 +394,7 @@
 "常に" = "Always";
 "ライト" = "Light";
 "ダーク" = "Dark";
-"共有" = "Shared";
-"仮想デスクトップ" = "Virtual desktops";
+"共通" = "Common";
 "壁紙を選択" = "Choose wallpaper";
 "Web壁紙は共有スコープのみで選択できます" = "Web wallpapers can only be selected for the shared scope";
 "毎日" = "Every day";
@@ -552,7 +539,6 @@
 "前の壁紙に切り替え" = "Switch to previous wallpaper";
 "音声のオン/オフ" = "Toggle audio on/off";
 "デスクトップアイコンの表示/非表示" = "Show/hide desktop icons";
-"未設定" = "Not set";
 "キーを入力…" = "Type a shortcut…";
 "既定に戻す" = "Reset to default";
 "ショートカット" = "Shortcut";

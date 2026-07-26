@@ -333,7 +333,7 @@
 "Mission Control のデスクトップごとに別の壁紙を割り当てられます。割り当ては壁紙タブのデスクトップタブ横のメニュー、または壁紙カードの右クリックから行えます。割り当てのないデスクトップは通常の壁紙を表示します。割り当てた壁紙の音声は再生されません。デスクトップ切り替え直後、壁紙の切り替わりが数百ミリ秒ほど遅れることがあります。これはmacOS側のデスクトップ切替通知が遅れて届くことによるもので、アプリの不具合ではありません。" = "Bạn có thể gán hình nền khác nhau cho từng desktop trong Mission Control. Gán từ menu cạnh tab Desktop trong tab Hình nền, hoặc nhấp chuột phải vào thẻ hình nền. Desktop chưa được gán sẽ hiển thị hình nền thông thường. Hình nền được gán sẽ không phát âm thanh. Ngay sau khi chuyển desktop, hình nền có thể mất vài trăm mili giây để cập nhật theo. Đây là do độ trễ của chính thông báo chuyển desktop từ macOS, không phải lỗi của ứng dụng.";
 "この機能はご利用のmacOSでは利用できません。" = "Tính năng này không khả dụng trên phiên bản macOS của bạn.";
 "デスクトップ%d" = "Desktop %d";
-"仮想デスクトップ" = "Màn hình ảo";
+"仮想デスクトップ" = "Desktop ảo";
 "現在" = "hiện tại";
 "デスクトップに割り当て…" = "Gán cho Desktop…";
 "デスクトップに割り当て" = "Gán cho desktop";
@@ -410,8 +410,7 @@
 "常に" = "Luôn luôn";
 "ライト" = "Sáng";
 "ダーク" = "Tối";
-"共有" = "Dùng chung";
-"仮想デスクトップ" = "Màn hình ảo";
+"共通" = "Dùng chung";
 "壁紙を選択" = "Chọn hình nền";
 "Web壁紙は共有スコープのみで選択できます" = "Hình nền web chỉ chọn được cho phạm vi dùng chung";
 "毎日" = "Hằng ngày";
@@ -556,7 +555,6 @@
 "前の壁紙に切り替え" = "Chuyển về hình nền trước";
 "音声のオン/オフ" = "Bật/tắt âm thanh";
 "デスクトップアイコンの表示/非表示" = "Hiện/ẩn biểu tượng trên bàn làm việc";
-"未設定" = "Chưa đặt";
 "キーを入力…" = "Nhập phím tắt…";
 "既定に戻す" = "Đặt lại về mặc định";
 "ショートカット" = "Phím tắt";

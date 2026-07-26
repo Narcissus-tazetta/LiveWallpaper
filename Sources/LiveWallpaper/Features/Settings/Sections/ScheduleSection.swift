@@ -461,7 +461,7 @@ extension SettingsView {
         )
         return Menu {
             Picker("", selection: scopeBinding) {
-                Label(model.localizedString("共有"), systemImage: "infinity")
+                Label(model.localizedString("共通"), systemImage: "infinity")
                     .tag(ScheduleScope.shared)
 
                 let screens = model.availableDisplayScreens()
@@ -500,7 +500,7 @@ extension SettingsView {
     private func scheduleScopeLabel(_ scope: ScheduleScope) -> String {
         switch scope.kind {
         case .shared:
-            return model.localizedString("共有")
+            return model.localizedString("共通")
         case .display:
             guard let screenID = scope.identifier,
                   let screen = model.availableDisplayScreens().first(where: { $0.id == screenID })
