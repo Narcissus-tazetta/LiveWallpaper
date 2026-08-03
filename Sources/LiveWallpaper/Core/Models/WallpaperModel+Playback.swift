@@ -9,7 +9,7 @@ extension WallpaperModel {
             return
         }
         lightweightMode = enabled
-        UserDefaults.standard.set(enabled, forKey: "lightweightMode")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.lightweightMode)
         applyLightweightSettings()
         requestPlaybackReconfiguration()
     }
@@ -21,7 +21,7 @@ extension WallpaperModel {
         audioEnabled = enabled
         applyAudioSettings()
         applyWebAudioSettings()
-        UserDefaults.standard.set(enabled, forKey: "audioEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.audioEnabled)
     }
 
     func setAudioVolume(_ volume: Float) {
@@ -31,7 +31,7 @@ extension WallpaperModel {
         }
         audioVolume = clampedVolume
         applyAudioSettings()
-        UserDefaults.standard.set(clampedVolume, forKey: "audioVolume")
+        UserDefaults.standard.set(clampedVolume, forKey: PrefsKey.audioVolume)
     }
 
     func setFrameRateLimit(_ limit: FrameRateLimit) {
@@ -39,7 +39,7 @@ extension WallpaperModel {
             return
         }
         frameRateLimit = limit
-        UserDefaults.standard.set(limit.rawValue, forKey: "frameRateLimit")
+        UserDefaults.standard.set(limit.rawValue, forKey: PrefsKey.frameRateLimit)
         applyDynamicPlaybackProfile()
     }
 
@@ -48,7 +48,7 @@ extension WallpaperModel {
             return
         }
         decodeMode = mode
-        UserDefaults.standard.set(mode.rawValue, forKey: "decodeMode")
+        UserDefaults.standard.set(mode.rawValue, forKey: PrefsKey.decodeMode)
         requestPlaybackReconfiguration()
     }
 
@@ -57,7 +57,7 @@ extension WallpaperModel {
             return
         }
         workProfile = profile
-        UserDefaults.standard.set(profile.rawValue, forKey: "workProfile")
+        UserDefaults.standard.set(profile.rawValue, forKey: PrefsKey.workProfile)
         applyDynamicPlaybackProfile()
     }
 
@@ -66,7 +66,7 @@ extension WallpaperModel {
             return
         }
         qualityPreset = preset
-        UserDefaults.standard.set(preset.rawValue, forKey: "qualityPreset")
+        UserDefaults.standard.set(preset.rawValue, forKey: PrefsKey.qualityPreset)
         applyDynamicPlaybackProfile()
     }
 
@@ -75,7 +75,7 @@ extension WallpaperModel {
             return
         }
         autoFrameRateEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "autoFrameRateEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.autoFrameRateEnabled)
         startAutoFrameRateMonitoring()
     }
 
@@ -84,7 +84,7 @@ extension WallpaperModel {
             return
         }
         batteryAwareQualityEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "batteryAwareQualityEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.batteryAwareQualityEnabled)
         startAutoFrameRateMonitoring()
     }
 
@@ -93,7 +93,7 @@ extension WallpaperModel {
             return
         }
         playlistPlaybackEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "playlistPlaybackEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.playlistPlaybackEnabled)
         if !enabled {
             setShufflePlaybackEnabled(false)
             clearPinCurrentVideo()
@@ -108,7 +108,7 @@ extension WallpaperModel {
             return
         }
         shufflePlaybackEnabled = normalized
-        UserDefaults.standard.set(normalized, forKey: "shufflePlaybackEnabled")
+        UserDefaults.standard.set(normalized, forKey: PrefsKey.shufflePlaybackEnabled)
     }
 
     func setVideoLoopEnabled(_ enabled: Bool) {
@@ -116,7 +116,7 @@ extension WallpaperModel {
             return
         }
         videoLoopEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "videoLoopEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.videoLoopEnabled)
         requestPlaybackReconfiguration()
     }
 

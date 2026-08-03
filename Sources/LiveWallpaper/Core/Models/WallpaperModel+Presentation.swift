@@ -9,7 +9,7 @@ extension WallpaperModel {
             return
         }
         fitMode = mode
-        UserDefaults.standard.set(mode.rawValue, forKey: "fitMode")
+        UserDefaults.standard.set(mode.rawValue, forKey: PrefsKey.fitMode)
         refreshPlayerPresentations()
     }
 

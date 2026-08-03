@@ -64,7 +64,7 @@ extension WallpaperModel {
             return
         }
         respectReduceMotionEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "respectReduceMotionEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.respectReduceMotionEnabled)
         evaluateForegroundCoverageState()
     }
 }

@@ -8,7 +8,7 @@ extension WallpaperModel {
             return
         }
         desktopReadabilityDimOpacity = clamped
-        UserDefaults.standard.set(clamped, forKey: "desktopReadabilityDimOpacity")
+        UserDefaults.standard.set(clamped, forKey: PrefsKey.desktopReadabilityDimOpacity)
         applyDesktopReadabilityDimState()
     }
 

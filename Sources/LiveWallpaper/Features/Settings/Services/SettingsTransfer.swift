@@ -196,7 +196,7 @@ enum SettingsTransfer {
         }
         if let bundleIDs = snapshot.suspendExclusionBundleIDs {
             model.suspendExclusionBundleIDs = []
-            UserDefaults.standard.removeObject(forKey: "suspendExclusionBundleIDs")
+            UserDefaults.standard.removeObject(forKey: PrefsKey.suspendExclusionBundleIDs)
             for bundleID in bundleIDs {
                 model.addSuspendExclusionBundleID(bundleID)
             }

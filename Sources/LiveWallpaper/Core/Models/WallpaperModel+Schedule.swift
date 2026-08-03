@@ -525,7 +525,7 @@ extension WallpaperModel {
     // MARK: - 永続化
 
     func restoreScheduleState() {
-        if let data = UserDefaults.standard.data(forKey: "scheduleRulesData"),
+        if let data = UserDefaults.standard.data(forKey: PrefsKey.scheduleRulesData),
            var decoded = try? JSONDecoder().decode([ScheduleRule].self, from: data)
         {
             // 「時間帯で切り替える」簡易UIは曜日スケジュールへ統合され廃止したため、
@@ -538,9 +538,9 @@ extension WallpaperModel {
             scheduleRules = decoded
         }
         // 未保存(初回起動・旧バージョンからの更新)はデフォルトON。
-        if UserDefaults.standard.object(forKey: "focusFilterIntegrationEnabled") != nil {
+        if UserDefaults.standard.object(forKey: PrefsKey.focusFilterIntegrationEnabled) != nil {
             focusFilterIntegrationEnabled = UserDefaults.standard
-                .bool(forKey: "focusFilterIntegrationEnabled")
+                .bool(forKey: PrefsKey.focusFilterIntegrationEnabled)
         }
         restoreFocusModeAssignments()
     }

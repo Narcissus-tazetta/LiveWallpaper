@@ -44,7 +44,7 @@ enum StoreClientError: LocalizedError {
     }
 
     private static func localized(_ key: String) -> String {
-        let raw = UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.automatic.rawValue
+        let raw = UserDefaults.standard.string(forKey: PrefsKey.appLanguage) ?? AppLanguage.automatic.rawValue
         let language = AppLanguage(rawValue: raw) ?? .automatic
         return AppLocalization.localizedString(key, languageCode: language.effectiveLanguageCode)
     }

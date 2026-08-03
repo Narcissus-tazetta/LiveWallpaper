@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wallpaperModel.startFocusModeMonitoring()
         syncLaunchAtLoginState()
         autoUpdateEnabled =
-            UserDefaults.standard.object(forKey: "autoUpdateEnabled") as? Bool ?? true
+            UserDefaults.standard.object(forKey: PrefsKey.autoUpdateEnabled) as? Bool ?? true
         wallpaperModel.autoUpdateEnabled = autoUpdateEnabled
         NSApp.applicationIconImage = appIconImage()
         LocalizationManager.swizzle()

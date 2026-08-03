@@ -10,74 +10,100 @@ extension WallpaperModel {
     /// 参照はいったん全部復元し、実在確認と間引きは verifyRestoredVideoPaths() が
     /// 起動直後にバックグラウンドでまとめて行う。
     func restoreState() {
-        clickThrough = UserDefaults.standard.object(forKey: "clickThrough") as? Bool ?? true
-        if let modeValue: String = UserDefaults.standard.string(forKey: "displayMode"),
+        restoreDisplayAndWindowPrefs()
+        restorePlaybackTogglePrefs()
+        restoreQualityAndPerformancePrefs()
+        restoreMiscFeatureTogglePrefs()
+        restoreDependentSubsystemState()
+        restoreSuspendPrefs()
+        restoreLibraryAndPlaylistState()
+        restoreLockScreenAndWebWallpaperState()
+        restorePresentationAndEditState()
+        persistPlaylistStateImmediately()
+    }
+
+    private func restoreDisplayAndWindowPrefs() {
+        clickThrough = UserDefaults.standard.object(forKey: PrefsKey.clickThrough) as? Bool ?? true
+        if let modeValue: String = UserDefaults.standard.string(forKey: PrefsKey.displayMode),
            let restoredMode = DisplayMode(rawValue: modeValue)
         {
             displayMode = restoredMode
         }
-        if let fitValue: String = UserDefaults.standard.string(forKey: "fitMode"),
+        if let fitValue: String = UserDefaults.standard.string(forKey: PrefsKey.fitMode),
            let restoredFit = VideoFitMode(rawValue: fitValue)
         {
             fitMode = restoredFit
         }
-        if let offsetValue = UserDefaults.standard.object(forKey: "desktopLevelOffset") as? Int,
+        if let offsetValue = UserDefaults.standard.object(forKey: PrefsKey.desktopLevelOffset) as? Int,
            let restoredOffset = DesktopLevelOffset(rawValue: offsetValue)
         {
             desktopLevelOffset = restoredOffset
         }
         refreshDesktopIconsVisibility()
         useFullScreenAuxiliary =
-            UserDefaults.standard.object(forKey: "useFullScreenAuxiliary") as? Bool ?? false
+            UserDefaults.standard.object(forKey: PrefsKey.useFullScreenAuxiliary) as? Bool ?? false
         menuBarOpaqueEnabled =
-            UserDefaults.standard.object(forKey: "menuBarOpaqueEnabled") as? Bool ?? false
+            UserDefaults.standard.object(forKey: PrefsKey.menuBarOpaqueEnabled) as? Bool ?? false
+    }
+
+    private func restorePlaybackTogglePrefs() {
         playlistPlaybackEnabled =
-            UserDefaults.standard.object(forKey: "playlistPlaybackEnabled") as? Bool ?? false
+            UserDefaults.standard.object(forKey: PrefsKey.playlistPlaybackEnabled) as? Bool ?? false
         shufflePlaybackEnabled =
-            UserDefaults.standard.object(forKey: "shufflePlaybackEnabled") as? Bool ?? false
+            UserDefaults.standard.object(forKey: PrefsKey.shufflePlaybackEnabled) as? Bool ?? false
         videoLoopEnabled =
-            UserDefaults.standard.object(forKey: "videoLoopEnabled") as? Bool ?? true
+            UserDefaults.standard.object(forKey: PrefsKey.videoLoopEnabled) as? Bool ?? true
         if !playlistPlaybackEnabled {
             shufflePlaybackEnabled = false
         }
         pinCurrentVideo = false
-        lightweightMode = UserDefaults.standard.object(forKey: "lightweightMode") as? Bool ?? false
+        lightweightMode = UserDefaults.standard.object(forKey: PrefsKey.lightweightMode) as? Bool ?? false
         respectReduceMotionEnabled =
-            UserDefaults.standard.object(forKey: "respectReduceMotionEnabled") as? Bool ?? true
+            UserDefaults.standard.object(forKey: PrefsKey.respectReduceMotionEnabled) as? Bool ?? true
         restoreHotKeysState()
-        audioEnabled = UserDefaults.standard.object(forKey: "audioEnabled") as? Bool ?? false
+        audioEnabled = UserDefaults.standard.object(forKey: PrefsKey.audioEnabled) as? Bool ?? false
         restorePlaybackSettingState()
-        if let qualityValue = UserDefaults.standard.string(forKey: "qualityPreset"),
+    }
+
+    private func restoreQualityAndPerformancePrefs() {
+        if let qualityValue = UserDefaults.standard.string(forKey: PrefsKey.qualityPreset),
            let restoredQuality = QualityPreset(rawValue: qualityValue)
         {
             qualityPreset = restoredQuality
         }
         autoFrameRateEnabled =
-            UserDefaults.standard.object(forKey: "autoFrameRateEnabled") as? Bool ?? true
+            UserDefaults.standard.object(forKey: PrefsKey.autoFrameRateEnabled) as? Bool ?? true
         batteryAwareQualityEnabled =
-            UserDefaults.standard.object(forKey: "batteryAwareQualityEnabled") as? Bool ?? true
-        if UserDefaults.standard.object(forKey: "audioVolume") != nil {
-            audioVolume = min(max(UserDefaults.standard.float(forKey: "audioVolume"), 0), 1)
+            UserDefaults.standard.object(forKey: PrefsKey.batteryAwareQualityEnabled) as? Bool ?? true
+        if UserDefaults.standard.object(forKey: PrefsKey.audioVolume) != nil {
+            audioVolume = min(max(UserDefaults.standard.float(forKey: PrefsKey.audioVolume), 0), 1)
         } else {
             audioVolume = 1.0
         }
-        if let storedDimOpacity = UserDefaults.standard.object(forKey: "desktopReadabilityDimOpacity") as? Double {
+        if let storedDimOpacity = UserDefaults.standard.object(forKey: PrefsKey.desktopReadabilityDimOpacity) as? Double {
             desktopReadabilityDimOpacity = min(max(storedDimOpacity, 0), 1)
         }
-        if let appLanguageValue = UserDefaults.standard.string(forKey: "appLanguage"),
+    }
+
+    private func restoreMiscFeatureTogglePrefs() {
+        if let appLanguageValue = UserDefaults.standard.string(forKey: PrefsKey.appLanguage),
            let restoredAppLanguage = AppLanguage(rawValue: appLanguageValue)
         {
             appLanguage = restoredAppLanguage
         }
         advancedSharingEnabled =
-            UserDefaults.standard.object(forKey: "advancedSharingEnabled") as? Bool ?? false
+            UserDefaults.standard.object(forKey: PrefsKey.advancedSharingEnabled) as? Bool ?? false
         dedicatedPlaybackContinuityEnabled =
-            UserDefaults.standard.object(forKey: "dedicatedPlaybackContinuityEnabled") as? Bool ?? true
+            UserDefaults.standard.object(forKey: PrefsKey.dedicatedPlaybackContinuityEnabled) as? Bool ?? true
         lockScreenSyncEnabled =
-            UserDefaults.standard.object(forKey: "lockScreenSyncEnabled") as? Bool ?? false
+            UserDefaults.standard.object(forKey: PrefsKey.lockScreenSyncEnabled) as? Bool ?? false
         lockScreenSyncStatus = lockScreenSyncEnabled
             ? (lockScreenSyncService.isSupported ? .idle : .unsupported)
             : .disabled
+    }
+
+    /// 上で復元した値をもとに、他のモデル拡張が持つ状態を初期化する。
+    private func restoreDependentSubsystemState() {
         applyAudioSettings()
         applyLightweightSettings()
         restoreAutoSwitchInterval()
@@ -85,8 +111,11 @@ extension WallpaperModel {
         restoreScreenPlaylists()
         restoreSpaceWallpaperState()
         restoreScheduleState()
+    }
+
+    private func restoreSuspendPrefs() {
         if let savedSuspendDisabled = UserDefaults.standard.stringArray(
-            forKey: "suspendDisabledDisplayIDs"
+            forKey: PrefsKey.suspendDisabledDisplayIDs
         ) {
             // UIでは割り当て済み画面だけがトグル対象なので、対応するオーバーライドが
             // 残っているエントリだけを引き継ぐ。
@@ -94,22 +123,25 @@ extension WallpaperModel {
                 .intersection(videoOverrideByScreenID.keys)
         }
         suspendWhenOtherAppFullScreen =
-            UserDefaults.standard.object(forKey: "suspendWhenOtherAppFullScreen") as? Bool ?? false
+            UserDefaults.standard.object(forKey: PrefsKey.suspendWhenOtherAppFullScreen) as? Bool ?? false
         suspendHighSensitivityEnabled =
-            UserDefaults.standard.object(forKey: "suspendHighSensitivityEnabled") as? Bool ?? false
+            UserDefaults.standard.object(forKey: PrefsKey.suspendHighSensitivityEnabled) as? Bool ?? false
         suspendWhenOtherAppFrontmost =
-            UserDefaults.standard.object(forKey: "suspendWhenOtherAppFrontmost") as? Bool ?? false
+            UserDefaults.standard.object(forKey: PrefsKey.suspendWhenOtherAppFrontmost) as? Bool ?? false
         if let savedExclusions = UserDefaults.standard.stringArray(
-            forKey: "suspendExclusionBundleIDs"
+            forKey: PrefsKey.suspendExclusionBundleIDs
         ) {
             suspendExclusionBundleIDs = Array(
                 Set(savedExclusions.map(normalizeBundleID).filter { !$0.isEmpty })
             )
             .sorted()
         }
+    }
+
+    private func restoreLibraryAndPlaylistState() {
         // 存在しないパスの間引きは verifyRestoredVideoPaths() が起動後に行う
-        // (このメソッド全体の注記を参照)。
-        if let playlistData = UserDefaults.standard.data(forKey: "playlistsData"),
+        // (restoreState() 全体の注記を参照)。
+        if let playlistData = UserDefaults.standard.data(forKey: PrefsKey.playlistsData),
            let decoded = try? JSONDecoder().decode([WallpaperPlaylist].self, from: playlistData)
         {
             playlists = decoded
@@ -117,7 +149,7 @@ extension WallpaperModel {
 
         restoreLibraryVideoPaths()
 
-        if let savedPlaylistID = UserDefaults.standard.string(forKey: "selectedPlaylistID"),
+        if let savedPlaylistID = UserDefaults.standard.string(forKey: PrefsKey.selectedPlaylistID),
            let uuid = UUID(uuidString: savedPlaylistID),
            playlists.contains(where: { $0.id == uuid })
         {
@@ -130,7 +162,7 @@ extension WallpaperModel {
 
         let allPaths = Set(libraryVideoPaths)
         if let savedDisplayNames = UserDefaults.standard.dictionary(
-            forKey: "registeredVideoDisplayNames"
+            forKey: PrefsKey.registeredVideoDisplayNames
         )
             as? [String: String]
         {
@@ -138,7 +170,7 @@ extension WallpaperModel {
                 allPaths.contains($0.key)
             }
         }
-        if let savedPath: String = UserDefaults.standard.string(forKey: "videoPath"),
+        if let savedPath: String = UserDefaults.standard.string(forKey: PrefsKey.videoPath),
            libraryVideoPaths.contains(savedPath)
         {
             currentVideoPath = savedPath
@@ -152,10 +184,13 @@ extension WallpaperModel {
         } else {
             currentVideoIndex = nil
         }
+    }
+
+    private func restoreLockScreenAndWebWallpaperState() {
         restoreLockScreenVideoPath()
         restoreWebWallpaperState()
         if let storedWebFeature =
-            UserDefaults.standard.object(forKey: "webWallpaperFeatureEnabled") as? Bool
+            UserDefaults.standard.object(forKey: PrefsKey.webWallpaperFeatureEnabled) as? Bool
         {
             webWallpaperFeatureEnabled = storedWebFeature
         } else {
@@ -163,7 +198,7 @@ extension WallpaperModel {
             // 登録済みソースがある場合のみ自動でONにする。
             webWallpaperFeatureEnabled = !webWallpaperSources.isEmpty
             UserDefaults.standard.set(
-                webWallpaperFeatureEnabled, forKey: "webWallpaperFeatureEnabled"
+                webWallpaperFeatureEnabled, forKey: PrefsKey.webWallpaperFeatureEnabled
             )
         }
         // webWallpaperFeatureEnabled が確定した後に再同期する。syncActivePlaylistPaths()は
@@ -171,6 +206,10 @@ extension WallpaperModel {
         // webWallpaperFeatureEnabledがデフォルト値(false)のままで、Web壁紙が
         // 再生キュー(registeredWebWallpaperIDs)に反映されずに固定されてしまう。
         syncActivePlaylistPaths()
+    }
+
+    private func restorePresentationAndEditState() {
+        let allPaths = Set(libraryVideoPaths)
         if let data = UserDefaults.standard.data(forKey: wallpaperPresentationStorageKey),
            let decoded = try? JSONDecoder().decode(
                [String: [String: WallpaperPresentation]].self,
@@ -187,18 +226,17 @@ extension WallpaperModel {
         {
             wallpaperEditByPath = decodedEdits.filter { allPaths.contains($0.key) }
         }
-        persistPlaylistStateImmediately()
     }
 
     /// ライブラリを復元する。旧バージョン(ライブラリ未分離)のデータは
     /// プレイリストの合算 + 旧 registeredVideoPaths キーから移行する。
     private func restoreLibraryVideoPaths() {
         var restored: [String]
-        if let savedLibrary = UserDefaults.standard.stringArray(forKey: "libraryVideoPaths") {
+        if let savedLibrary = UserDefaults.standard.stringArray(forKey: PrefsKey.libraryVideoPaths) {
             restored = savedLibrary
         } else {
             let legacyPaths =
-                UserDefaults.standard.stringArray(forKey: "registeredVideoPaths") ?? []
+                UserDefaults.standard.stringArray(forKey: PrefsKey.registeredVideoPaths) ?? []
             restored = []
             var seen = Set<String>()
             for path in playlists.flatMap(\.videoPaths) + legacyPaths where !seen.contains(path) {
@@ -217,22 +255,22 @@ extension WallpaperModel {
     }
 
     private func restorePlaybackSettingState() {
-        if let frameRateValue = UserDefaults.standard.string(forKey: "frameRateLimit"),
+        if let frameRateValue = UserDefaults.standard.string(forKey: PrefsKey.frameRateLimit),
            let restoredFrameRate = FrameRateLimit(rawValue: frameRateValue)
         {
             frameRateLimit = restoredFrameRate
         }
-        if let decodeValue = UserDefaults.standard.string(forKey: "decodeMode"),
+        if let decodeValue = UserDefaults.standard.string(forKey: PrefsKey.decodeMode),
            let restoredDecodeMode = DecodeMode(rawValue: decodeValue)
         {
             if restoredDecodeMode == .gpuAdaptive {
                 decodeMode = .automatic
-                UserDefaults.standard.set(DecodeMode.automatic.rawValue, forKey: "decodeMode")
+                UserDefaults.standard.set(DecodeMode.automatic.rawValue, forKey: PrefsKey.decodeMode)
             } else {
                 decodeMode = restoredDecodeMode
             }
         }
-        if let workProfileValue = UserDefaults.standard.string(forKey: "workProfile"),
+        if let workProfileValue = UserDefaults.standard.string(forKey: PrefsKey.workProfile),
            let restoredWorkProfile = WorkProfile(rawValue: workProfileValue)
         {
             workProfile = restoredWorkProfile
@@ -246,7 +284,7 @@ extension WallpaperModel {
                 .filter { validPaths.contains($0.key) }
         UserDefaults.standard.set(
             registeredVideoDisplayNames,
-            forKey: "registeredVideoDisplayNames"
+            forKey: PrefsKey.registeredVideoDisplayNames
         )
     }
 
@@ -285,7 +323,7 @@ extension WallpaperModel {
             return
         }
         advancedSharingEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "advancedSharingEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.advancedSharingEnabled)
     }
 
     func setWebWallpaperFeatureEnabled(_ enabled: Bool) {
@@ -293,7 +331,7 @@ extension WallpaperModel {
             return
         }
         webWallpaperFeatureEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "webWallpaperFeatureEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.webWallpaperFeatureEnabled)
         syncActivePlaylistPaths()
 
         // 機能を隠すとWeb壁紙を切り替える手段がなくなるため、表示中なら動画へ戻す。
@@ -311,11 +349,11 @@ extension WallpaperModel {
         if !enabled {
             guard lockScreenSyncEnabled || lockScreenSyncService.hasActiveLease else {
                 lockScreenSyncStatus = .disabled
-                UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+                UserDefaults.standard.set(false, forKey: PrefsKey.lockScreenSyncEnabled)
                 return
             }
             lockScreenSyncEnabled = false
-            UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+            UserDefaults.standard.set(false, forKey: PrefsKey.lockScreenSyncEnabled)
             removeLockScreenSync()
             return
         }
@@ -325,7 +363,7 @@ extension WallpaperModel {
         }
 
         lockScreenSyncEnabled = true
-        UserDefaults.standard.set(true, forKey: "lockScreenSyncEnabled")
+        UserDefaults.standard.set(true, forKey: PrefsKey.lockScreenSyncEnabled)
         lockScreenSyncStatus = lockScreenSyncService.isSupported ? .idle : .unsupported
         syncCurrentVideoToLockScreen()
     }
@@ -413,7 +451,7 @@ extension WallpaperModel {
                         return
                     }
                     self.lockScreenSyncEnabled = false
-                    UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+                    UserDefaults.standard.set(false, forKey: PrefsKey.lockScreenSyncEnabled)
                     self.lockScreenSyncStatus = .restored
                 }
             } catch {
@@ -441,7 +479,7 @@ extension WallpaperModel {
                         return
                     }
                     self.lockScreenSyncEnabled = false
-                    UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+                    UserDefaults.standard.set(false, forKey: PrefsKey.lockScreenSyncEnabled)
                     self.lockScreenSyncStatus = .restored
                 }
             } catch {
@@ -534,11 +572,11 @@ extension WallpaperModel {
         do {
             try lockScreenSyncService.restoreOriginalAerialAndWallpaperStore()
             lockScreenSyncEnabled = false
-            UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+            UserDefaults.standard.set(false, forKey: PrefsKey.lockScreenSyncEnabled)
             lockScreenSyncStatus = .recovered
         } catch {
             lockScreenSyncEnabled = false
-            UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+            UserDefaults.standard.set(false, forKey: PrefsKey.lockScreenSyncEnabled)
             lockScreenSyncStatus = .failed(error.localizedDescription)
         }
     }
@@ -554,7 +592,7 @@ extension WallpaperModel {
         do {
             try lockScreenSyncService.restoreOriginalAerialAndWallpaperStore()
             lockScreenSyncEnabled = false
-            UserDefaults.standard.set(false, forKey: "lockScreenSyncEnabled")
+            UserDefaults.standard.set(false, forKey: PrefsKey.lockScreenSyncEnabled)
             lockScreenSyncStatus = .restored
         } catch {
             lockScreenSyncStatus = .failed(error.localizedDescription)
@@ -590,7 +628,7 @@ extension WallpaperModel {
         _ = setSuspendHighSensitivityEnabled(false)
         _ = setSuspendWhenOtherAppFrontmost(false)
         suspendExclusionBundleIDs = []
-        UserDefaults.standard.removeObject(forKey: "suspendExclusionBundleIDs")
+        UserDefaults.standard.removeObject(forKey: PrefsKey.suspendExclusionBundleIDs)
         // Space別壁紙は機能トグルのみ既定(OFF)へ戻す。割り当て自体は
         // ディスプレイ別オーバーライドと同様、リセット対象にしない。
         setSpaceWallpaperFeatureEnabled(false)

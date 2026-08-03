@@ -502,13 +502,6 @@ extension SettingsView {
       )
   }
 
-  func settingsFootnote(_ text: String, color: Color = .secondary) -> some View {
-    Text(text)
-      .font(.caption)
-      .foregroundColor(color)
-      .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
   func settingsCalloutNote(systemImage: String, text: String) -> some View {
     HStack(alignment: .top, spacing: 8) {
       Image(systemName: systemImage)
@@ -560,36 +553,6 @@ extension SettingsView {
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  /// トグル本体とヘルプアイコン、展開時の説明文をまとめた行。
-  /// 「Toggle + はてなアイコン + 折りたたみ説明」が表示セクション全体で
-  /// 繰り返し登場するため、ここに集約している。
-  func toggleWithHelp(
-    _ title: String,
-    isOn: Binding<Bool>,
-    helpTopic: HelpTopic,
-    helpText: String,
-    disabled: Bool = false
-  ) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Toggle(isOn: isOn) {
-        HStack(spacing: 6) {
-          Text(title)
-          helpIconButton(for: helpTopic)
-        }
-      }
-      .disabled(disabled)
-
-      helpFootnote(for: helpTopic, text: helpText)
-    }
-  }
-
-  @ViewBuilder
-  func helpFootnote(for topic: HelpTopic, text: String) -> some View {
-    if expandedHelpTopics.contains(topic) {
-      settingsFootnote(text)
-    }
   }
 
   var advancedSettingsSection: some View {
@@ -797,17 +760,4 @@ extension SettingsView {
     }
   }
 
-  func helpIconButton(for topic: HelpTopic) -> some View {
-    Button(action: { toggleHelp(topic) }) {
-      Image(
-        systemName: expandedHelpTopics.contains(topic) || hoveredHelpTopic == topic
-          ? "questionmark.circle.fill"
-          : "questionmark.circle"
-      )
-    }
-    .buttonStyle(.plain)
-    .onHover { over in
-      hoveredHelpTopic = over ? topic : nil
-    }
-  }
 }

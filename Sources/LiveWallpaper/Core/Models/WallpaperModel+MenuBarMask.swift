@@ -7,7 +7,7 @@ extension WallpaperModel {
         guard menuBarOpaqueEnabled != enabled else {
             return
         }
-        UserDefaults.standard.set(enabled, forKey: "menuBarOpaqueEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.menuBarOpaqueEnabled)
         menuBarOpaqueEnabled = enabled
         applyMenuBarMaskState()
     }
@@ -23,7 +23,7 @@ extension WallpaperModel {
         // "_HIHideMenuBar" is the same NSGlobalDomain key backing
         // `defaults read -g _HIHideMenuBar`; UserDefaults.standard cascades into the
         // global domain so this stays within public API even though the key is private.
-        UserDefaults.standard.bool(forKey: "_HIHideMenuBar")
+        UserDefaults.standard.bool(forKey: PrefsKey.hideMenuBarGlobal)
     }
 
     // Bakes the "opaque menu bar" strip into the existing wallpaper windows' own content

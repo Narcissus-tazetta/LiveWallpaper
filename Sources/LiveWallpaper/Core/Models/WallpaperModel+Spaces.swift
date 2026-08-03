@@ -92,7 +92,7 @@ extension WallpaperModel {
             return
         }
         spaceWallpaperFeatureEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "spaceWallpaperFeatureEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.spaceWallpaperFeatureEnabled)
         if enabled {
             refreshSpacesSnapshot()
         } else {
@@ -111,7 +111,7 @@ extension WallpaperModel {
             return
         }
         menuBarSpaceNumberEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "menuBarSpaceNumberEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.menuBarSpaceNumberEnabled)
         // バッジ表示は AppDelegate 側が activeDesktopSpaceDidResolveNotification と
         // $menuBarSpaceNumberEnabled で追従する。
         refreshSpaceDependentInterface()
@@ -120,15 +120,15 @@ extension WallpaperModel {
     // MARK: - 永続化
 
     private func persistSpaceVideos() {
-        UserDefaults.standard.set(videoBySpaceUUID, forKey: "videoBySpaceUUID")
+        UserDefaults.standard.set(videoBySpaceUUID, forKey: PrefsKey.videoBySpaceUUID)
     }
 
     func restoreSpaceWallpaperState() {
         spaceWallpaperFeatureEnabled =
-            UserDefaults.standard.object(forKey: "spaceWallpaperFeatureEnabled") as? Bool ?? false
+            UserDefaults.standard.object(forKey: PrefsKey.spaceWallpaperFeatureEnabled) as? Bool ?? false
         menuBarSpaceNumberEnabled =
-            UserDefaults.standard.object(forKey: "menuBarSpaceNumberEnabled") as? Bool ?? false
-        if let saved = UserDefaults.standard.dictionary(forKey: "videoBySpaceUUID")
+            UserDefaults.standard.object(forKey: PrefsKey.menuBarSpaceNumberEnabled) as? Bool ?? false
+        if let saved = UserDefaults.standard.dictionary(forKey: PrefsKey.videoBySpaceUUID)
             as? [String: String]
         {
             // 実在確認は verifyRestoredVideoPaths() が起動後にまとめて行う(restoreState 参照)。

@@ -47,12 +47,12 @@ extension WallpaperModel {
             libraryVideoPaths.removeAll()
             registeredVideoPaths.removeAll()
             registeredWebWallpaperIDs.removeAll()
-            UserDefaults.standard.removeObject(forKey: "libraryVideoPaths")
-            UserDefaults.standard.removeObject(forKey: "registeredVideoPaths")
+            UserDefaults.standard.removeObject(forKey: PrefsKey.libraryVideoPaths)
+            UserDefaults.standard.removeObject(forKey: PrefsKey.registeredVideoPaths)
             registeredVideoDisplayNames.removeAll()
             UserDefaults.standard.set(
                 registeredVideoDisplayNames,
-                forKey: "registeredVideoDisplayNames"
+                forKey: PrefsKey.registeredVideoDisplayNames
             )
             wallpaperPresentationByPath.removeAll()
             UserDefaults.standard.removeObject(forKey: wallpaperPresentationStorageKey)
@@ -60,7 +60,7 @@ extension WallpaperModel {
             stopAllPlayers()
             currentVideoPath = nil
             currentVideoIndex = nil
-            UserDefaults.standard.removeObject(forKey: "videoPath")
+            UserDefaults.standard.removeObject(forKey: PrefsKey.videoPath)
             persistPlaylistStateImmediately()
             evaluateForegroundCoverageState()
             NotificationCenter.default.post(name: .thumbnailCacheDidClear, object: nil)

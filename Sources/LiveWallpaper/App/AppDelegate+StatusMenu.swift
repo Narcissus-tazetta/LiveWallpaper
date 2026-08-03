@@ -10,6 +10,17 @@ extension AppDelegate {
         // Without this, AppKit re-enables every item on each menu open,
         // overriding the isEnabled toggles refreshPlaybackMenuState() sets below.
         menu.autoenablesItems = false
+        appendPlaybackMenuItems(to: menu)
+        appendUpdateAndQuitMenuItems(to: menu)
+
+        statusItem?.menu = menu
+        configureMenuStateObservers()
+        refreshPlaybackMenuState()
+        refreshLocalizedInterface()
+        refreshSpaceNumberBadge()
+    }
+
+    private func appendPlaybackMenuItems(to menu: NSMenu) {
         let openWallpaperItem = NSMenuItem(
             title: localized("壁紙を開く"),
             action: #selector(openWallpaperTab),
@@ -131,7 +142,9 @@ extension AppDelegate {
         )
         importItem.tag = MenuTag.importPackage
         menu.addItem(importItem)
+    }
 
+    private func configureMenuStateObservers() {
         wallpaperModel.$audioEnabled
             .receive(on: DispatchQueue.main)
             .sink { [weak self] enabled in
@@ -231,7 +244,9 @@ extension AppDelegate {
                 self?.refreshLocalizedInterface()
             }
             .store(in: &cancellables)
+    }
 
+    private func appendUpdateAndQuitMenuItems(to menu: NSMenu) {
         #if canImport(Sparkle)
             let updateItem = NSMenuItem(
                 title: localized("アップデートを確認"),
@@ -251,11 +266,6 @@ extension AppDelegate {
         )
         quitItem.tag = MenuTag.quitApp
         menu.addItem(quitItem)
-
-        statusItem?.menu = menu
-        refreshPlaybackMenuState()
-        refreshLocalizedInterface()
-        refreshSpaceNumberBadge()
     }
 
     func configureStatusIcon() {

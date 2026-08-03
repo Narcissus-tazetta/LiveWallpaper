@@ -9,13 +9,13 @@ extension WallpaperModel {
             return
         }
         autoSwitchIntervalMinutes = minutes
-        UserDefaults.standard.set(minutes, forKey: "autoSwitchIntervalMinutes")
+        UserDefaults.standard.set(minutes, forKey: PrefsKey.autoSwitchIntervalMinutes)
         restartAutoSwitchTimer()
     }
 
     func restoreAutoSwitchInterval() {
         autoSwitchIntervalMinutes =
-            UserDefaults.standard.object(forKey: "autoSwitchIntervalMinutes") as? Int ?? 0
+            UserDefaults.standard.object(forKey: PrefsKey.autoSwitchIntervalMinutes) as? Int ?? 0
         restartAutoSwitchTimer()
     }
 

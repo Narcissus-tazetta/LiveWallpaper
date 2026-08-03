@@ -44,29 +44,29 @@ extension WallpaperModel {
     func flushPersistedState() {
         do {
             let playlistData = try JSONEncoder().encode(playlists)
-            UserDefaults.standard.set(playlistData, forKey: "playlistsData")
-            UserDefaults.standard.set(libraryVideoPaths, forKey: "libraryVideoPaths")
+            UserDefaults.standard.set(playlistData, forKey: PrefsKey.playlistsData)
+            UserDefaults.standard.set(libraryVideoPaths, forKey: PrefsKey.libraryVideoPaths)
             // 旧バージョンへ戻した場合の移行元として、旧キーにもライブラリ全体を書いておく
-            UserDefaults.standard.set(libraryVideoPaths, forKey: "registeredVideoPaths")
-            UserDefaults.standard.set(selectedPlaylistID?.uuidString, forKey: "selectedPlaylistID")
+            UserDefaults.standard.set(libraryVideoPaths, forKey: PrefsKey.registeredVideoPaths)
+            UserDefaults.standard.set(selectedPlaylistID?.uuidString, forKey: PrefsKey.selectedPlaylistID)
             let presentationData = try JSONEncoder().encode(wallpaperPresentationByPath)
             UserDefaults.standard.set(presentationData, forKey: wallpaperPresentationStorageKey)
             let editData = try JSONEncoder().encode(wallpaperEditByPath)
             UserDefaults.standard.set(editData, forKey: wallpaperEditStorageKey)
             let webData = try JSONEncoder().encode(webWallpaperSources)
-            UserDefaults.standard.set(webData, forKey: "webWallpaperSourcesData")
+            UserDefaults.standard.set(webData, forKey: PrefsKey.webWallpaperSourcesData)
             let scheduleData = try JSONEncoder().encode(scheduleRules)
-            UserDefaults.standard.set(scheduleData, forKey: "scheduleRulesData")
+            UserDefaults.standard.set(scheduleData, forKey: PrefsKey.scheduleRulesData)
             UserDefaults.standard.set(
-                focusFilterIntegrationEnabled, forKey: "focusFilterIntegrationEnabled"
+                focusFilterIntegrationEnabled, forKey: PrefsKey.focusFilterIntegrationEnabled
             )
             let focusAssignmentsData = try JSONEncoder().encode(focusModeAssignments)
-            UserDefaults.standard.set(focusAssignmentsData, forKey: "focusModeAssignmentsData")
-            UserDefaults.standard.set(wallpaperKind.rawValue, forKey: "wallpaperKind")
+            UserDefaults.standard.set(focusAssignmentsData, forKey: PrefsKey.focusModeAssignmentsData)
+            UserDefaults.standard.set(wallpaperKind.rawValue, forKey: PrefsKey.wallpaperKind)
             if let webID = currentWebWallpaperID {
-                UserDefaults.standard.set(webID.uuidString, forKey: "currentWebWallpaperID")
+                UserDefaults.standard.set(webID.uuidString, forKey: PrefsKey.currentWebWallpaperID)
             } else {
-                UserDefaults.standard.removeObject(forKey: "currentWebWallpaperID")
+                UserDefaults.standard.removeObject(forKey: PrefsKey.currentWebWallpaperID)
             }
             recordPersistenceSuccess()
         } catch {

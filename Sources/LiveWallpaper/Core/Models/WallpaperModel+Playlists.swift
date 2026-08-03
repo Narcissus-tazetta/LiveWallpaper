@@ -179,7 +179,7 @@ extension WallpaperModel {
             registeredVideoDisplayNames[trimmed] = preferredDisplayName
             UserDefaults.standard.set(
                 registeredVideoDisplayNames,
-                forKey: "registeredVideoDisplayNames"
+                forKey: PrefsKey.registeredVideoDisplayNames
             )
         }
 
@@ -219,7 +219,7 @@ extension WallpaperModel {
             if registeredVideoDisplayNames[destinationPath] == nil {
                 registeredVideoDisplayNames[destinationPath] = sourceURL.lastPathComponent
                 UserDefaults.standard.set(
-                    registeredVideoDisplayNames, forKey: "registeredVideoDisplayNames"
+                    registeredVideoDisplayNames, forKey: PrefsKey.registeredVideoDisplayNames
                 )
             }
         }
@@ -479,7 +479,7 @@ extension WallpaperModel {
         registeredVideoDisplayNames[trimmedPath] = finalName
         UserDefaults.standard.set(
             registeredVideoDisplayNames,
-            forKey: "registeredVideoDisplayNames"
+            forKey: PrefsKey.registeredVideoDisplayNames
         )
     }
 
@@ -498,8 +498,8 @@ extension WallpaperModel {
             currentWebWallpaperID = nil
             webWallpaperLoadState = .idle
             webPlayerViews.removeAll()
-            UserDefaults.standard.set(WallpaperKind.video.rawValue, forKey: "wallpaperKind")
-            UserDefaults.standard.removeObject(forKey: "currentWebWallpaperID")
+            UserDefaults.standard.set(WallpaperKind.video.rawValue, forKey: PrefsKey.wallpaperKind)
+            UserDefaults.standard.removeObject(forKey: PrefsKey.currentWebWallpaperID)
             windowRetireWorkItem?.cancel()
             retiredWindows.removeAll()
             rebuildWindows()
@@ -511,7 +511,7 @@ extension WallpaperModel {
         addVideoPathToLibrary(trimmed)
         currentVideoPath = trimmed
         currentVideoIndex = registeredVideoPaths.firstIndex(of: trimmed)
-        UserDefaults.standard.set(trimmed, forKey: "videoPath")
+        UserDefaults.standard.set(trimmed, forKey: PrefsKey.videoPath)
         refreshPlayerPresentations()
         if !switchedFromWeb {
             scheduleWindowRebuild(delay: 0.05)
@@ -541,7 +541,7 @@ extension WallpaperModel {
         registeredVideoDisplayNames.removeValue(forKey: trimmed)
         UserDefaults.standard.set(
             registeredVideoDisplayNames,
-            forKey: "registeredVideoDisplayNames"
+            forKey: PrefsKey.registeredVideoDisplayNames
         )
 
         if wasLockScreen {
@@ -579,7 +579,7 @@ extension WallpaperModel {
     private func clearCurrentVideoReference() {
         currentVideoPath = nil
         currentVideoIndex = nil
-        UserDefaults.standard.removeObject(forKey: "videoPath")
+        UserDefaults.standard.removeObject(forKey: PrefsKey.videoPath)
         persistPlaylistState()
     }
 

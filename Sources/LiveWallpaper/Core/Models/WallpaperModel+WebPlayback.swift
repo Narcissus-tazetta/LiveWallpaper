@@ -50,8 +50,8 @@ extension WallpaperModel {
         webWallpaperLoadState = .loading
         webWallpaperErrorMessage = nil
         stopAllPlayers()
-        UserDefaults.standard.set(WallpaperKind.web.rawValue, forKey: "wallpaperKind")
-        UserDefaults.standard.set(id.uuidString, forKey: "currentWebWallpaperID")
+        UserDefaults.standard.set(WallpaperKind.web.rawValue, forKey: PrefsKey.wallpaperKind)
+        UserDefaults.standard.set(id.uuidString, forKey: PrefsKey.currentWebWallpaperID)
         scheduleWindowRebuild(delay: 0.05)
         webWallpaperLoadState = .loading
         persistWebWallpaperState()
@@ -76,8 +76,8 @@ extension WallpaperModel {
                 wallpaperKind = .video
                 currentWebWallpaperID = nil
                 webWallpaperLoadState = .idle
-                UserDefaults.standard.set(WallpaperKind.video.rawValue, forKey: "wallpaperKind")
-                UserDefaults.standard.removeObject(forKey: "currentWebWallpaperID")
+                UserDefaults.standard.set(WallpaperKind.video.rawValue, forKey: PrefsKey.wallpaperKind)
+                UserDefaults.standard.removeObject(forKey: PrefsKey.currentWebWallpaperID)
                 scheduleWindowRebuild(delay: 0.05)
                 if let currentPath = currentVideoPath,
                    FileManager.default.fileExists(atPath: currentPath)
@@ -175,13 +175,13 @@ extension WallpaperModel {
     }
 
     func restoreWebWallpaperState() {
-        if let kindValue = UserDefaults.standard.string(forKey: "wallpaperKind"),
+        if let kindValue = UserDefaults.standard.string(forKey: PrefsKey.wallpaperKind),
            let restoredKind = WallpaperKind(rawValue: kindValue)
         {
             wallpaperKind = restoredKind
         }
 
-        if let data = UserDefaults.standard.data(forKey: "webWallpaperSourcesData"),
+        if let data = UserDefaults.standard.data(forKey: PrefsKey.webWallpaperSourcesData),
            let decoded = try? JSONDecoder().decode([WebWallpaperSource].self, from: data)
         {
             webWallpaperSources = decoded.filter { source in
@@ -196,7 +196,7 @@ extension WallpaperModel {
         // UserDefaults から復元されていない(デフォルト値のまま)ため、
         // ここで呼ぶと再生キューへWeb壁紙が反映されないまま固定されてしまう。
 
-        if let savedID = UserDefaults.standard.string(forKey: "currentWebWallpaperID"),
+        if let savedID = UserDefaults.standard.string(forKey: PrefsKey.currentWebWallpaperID),
            let uuid = UUID(uuidString: savedID),
            webWallpaperSources.contains(where: { $0.id == uuid })
         {
@@ -238,9 +238,9 @@ extension WallpaperModel {
         wallpaperKind = .video
         webWallpaperLoadState = .idle
         webWallpaperErrorMessage = nil
-        UserDefaults.standard.set(WallpaperKind.video.rawValue, forKey: "wallpaperKind")
-        UserDefaults.standard.removeObject(forKey: "currentWebWallpaperID")
-        UserDefaults.standard.removeObject(forKey: "webWallpaperSourcesData")
+        UserDefaults.standard.set(WallpaperKind.video.rawValue, forKey: PrefsKey.wallpaperKind)
+        UserDefaults.standard.removeObject(forKey: PrefsKey.currentWebWallpaperID)
+        UserDefaults.standard.removeObject(forKey: PrefsKey.webWallpaperSourcesData)
         scheduleWindowRebuild(delay: 0.05)
     }
 }

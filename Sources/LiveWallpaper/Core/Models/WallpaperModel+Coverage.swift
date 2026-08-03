@@ -10,7 +10,7 @@ extension WallpaperModel {
             return true
         }
 
-        UserDefaults.standard.set(enabled, forKey: "suspendWhenOtherAppFullScreen")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.suspendWhenOtherAppFullScreen)
         suspendWhenOtherAppFullScreen = enabled
         if enabled, !suspendWhenOtherAppFrontmost {
             setSuspendWhenOtherAppFrontmost(true)
@@ -26,7 +26,7 @@ extension WallpaperModel {
             return true
         }
 
-        UserDefaults.standard.set(enabled, forKey: "suspendHighSensitivityEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.suspendHighSensitivityEnabled)
         suspendHighSensitivityEnabled = enabled
         if enabled {
             refreshScreenRecordingTrustForCoverage()
@@ -42,7 +42,7 @@ extension WallpaperModel {
             return true
         }
 
-        UserDefaults.standard.set(enabled, forKey: "suspendWhenOtherAppFrontmost")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.suspendWhenOtherAppFrontmost)
         suspendWhenOtherAppFrontmost = enabled
         evaluateForegroundCoverageState()
         return true
@@ -58,7 +58,7 @@ extension WallpaperModel {
         }
         suspendExclusionBundleIDs.append(normalized)
         suspendExclusionBundleIDs.sort()
-        UserDefaults.standard.set(suspendExclusionBundleIDs, forKey: "suspendExclusionBundleIDs")
+        UserDefaults.standard.set(suspendExclusionBundleIDs, forKey: PrefsKey.suspendExclusionBundleIDs)
         evaluateForegroundCoverageState()
     }
 
@@ -68,7 +68,7 @@ extension WallpaperModel {
             return
         }
         suspendExclusionBundleIDs.remove(at: index)
-        UserDefaults.standard.set(suspendExclusionBundleIDs, forKey: "suspendExclusionBundleIDs")
+        UserDefaults.standard.set(suspendExclusionBundleIDs, forKey: PrefsKey.suspendExclusionBundleIDs)
         evaluateForegroundCoverageState()
     }
 

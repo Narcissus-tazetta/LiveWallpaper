@@ -102,7 +102,7 @@ extension WallpaperModel {
     }
 
     func restoreFocusModeAssignments() {
-        guard let data = UserDefaults.standard.data(forKey: "focusModeAssignmentsData"),
+        guard let data = UserDefaults.standard.data(forKey: PrefsKey.focusModeAssignmentsData),
               let decoded = try? JSONDecoder().decode([String: ScheduleTarget].self, from: data)
         else {
             return

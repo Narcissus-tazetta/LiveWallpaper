@@ -162,7 +162,7 @@ extension AppDelegate {
         let enabled = currentLaunchAtLoginEnabled()
         launchAtLoginEnabled = enabled
         wallpaperModel.launchAtLoginEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "launchAtLogin")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.launchAtLogin)
     }
 
     @objc func handleAutoUpdateToggle(_ note: Notification) {
@@ -190,7 +190,7 @@ extension AppDelegate {
         if #available(macOS 13.0, *) {
             return SMAppService.mainApp.status == .enabled
         }
-        return UserDefaults.standard.object(forKey: "launchAtLogin") as? Bool ?? false
+        return UserDefaults.standard.object(forKey: PrefsKey.launchAtLogin) as? Bool ?? false
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -226,7 +226,7 @@ extension AppDelegate {
     func setAutoUpdateEnabled(_ enabled: Bool) {
         autoUpdateEnabled = enabled
         wallpaperModel.autoUpdateEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "autoUpdateEnabled")
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.autoUpdateEnabled)
         #if canImport(Sparkle)
             if let updater = updaterController?.updater {
                 let shouldEnable = enabled && currentUpdateEnvironmentIssues().isEmpty

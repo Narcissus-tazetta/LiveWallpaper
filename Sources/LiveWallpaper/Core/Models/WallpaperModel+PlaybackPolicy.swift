@@ -66,7 +66,7 @@ extension WallpaperModel {
         }
         if pinCurrentVideo, shufflePlaybackEnabled {
             shufflePlaybackEnabled = false
-            UserDefaults.standard.set(false, forKey: "shufflePlaybackEnabled")
+            UserDefaults.standard.set(false, forKey: PrefsKey.shufflePlaybackEnabled)
         }
     }
 
