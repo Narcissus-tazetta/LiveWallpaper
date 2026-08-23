@@ -67,7 +67,7 @@ If that happens:
     - Quality preset, work profile, frame rate limits (30fps / 60fps / unlimited), and decode mode settings.
     - Lowers playback load automatically when the battery drops to 10% or less.
     - Freezes the wallpaper when the system's **Reduce Motion** accessibility setting is on.
-- **Localization**: Japanese, English, Traditional Chinese, Vietnamese, and Turkish.
+- **Localization**: Full UI translation (menus, Settings, notifications) in Japanese, English, Traditional Chinese, Vietnamese, and Turkish. Follows your macOS language automatically, or can be set manually in Settings.
 - **Auto updates**: Integrated with Sparkle for in-app updates.
 
 <video src="https://github.com/user-attachments/assets/b5f19e23-928b-4f37-a03b-d229949b905a" width="60%" controls autoplay loop muted></video>
@@ -189,7 +189,8 @@ swift test
 
 ```bash
 # Create distributable .app / .zip / .dmg (ad-hoc signing only)
-./scripts/package_zip.sh 1.0.0 1
+# The build number is derived from the version automatically; omit it.
+./scripts/package_zip.sh 1.0.0
 ```
 
 Distribution uses ad-hoc signing only; Apple notarization and Developer ID signing are not used. Sparkle appcast signing (Ed25519) is handled separately via `scripts/sign_zip.py`.

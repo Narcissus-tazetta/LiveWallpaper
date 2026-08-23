@@ -67,7 +67,7 @@ brew upgrade --cask livewallpaper
     - 画質プリセット、作業プロファイル、フレームレート（30fps / 60fps / 制限なし）、デコードモードを調整できます。
     - バッテリー残量が10%以下になると、自動的に再生の負荷を下げます。
     - システムの「視差効果を減らす」がオンのときは、壁紙を静止フレームで止めます。
-- **多言語対応**: 日本語・英語・繁体字中国語・ベトナム語・トルコ語に対応しています。
+- **多言語対応**: メニュー・設定画面・通知を含むアプリ全体のUIを、日本語・英語・繁体字中国語・ベトナム語・トルコ語で完全に翻訳しています。OSの言語設定に自動追従するほか、設定画面から手動で切り替えることもできます。
 - **自動アップデート**: Sparkleを組み込んでいるので、アプリ内から簡単に最新版へアップデートできます。
 
 <video src="https://github.com/user-attachments/assets/b5f19e23-928b-4f37-a03b-d229949b905a" width="60%" controls autoplay loop muted></video>
@@ -188,7 +188,8 @@ swift test
 
 ```bash
 # 配布用 .app / .zip / .dmg の生成（adhoc 署名のみ）
-./scripts/package_zip.sh 1.0.0 1
+# ビルド番号はバージョンから自動算出されるため省略する。
+./scripts/package_zip.sh 1.0.0
 ```
 
 配布パッケージは ad-hoc 署名のみで、Apple 公証や Developer ID 署名は行いません。自動アップデート用の Sparkle appcast 署名（Ed25519）は別途 `scripts/sign_zip.py` で行います。
