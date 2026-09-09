@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 /// PackageImporter が manifest内の edit(トリム/ループ)メタデータを、モデルへ適用する
 /// 前に WallpaperEditMetadata.isValid で検証することを確認する。Store経由で他人の
@@ -127,6 +126,46 @@ final class PackageImporterEditValidationTests: XCTestCase {
         let edit = try XCTUnwrap(model.wallpaperEdit(for: path))
         XCTAssertEqual(edit.trimStart, 1)
         XCTAssertEqual(edit.trimEnd, 9)
+    }
+
+    func testPackageVideoSymlinkEscapingExtractionRootIsRejected() async throws {
+        let workDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let contentDir = workDir.appendingPathComponent("content")
+        let videosDir = contentDir.appendingPathComponent("videos")
+        try fileManager.createDirectory(at: videosDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: workDir) }
+
+        let video = packageVideo(id: "linked-video", edit: nil)
+        let manifest = PackageManifest(
+            version: "1.1",
+            manifest: .init(
+                name: "Unsafe", author: "tester", createdAt: "2026-09-09T00:00:00Z",
+                description: "desc", license: nil
+            ),
+            videos: [video], playlists: [],
+            packaging: .init(videosIncluded: true, packageSizeBytes: nil)
+        )
+        try JSONEncoder().encode(manifest).write(
+            to: contentDir.appendingPathComponent("metadata.json")
+        )
+        try fileManager.createSymbolicLink(
+            at: videosDir.appendingPathComponent("linked-video.mp4"),
+            withDestinationURL: URL(fileURLWithPath: "/etc/hosts")
+        )
+        let packageURL = workDir.appendingPathComponent("unsafe.lwpkg")
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        task.arguments = ["-c", "-k", "--keepParent", contentDir.path, packageURL.path]
+        try task.run()
+        task.waitUntilExit()
+        XCTAssertEqual(task.terminationStatus, 0)
+
+        do {
+            try await PackageImporter().importPackage(from: packageURL, into: WallpaperModel())
+            XCTFail("symlinked package video must be rejected")
+        } catch PackageImporter.ImportError.unsafeFileReference {
+            // expected
+        }
     }
 
     // MARK: - ループ開始位置の取り込み

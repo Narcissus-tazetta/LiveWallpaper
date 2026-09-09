@@ -82,7 +82,7 @@ async function submitEntry(overrides: { title?: string; author?: string } = {}) 
 				id,
 				title: overrides.title ?? "Test Title",
 				author: overrides.author ?? "Test Author",
-				sha256: "deadbeef",
+				sha256: "d".repeat(64),
 				sizeBytes: bytes.byteLength,
 				objectKey,
 			}),
@@ -112,7 +112,7 @@ async function submitEntryForWithdraw(): Promise<{
 				id,
 				title: "Withdraw Test",
 				author: "Test Author",
-				sha256: "deadbeef",
+				sha256: "d".repeat(64),
 				sizeBytes: bytes.byteLength,
 				objectKey,
 			}),
@@ -144,7 +144,7 @@ async function submitEntryWithVideo(
 				id,
 				title: "Video Test",
 				author: "Test Author",
-				sha256: "deadbeef",
+				sha256: "d".repeat(64),
 				sizeBytes: zipBytes.byteLength,
 				objectKey,
 			}),
@@ -199,7 +199,7 @@ describe("store submission review flow", () => {
 					id: crypto.randomUUID(), // 別のuuid = objectKeyと不一致
 					title: "Test Title",
 					author: "Test Author",
-					sha256: "deadbeef",
+					sha256: "d".repeat(64),
 					sizeBytes: bytes.byteLength,
 					objectKey,
 				}),
@@ -666,6 +666,76 @@ describe("store submission review flow", () => {
 			.first<{ action: string | null }>();
 		// 記録されるactionは要求されなかった"reject"ではなく実際の結果("published")。
 		expect(tokenRow?.action).toBe("published");
+	});
+
+	it("rejects oversized metadata at submit even if a presigned slot was obtained with a smaller claim", async () => {
+		const id = crypto.randomUUID();
+		const objectKey = `packages/${id}.lwpkg`;
+		await env.STORE_BUCKET.put(objectKey, new Uint8Array([1]));
+		const res = await callWorker(new Request("https://store.example.com/submit", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				id, title: "Oversized", author: "Tester", sha256: "a".repeat(64),
+				sizeBytes: 500 * 1024 * 1024 + 1, objectKey,
+			}),
+		}));
+		expect(res.status).toBe(413);
+	});
+
+	it("does not allow reports to mutate requested or rejected entries", async () => {
+		const mock = mockResendEmail();
+		const { id } = await submitEntry();
+		void mock;
+		const report = () => callWorker(new Request("https://store.example.com/report", {
+			method: "POST",
+			headers: { "content-type": "application/json", "cf-connecting-ip": crypto.randomUUID() },
+			body: JSON.stringify({ entryId: id, reason: "test" }),
+		}));
+		expect((await report()).status).toBe(404);
+		await callWorker(new Request(`https://store.example.com/admin/entries/${id}/reject`, {
+			method: "POST", headers: { "x-admin-key": ADMIN_KEY },
+		}));
+		expect((await report()).status).toBe(404);
+		expect(await entryStatus(id)).toBe("rejected");
+	});
+
+	it("newest pagination keeps every entry when timestamps are identical", async () => {
+		const ids: string[] = [];
+		for (let i = 0; i < 3; i++) {
+			const { id } = await submitEntry({ title: `Same Time ${i}` });
+			ids.push(id);
+			await callWorker(new Request(`https://store.example.com/admin/entries/${id}/approve`, {
+				method: "POST", headers: { "x-admin-key": ADMIN_KEY },
+			}));
+			await env.STORE_DB.prepare("UPDATE store_entries SET created_at = ? WHERE id = ?")
+				.bind("2026-01-01T00:00:00.000Z", id).run();
+		}
+		const seen: string[] = [];
+		let cursor: string | null = null;
+		do {
+			const url = new URL("https://store.example.com/catalog");
+			url.searchParams.set("limit", "1");
+			url.searchParams.set("q", "Same Time");
+			if (cursor) url.searchParams.set("cursor", cursor);
+			const json = await (await callWorker(new Request(url))).json() as {
+				entries: { id: string }[]; nextCursor: string | null;
+			};
+			seen.push(...json.entries.map((entry) => entry.id));
+			cursor = json.nextCursor;
+		} while (cursor);
+		expect(new Set(seen)).toEqual(new Set(ids));
+	});
+
+	it("refuses a small ZIP whose video expands beyond the preview cap", async () => {
+		const hugeVideo = new Uint8Array(48 * 1024 * 1024 + 1);
+		const mock = mockResendEmail();
+		await submitEntryWithVideo(hugeVideo);
+		const token = mock.getToken();
+		const res = await callWorker(
+			new Request(`https://store.example.com/admin/review/${token}/video`),
+		);
+		expect(res.status).toBe(404);
 	});
 
 	it("scheduled() auto-rejects 'requested' entries whose review tokens have all expired", async () => {

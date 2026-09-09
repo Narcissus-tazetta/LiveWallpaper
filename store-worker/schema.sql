@@ -21,10 +21,12 @@ CREATE TABLE store_entries (
     withdraw_token_hash TEXT
 );
 
-CREATE INDEX idx_store_entries_status_created ON store_entries(status, created_at DESC);
+-- created_at は同一ミリ秒に複数行ができるため、id を最終タイブレーカーに含める。
+-- 既存デプロイは migrations/0002 が同じ列構成を _v2 名で作り直す。
+CREATE INDEX idx_store_entries_status_created ON store_entries(status, created_at DESC, id DESC);
 
--- /catalog?sort=popular (download_count DESC, created_at DESC でのカーソルページング) 用。
-CREATE INDEX idx_store_entries_status_downloads ON store_entries(status, download_count DESC, created_at DESC);
+-- /catalog?sort=popular (download_count DESC, created_at DESC, id DESC でのカーソルページング) 用。
+CREATE INDEX idx_store_entries_status_downloads ON store_entries(status, download_count DESC, created_at DESC, id DESC);
 
 CREATE TABLE store_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

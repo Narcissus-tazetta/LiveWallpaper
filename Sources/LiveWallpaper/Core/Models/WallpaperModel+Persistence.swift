@@ -34,8 +34,9 @@ extension WallpaperModel {
         {
             fitMode = restoredFit
         }
-        if let offsetValue = UserDefaults.standard.object(forKey: PrefsKey.desktopLevelOffset) as? Int,
-           let restoredOffset = DesktopLevelOffset(rawValue: offsetValue)
+        if let offsetValue = UserDefaults.standard
+            .object(forKey: PrefsKey.desktopLevelOffset) as? Int,
+            let restoredOffset = DesktopLevelOffset(rawValue: offsetValue)
         {
             desktopLevelOffset = restoredOffset
         }
@@ -57,9 +58,11 @@ extension WallpaperModel {
             shufflePlaybackEnabled = false
         }
         pinCurrentVideo = false
-        lightweightMode = UserDefaults.standard.object(forKey: PrefsKey.lightweightMode) as? Bool ?? false
+        lightweightMode =
+            UserDefaults.standard.object(forKey: PrefsKey.lightweightMode) as? Bool ?? false
         respectReduceMotionEnabled =
-            UserDefaults.standard.object(forKey: PrefsKey.respectReduceMotionEnabled) as? Bool ?? true
+            UserDefaults.standard
+                .object(forKey: PrefsKey.respectReduceMotionEnabled) as? Bool ?? true
         restoreHotKeysState()
         audioEnabled = UserDefaults.standard.object(forKey: PrefsKey.audioEnabled) as? Bool ?? false
         restorePlaybackSettingState()
@@ -74,13 +77,16 @@ extension WallpaperModel {
         autoFrameRateEnabled =
             UserDefaults.standard.object(forKey: PrefsKey.autoFrameRateEnabled) as? Bool ?? true
         batteryAwareQualityEnabled =
-            UserDefaults.standard.object(forKey: PrefsKey.batteryAwareQualityEnabled) as? Bool ?? true
+            UserDefaults.standard
+                .object(forKey: PrefsKey.batteryAwareQualityEnabled) as? Bool ?? true
         if UserDefaults.standard.object(forKey: PrefsKey.audioVolume) != nil {
             audioVolume = min(max(UserDefaults.standard.float(forKey: PrefsKey.audioVolume), 0), 1)
         } else {
             audioVolume = 1.0
         }
-        if let storedDimOpacity = UserDefaults.standard.object(forKey: PrefsKey.desktopReadabilityDimOpacity) as? Double {
+        if let storedDimOpacity = UserDefaults.standard.object(
+            forKey: PrefsKey.desktopReadabilityDimOpacity
+        ) as? Double {
             desktopReadabilityDimOpacity = min(max(storedDimOpacity, 0), 1)
         }
     }
@@ -94,12 +100,15 @@ extension WallpaperModel {
         advancedSharingEnabled =
             UserDefaults.standard.object(forKey: PrefsKey.advancedSharingEnabled) as? Bool ?? false
         dedicatedPlaybackContinuityEnabled =
-            UserDefaults.standard.object(forKey: PrefsKey.dedicatedPlaybackContinuityEnabled) as? Bool ?? true
+            UserDefaults.standard
+                .object(forKey: PrefsKey.dedicatedPlaybackContinuityEnabled) as? Bool
+                ?? true
         lockScreenSyncEnabled =
             UserDefaults.standard.object(forKey: PrefsKey.lockScreenSyncEnabled) as? Bool ?? false
-        lockScreenSyncStatus = lockScreenSyncEnabled
-            ? (lockScreenSyncService.isSupported ? .idle : .unsupported)
-            : .disabled
+        lockScreenSyncStatus =
+            lockScreenSyncEnabled
+                ? (lockScreenSyncService.isSupported ? .idle : .unsupported)
+                : .disabled
     }
 
     /// 上で復元した値をもとに、他のモデル拡張が持つ状態を初期化する。
@@ -123,11 +132,14 @@ extension WallpaperModel {
                 .intersection(videoOverrideByScreenID.keys)
         }
         suspendWhenOtherAppFullScreen =
-            UserDefaults.standard.object(forKey: PrefsKey.suspendWhenOtherAppFullScreen) as? Bool ?? false
+            UserDefaults.standard
+                .object(forKey: PrefsKey.suspendWhenOtherAppFullScreen) as? Bool ?? false
         suspendHighSensitivityEnabled =
-            UserDefaults.standard.object(forKey: PrefsKey.suspendHighSensitivityEnabled) as? Bool ?? false
+            UserDefaults.standard
+                .object(forKey: PrefsKey.suspendHighSensitivityEnabled) as? Bool ?? false
         suspendWhenOtherAppFrontmost =
-            UserDefaults.standard.object(forKey: PrefsKey.suspendWhenOtherAppFrontmost) as? Bool ?? false
+            UserDefaults.standard
+                .object(forKey: PrefsKey.suspendWhenOtherAppFrontmost) as? Bool ?? false
         if let savedExclusions = UserDefaults.standard.stringArray(
             forKey: PrefsKey.suspendExclusionBundleIDs
         ) {
@@ -232,7 +244,9 @@ extension WallpaperModel {
     /// プレイリストの合算 + 旧 registeredVideoPaths キーから移行する。
     private func restoreLibraryVideoPaths() {
         var restored: [String]
-        if let savedLibrary = UserDefaults.standard.stringArray(forKey: PrefsKey.libraryVideoPaths) {
+        if let savedLibrary = UserDefaults.standard
+            .stringArray(forKey: PrefsKey.libraryVideoPaths)
+        {
             restored = savedLibrary
         } else {
             let legacyPaths =
@@ -265,7 +279,10 @@ extension WallpaperModel {
         {
             if restoredDecodeMode == .gpuAdaptive {
                 decodeMode = .automatic
-                UserDefaults.standard.set(DecodeMode.automatic.rawValue, forKey: PrefsKey.decodeMode)
+                UserDefaults.standard.set(
+                    DecodeMode.automatic.rawValue,
+                    forKey: PrefsKey.decodeMode
+                )
             } else {
                 decodeMode = restoredDecodeMode
             }
@@ -386,6 +403,7 @@ extension WallpaperModel {
         let service = lockScreenSyncService
 
         lockScreenSyncTask?.cancel()
+        lockScreenSyncService.cancelPendingSync()
         lockScreenSyncStatus = .syncing
         lockScreenSyncTask = Task { [weak self] in
             do {
@@ -416,6 +434,7 @@ extension WallpaperModel {
 
     func releaseLockScreenBorrowIfNeeded() {
         lockScreenSyncTask?.cancel()
+        lockScreenSyncService.cancelPendingSync()
         lockScreenUnlockResetWorkItem?.cancel()
         lockScreenUnlockResetWorkItem = nil
 
@@ -440,6 +459,7 @@ extension WallpaperModel {
         let service = lockScreenSyncService
 
         lockScreenSyncTask?.cancel()
+        lockScreenSyncService.cancelPendingSync()
         lockScreenUnlockResetWorkItem?.cancel()
         lockScreenUnlockResetWorkItem = nil
         lockScreenSyncStatus = .removing
@@ -468,6 +488,7 @@ extension WallpaperModel {
     func restoreLockScreenWallpaperSettings() {
         let service = lockScreenSyncService
         lockScreenSyncTask?.cancel()
+        lockScreenSyncService.cancelPendingSync()
         lockScreenUnlockResetWorkItem?.cancel()
         lockScreenUnlockResetWorkItem = nil
         lockScreenSyncStatus = .restoring

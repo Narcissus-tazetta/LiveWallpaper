@@ -24,6 +24,7 @@ final class StoreCatalogController: ObservableObject {
     private var nextCursor: String?
     private var hasLoadedOnce: Bool = false
     private var searchDebounceTask: Task<Void, Never>?
+    private var requestGeneration: UInt64 = 0
     private let session: URLSession
     private let fileManager: FileManager
 
@@ -52,9 +53,9 @@ final class StoreCatalogController: ObservableObject {
             guard let self, !Task.isCancelled else {
                 return
             }
-            self.isSearching = true
-            await self.reload()
-            self.isSearching = false
+            isSearching = true
+            await reload()
+            isSearching = false
         }
     }
 
@@ -64,20 +65,30 @@ final class StoreCatalogController: ObservableObject {
         }
         sortOption = option
         searchDebounceTask?.cancel()
-        Task { await reload() }
+        // Taskの実行開始前に旧レスポンスが返る隙をなくす。
+        requestGeneration &+= 1
+        Task { [weak self] in await self?.reload() }
     }
 
     func reload() async {
+        requestGeneration &+= 1
+        let generation = requestGeneration
         hasLoadedOnce = true
         isLoading = true
         errorMessage = nil
         nextCursor = nil
-        defer { isLoading = false }
+        defer {
+            if requestGeneration == generation {
+                isLoading = false
+            }
+        }
         do {
             let page = try await fetchPage(cursor: nil)
+            guard requestGeneration == generation else { return }
             entries = page.entries
             nextCursor = page.nextCursor
         } catch {
+            guard requestGeneration == generation else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -87,12 +98,19 @@ final class StoreCatalogController: ObservableObject {
             return
         }
         isLoading = true
-        defer { isLoading = false }
+        let generation = requestGeneration
+        defer {
+            if requestGeneration == generation {
+                isLoading = false
+            }
+        }
         do {
             let page = try await fetchPage(cursor: cursor)
+            guard requestGeneration == generation else { return }
             entries.append(contentsOf: page.entries)
             nextCursor = page.nextCursor
         } catch {
+            guard requestGeneration == generation else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -116,7 +134,9 @@ final class StoreCatalogController: ObservableObject {
         components.queryItems = queryItems
 
         let (data, response) = try await session.data(from: components.url!)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+        guard let http = response as? HTTPURLResponse,
+              (200 ..< 300).contains(http.statusCode)
+        else {
             throw StoreClientError.invalidResponse
         }
         return try JSONDecoder().decode(StoreCatalogResponse.self, from: data)
@@ -140,7 +160,9 @@ final class StoreCatalogController: ObservableObject {
             // バッファせず、download(from:)でディスクへストリーミングしてから
             // チャンク単位でハッシュを計算する。
             let (downloadedFile, response) = try await session.download(from: url)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            guard let http = response as? HTTPURLResponse,
+                  (200 ..< 300).contains(http.statusCode)
+            else {
                 try? fileManager.removeItem(at: downloadedFile)
                 throw StoreClientError.invalidResponse
             }
@@ -184,7 +206,9 @@ final class StoreCatalogController: ObservableObject {
         request.httpBody = try? JSONEncoder().encode(ReportBody(entryId: entry.id, reason: reason))
         do {
             let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            guard let http = response as? HTTPURLResponse,
+                  (200 ..< 300).contains(http.statusCode)
+            else {
                 throw StoreClientError.invalidResponse
             }
             _ = data
@@ -196,7 +220,9 @@ final class StoreCatalogController: ObservableObject {
     }
 
     private static func localized(_ key: String) -> String {
-        let raw = UserDefaults.standard.string(forKey: PrefsKey.appLanguage) ?? AppLanguage.automatic.rawValue
+        let raw =
+            UserDefaults.standard.string(forKey: PrefsKey.appLanguage) ?? AppLanguage.automatic
+                .rawValue
         let language = AppLanguage(rawValue: raw) ?? .automatic
         return AppLocalization.localizedString(key, languageCode: language.effectiveLanguageCode)
     }

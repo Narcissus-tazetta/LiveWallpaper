@@ -96,6 +96,8 @@ final class LockScreenSyncService {
 
     private let manifestResolver: AerialManifestResolver
     private let videoExporter: AerialVideoExporter
+    private let operationLock = NSLock()
+    private var currentSyncOperationID: UUID?
 
     private let wallpaperServiceProcessNames = [
         "WallpaperAgent",
@@ -118,16 +120,16 @@ final class LockScreenSyncService {
         processKiller: @escaping (String) -> Void = LockScreenSyncService.killProcess(named:)
     ) {
         self.fileManager = fileManager
-        self.injectedAerialsBaseURL = aerialsBaseURL
-        self.injectedWallpaperStoreURL = wallpaperStoreURL
-        self.injectedAerialBackupDirectoryURL = aerialBackupDirectoryURL
+        injectedAerialsBaseURL = aerialsBaseURL
+        injectedWallpaperStoreURL = wallpaperStoreURL
+        injectedAerialBackupDirectoryURL = aerialBackupDirectoryURL
         self.shouldRestartWallpaperServices = shouldRestartWallpaperServices
         self.processKiller = processKiller
-        self.manifestResolver = AerialManifestResolver(
+        manifestResolver = AerialManifestResolver(
             fileManager: fileManager,
             aerialsBaseURL: aerialsBaseURL
         )
-        self.videoExporter = AerialVideoExporter(
+        videoExporter = AerialVideoExporter(
             fileManager: fileManager,
             shouldValidatePreparedVideo: shouldValidatePreparedVideo
         )
@@ -146,6 +148,8 @@ final class LockScreenSyncService {
     }
 
     func sync(videoURL: URL) async throws -> BorrowedAerialAsset {
+        let operationID = beginSyncOperation()
+        defer { finishSyncOperation(operationID) }
         guard isSupported || injectedAerialsBaseURL != nil else {
             throw LockScreenSyncError.unsupportedOS
         }
@@ -159,17 +163,72 @@ final class LockScreenSyncService {
             .appendingPathComponent(".\(borrowedAsset.id).\(UUID().uuidString)")
             .appendingPathExtension("mov")
         try await videoExporter.prepareVideo(from: videoURL, to: temporaryVideoURL)
+        try Task.checkCancellation()
 
         do {
-            try replaceItem(at: borrowedAsset.videoURL, with: temporaryVideoURL)
-            try applyWallpaperSelection(assetID: borrowedAsset.id)
-            saveLease(for: borrowedAsset)
-            restartWallpaperServices()
+            try commitSyncOperation(
+                operationID,
+                asset: borrowedAsset,
+                temporaryVideoURL: temporaryVideoURL
+            )
             return borrowedAsset
+        } catch is CancellationError {
+            try? fileManager.removeItem(at: temporaryVideoURL)
+            throw CancellationError()
         } catch {
             try? restoreOriginalAerial(assetID: borrowedAsset.id)
             throw error
         }
+    }
+
+    func cancelPendingSync() {
+        operationLock.lock()
+        currentSyncOperationID = nil
+        operationLock.unlock()
+    }
+
+    private func beginSyncOperation() -> UUID {
+        let id = UUID()
+        operationLock.lock()
+        currentSyncOperationID = id
+        operationLock.unlock()
+        return id
+    }
+
+    private func finishSyncOperation(_ id: UUID) {
+        operationLock.lock()
+        if currentSyncOperationID == id {
+            currentSyncOperationID = nil
+        }
+        operationLock.unlock()
+    }
+
+    /// キャンセル判定からリース保存までを1つの同期区間にする。
+    /// cancelPendingSync()がこの間へ割り込んで「リースなし」と誤判定しない。
+    private func commitSyncOperation(
+        _ id: UUID,
+        asset: BorrowedAerialAsset,
+        temporaryVideoURL: URL
+    ) throws {
+        operationLock.lock()
+        guard currentSyncOperationID == id else {
+            operationLock.unlock()
+            try? fileManager.removeItem(at: temporaryVideoURL)
+            throw CancellationError()
+        }
+        do {
+            try replaceItem(at: asset.videoURL, with: temporaryVideoURL)
+            try applyWallpaperSelection(assetID: asset.id)
+            saveLease(for: asset)
+        } catch {
+            operationLock.unlock()
+            throw error
+        }
+        operationLock.unlock()
+
+        // ロック解放後に呼ぶ。リースは永続化済みなので、プロセス kill を含む
+        // この処理中に cancelPendingSync()(メインスレッド)がロック待ちしない。
+        restartWallpaperServices()
     }
 
     func restoreOriginalAerialAndWallpaperStore() throws {
@@ -205,12 +264,14 @@ final class LockScreenSyncService {
 
     var activeLease: LockScreenSyncLease? {
         if let data = UserDefaults.standard.data(forKey: leaseDefaultsKey),
-           let lease = try? JSONDecoder().decode(LockScreenSyncLease.self, from: data) {
+           let lease = try? JSONDecoder().decode(LockScreenSyncLease.self, from: data)
+        {
             return lease
         }
         if let legacyID = UserDefaults.standard.string(forKey: legacyBorrowedAerialIDKey) {
-            let legacyName = UserDefaults.standard.string(forKey: legacyBorrowedAerialNameKey)
-                ?? legacyID
+            let legacyName =
+                UserDefaults.standard.string(forKey: legacyBorrowedAerialNameKey)
+                    ?? legacyID
             return LockScreenSyncLease(
                 assetID: legacyID,
                 assetName: legacyName,
@@ -226,17 +287,28 @@ final class LockScreenSyncService {
     }
 
     func restoreWallpaperStoreBackup() throws {
+        try restoreWallpaperStoreBackup(restartServices: true)
+    }
+
+    private func restoreWallpaperStoreBackup(restartServices: Bool) throws {
         guard let indexURL = wallpaperStoreIndexURL else {
             throw LockScreenSyncError.wallpaperStoreUnavailable
         }
         guard let backupURL = latestWallpaperStoreBackup(for: indexURL) else {
             throw LockScreenSyncError.backupUnavailable
         }
-        if fileManager.fileExists(atPath: indexURL.path) {
-            try fileManager.removeItem(at: indexURL)
+        let temporaryURL = indexURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(indexURL.lastPathComponent).restore.\(UUID().uuidString)")
+        try fileManager.copyItem(at: backupURL, to: temporaryURL)
+        do {
+            try replaceItem(at: indexURL, with: temporaryURL)
+        } catch {
+            try? fileManager.removeItem(at: temporaryURL)
+            throw error
         }
-        try fileManager.copyItem(at: backupURL, to: indexURL)
-        restartWallpaperServices()
+        if restartServices {
+            restartWallpaperServices()
+        }
     }
 
     func openWallpaperSettings() {
@@ -266,7 +338,8 @@ final class LockScreenSyncService {
             assetID: asset.id,
             assetName: asset.name,
             createdAt: Date(),
-            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            appVersion: Bundle.main
+                .object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
                 ?? "unknown"
         )
         if let data = try? JSONEncoder().encode(lease) {
@@ -289,16 +362,19 @@ final class LockScreenSyncService {
         if injectedAerialsBaseURL != nil {
             return nil
         }
-        guard let appSupportURL = fileManager.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
+        guard
+            let appSupportURL = fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+        else {
             return nil
         }
-        return appSupportURL
-            .appendingPathComponent("com.apple.wallpaper", isDirectory: true)
-            .appendingPathComponent("Store", isDirectory: true)
-            .appendingPathComponent("Index.plist")
+        return
+            appSupportURL
+                .appendingPathComponent("com.apple.wallpaper", isDirectory: true)
+                .appendingPathComponent("Store", isDirectory: true)
+                .appendingPathComponent("Index.plist")
     }
 
     private func backupOriginalAerialIfNeeded(_ asset: BorrowedAerialAsset) throws {
@@ -335,21 +411,25 @@ final class LockScreenSyncService {
 
     private func backupURLForBorrowedAerial(assetID: String) throws -> URL {
         if let injectedAerialBackupDirectoryURL {
-            return injectedAerialBackupDirectoryURL
-                .appendingPathComponent(assetID)
-                .appendingPathExtension("mov")
+            return
+                injectedAerialBackupDirectoryURL
+                    .appendingPathComponent(assetID)
+                    .appendingPathExtension("mov")
         }
-        guard let appSupportURL = fileManager.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
+        guard
+            let appSupportURL = fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+        else {
             throw LockScreenSyncError.applicationSupportUnavailable
         }
-        return appSupportURL
-            .appendingPathComponent("LiveWallpaper", isDirectory: true)
-            .appendingPathComponent("AerialBackups", isDirectory: true)
-            .appendingPathComponent(assetID)
-            .appendingPathExtension("mov")
+        return
+            appSupportURL
+                .appendingPathComponent("LiveWallpaper", isDirectory: true)
+                .appendingPathComponent("AerialBackups", isDirectory: true)
+                .appendingPathComponent(assetID)
+                .appendingPathExtension("mov")
     }
 
     private func applyWallpaperSelection(assetID: String) throws {
@@ -360,32 +440,42 @@ final class LockScreenSyncService {
         }
 
         let data = try Data(contentsOf: indexURL)
-        guard var store = try PropertyListSerialization.propertyList(
-            from: data,
-            options: [],
-            format: nil
-        ) as? [String: Any] else {
+        guard
+            var store = try PropertyListSerialization.propertyList(
+                from: data,
+                options: [],
+                format: nil
+            ) as? [String: Any]
+        else {
             return
         }
 
-        try backupWallpaperStore(indexURL)
+        let transactionBackupURL = try backupWallpaperStore(indexURL)
         WallpaperStorePatcher.applySelection(assetID: assetID, to: &store)
         let outputData = try PropertyListSerialization.data(
             fromPropertyList: store,
             format: .binary,
             options: 0
         )
-        try writeAtomically(outputData, to: indexURL)
-        try verifyLinkedWallpaperSelection(assetID: assetID, at: indexURL)
+        do {
+            try writeAtomically(outputData, to: indexURL)
+            try verifyLinkedWallpaperSelection(assetID: assetID, at: indexURL)
+        } catch {
+            // この同期の直前バックアップだけを戻し、古い壁紙状態への巻き戻しを防ぐ。
+            try? restoreWallpaperStore(from: transactionBackupURL, to: indexURL)
+            throw error
+        }
     }
 
     private func verifyLinkedWallpaperSelection(assetID: String, at indexURL: URL) throws {
         let data = try Data(contentsOf: indexURL)
-        guard let store = try PropertyListSerialization.propertyList(
-            from: data,
-            options: [],
-            format: nil
-        ) as? [String: Any] else {
+        guard
+            let store = try PropertyListSerialization.propertyList(
+                from: data,
+                options: [],
+                format: nil
+            ) as? [String: Any]
+        else {
             throw LockScreenSyncError.wallpaperStoreVerificationFailed
         }
         guard WallpaperStorePatcher.verifySelection(assetID: assetID, in: store) else {
@@ -413,9 +503,9 @@ final class LockScreenSyncService {
         try fileManager.copyItem(at: url, to: backupURL)
     }
 
-    private func backupWallpaperStore(_ url: URL) throws {
+    private func backupWallpaperStore(_ url: URL) throws -> URL {
         guard fileManager.fileExists(atPath: url.path) else {
-            return
+            throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: url.path])
         }
         try backupFileIfNeeded(url)
 
@@ -429,6 +519,21 @@ final class LockScreenSyncService {
                 )
         }
         try fileManager.copyItem(at: url, to: timestampedBackupURL)
+        return timestampedBackupURL
+    }
+
+    private func restoreWallpaperStore(from backupURL: URL, to indexURL: URL) throws {
+        let temporaryURL = indexURL.deletingLastPathComponent()
+            .appendingPathComponent(
+                ".\(indexURL.lastPathComponent).restore.\(UUID().uuidString).tmp"
+            )
+        try fileManager.copyItem(at: backupURL, to: temporaryURL)
+        do {
+            try replaceItem(at: indexURL, with: temporaryURL)
+        } catch {
+            try? fileManager.removeItem(at: temporaryURL)
+            throw error
+        }
     }
 
     private func latestWallpaperStoreBackup(for indexURL: URL) -> URL? {
@@ -441,24 +546,27 @@ final class LockScreenSyncService {
         let directoryURL = indexURL.deletingLastPathComponent()
         let prefix = "\(indexURL.lastPathComponent).livewallpaper."
         let suffix = ".bak"
-        let backups = (try? fileManager.contentsOfDirectory(
-            at: directoryURL,
-            includingPropertiesForKeys: [.contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        )) ?? []
+        let backups =
+            (try? fileManager.contentsOfDirectory(
+                at: directoryURL,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+            )) ?? []
 
-        return backups
-            .filter { url in
-                url.lastPathComponent.hasPrefix(prefix)
-                    && url.lastPathComponent.hasSuffix(suffix)
-            }
-            .max { lhs, rhs in
-                let leftValues = try? lhs.resourceValues(forKeys: [.contentModificationDateKey])
-                let rightValues = try? rhs.resourceValues(forKeys: [.contentModificationDateKey])
-                let leftDate = leftValues?.contentModificationDate ?? .distantPast
-                let rightDate = rightValues?.contentModificationDate ?? .distantPast
-                return leftDate < rightDate
-            }
+        return
+            backups
+                .filter { url in
+                    url.lastPathComponent.hasPrefix(prefix)
+                        && url.lastPathComponent.hasSuffix(suffix)
+                }
+                .max { lhs, rhs in
+                    let leftValues = try? lhs.resourceValues(forKeys: [.contentModificationDateKey])
+                    let rightValues = try? rhs
+                        .resourceValues(forKeys: [.contentModificationDateKey])
+                    let leftDate = leftValues?.contentModificationDate ?? .distantPast
+                    let rightDate = rightValues?.contentModificationDate ?? .distantPast
+                    return leftDate < rightDate
+                }
     }
 
     private static let backupTimestampFormatter: DateFormatter = {

@@ -18,6 +18,8 @@ const ALLOWED_CONTENT_TYPES = new Set(["application/octet-stream"]);
 const MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024; // 2MB, plenty above the ~15-40KB expected size
 const ALLOWED_THUMBNAIL_CONTENT_TYPES = new Set(["image/jpeg"]);
 const PRESIGNED_URL_TTL_SECONDS = 900;
+// 署名URLの失効後にも送信途中の時計ずれを吸収しつつ、未submit実体を回収する猶予。
+const ORPHAN_UPLOAD_GRACE_SECONDS = 2 * 60 * 60;
 // .lwpkg はZIPなので審査用プレビューはWorker内でメモリ展開してから動画部分だけを
 // 返す。ZIP本体(この値まで)と展開後の動画バッファ(ほぼ同サイズ、metadata/previews
 // は無視できるほど小さい)が同時にメモリ上に載るため、ピークはこの値のおよそ2倍になる。
@@ -25,6 +27,9 @@ const PRESIGNED_URL_TTL_SECONDS = 900;
 // 残すため、2倍しても128MBを大きく下回るこの値を上限に据える(超える投稿はプレビュー
 // 不可とし、/admin/review/:token/download での生ファイルダウンロードに倒す)。
 const MAX_VIDEO_PREVIEW_BYTES = 48 * 1024 * 1024;
+// unzipSync は展開先サイズを制限しても、入力ZIP自体は先にメモリへ読むため、
+// インラインプレビューで受け入れるアーカイブサイズにも独立した上限を設ける。
+const MAX_PREVIEW_ARCHIVE_BYTES = 64 * 1024 * 1024;
 const REPORT_THRESHOLD = 3;
 // 通報通知と審査依頼の両方の送信先(運営本人のメールアドレス)。
 const ADMIN_NOTIFY_EMAIL = "ibaragiakira2007@gmail.com";
@@ -39,6 +44,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function errorResponse(message: string, status = 400): Response {
 	return jsonResponse({ error: message }, status);
+}
+
+function isNonEmptyString(value: unknown, maxLength: number): value is string {
+	return typeof value === "string" && value.trim().length > 0 && value.length <= maxLength;
 }
 
 function clientIP(request: Request): string {
@@ -168,7 +177,11 @@ async function handleUploadUrl(request: Request, env: Env): Promise<Response> {
 		`https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${env.R2_BUCKET_NAME}/${objectKey}`,
 	);
 	objectURL.searchParams.set("X-Amz-Expires", String(PRESIGNED_URL_TTL_SECONDS));
-	const signed = await s3.sign(new Request(objectURL, { method: "PUT" }), {
+	// content-length も署名対象に含め、検証済みの申告サイズを実際のPUTに拘束する。
+	const signed = await s3.sign(new Request(objectURL, {
+		method: "PUT",
+		headers: { "content-length": String(sizeBytes) },
+	}), {
 		aws: { signQuery: true },
 	});
 
@@ -275,11 +288,40 @@ async function handleSubmit(
 	}
 
 	const { id, title, author, sha256, sizeBytes, objectKey } = body;
-	if (!id || !title || !author || !sha256 || !objectKey) {
+	if (
+		!isNonEmptyString(id, 36) ||
+		!isNonEmptyString(title, 200) ||
+		!isNonEmptyString(author, 200) ||
+		!isNonEmptyString(sha256, 64) ||
+		!isNonEmptyString(objectKey, 128)
+	) {
 		return errorResponse("missing required fields");
 	}
-	if (typeof sizeBytes !== "number" || sizeBytes <= 0) {
+	if (
+		typeof sizeBytes !== "number" ||
+		!Number.isSafeInteger(sizeBytes) ||
+		sizeBytes <= 0
+	) {
 		return errorResponse("invalid sizeBytes");
+	}
+	if (sizeBytes > MAX_UPLOAD_BYTES) {
+		return errorResponse(`sizeBytes exceeds ${MAX_UPLOAD_BYTES} byte limit`, 413);
+	}
+	if (!/^[0-9a-f]{64}$/i.test(sha256)) {
+		return errorResponse("invalid sha256");
+	}
+	if (body.description !== undefined && body.description !== null && typeof body.description !== "string") {
+		return errorResponse("invalid description");
+	}
+	if (body.license !== undefined && body.license !== null && typeof body.license !== "string") {
+		return errorResponse("invalid license");
+	}
+	if (body.durationSeconds !== undefined &&
+		(typeof body.durationSeconds !== "number" || !Number.isFinite(body.durationSeconds) || body.durationSeconds <= 0)) {
+		return errorResponse("invalid durationSeconds");
+	}
+	if (body.hasAudio !== undefined && typeof body.hasAudio !== "boolean") {
+		return errorResponse("invalid hasAudio");
 	}
 
 	// store_entries.id はクライアント申告値をそのまま主キーに使うため、objectKey
@@ -393,27 +435,28 @@ async function handleCatalog(request: Request, env: Env): Promise<Response> {
 		bindings.push(`%${escapeLikePattern(q)}%`);
 	}
 
-	// popular/newestでカーソルの意味が変わる: newestはcreated_atのみで一意な順序が
-	// 決まるが、popularはdownload_countが同点になり得るのでcreated_atをタイブレークに
-	// 加えた複合カーソル("<downloadCount>_<createdAt>")にしないとページ境界で
-	// 同点エントリが重複/欠落する。
+	// created_atは同一ミリ秒に複数行ができるため、idを最終タイブレーカーにする。
 	let orderClause: string;
 	if (sort === "popular") {
-		orderClause = "download_count DESC, created_at DESC";
+		orderClause = "download_count DESC, created_at DESC, id DESC";
 		if (cursor) {
-			const sep = cursor.indexOf("_");
-			const count = sep >= 0 ? Number.parseInt(cursor.slice(0, sep), 10) : Number.NaN;
-			const createdAt = sep >= 0 ? cursor.slice(sep + 1) : "";
-			if (Number.isFinite(count) && createdAt) {
-				conditions.push("(download_count < ? OR (download_count = ? AND created_at < ?))");
-				bindings.push(count, count, createdAt);
+			const [rawCount, createdAt, cursorID] = cursor.split("|");
+			const count = Number.parseInt(rawCount, 10);
+			if (Number.isFinite(count) && createdAt && cursorID) {
+				conditions.push(`(download_count < ? OR
+					(download_count = ? AND created_at < ?) OR
+					(download_count = ? AND created_at = ? AND id < ?))`);
+				bindings.push(count, count, createdAt, count, createdAt, cursorID);
 			}
 		}
 	} else {
-		orderClause = "created_at DESC";
+		orderClause = "created_at DESC, id DESC";
 		if (cursor) {
-			conditions.push("created_at < ?");
-			bindings.push(cursor);
+			const [createdAt, cursorID] = cursor.split("|");
+			if (createdAt && cursorID) {
+				conditions.push("(created_at < ? OR (created_at = ? AND id < ?))");
+				bindings.push(createdAt, createdAt, cursorID);
+			}
 		}
 	}
 
@@ -431,10 +474,12 @@ async function handleCatalog(request: Request, env: Env): Promise<Response> {
 	const page = hasMore ? results.slice(0, limit) : results;
 	const nextCursor = hasMore
 		? sort === "popular"
-			? `${(page[page.length - 1] as { download_count: number }).download_count}_${
-					(page[page.length - 1] as { created_at: string }).created_at
-				}`
-			: (page[page.length - 1] as { created_at: string }).created_at
+				? `${(page[page.length - 1] as { download_count: number }).download_count}|${
+						(page[page.length - 1] as { created_at: string }).created_at
+					}|${(page[page.length - 1] as { id: string }).id}`
+				: `${(page[page.length - 1] as { created_at: string }).created_at}|${
+						(page[page.length - 1] as { id: string }).id
+					}`
 		: null;
 
 	const entries = page.map((row) => {
@@ -688,7 +733,7 @@ async function handleReport(request: Request, env: Env): Promise<Response> {
 	}
 
 	const entry = await env.STORE_DB.prepare(
-		"SELECT title, report_count FROM store_entries WHERE id = ?",
+		"SELECT title, report_count FROM store_entries WHERE id = ? AND status = 'published'",
 	)
 		.bind(entryId)
 		.first<{ title: string; report_count: number }>();
@@ -697,38 +742,31 @@ async function handleReport(request: Request, env: Env): Promise<Response> {
 	}
 
 	const reporterIP = clientIP(request);
-	const alreadyReported = await env.STORE_DB.prepare(
-		"SELECT 1 FROM store_reports WHERE entry_id = ? AND reporter_ip = ?",
+	const insertResult = await env.STORE_DB.prepare(
+		`INSERT INTO store_reports (entry_id, reason, reporter_ip, reported_at)
+		 VALUES (?, ?, ?, ?) ON CONFLICT(entry_id, reporter_ip) DO NOTHING`,
 	)
-		.bind(entryId, reporterIP)
-		.first();
-	if (alreadyReported) {
+		.bind(entryId, reason ?? null, reporterIP, new Date().toISOString())
+		.run();
+	if (insertResult.meta.changes !== 1) {
 		// 同じ通報者からの重複通報は黙って現在の件数を返す(多重投票で閾値を
 		// 越えさせられないようにする)。
 		return jsonResponse({ ok: true, reportCount: entry.report_count });
 	}
 
 	await env.STORE_DB.prepare(
-		"INSERT INTO store_reports (entry_id, reason, reporter_ip, reported_at) VALUES (?, ?, ?, ?)",
+		`UPDATE store_entries
+		 SET report_count = report_count + 1,
+		     status = CASE WHEN report_count + 1 >= ? THEN 'pending' ELSE status END
+		 WHERE id = ? AND status IN ('published', 'pending')`,
 	)
-		.bind(entryId, reason ?? null, reporterIP, new Date().toISOString())
+		.bind(REPORT_THRESHOLD, entryId)
 		.run();
-
-	const newCount = entry.report_count + 1;
-	const hidden = newCount >= REPORT_THRESHOLD;
-	if (hidden) {
-		await env.STORE_DB.prepare(
-			"UPDATE store_entries SET report_count = ?, status = 'pending' WHERE id = ?",
-		)
-			.bind(newCount, entryId)
-			.run();
-	} else {
-		await env.STORE_DB.prepare(
-			"UPDATE store_entries SET report_count = ? WHERE id = ?",
-		)
-			.bind(newCount, entryId)
-			.run();
-	}
+	const updated = await env.STORE_DB.prepare(
+		"SELECT report_count, status FROM store_entries WHERE id = ?",
+	).bind(entryId).first<{ report_count: number; status: string }>();
+	const newCount = updated?.report_count ?? entry.report_count;
+	const hidden = updated?.status === "pending";
 
 	await notifyReport(env, entryId, entry.title, reason ?? null, newCount, hidden);
 
@@ -747,6 +785,27 @@ async function deleteEntryObjects(
 	await env.STORE_BUCKET.delete(objectKey);
 	if (thumbnailKey) {
 		await env.STORE_BUCKET.delete(thumbnailKey);
+	}
+}
+
+/// upload-url取得後にsubmitされなかったR2実体を定期回収する。DBに参照がある実体は
+/// statusにかかわらず保持し、署名URLの有効期限+十分な猶予を過ぎた孤児だけを消す。
+async function cleanupOrphanUploads(env: Env): Promise<void> {
+	const cutoff = Date.now() - ORPHAN_UPLOAD_GRACE_SECONDS * 1000;
+	for (const prefix of ["packages/", "thumbnails/"]) {
+		let cursor: string | undefined;
+		do {
+			const listed = await env.STORE_BUCKET.list({ prefix, cursor, limit: 500 });
+			for (const object of listed.objects) {
+				if (object.uploaded.getTime() > cutoff) continue;
+				const column = prefix === "packages/" ? "object_key" : "thumbnail_key";
+				const referenced = await env.STORE_DB.prepare(
+					`SELECT 1 FROM store_entries WHERE ${column} = ? LIMIT 1`,
+				).bind(object.key).first();
+				if (!referenced) await env.STORE_BUCKET.delete(object.key);
+			}
+			cursor = listed.truncated ? listed.cursor : undefined;
+		} while (cursor);
 	}
 }
 
@@ -774,14 +833,14 @@ async function handleAdminDelete(
 		return errorResponse("entry not found", 404);
 	}
 
-	// store_review_tokens.entry_id は store_entries(id) への外部キーなので、親行
-	// (store_entries)を先に消すとFOREIGN KEY制約違反になる。子(store_review_tokens)
-	// を先に消す。
+	// 先に公開経路から隠し、R2削除失敗時は行とキーを残して再試行可能にする。
+	await env.STORE_DB.prepare("UPDATE store_entries SET status = 'deletion_pending' WHERE id = ?")
+		.bind(id).run();
+	await deleteEntryObjects(env, row.object_key, row.thumbnail_key);
 	await env.STORE_DB.batch([
 		env.STORE_DB.prepare("DELETE FROM store_review_tokens WHERE entry_id = ?").bind(id),
 		env.STORE_DB.prepare("DELETE FROM store_entries WHERE id = ?").bind(id),
 	]);
-	await deleteEntryObjects(env, row.object_key, row.thumbnail_key);
 
 	return jsonResponse({ ok: true });
 }
@@ -821,12 +880,14 @@ async function handleWithdraw(request: Request, env: Env, id: string): Promise<R
 		return errorResponse("entry not found or invalid token", 404);
 	}
 
-	// handleAdminDeleteと同様、親(store_entries)より先に子(store_review_tokens)を消す。
+	// 認証済みの行を先に非公開化し、R2削除失敗時にも同じトークンで再試行可能にする。
+	await env.STORE_DB.prepare("UPDATE store_entries SET status = 'deletion_pending' WHERE id = ?")
+		.bind(id).run();
+	await deleteEntryObjects(env, row.object_key, row.thumbnail_key);
 	await env.STORE_DB.batch([
 		env.STORE_DB.prepare("DELETE FROM store_review_tokens WHERE entry_id = ?").bind(id),
 		env.STORE_DB.prepare("DELETE FROM store_entries WHERE id = ?").bind(id),
 	]);
-	await deleteEntryObjects(env, row.object_key, row.thumbnail_key);
 
 	return jsonResponse({ ok: true });
 }
@@ -923,11 +984,18 @@ async function applyReviewDecision(
 	action: "approve" | "reject",
 ): Promise<{ changed: boolean; status: string | null }> {
 	const requestedStatus = action === "approve" ? "published" : "rejected";
-	const result = await env.STORE_DB.prepare(
-		"UPDATE store_entries SET status = ? WHERE id = ? AND status = 'requested'",
-	)
-		.bind(requestedStatus, entryId)
-		.run();
+	const nowISO = new Date().toISOString();
+	// 状態遷移とトークン監査更新はD1 batchの同一トランザクションで
+	// 実行し、片方だけが永続化される状態を作らない。
+	const [result] = await env.STORE_DB.batch([
+		env.STORE_DB.prepare(
+			"UPDATE store_entries SET status = ? WHERE id = ? AND status = 'requested'",
+		).bind(requestedStatus, entryId),
+		env.STORE_DB.prepare(
+			`UPDATE store_review_tokens SET consumed_at = COALESCE(consumed_at, ?), action = ?
+			 WHERE entry_id = ? AND (consumed_at IS NULL OR action IS NULL)`,
+		).bind(nowISO, requestedStatus, entryId),
+	]);
 	const changed = result.meta.changes === 1;
 
 	// changed===false の場合、実際のステータス(既に決定済みならそれ、entryIdが
@@ -947,15 +1015,14 @@ async function applyReviewDecision(
 		return { changed, status };
 	}
 
-	const nowISO = new Date().toISOString();
-	await env.STORE_DB.prepare(
-		`UPDATE store_review_tokens SET consumed_at = COALESCE(consumed_at, ?), action = ?
-		 WHERE entry_id = ? AND (consumed_at IS NULL OR action IS NULL)`,
-	)
-		.bind(nowISO, status, entryId)
-		.run();
+	if (!changed) {
+		// 競合相手が先に決定した場合は監査値を実際の状態に補正する。
+		await env.STORE_DB.prepare(
+			"UPDATE store_review_tokens SET action = ? WHERE entry_id = ?",
+		).bind(status, entryId).run();
+	}
 
-	if (changed && status === "rejected") {
+	if (status === "rejected") {
 		const row = await env.STORE_DB.prepare(
 			"SELECT object_key, thumbnail_key FROM store_entries WHERE id = ?",
 		)
@@ -1160,23 +1227,35 @@ function parseRangeHeader(
 function extractVideoEntry(zipBytes: Uint8Array): Uint8Array | null {
 	const videoPathRe = /^content\/videos\/[^/]+$/i;
 	let matchedKey: string | null = null;
-	const unzipped = unzipSync(zipBytes, {
-		filter(file) {
-			if (matchedKey) {
-				// 単一動画パッケージ想定なので最初に見つかった1件だけを対象にする。
+	let rejectedForSize = false;
+	let unzipped: Record<string, Uint8Array>;
+	try {
+		unzipped = unzipSync(zipBytes, {
+			filter(file) {
+				if (matchedKey || rejectedForSize) {
+					return false;
+				}
+				if (videoPathRe.test(file.name)) {
+					// 圧縮後のパッケージではなく、ZIPヘッダの展開後サイズで
+					// 展開前に拒否する。unzipSync後の検査ではZIP爆弾を防げない。
+					if ((file.originalSize ?? Number.POSITIVE_INFINITY) > MAX_VIDEO_PREVIEW_BYTES) {
+						rejectedForSize = true;
+						return false;
+					}
+					matchedKey = file.name;
+					return true;
+				}
 				return false;
-			}
-			if (videoPathRe.test(file.name)) {
-				matchedKey = file.name;
-				return true;
-			}
-			return false;
-		},
-	});
+			},
+		});
+	} catch {
+		return null;
+	}
 	if (!matchedKey) {
 		return null;
 	}
-	return unzipped[matchedKey] ?? null;
+	const video = unzipped[matchedKey] ?? null;
+	return video && video.byteLength <= MAX_VIDEO_PREVIEW_BYTES ? video : null;
 }
 
 /// R2から取得したZIPをまるごとメモリ展開するのはピークメモリも計算量も大きいため、
@@ -1197,6 +1276,9 @@ async function getCachedExtractedVideo(env: Env, objectKey: string): Promise<Uin
 
 	const object = await env.STORE_BUCKET.get(objectKey);
 	if (!object) {
+		return null;
+	}
+	if (object.size > MAX_PREVIEW_ARCHIVE_BYTES) {
 		return null;
 	}
 	const zipBytes = new Uint8Array(await object.arrayBuffer());
@@ -1240,7 +1322,7 @@ async function handleAdminReviewVideo(
 	if (!row || new Date(row.expires_at).getTime() <= Date.now()) {
 		return errorResponse("video not found", 404);
 	}
-	if (row.size_bytes > MAX_VIDEO_PREVIEW_BYTES) {
+	if (row.size_bytes > MAX_PREVIEW_ARCHIVE_BYTES) {
 		return errorResponse(
 			`package too large to preview inline; use /admin/review/${token}/download instead`,
 			413,
@@ -1334,22 +1416,38 @@ async function handleAdminReviewDecide(
 	// トークンの一回限り消費をこの1文のUPDATEで保証する。meta.changes===1なら
 	// このリクエストが「勝った」ことが分かる(GETは消費しない。メールセキュリティ
 	// スキャナの自動プリフェッチでリンクが死なないようにするため)。
-	const consumeResult = await env.STORE_DB.prepare(
-		`UPDATE store_review_tokens SET consumed_at = ?, action = ?
-		 WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
-	)
-		.bind(nowISO, action, tokenHash, nowISO)
-		.run();
+	const requestedStatus = action === "approve" ? "published" : "rejected";
+	const [consumeResult] = await env.STORE_DB.batch([
+		env.STORE_DB.prepare(
+			`UPDATE store_review_tokens SET consumed_at = ?, action = ?
+			 WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
+		).bind(nowISO, action, tokenHash, nowISO),
+		env.STORE_DB.prepare(
+			`UPDATE store_entries SET status = ?
+			 WHERE status = 'requested' AND id = (
+				 SELECT entry_id FROM store_review_tokens
+				 WHERE token_hash = ? AND consumed_at = ?
+			 )`,
+		).bind(requestedStatus, tokenHash, nowISO),
+	]);
 
 	if (consumeResult.meta.changes !== 1) {
-		const exists = await env.STORE_DB.prepare(
-			"SELECT 1 FROM store_review_tokens WHERE token_hash = ?",
+		const existing = await env.STORE_DB.prepare(
+			"SELECT entry_id, action FROM store_review_tokens WHERE token_hash = ?",
 		)
 			.bind(tokenHash)
-			.first();
+			.first<{ entry_id: string; action: string | null }>();
+		// 却下状態のR2削除だけが失敗した場合、消費済みリンクでも後始末を再試行する。
+		if (existing?.action === "rejected" || existing?.action === "reject") {
+			await applyReviewDecision(env, existing.entry_id, "reject");
+			return new Response(null, {
+				status: 303,
+				headers: { location: `/admin/review/${token}` },
+			});
+		}
 		return errorResponse(
-			exists ? "review link already used or expired" : "review link not found",
-			exists ? 410 : 404,
+			existing ? "review link already used or expired" : "review link not found",
+			existing ? 410 : 404,
 		);
 	}
 
@@ -1359,6 +1457,8 @@ async function handleAdminReviewDecide(
 		.bind(tokenHash)
 		.first<{ entry_id: string }>();
 	if (tokenRow) {
+		// batchで状態は決定済み。共通関数は監査値の正規化と
+		// rejected実体の再試行可能な削除を担当する。
 		await applyReviewDecision(env, tokenRow.entry_id, action);
 	}
 
@@ -1604,5 +1704,6 @@ export default {
 		await Promise.all(
 			(results as { id: string }[]).map((row) => applyReviewDecision(env, row.id, "reject")),
 		);
+		await cleanupOrphanUploads(env);
 	},
 } satisfies ExportedHandler<Env>;

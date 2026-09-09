@@ -1,6 +1,6 @@
 import Foundation
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class LockScreenSyncServiceTests: XCTestCase {
     private let tahoeID = "4C108785-A7BA-422E-9C79-B0129F1D5550"
@@ -97,12 +97,12 @@ final class LockScreenSyncServiceTests: XCTestCase {
         do {
             _ = try await service.sync(videoURL: sourceVideoURL)
             XCTFail("Expected noDownloadedAerials")
-        } catch LockScreenSyncError.noDownloadedAerials {
-        }
+        } catch LockScreenSyncError.noDownloadedAerials {}
     }
 
     func testSyncRollsBackVideoWhenWallpaperStoreVerificationFails() async throws {
         let fixture = try makeFixture(downloadedIDs: [tahoeID], includesWallpaperStates: false)
+        let originalStoreData = try Data(contentsOf: fixture.storeURL)
         let sourceVideoURL = try writeFakeVideo(named: "source.mov", contents: "live-video")
         let service = makeService(fixture)
 
@@ -111,6 +111,7 @@ final class LockScreenSyncServiceTests: XCTestCase {
             XCTFail("Expected wallpaperStoreVerificationFailed")
         } catch LockScreenSyncError.wallpaperStoreVerificationFailed {
             XCTAssertEqual(try String(contentsOf: fixture.videoURL(tahoeID)), "original-\(tahoeID)")
+            XCTAssertEqual(try Data(contentsOf: fixture.storeURL), originalStoreData)
         }
     }
 
@@ -294,10 +295,10 @@ final class LockScreenSyncServiceTests: XCTestCase {
             "Files": [],
             "Configuration": Data()
         ]
-        let aerialTemplateChoice: [String: Any] = [
+        let aerialTemplateChoice: [String: Any] = try [
             "Provider": "com.apple.wallpaper.choice.aerials",
             "Files": [],
-            "Configuration": try PropertyListSerialization.data(
+            "Configuration": PropertyListSerialization.data(
                 fromPropertyList: ["assetID": sequoiaID],
                 format: .binary,
                 options: 0
@@ -314,36 +315,26 @@ final class LockScreenSyncServiceTests: XCTestCase {
             ]
         ]
         let surfaceKey = type == "linked" ? "Linked" : "Idle"
-        let store: [String: Any] = includesWallpaperStates ? [
-            "AllSpacesAndDisplays": [
-                "Type": type,
-                surfaceKey: [
-                    "LastSet": Date(),
-                    "LastUse": Date(),
-                    "Content": [
-                        "Choices": [
-                            [
-                                "Provider": "com.apple.wallpaper.choice.image",
-                                "Files": [],
-                                "Configuration": Data()
+        let store: [String: Any] =
+            includesWallpaperStates
+                ? [
+                    "AllSpacesAndDisplays": [
+                        "Type": type,
+                        surfaceKey: [
+                            "LastSet": Date(),
+                            "LastUse": Date(),
+                            "Content": [
+                                "Choices": [
+                                    [
+                                        "Provider": "com.apple.wallpaper.choice.image",
+                                        "Files": [],
+                                        "Configuration": Data()
+                                    ]
+                                ]
                             ]
                         ]
-                    ]
-                ]
-            ],
-            "SystemDefault": [
-                "Type": type,
-                surfaceKey: surface
-            ],
-            "Displays": [
-                "display": [
-                    "Type": type,
-                    surfaceKey: surface
-                ]
-            ],
-            "Spaces": [
-                "space": [
-                    "Default": [
+                    ],
+                    "SystemDefault": [
                         "Type": type,
                         surfaceKey: surface
                     ],
@@ -352,10 +343,22 @@ final class LockScreenSyncServiceTests: XCTestCase {
                             "Type": type,
                             surfaceKey: surface
                         ]
+                    ],
+                    "Spaces": [
+                        "space": [
+                            "Default": [
+                                "Type": type,
+                                surfaceKey: surface
+                            ],
+                            "Displays": [
+                                "display": [
+                                    "Type": type,
+                                    surfaceKey: surface
+                                ]
+                            ]
+                        ]
                     ]
-                ]
-            ]
-        ] : [:]
+                ] : [:]
         let data = try PropertyListSerialization.data(
             fromPropertyList: store,
             format: .binary,
@@ -410,11 +413,20 @@ final class LockScreenSyncServiceTests: XCTestCase {
             for value in spaces.values {
                 let space = try XCTUnwrap(value as? [String: Any], file: file, line: line)
                 if let defaultState = space["Default"] as? [String: Any] {
-                    try assertLinkedAerialState(defaultState, assetID: assetID, file: file, line: line)
+                    try assertLinkedAerialState(
+                        defaultState,
+                        assetID: assetID,
+                        file: file,
+                        line: line
+                    )
                 }
                 if let displays = space["Displays"] as? [String: Any] {
                     for displayValue in displays.values {
-                        let state = try XCTUnwrap(displayValue as? [String: Any], file: file, line: line)
+                        let state = try XCTUnwrap(
+                            displayValue as? [String: Any],
+                            file: file,
+                            line: line
+                        )
                         try assertLinkedAerialState(state, assetID: assetID, file: file, line: line)
                     }
                 }
@@ -432,7 +444,11 @@ final class LockScreenSyncServiceTests: XCTestCase {
         XCTAssertNil(state["Idle"], file: file, line: line)
         XCTAssertNil(state["Desktop"], file: file, line: line)
         let surfaceState = try XCTUnwrap(state["Linked"] as? [String: Any], file: file, line: line)
-        let content = try XCTUnwrap(surfaceState["Content"] as? [String: Any], file: file, line: line)
+        let content = try XCTUnwrap(
+            surfaceState["Content"] as? [String: Any],
+            file: file,
+            line: line
+        )
         let choices = try XCTUnwrap(content["Choices"] as? [[String: Any]], file: file, line: line)
         XCTAssertEqual(
             choices.first?["Provider"] as? String,

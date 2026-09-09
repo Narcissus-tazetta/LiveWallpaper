@@ -67,16 +67,60 @@ final class PackageImporter {
         try extractPackage(from: packageURL, to: tempDir)
         let (manifest, packageRootDir) = try loadManifest(from: tempDir)
         try validateManifest(manifest)
+        try preflightVideos(
+            manifest.videos, from: packageRootDir, duplicateResolution: duplicateResolution
+        )
 
         var importedVideoPaths: [String: String] = [:]
+        let existingFilesBeforeImport = Set(
+            (try? fileManager.contentsOfDirectory(
+                at: appSupportVideosDir(), includingPropertiesForKeys: nil
+            ))?.map(\.path) ?? []
+        )
+        let rollbackDirectory = tempDir.appendingPathComponent("rollback", isDirectory: true)
+        try fileManager.createDirectory(at: rollbackDirectory, withIntermediateDirectories: true)
+        var replacementBackups: [String: URL] = [:]
 
+        do {
+            for video in manifest.videos {
+                if case .replace = duplicateResolution,
+                   let existingPath = try findExistingVideoPath(for: video),
+                   replacementBackups[existingPath] == nil
+                {
+                    let backupURL = rollbackDirectory.appendingPathComponent(UUID().uuidString)
+                    try fileManager.copyItem(atPath: existingPath, toPath: backupURL.path)
+                    replacementBackups[existingPath] = backupURL
+                }
+                if let videoPath = try importVideo(
+                    video,
+                    from: packageRootDir,
+                    duplicateResolution: duplicateResolution
+                ) {
+                    importedVideoPaths[video.id] = videoPath
+                }
+            }
+        } catch {
+            for path in importedVideoPaths.values where !existingFilesBeforeImport.contains(path) {
+                try? fileManager.removeItem(atPath: path)
+            }
+            for (path, backupURL) in replacementBackups {
+                let targetURL = URL(fileURLWithPath: path)
+                let stagedURL = targetURL.deletingLastPathComponent()
+                    .appendingPathComponent(".\(UUID().uuidString).rollback")
+                do {
+                    try fileManager.copyItem(at: backupURL, to: stagedURL)
+                    _ = try fileManager.replaceItemAt(targetURL, withItemAt: stagedURL)
+                } catch {
+                    try? fileManager.removeItem(at: stagedURL)
+                }
+            }
+            throw error
+        }
+
+        // 全ファイルが正常に配置できた後にだけモデルを更新する。
+        // 後半のビデオで失敗した際に、ライブラリが半分だけ増えない。
         for video in manifest.videos {
-            if let videoPath = try importVideo(
-                video,
-                from: packageRootDir,
-                duplicateResolution: duplicateResolution
-            ) {
-                importedVideoPaths[video.id] = videoPath
+            if let videoPath = importedVideoPaths[video.id] {
                 model.addVideoPathToLibrary(videoPath)
 
                 for (screenId, pres) in video.presentations {
@@ -258,6 +302,68 @@ final class PackageImporter {
             && !value.contains("\0")
     }
 
+    private func validatedVideoURL(
+        _ video: PackageManifest.PackageVideo,
+        from packageRoot: URL
+    ) throws -> URL {
+        let sourceFileName = video.source.fileName
+        guard Self.isSafePathComponent(video.id), Self.isSafePathComponent(sourceFileName) else {
+            throw ImportError.unsafeFileReference(sourceFileName)
+        }
+        let videosDir = packageRoot.appendingPathComponent("videos", isDirectory: true)
+        let videoURL = videosDir.appendingPathComponent("\(video.id).mp4")
+        let resolvedRoot = packageRoot.resolvingSymlinksInPath().standardizedFileURL.path
+        let resolvedVideo = videoURL.resolvingSymlinksInPath().standardizedFileURL.path
+        guard resolvedVideo.hasPrefix(resolvedRoot + "/") else {
+            throw ImportError.unsafeFileReference(sourceFileName)
+        }
+        guard fileManager.fileExists(atPath: videoURL.path) else {
+            throw ImportError.videoNotFound(sourceFileName)
+        }
+        let values = try videoURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true else {
+            throw ImportError.unsafeFileReference(sourceFileName)
+        }
+        return videoURL
+    }
+
+    private func preflightVideos(
+        _ videos: [PackageManifest.PackageVideo],
+        from packageRoot: URL,
+        duplicateResolution: DuplicateResolution
+    ) throws {
+        var ids = Set<String>()
+        for video in videos {
+            guard ids.insert(video.id).inserted else {
+                throw ImportError.invalidPackageFormat
+            }
+            let videosDir = packageRoot.appendingPathComponent("videos", isDirectory: true)
+            if !fileManager.fileExists(atPath: videosDir.path) {
+                guard try findExistingVideoPath(for: video) != nil else {
+                    throw ImportError.videoNotFound(video.source.fileName)
+                }
+                continue
+            }
+            let videoURL = try validatedVideoURL(video, from: packageRoot)
+            let attrs = try fileManager.attributesOfItem(atPath: videoURL.path)
+            let size = attrs[.size] as? UInt64 ?? 0
+            if let expected = video.source.size, expected > 0, size != expected {
+                throw ImportError.corruptedVideoFile(video.source.fileName)
+            }
+            if let expected = video.sha256,
+               try computeSHA256(for: videoURL.path)
+               .caseInsensitiveCompare(expected) != .orderedSame
+            {
+                throw ImportError.invalidChecksum(video.source.fileName)
+            }
+            if case .abort = duplicateResolution,
+               try findExistingVideoPath(for: video) != nil
+            {
+                throw ImportError.duplicateVideo(video.source.fileName)
+            }
+        }
+    }
+
     private func importVideo(
         _ video: PackageManifest.PackageVideo,
         from tempDir: URL,
@@ -268,48 +374,54 @@ final class PackageImporter {
             throw ImportError.unsafeFileReference(sourceFileName)
         }
         let videosDir = tempDir.appendingPathComponent("videos")
-        let videoFile = videosDir.appendingPathComponent("\(video.id).mp4")
 
-        if fileManager.fileExists(atPath: videoFile.path) {
-            let attrs = try fileManager.attributesOfItem(atPath: videoFile.path)
-            let fileSize = attrs[.size] as? UInt64 ?? 0
-
-            if let expectedSize = video.source.size, expectedSize > 0 {
-                guard fileSize == expectedSize else {
-                    throw ImportError.corruptedVideoFile(sourceFileName)
-                }
-            }
-
-            if let expectedSHA256 = video.sha256 {
-                let actualSHA256 = try computeSHA256(for: videoFile.path)
-                guard actualSHA256 == expectedSHA256 else {
-                    throw ImportError.invalidChecksum(sourceFileName)
-                }
-            }
-
-            if let existingPath = try findExistingVideoPath(for: video) {
-                switch duplicateResolution {
-                case .abort:
-                    throw ImportError.duplicateVideo(sourceFileName)
-                case .replace:
-                    try fileManager.removeItem(atPath: existingPath)
-                    try fileManager.copyItem(atPath: videoFile.path, toPath: existingPath)
-                    return existingPath
-                }
-            }
-
-            let destPath = try makeImportDestinationPath(forVideoNamed: sourceFileName)
-            try fileManager.copyItem(atPath: videoFile.path, toPath: destPath)
-
-            return destPath
-        } else if !fileManager.fileExists(atPath: videosDir.path) {
+        if !fileManager.fileExists(atPath: videosDir.path) {
             if let matchedPath = try findExistingVideoPath(for: video) {
                 return matchedPath
             }
             throw ImportError.videoNotFound(sourceFileName)
-        } else {
-            throw ImportError.videoNotFound(sourceFileName)
         }
+        let videoFile = try validatedVideoURL(video, from: tempDir)
+
+        let attrs = try fileManager.attributesOfItem(atPath: videoFile.path)
+        let fileSize = attrs[.size] as? UInt64 ?? 0
+
+        if let expectedSize = video.source.size, expectedSize > 0 {
+            guard fileSize == expectedSize else {
+                throw ImportError.corruptedVideoFile(sourceFileName)
+            }
+        }
+
+        if let expectedSHA256 = video.sha256 {
+            let actualSHA256 = try computeSHA256(for: videoFile.path)
+            guard actualSHA256 == expectedSHA256 else {
+                throw ImportError.invalidChecksum(sourceFileName)
+            }
+        }
+
+        if let existingPath = try findExistingVideoPath(for: video) {
+            switch duplicateResolution {
+            case .abort:
+                throw ImportError.duplicateVideo(sourceFileName)
+            case .replace:
+                let existingURL = URL(fileURLWithPath: existingPath)
+                let stagedURL = existingURL.deletingLastPathComponent()
+                    .appendingPathComponent(".\(UUID().uuidString).import")
+                try fileManager.copyItem(at: videoFile, to: stagedURL)
+                do {
+                    _ = try fileManager.replaceItemAt(existingURL, withItemAt: stagedURL)
+                } catch {
+                    try? fileManager.removeItem(at: stagedURL)
+                    throw error
+                }
+                return existingPath
+            }
+        }
+
+        let destPath = try makeImportDestinationPath(forVideoNamed: sourceFileName)
+        try fileManager.copyItem(atPath: videoFile.path, toPath: destPath)
+
+        return destPath
     }
 
     private func computeSHA256(for filePath: String) throws -> String {
@@ -332,8 +444,9 @@ final class PackageImporter {
 
     private func appSupportVideosDir() throws -> URL {
         let libraryDir = fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-        let appSupportDir = libraryDir
-            .appendingPathComponent("Application Support/LiveWallpaper/Videos")
+        let appSupportDir =
+            libraryDir
+                .appendingPathComponent("Application Support/LiveWallpaper/Videos")
         try fileManager.createDirectory(at: appSupportDir, withIntermediateDirectories: true)
         return appSupportDir
     }

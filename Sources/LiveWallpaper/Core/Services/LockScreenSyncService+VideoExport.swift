@@ -32,12 +32,23 @@ struct AerialVideoExporter {
 
         let asset = AVURLAsset(url: sourceURL)
         do {
-            try await exportVideo(asset, to: destinationURL, presetName: AVAssetExportPresetPassthrough)
+            try await exportVideo(
+                asset,
+                to: destinationURL,
+                presetName: AVAssetExportPresetPassthrough
+            )
+        } catch is CancellationError {
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                try? fileManager.removeItem(at: destinationURL)
+            }
+            throw CancellationError()
         } catch {
             if fileManager.fileExists(atPath: destinationURL.path) {
                 try? fileManager.removeItem(at: destinationURL)
             }
-            try await exportVideo(asset, to: destinationURL, presetName: AVAssetExportPresetHighestQuality)
+            try await exportVideo(
+                asset, to: destinationURL, presetName: AVAssetExportPresetHighestQuality
+            )
         }
         try await validatePreparedVideo(at: destinationURL)
     }
@@ -47,10 +58,12 @@ struct AerialVideoExporter {
         to destinationURL: URL,
         presetName: String
     ) async throws {
-        guard let exportSession = AVAssetExportSession(
-            asset: asset,
-            presetName: presetName
-        ) else {
+        guard
+            let exportSession = AVAssetExportSession(
+                asset: asset,
+                presetName: presetName
+            )
+        else {
             throw LockScreenSyncError.exportSessionUnavailable
         }
         exportSession.outputURL = destinationURL
@@ -58,21 +71,30 @@ struct AerialVideoExporter {
         exportSession.shouldOptimizeForNetworkUse = false
 
         let exportSessionBox = ExportSessionBox(exportSession)
-        try await withCheckedThrowingContinuation { continuation in
-            exportSessionBox.session.exportAsynchronously {
-                switch exportSessionBox.session.status {
-                case .completed:
-                    continuation.resume()
-                case .failed, .cancelled:
-                    let message = exportSessionBox.session.error?.localizedDescription
-                        ?? "動画の mov 変換に失敗しました。"
-                    continuation.resume(throwing: LockScreenSyncError.exportFailed(message))
-                default:
-                    continuation.resume(
-                        throwing: LockScreenSyncError.exportFailed("動画の mov 変換が完了しませんでした。")
-                    )
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                exportSessionBox.session.exportAsynchronously {
+                    switch exportSessionBox.session.status {
+                    case .completed:
+                        continuation.resume()
+                    case .failed, .cancelled:
+                        if Task.isCancelled {
+                            continuation.resume(throwing: CancellationError())
+                        } else {
+                            let message =
+                                exportSessionBox.session.error?.localizedDescription
+                                    ?? "動画の mov 変換に失敗しました。"
+                            continuation.resume(throwing: LockScreenSyncError.exportFailed(message))
+                        }
+                    default:
+                        continuation.resume(
+                            throwing: LockScreenSyncError.exportFailed("動画の mov 変換が完了しませんでした。")
+                        )
+                    }
                 }
             }
+        } onCancel: {
+            exportSessionBox.session.cancelExport()
         }
     }
 
@@ -89,7 +111,8 @@ struct AerialVideoExporter {
             isPlayable = try await asset.load(.isPlayable)
             videoTracks = try await asset.loadTracks(withMediaType: .video)
         } catch {
-            throw LockScreenSyncError.invalidVideo("ロック画面用の動画を読み込めませんでした: \(error.localizedDescription)")
+            throw LockScreenSyncError
+                .invalidVideo("ロック画面用の動画を読み込めませんでした: \(error.localizedDescription)")
         }
 
         guard isPlayable else {
