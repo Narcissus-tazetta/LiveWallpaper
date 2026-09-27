@@ -27,6 +27,7 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         openWallpaperItem.image = wallpaperMenuIcon()
+        preserveConceptMenuIconVisibility(openWallpaperItem)
         openWallpaperItem.tag = MenuTag.openWallpaper
         menu.addItem(openWallpaperItem)
         let openWallpaperFitItem = NSMenuItem(
@@ -35,6 +36,7 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         openWallpaperFitItem.image = wallpaperFitMenuIcon()
+        preserveConceptMenuIconVisibility(openWallpaperFitItem)
         openWallpaperFitItem.tag = MenuTag.openWallpaperFit
         menu.addItem(openWallpaperFitItem)
         let openSettingsItem = NSMenuItem(
@@ -51,6 +53,7 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         toggleItem.image = audioMenuIcon(wallpaperModel.audioEnabled)
+        preserveConceptMenuIconVisibility(toggleItem)
         toggleItem.tag = MenuTag.audioToggle
         menu.addItem(toggleItem)
 
@@ -62,6 +65,7 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         playlistItem.image = playlistMenuIcon()
+        preserveConceptMenuIconVisibility(playlistItem)
         playlistItem.tag = MenuTag.playlistToggle
         menu.addItem(playlistItem)
 
@@ -71,6 +75,7 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         pinItem.image = pinCurrentVideoMenuIcon()
+        preserveConceptMenuIconVisibility(pinItem)
         pinItem.tag = MenuTag.pinCurrentVideoToggle
         menu.addItem(pinItem)
 
@@ -80,6 +85,7 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         assignSpaceItem.image = assignToCurrentSpaceMenuIcon()
+        preserveConceptMenuIconVisibility(assignSpaceItem)
         assignSpaceItem.tag = MenuTag.assignToCurrentSpace
         menu.addItem(assignSpaceItem)
 
@@ -89,6 +95,7 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         shuffleItem.image = shuffleMenuIcon()
+        preserveConceptMenuIconVisibility(shuffleItem)
         shuffleItem.tag = MenuTag.shuffleToggle
         menu.addItem(shuffleItem)
 
@@ -142,6 +149,17 @@ extension AppDelegate {
         )
         importItem.tag = MenuTag.importPackage
         menu.addItem(importItem)
+    }
+
+    /// macOS 27 hides symbol images in menus by default. Keep icons that identify
+    /// persistent objects or modes, while allowing command-only rows to follow
+    /// the system's reduced-icon menu style.
+    private func preserveConceptMenuIconVisibility(_ item: NSMenuItem) {
+        if #available(macOS 27.0, *) {
+            // Use KVC so release builds made with an older macOS SDK still compile.
+            // NSMenuItemImageVisibility.visible has the raw value 1.
+            item.setValue(NSNumber(value: 1), forKey: "preferredImageVisibility")
+        }
     }
 
     private func configureMenuStateObservers() {
