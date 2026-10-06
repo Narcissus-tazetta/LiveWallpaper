@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 extension AppDelegate {
     func setupStatusBar() {
@@ -21,6 +22,13 @@ extension AppDelegate {
     }
 
     private func appendPlaybackMenuItems(to menu: NSMenu) {
+        let powerStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        powerStatusItem.isEnabled = false
+        powerStatusItem.isHidden = true
+        powerStatusItem.image = menuIcon(systemSymbolName: "battery.50", accessibilityDescription: "")
+        powerStatusItem.tag = MenuTag.powerPolicyStatus
+        menu.addItem(powerStatusItem)
+
         let openWallpaperItem = NSMenuItem(
             title: localized("壁紙を開く"),
             action: #selector(openWallpaperTab),
@@ -191,6 +199,17 @@ extension AppDelegate {
                 item.image = self?.pauseMenuIcon(paused)
             }
             .store(in: &cancellables)
+
+        Publishers.CombineLatest3(
+            wallpaperModel.$isOnBatteryPower,
+            wallpaperModel.$batteryPlaybackPolicy,
+            wallpaperModel.$lightweightMode
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] _, _, _ in
+            self?.refreshPowerPolicyStatusItem()
+        }
+        .store(in: &cancellables)
 
         wallpaperModel.$playlistPlaybackEnabled
             .receive(on: DispatchQueue.main)
@@ -389,10 +408,34 @@ extension AppDelegate {
         }
     }
 
+    /// バッテリー方針で再生を変えている間だけ、その旨をメニュー先頭に出す。
+    /// 利用者が「止まっている理由」を切り分けられるようにするため。
+    func refreshPowerPolicyStatusItem() {
+        guard let item = statusItem?.menu?.item(withTag: MenuTag.powerPolicyStatus) else {
+            return
+        }
+        // @Published の sink は値の確定前(willSet)に呼ばれるため、次の runloop で読む。
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            if wallpaperModel.batteryFreezeActive {
+                item.title = localized("バッテリー駆動中のため、壁紙を静止しています。")
+                item.isHidden = false
+            } else if wallpaperModel.batteryReduceLoadActive, !wallpaperModel.lightweightMode {
+                item.title = localized("バッテリー駆動中のため、軽量モードで再生しています。")
+                item.isHidden = false
+            } else {
+                item.isHidden = true
+            }
+        }
+    }
+
     func refreshLocalizedInterface() {
         guard let menu = statusItem?.menu else {
             return
         }
+        refreshPowerPolicyStatusItem()
 
         if let item = menu.item(withTag: MenuTag.openWallpaper) {
             item.title = localized("壁紙を開く")

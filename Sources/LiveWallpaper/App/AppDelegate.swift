@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let quitApp = 1012
         static let assignToCurrentSpace = 1014
         static let pauseToggle = 1015
+        static let powerPolicyStatus = 1016
     }
 
     func applicationWillFinishLaunching(_: Notification) {

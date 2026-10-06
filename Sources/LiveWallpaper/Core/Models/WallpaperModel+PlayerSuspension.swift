@@ -196,15 +196,45 @@ extension WallpaperModel {
         guard let path = currentVideoPath else {
             return nil
         }
-        // 停止中に壁紙を切り替えた直後は、トリム開始位置への seek が着地する前に
-        // ここへ来る(currentTime はまだ 0)。トリムで切り落とした先頭を静止画に
-        // しないよう、トリム開始より前は開始位置へ寄せる。
-        var time = player.currentTime()
-        if let trimStart = wallpaperEditByPath[path]?.trimStart, trimStart > 0,
-           !time.isNumeric || time.seconds < trimStart
-        {
-            time = CMTime(seconds: trimStart, preferredTimescale: 600)
+        return captureFreezeStill(path: path, playerTime: player.currentTime())
+    }
+
+    /// 静止画を1枚デコードする。`playerTime` が nil(プレイヤー未生成)か再生の
+    /// 先頭にあるときは、利用者はまだ何も見ていないので、フェードインで始まる
+    /// 動画の黒い先頭で止めないよう、サムネイルと同じ基準で情報のある絵を少し
+    /// 先から探す。途中で止めたときはその瞬間のフレームをそのまま使う。
+    func captureFreezeStill(path: String, playerTime: CMTime?) -> CGImage? {
+        let time = freezeCaptureTime(playerTime ?? .invalid, path: path)
+        let image = VideoFrameCapture.capture(path: path, time: time)
+        let trimStart = wallpaperEditByPath[path]?.trimStart ?? 0
+        let isAtStart = time.seconds <= trimStart + 0.05
+        guard isAtStart, let image, ThumbnailImageScorer.isLowInformation(image) else {
+            return image
         }
-        return VideoFrameCapture.capture(path: path, time: time)
+        let trimEnd = wallpaperEditByPath[path]?.trimEnd ?? .infinity
+        for offset in [0.8, 1.5, 3.0, 6.0] where trimStart + offset < trimEnd {
+            let candidateTime = CMTime(seconds: trimStart + offset, preferredTimescale: 600)
+            if let candidate = VideoFrameCapture.capture(path: path, time: candidateTime),
+               !ThumbnailImageScorer.isLowInformation(candidate)
+            {
+                return candidate
+            }
+        }
+        return image
+    }
+
+    /// 停止中に壁紙を入れた直後は、AVPlayerLooper がまだアイテムを差し込んで
+    /// おらず currentTime が無効値になる(そのまま渡すとデコードに失敗して黒い
+    /// 画面になる)。トリムで切り落とした先頭も静止画にしないよう、無効値と
+    /// トリム開始より前はトリム開始位置に寄せる。
+    func freezeCaptureTime(_ time: CMTime, path: String) -> CMTime {
+        Self.freezeCaptureTime(time, trimStart: wallpaperEditByPath[path]?.trimStart ?? 0)
+    }
+
+    static func freezeCaptureTime(_ time: CMTime, trimStart: Double) -> CMTime {
+        guard time.isNumeric, time.seconds >= trimStart else {
+            return CMTime(seconds: trimStart, preferredTimescale: 600)
+        }
+        return time
     }
 }

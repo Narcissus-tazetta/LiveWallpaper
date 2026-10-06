@@ -60,6 +60,7 @@ extension WallpaperModel {
         pinCurrentVideo = false
         lightweightMode =
             UserDefaults.standard.object(forKey: PrefsKey.lightweightMode) as? Bool ?? false
+        restoreBatteryPlaybackPolicy()
         respectReduceMotionEnabled =
             UserDefaults.standard
                 .object(forKey: PrefsKey.respectReduceMotionEnabled) as? Bool ?? true

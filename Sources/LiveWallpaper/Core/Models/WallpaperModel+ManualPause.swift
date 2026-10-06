@@ -21,13 +21,14 @@ extension WallpaperModel {
         setManualPauseActive(!manualPauseActive)
     }
 
-    /// 自動停止の判定とは無関係に、常に全画面を静止させる要因の和。
+    /// 自動停止の判定とは無関係に、常に全画面を静止させる要因(Reduce Motion・
+    /// 手動の一時停止・バッテリー駆動中の静止方針)の和。
     /// 「自動停止しないディスプレイ」の除外より優先する。
     func forcedFreezeDisplayIDs() -> Set<String> {
         forcedFreezeActive ? allWallpaperDisplayIDs() : []
     }
 
     var forcedFreezeActive: Bool {
-        reduceMotionFreezeActive || manualPauseActive
+        reduceMotionFreezeActive || manualPauseActive || batteryFreezeActive
     }
 }

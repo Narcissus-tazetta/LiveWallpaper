@@ -9,7 +9,7 @@ extension WallpaperModel {
     /// generation itself — see `ensureLightweightProxyIfNeeded(for:)` for that.
     func resolvedPlaybackURL(for path: String) -> URL {
         let originalURL = URL(fileURLWithPath: path)
-        guard lightweightMode, let proxyURL = lightweightProxyCache.cachedProxyURL(for: path) else {
+        guard effectiveLightweightMode, let proxyURL = lightweightProxyCache.cachedProxyURL(for: path) else {
             return originalURL
         }
         return proxyURL
@@ -24,7 +24,7 @@ extension WallpaperModel {
     }
 
     private func ensureLightweightProxyIfNeeded(for path: String) {
-        guard lightweightMode else {
+        guard effectiveLightweightMode else {
             lightweightProxyCache.cancelActiveGeneration()
             lightweightProxyState = .idle
             return
@@ -39,7 +39,7 @@ extension WallpaperModel {
             // lightweight mode is still on — a generation started before the
             // user switched video/toggled the mode off may resolve after either
             // has already changed, and must not resurrect stale UI state.
-            guard let self, self.currentVideoPath == path, self.lightweightMode else {
+            guard let self, self.currentVideoPath == path, self.effectiveLightweightMode else {
                 return
             }
             switch result {

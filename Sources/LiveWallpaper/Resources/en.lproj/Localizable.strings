@@ -551,3 +551,10 @@
 "壁紙を一時停止" = "Pause wallpaper";
 "壁紙の再生を再開" = "Resume wallpaper";
 "壁紙の一時停止/再開" = "Pause/resume wallpaper";
+"バッテリー駆動中" = "On battery";
+"通常どおり" = "As usual";
+"負荷を下げる" = "Reduce load";
+"静止画にする" = "Freeze";
+"電源アダプタを外している間の動作を選びます。負荷を下げるは軽量モードと同じ縮小版の動画で再生し、静止画にするは壁紙を止めます。電源につなぐとすぐに元へ戻ります。" = "Choose what happens while the power adapter is disconnected. Reduce load plays the smaller version used by Lightweight mode; Freeze stops the wallpaper. Everything returns to normal as soon as you plug in.";
+"バッテリー駆動中のため、壁紙を静止しています。" = "The wallpaper is frozen because the Mac is on battery.";
+"バッテリー駆動中のため、軽量モードで再生しています。" = "Playing in Lightweight mode because the Mac is on battery.";

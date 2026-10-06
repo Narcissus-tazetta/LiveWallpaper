@@ -200,7 +200,7 @@ extension WallpaperModel {
         player.allowsExternalPlayback = false
         player.preventsDisplaySleepDuringVideoPlayback = false
         player.actionAtItemEnd = .none
-        player.automaticallyWaitsToMinimizeStalling = lightweightMode
+        player.automaticallyWaitsToMinimizeStalling = effectiveLightweightMode
         player.isMuted = muted
         return player
     }
@@ -254,9 +254,9 @@ extension WallpaperModel {
     }
 
     func applyLightweightSettings() {
-        sharedPlayer?.automaticallyWaitsToMinimizeStalling = lightweightMode
+        sharedPlayer?.automaticallyWaitsToMinimizeStalling = effectiveLightweightMode
         for entry in allDedicatedSlotEntries() {
-            entry.slot.player.automaticallyWaitsToMinimizeStalling = lightweightMode
+            entry.slot.player.automaticallyWaitsToMinimizeStalling = effectiveLightweightMode
         }
     }
 
@@ -295,7 +295,7 @@ extension WallpaperModel {
     private func playbackProfileInputs() -> PlaybackProfileResolver.Inputs {
         PlaybackProfileResolver.Inputs(
             workProfile: workProfile,
-            lightweightMode: lightweightMode,
+            lightweightMode: effectiveLightweightMode,
             targetMaxPixelWidth: targetMaxPixelWidth(),
             qualityPreset: qualityPreset,
             decodeMode: decodeMode,
@@ -409,7 +409,7 @@ extension WallpaperModel {
         return didApply
     }
 
-    private func requestPlaybackReconfiguration() {
+    func requestPlaybackReconfiguration() {
         guard !pendingPlaybackReconfiguration else {
             return
         }

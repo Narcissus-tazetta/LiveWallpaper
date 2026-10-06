@@ -71,6 +71,10 @@ extension SettingsView {
         modelBinding(model.workProfile) { model.setWorkProfile($0) }
     }
 
+    var batteryPlaybackPolicyBinding: Binding<BatteryPlaybackPolicy> {
+        modelBinding(model.batteryPlaybackPolicy) { model.setBatteryPlaybackPolicy($0) }
+    }
+
     var frameRateLimitBinding: Binding<FrameRateLimit> {
         modelBinding(model.frameRateLimit) { model.setFrameRateLimit($0) }
     }

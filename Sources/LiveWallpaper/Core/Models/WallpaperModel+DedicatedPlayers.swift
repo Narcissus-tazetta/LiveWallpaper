@@ -382,7 +382,7 @@ extension WallpaperModel {
     /// 隣接プリフェッチ(温存)だけを許可するかどうかの安全弁。既存の負荷シグナルを
     /// 再利用し、新規の監視機構は作らない。再生位置記憶自体はここに関わらず常時有効。
     private var shouldAllowWarmWindowPrefetch: Bool {
-        if lightweightMode {
+        if effectiveLightweightMode {
             return false
         }
         if workProfile == .lowPower || workProfile == .ultraLight {
@@ -473,7 +473,7 @@ extension WallpaperModel {
                     let freeze = dedicatedFreezeFrame(
                         forScreenID: displayID,
                         path: path,
-                        time: player?.currentTime() ?? .zero
+                        time: player?.currentTime()
                     )
                     layer.player = nil
                     layer.contents = freeze
@@ -509,14 +509,14 @@ extension WallpaperModel {
     private func dedicatedFreezeFrame(
         forScreenID screenID: String,
         path: String,
-        time: CMTime
+        time: CMTime?
     ) -> CGImage? {
         if let cached = dedicatedFreezeFrameByScreenID[screenID],
            cached.path == path, cached.time == time
         {
             return cached.image
         }
-        let image = VideoFrameCapture.capture(path: path, time: time)
+        let image = captureFreezeStill(path: path, playerTime: time)
         dedicatedFreezeFrameByScreenID[screenID] = (path: path, time: time, image: image)
         return image
     }

@@ -144,6 +144,11 @@ final class WallpaperModel: ObservableObject {
     @Published var systemReduceMotionEnabled: Bool = false
     /// 利用者による一時停止。永続化しない(WallpaperModel+ManualPause.swift)。
     @Published var manualPauseActive: Bool = false
+    /// バッテリー駆動中の再生方針(WallpaperModel+PowerPolicy.swift)。
+    @Published var batteryPlaybackPolicy: BatteryPlaybackPolicy = .normal
+    /// 今バッテリーで動いているか。IOKit の電源通知で更新する。
+    @Published var isOnBatteryPower: Bool = false
+    var powerSourceRunLoopSource: CFRunLoopSource?
     /// グローバルホットキー機能のマスタースイッチ(既定OFF・オプトイン)。
     @Published var hotKeysEnabled: Bool = false
     /// 操作ごとのキー割り当て。未登録の操作は既定の組み合わせを使う。
@@ -218,7 +223,7 @@ final class WallpaperModel: ObservableObject {
     var dedicatedSlotsByScreenID: [String: [String: DedicatedPlayerSlot]] = [:]
     /// screenID -> 現在レイヤーにアタッチされているパス(温存中の隣接スロットとの区別に使う)。
     var activeDedicatedPathByScreenID: [String: String] = [:]
-    var dedicatedFreezeFrameByScreenID: [String: (path: String, time: CMTime, image: CGImage?)] =
+    var dedicatedFreezeFrameByScreenID: [String: (path: String, time: CMTime?, image: CGImage?)] =
         [:]
     /// (screenID, path) -> 直前に破棄したときの再生位置。メモリ上のみで再起動を跨いで
     /// 永続化しない(Space UUIDはOS再起動で作り直され得るため)。
@@ -338,6 +343,8 @@ final class WallpaperModel: ObservableObject {
         playbackEnvironment = Self.detectPlaybackEnvironment()
         configurePlayer()
         restoreState()
+        // 最初の再生で軽量プロキシを使うか決めるため、壁紙を出す前に電源状態を取る。
+        configurePowerSourceMonitoring()
         recoverStaleLockScreenSyncOnLaunchIfNeeded()
         LocalizationManager.setLanguage(effectiveAppLanguageCode)
         refreshDisplayScreens()
@@ -414,6 +421,9 @@ final class WallpaperModel: ObservableObject {
         }
         if let observer = autoFrameRatePowerStateObserver {
             NotificationCenter.default.removeObserver(observer)
+        }
+        if let source = powerSourceRunLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .defaultMode)
         }
     }
 

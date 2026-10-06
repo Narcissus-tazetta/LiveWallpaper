@@ -66,6 +66,7 @@ If that happens:
     - Supports exclusion rules for apps and displays that should not trigger pause.
     - Quality preset, work profile, frame rate limits (30fps / 60fps / unlimited), and decode mode settings.
     - Lowers playback load automatically when the battery drops to 10% or less.
+    - Choose what happens on battery power: play as usual, play the smaller Lightweight version, or freeze the wallpaper. It switches back the moment you plug in.
     - Freezes the wallpaper when the system's **Reduce Motion** accessibility setting is on.
 - **Localization**: Full UI translation (menus, Settings, notifications) in Japanese, English, Traditional Chinese, Vietnamese, and Turkish. Follows your macOS language automatically, or can be set manually in Settings.
 - **Auto updates**: Integrated with Sparkle for in-app updates.

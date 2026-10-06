@@ -30,6 +30,9 @@ extension SettingsView {
     "画質",
     "動作プロファイル",
     "再生負荷",
+    "バッテリー駆動中",
+    "負荷を下げる",
+    "静止画にする",
     "デコード",
     "デスクトップレベル",
     "環境に応じて再生負荷を自動調整",
@@ -131,6 +134,7 @@ extension SettingsView {
       header: Label(model.localizedString("パフォーマンス・省電力"), systemImage: "bolt.fill")
     ) {
       Toggle(model.localizedString("再生の軽量モード（省電力）"), isOn: lightweightModeBinding)
+      batteryPlaybackPolicyRow
       if model.lightweightProxyState == .generating {
         settingsFootnote(model.localizedString("軽量版を生成中..."))
       }
@@ -733,6 +737,36 @@ extension SettingsView {
     }
     .padding(.top, 6)
     .padding(.leading, 10)
+  }
+
+  var batteryPlaybackPolicyRow: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 8) {
+        Text(model.localizedString("バッテリー駆動中"))
+        helpIconButton(for: .batteryPlaybackPolicy)
+        Spacer(minLength: 12)
+        EqualSegmentedControl(
+          options: [
+            (model.localizedString("通常どおり"), BatteryPlaybackPolicy.normal),
+            (model.localizedString("負荷を下げる"), BatteryPlaybackPolicy.reduceLoad),
+            (model.localizedString("静止画にする"), BatteryPlaybackPolicy.freeze)
+          ],
+          selection: batteryPlaybackPolicyBinding
+        )
+        .frame(height: 24)
+      }
+      helpFootnote(
+        for: .batteryPlaybackPolicy,
+        text: model.localizedString(
+          "電源アダプタを外している間の動作を選びます。負荷を下げるは軽量モードと同じ縮小版の動画で再生し、静止画にするは壁紙を止めます。電源につなぐとすぐに元へ戻ります。"
+        )
+      )
+      if model.batteryFreezeActive {
+        settingsFootnote(model.localizedString("バッテリー駆動中のため、壁紙を静止しています。"))
+      } else if model.batteryReduceLoadActive, !model.lightweightMode {
+        settingsFootnote(model.localizedString("バッテリー駆動中のため、軽量モードで再生しています。"))
+      }
+    }
   }
 
   func advancedSettingRow<Content: View>(

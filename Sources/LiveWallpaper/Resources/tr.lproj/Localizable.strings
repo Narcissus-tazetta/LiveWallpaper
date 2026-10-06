@@ -553,3 +553,10 @@
 "壁紙を一時停止" = "Duvar kâğıdını duraklat";
 "壁紙の再生を再開" = "Duvar kâğıdını sürdür";
 "壁紙の一時停止/再開" = "Duvar kâğıdını duraklat/sürdür";
+"バッテリー駆動中" = "Pil gücündeyken";
+"通常どおり" = "Normal";
+"負荷を下げる" = "Yükü azalt";
+"静止画にする" = "Dondur";
+"電源アダプタを外している間の動作を選びます。負荷を下げるは軽量モードと同じ縮小版の動画で再生し、静止画にするは壁紙を止めます。電源につなぐとすぐに元へ戻ります。" = "Güç adaptörü takılı değilken ne olacağını seçin. Yükü azalt, Hafif modda kullanılan küçük sürümü oynatır; Dondur duvar kâğıdını durdurur. Güce bağladığınızda her şey hemen normale döner.";
+"バッテリー駆動中のため、壁紙を静止しています。" = "Mac pil gücünde olduğu için duvar kâğıdı donduruldu.";
+"バッテリー駆動中のため、軽量モードで再生しています。" = "Mac pil gücünde olduğu için Hafif modda oynatılıyor.";

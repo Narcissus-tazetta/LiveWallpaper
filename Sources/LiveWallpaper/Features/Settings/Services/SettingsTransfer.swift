@@ -22,6 +22,7 @@ struct SettingsSnapshot: Codable {
     var shufflePlaybackEnabled: Bool?
     var autoFrameRateEnabled: Bool?
     var batteryAwareQualityEnabled: Bool?
+    var batteryPlaybackPolicy: String?
     var desktopLevelOffset: Int?
     var useFullScreenAuxiliary: Bool?
     var menuBarOpaqueEnabled: Bool?
@@ -80,6 +81,7 @@ enum SettingsTransfer {
             shufflePlaybackEnabled: model.shufflePlaybackEnabled,
             autoFrameRateEnabled: model.autoFrameRateEnabled,
             batteryAwareQualityEnabled: model.batteryAwareQualityEnabled,
+            batteryPlaybackPolicy: model.batteryPlaybackPolicy.rawValue,
             desktopLevelOffset: model.desktopLevelOffset.rawValue,
             useFullScreenAuxiliary: model.useFullScreenAuxiliary,
             menuBarOpaqueEnabled: model.menuBarOpaqueEnabled,
@@ -148,6 +150,9 @@ enum SettingsTransfer {
         }
         if let value = snapshot.batteryAwareQualityEnabled {
             model.setBatteryAwareQualityEnabled(value)
+        }
+        if let value = snapshot.batteryPlaybackPolicy.flatMap(BatteryPlaybackPolicy.init(rawValue:)) {
+            model.setBatteryPlaybackPolicy(value)
         }
     }
 

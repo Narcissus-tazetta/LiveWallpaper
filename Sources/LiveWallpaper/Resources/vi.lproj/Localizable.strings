@@ -553,3 +553,10 @@
 "壁紙を一時停止" = "Tạm dừng hình nền";
 "壁紙の再生を再開" = "Tiếp tục phát hình nền";
 "壁紙の一時停止/再開" = "Tạm dừng/tiếp tục hình nền";
+"バッテリー駆動中" = "Khi dùng pin";
+"通常どおり" = "Như bình thường";
+"負荷を下げる" = "Giảm tải";
+"静止画にする" = "Đóng băng";
+"電源アダプタを外している間の動作を選びます。負荷を下げるは軽量モードと同じ縮小版の動画で再生し、静止画にするは壁紙を止めます。電源につなぐとすぐに元へ戻ります。" = "Chọn cách hoạt động khi rút bộ sạc. Giảm tải sẽ phát bản thu nhỏ giống chế độ nhẹ; Đóng băng sẽ dừng hình nền. Mọi thứ trở lại bình thường ngay khi cắm sạc.";
+"バッテリー駆動中のため、壁紙を静止しています。" = "Hình nền đang đóng băng vì máy đang dùng pin.";
+"バッテリー駆動中のため、軽量モードで再生しています。" = "Đang phát ở chế độ nhẹ vì máy đang dùng pin.";
