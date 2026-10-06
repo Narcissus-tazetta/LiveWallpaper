@@ -131,9 +131,11 @@ extension WallpaperModel {
         if dedicatedPlaybackContinuityEnabled {
             recordResumeTime(evictTime, forScreenID: screenID, path: path)
         }
-        slot.looper.disableLooping()
-        slot.player.pause()
-        slot.player.removeAllItems()
+        if !adoptEvictedPlayerForTransition(slot.player, looper: slot.looper) {
+            slot.looper.disableLooping()
+            slot.player.pause()
+            slot.player.removeAllItems()
+        }
         slots.removeValue(forKey: path)
         dedicatedSlotsByScreenID[screenID] = slots.isEmpty ? nil : slots
         if activeDedicatedPathByScreenID[screenID] == path {

@@ -30,6 +30,11 @@ extension SettingsView {
     "画質",
     "動作プロファイル",
     "再生負荷",
+    "切り替えエフェクト",
+    "エフェクトの種類",
+    "クロスフェード",
+    "黒を挟む",
+    "フェード",
     "バッテリー駆動中",
     "負荷を下げる",
     "静止画にする",
@@ -66,6 +71,32 @@ extension SettingsView {
               "この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です"
             )
           )
+
+          displayChoicePicker(
+            title: model.localizedString("切り替えエフェクト"),
+            options: [
+              (model.localizedString("オフ"), 0.0),
+              (model.localizedString("0.5秒"), 0.5),
+              (model.localizedString("1秒"), 1.0),
+              (model.localizedString("2秒"), 2.0)
+            ],
+            selection: wallpaperTransitionDurationBinding,
+            helpTopic: .wallpaperTransition,
+            helpText: model.localizedString(
+              "壁紙が切り替わるときに前の壁紙からなめらかに移り変わります。デスクトップ（Space）の切り替えと、視差効果を減らす設定がオンのときはフェードしません。"
+            )
+          )
+
+          if model.wallpaperTransitionDuration > 0 {
+            displayChoicePicker(
+              title: model.localizedString("エフェクトの種類"),
+              options: [
+                (model.localizedString("クロスフェード"), WallpaperTransitionStyle.crossfade),
+                (model.localizedString("黒を挟む"), WallpaperTransitionStyle.dipToBlack)
+              ],
+              selection: wallpaperTransitionStyleBinding
+            )
+          }
 
           desktopReadabilityDimSection
         }

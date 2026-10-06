@@ -492,6 +492,12 @@ extension WallpaperModel {
             removeRegisteredVideo(path: trimmed)
             return
         }
+        performSharedWallpaperTransition(to: .video(trimmed)) {
+            applyRegisteredVideoSelection(path: trimmed, clearsPin: clearsPin)
+        }
+    }
+
+    private func applyRegisteredVideoSelection(path trimmed: String, clearsPin: Bool) {
         let switchedFromWeb = wallpaperKind == .web
         if switchedFromWeb {
             wallpaperKind = .video

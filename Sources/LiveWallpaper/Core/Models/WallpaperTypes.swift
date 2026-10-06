@@ -51,3 +51,8 @@ enum DesktopLevelOffset: Int {
     case zero = 0
     case plusOne = 1
 }
+
+enum WallpaperTransitionStyle: String, CaseIterable {
+    case crossfade
+    case dipToBlack
+}

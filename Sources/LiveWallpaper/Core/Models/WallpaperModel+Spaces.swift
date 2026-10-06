@@ -53,6 +53,12 @@ extension WallpaperModel {
     }
 
     func setSpaceVideo(path: String?, forSpaceUUID uuid: String) {
+        performDisplayAssignmentTransition {
+            applySpaceVideo(path: path, forSpaceUUID: uuid)
+        }
+    }
+
+    private func applySpaceVideo(path: String?, forSpaceUUID uuid: String) {
         if let path {
             guard FileManager.default.fileExists(atPath: path) else {
                 return
@@ -236,6 +242,14 @@ extension WallpaperModel {
 
     /// activeSpaceDidChangeNotification から呼ばれる入口。
     func handleActiveSpaceChanged() {
+        // Space 切替はOSがスライドで見せているので、その最中に壁紙が変わっても
+        // (Space別壁紙・Space切替で境界を跨いだスケジュール)フェードを重ねない。
+        withoutWallpaperTransitions {
+            applyActiveSpaceChange()
+        }
+    }
+
+    private func applyActiveSpaceChange() {
         guard spaceWallpaperFeatureEnabled, isSpaceWallpaperAvailable,
               !isWebWallpaperActive
         else {

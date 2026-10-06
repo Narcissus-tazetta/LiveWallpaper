@@ -44,6 +44,12 @@ extension WallpaperModel {
     }
 
     func setVideoOverride(path: String?, forScreenID screenID: String) {
+        performDisplayAssignmentTransition {
+            applyVideoOverride(path: path, forScreenID: screenID)
+        }
+    }
+
+    private func applyVideoOverride(path: String?, forScreenID screenID: String) {
         if let path {
             guard FileManager.default.fileExists(atPath: path) else {
                 return

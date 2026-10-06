@@ -80,6 +80,7 @@ extension SettingsView {
         case fullScreenAuxiliary
         case batteryAwareQuality
         case batteryPlaybackPolicy
+        case wallpaperTransition
         case videoLoop
         case menuBarOpaque
         case spaceWallpaper

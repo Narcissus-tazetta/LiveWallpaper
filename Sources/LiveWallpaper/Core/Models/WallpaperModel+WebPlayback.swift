@@ -45,6 +45,12 @@ extension WallpaperModel {
         guard webWallpaperSources.contains(where: { $0.id == id }) else {
             return
         }
+        performSharedWallpaperTransition(to: .web(id)) {
+            applyWebWallpaperSelection(id: id)
+        }
+    }
+
+    private func applyWebWallpaperSelection(id: UUID) {
         wallpaperKind = .web
         currentWebWallpaperID = id
         webWallpaperLoadState = .loading

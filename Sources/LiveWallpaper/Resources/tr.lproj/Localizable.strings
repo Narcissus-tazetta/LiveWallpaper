@@ -560,3 +560,12 @@
 "電源アダプタを外している間の動作を選びます。負荷を下げるは軽量モードと同じ縮小版の動画で再生し、静止画にするは壁紙を止めます。電源につなぐとすぐに元へ戻ります。" = "Güç adaptörü takılı değilken ne olacağını seçin. Yükü azalt, Hafif modda kullanılan küçük sürümü oynatır; Dondur duvar kâğıdını durdurur. Güce bağladığınızda her şey hemen normale döner.";
 "バッテリー駆動中のため、壁紙を静止しています。" = "Mac pil gücünde olduğu için duvar kâğıdı donduruldu.";
 "バッテリー駆動中のため、軽量モードで再生しています。" = "Mac pil gücünde olduğu için Hafif modda oynatılıyor.";
+"0.5秒" = "0,5 sn";
+"1秒" = "1 sn";
+"2秒" = "2 sn";
+"切り替えエフェクト" = "Geçiş efekti";
+"フェード" = "Solma";
+"壁紙が切り替わるときに前の壁紙からなめらかに移り変わります。デスクトップ（Space）の切り替えと、視差効果を減らす設定がオンのときはフェードしません。" = "Duvar kâğıdı değiştiğinde öncekinden yumuşak bir geçişle değişir. Masaüstleri (Spaces) arasında geçerken ve Hareketi Azalt açıkken geçiş yapılmaz.";
+"エフェクトの種類" = "Efekt türü";
+"クロスフェード" = "Çapraz geçiş";
+"黒を挟む" = "Siyahtan geçiş";

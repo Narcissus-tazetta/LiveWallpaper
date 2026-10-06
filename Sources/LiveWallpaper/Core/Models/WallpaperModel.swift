@@ -149,6 +149,13 @@ final class WallpaperModel: ObservableObject {
     /// 今バッテリーで動いているか。IOKit の電源通知で更新する。
     @Published var isOnBatteryPower: Bool = false
     var powerSourceRunLoopSource: CFRunLoopSource?
+    /// Wallpaper switch effect length in seconds; 0 turns it off (WallpaperModel+Transition.swift).
+    @Published var wallpaperTransitionDuration: Double = 0.5
+    @Published var wallpaperTransitionStyle: WallpaperTransitionStyle = .crossfade
+    var wallpaperTransitionSuppressionDepth: Int = 0
+    var wallpaperTransitionNestingDepth: Int = 0
+    var transitionHeldPlayers: [ObjectIdentifier: TransitionHeldPlayer] = [:]
+    var transitionAudioRampTimer: Timer?
     /// グローバルホットキー機能のマスタースイッチ(既定OFF・オプトイン)。
     @Published var hotKeysEnabled: Bool = false
     /// 操作ごとのキー割り当て。未登録の操作は既定の組み合わせを使う。

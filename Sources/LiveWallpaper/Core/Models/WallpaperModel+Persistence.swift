@@ -61,6 +61,7 @@ extension WallpaperModel {
         lightweightMode =
             UserDefaults.standard.object(forKey: PrefsKey.lightweightMode) as? Bool ?? false
         restoreBatteryPlaybackPolicy()
+        restoreWallpaperTransitionSettings()
         respectReduceMotionEnabled =
             UserDefaults.standard
                 .object(forKey: PrefsKey.respectReduceMotionEnabled) as? Bool ?? true

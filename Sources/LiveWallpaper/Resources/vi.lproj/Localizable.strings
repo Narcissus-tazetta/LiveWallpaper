@@ -560,3 +560,12 @@
 "電源アダプタを外している間の動作を選びます。負荷を下げるは軽量モードと同じ縮小版の動画で再生し、静止画にするは壁紙を止めます。電源につなぐとすぐに元へ戻ります。" = "Chọn cách hoạt động khi rút bộ sạc. Giảm tải sẽ phát bản thu nhỏ giống chế độ nhẹ; Đóng băng sẽ dừng hình nền. Mọi thứ trở lại bình thường ngay khi cắm sạc.";
 "バッテリー駆動中のため、壁紙を静止しています。" = "Hình nền đang đóng băng vì máy đang dùng pin.";
 "バッテリー駆動中のため、軽量モードで再生しています。" = "Đang phát ở chế độ nhẹ vì máy đang dùng pin.";
+"0.5秒" = "0,5 giây";
+"1秒" = "1 giây";
+"2秒" = "2 giây";
+"切り替えエフェクト" = "Hiệu ứng chuyển";
+"フェード" = "Mờ dần";
+"壁紙が切り替わるときに前の壁紙からなめらかに移り変わります。デスクトップ（Space）の切り替えと、視差効果を減らす設定がオンのときはフェードしません。" = "Khi đổi hình nền, hình mới sẽ chuyển mượt từ hình trước. Không có hiệu ứng khi chuyển màn hình nền (Spaces) hoặc khi bật Giảm chuyển động.";
+"エフェクトの種類" = "Kiểu hiệu ứng";
+"クロスフェード" = "Chuyển mờ chéo";
+"黒を挟む" = "Mờ qua màu đen";

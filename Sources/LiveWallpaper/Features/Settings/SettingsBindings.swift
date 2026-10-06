@@ -71,6 +71,14 @@ extension SettingsView {
         modelBinding(model.workProfile) { model.setWorkProfile($0) }
     }
 
+    var wallpaperTransitionDurationBinding: Binding<Double> {
+        modelBinding(model.wallpaperTransitionDuration) { model.setWallpaperTransitionDuration($0) }
+    }
+
+    var wallpaperTransitionStyleBinding: Binding<WallpaperTransitionStyle> {
+        modelBinding(model.wallpaperTransitionStyle) { model.setWallpaperTransitionStyle($0) }
+    }
+
     var batteryPlaybackPolicyBinding: Binding<BatteryPlaybackPolicy> {
         modelBinding(model.batteryPlaybackPolicy) { model.setBatteryPlaybackPolicy($0) }
     }

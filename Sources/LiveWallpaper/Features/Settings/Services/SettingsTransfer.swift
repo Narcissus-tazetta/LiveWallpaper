@@ -23,6 +23,8 @@ struct SettingsSnapshot: Codable {
     var autoFrameRateEnabled: Bool?
     var batteryAwareQualityEnabled: Bool?
     var batteryPlaybackPolicy: String?
+    var wallpaperTransitionDuration: Double?
+    var wallpaperTransitionStyle: String?
     var desktopLevelOffset: Int?
     var useFullScreenAuxiliary: Bool?
     var menuBarOpaqueEnabled: Bool?
@@ -82,6 +84,8 @@ enum SettingsTransfer {
             autoFrameRateEnabled: model.autoFrameRateEnabled,
             batteryAwareQualityEnabled: model.batteryAwareQualityEnabled,
             batteryPlaybackPolicy: model.batteryPlaybackPolicy.rawValue,
+            wallpaperTransitionDuration: model.wallpaperTransitionDuration,
+            wallpaperTransitionStyle: model.wallpaperTransitionStyle.rawValue,
             desktopLevelOffset: model.desktopLevelOffset.rawValue,
             useFullScreenAuxiliary: model.useFullScreenAuxiliary,
             menuBarOpaqueEnabled: model.menuBarOpaqueEnabled,
@@ -153,6 +157,14 @@ enum SettingsTransfer {
         }
         if let value = snapshot.batteryPlaybackPolicy.flatMap(BatteryPlaybackPolicy.init(rawValue:)) {
             model.setBatteryPlaybackPolicy(value)
+        }
+        if let value = snapshot.wallpaperTransitionDuration,
+           WallpaperModel.wallpaperTransitionDurationOptions.contains(value)
+        {
+            model.setWallpaperTransitionDuration(value)
+        }
+        if let value = snapshot.wallpaperTransitionStyle.flatMap(WallpaperTransitionStyle.init(rawValue:)) {
+            model.setWallpaperTransitionStyle(value)
         }
     }
 

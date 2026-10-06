@@ -558,3 +558,12 @@
 "電源アダプタを外している間の動作を選びます。負荷を下げるは軽量モードと同じ縮小版の動画で再生し、静止画にするは壁紙を止めます。電源につなぐとすぐに元へ戻ります。" = "Choose what happens while the power adapter is disconnected. Reduce load plays the smaller version used by Lightweight mode; Freeze stops the wallpaper. Everything returns to normal as soon as you plug in.";
 "バッテリー駆動中のため、壁紙を静止しています。" = "The wallpaper is frozen because the Mac is on battery.";
 "バッテリー駆動中のため、軽量モードで再生しています。" = "Playing in Lightweight mode because the Mac is on battery.";
+"0.5秒" = "0.5 s";
+"1秒" = "1 s";
+"2秒" = "2 s";
+"切り替えエフェクト" = "Switch effect";
+"フェード" = "Fade";
+"壁紙が切り替わるときに前の壁紙からなめらかに移り変わります。デスクトップ（Space）の切り替えと、視差効果を減らす設定がオンのときはフェードしません。" = "Smoothly cross-fades from the previous wallpaper when the wallpaper changes. There is no fade when switching desktops (Spaces) or while Reduce Motion is on.";
+"エフェクトの種類" = "Effect";
+"クロスフェード" = "Cross-fade";
+"黒を挟む" = "Fade through black";

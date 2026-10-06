@@ -28,6 +28,8 @@ enum PrefsKey {
     static let libraryVideoPaths = "libraryVideoPaths"
     static let lightweightMode = "lightweightMode"
     static let batteryPlaybackPolicy = "batteryPlaybackPolicy"
+    static let wallpaperTransitionDuration = "wallpaperTransitionDuration"
+    static let wallpaperTransitionStyle = "wallpaperTransitionStyle"
     static let lockScreenSyncEnabled = "lockScreenSyncEnabled"
     static let menuBarOpaqueEnabled = "menuBarOpaqueEnabled"
     static let menuBarSpaceNumberEnabled = "menuBarSpaceNumberEnabled"
