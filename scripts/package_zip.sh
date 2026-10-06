@@ -106,9 +106,11 @@ mkdir -p "$DIST_DIR"
 
 cd "$ROOT_DIR"
 echo "[1/6] Building release binary..."
+# SwiftPM 6.4 defaults to the swiftbuild system, which writes elsewhere and does
+# not embed Sparkle; the paths above would silently pick up a stale binary.
 if [[ "$ARCH_MODE" == "universal" ]]; then
-  swift build -c release --arch arm64
-  swift build -c release --arch x86_64
+  swift build --build-system native -c release --arch arm64
+  swift build --build-system native -c release --arch x86_64
 
   if [[ ! -f "$ARM_EXEC_PATH" ]]; then
     echo "arm64 release binary not found: $ARM_EXEC_PATH" >&2
@@ -123,7 +125,7 @@ if [[ "$ARCH_MODE" == "universal" ]]; then
   lipo -create "$ARM_EXEC_PATH" "$X64_EXEC_PATH" -output "$UNIVERSAL_EXEC_PATH"
   EXEC_PATH="$UNIVERSAL_EXEC_PATH"
 else
-  swift build -c release --arch arm64
+  swift build --build-system native -c release --arch arm64
   EXEC_PATH="$ARM_EXEC_PATH"
 fi
 

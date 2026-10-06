@@ -185,8 +185,15 @@ Built with Swift, SwiftUI, and AppKit.
 
 ```bash
 # Resolve dependencies and build
-swift build -c release
+swift build --build-system native -c release
 ```
+
+```bash
+# Run from source
+swift run --build-system native
+```
+
+SwiftPM 6.4 and later default to the `swiftbuild` build system, which does not copy Sparkle.framework next to the executable, so the app fails to launch. Pass `--build-system native` to `swift build` / `swift run`.
 
 ```bash
 # Run the unit tests
