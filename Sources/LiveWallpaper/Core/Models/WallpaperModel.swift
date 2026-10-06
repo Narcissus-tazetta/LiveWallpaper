@@ -156,6 +156,12 @@ final class WallpaperModel: ObservableObject {
     var wallpaperTransitionNestingDepth: Int = 0
     var transitionHeldPlayers: [ObjectIdentifier: TransitionHeldPlayer] = [:]
     var transitionAudioRampTimer: Timer?
+    /// Screen saver bundle install state and config sync (WallpaperModel+ScreenSaver.swift).
+    @Published var screenSaverInstallState: ScreenSaverInstallState = .unavailable
+    @Published var screenSaverErrorMessage: String?
+    let screenSaverInstaller = ScreenSaverInstaller()
+    var lastWrittenScreenSaverConfig: ScreenSaverConfig?
+    var screenSaverSyncCancellable: AnyCancellable?
     /// グローバルホットキー機能のマスタースイッチ(既定OFF・オプトイン)。
     @Published var hotKeysEnabled: Bool = false
     /// 操作ごとのキー割り当て。未登録の操作は既定の組み合わせを使う。
@@ -378,6 +384,7 @@ final class WallpaperModel: ObservableObject {
         verifyRestoredVideoPaths()
         restartScheduleEvaluationTimer()
         evaluateSchedule(trigger: .launch)
+        configureScreenSaverSync()
     }
 
     deinit {

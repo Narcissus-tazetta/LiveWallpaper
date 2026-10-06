@@ -171,6 +171,7 @@ if [[ -d "$ROOT_DIR/Sources/LiveWallpaper/Resources" ]]; then
   done
 fi
 cp -R "$SPARKLE_FRAMEWORK_PATH" "$APP_DIR/Contents/MacOS/Sparkle.framework"
+"$ROOT_DIR/scripts/build_screensaver.sh" "$VERSION" "$APP_DIR/Contents/Resources" >/dev/null
 
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

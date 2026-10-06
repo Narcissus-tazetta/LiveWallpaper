@@ -54,6 +54,7 @@ If that happens:
 - **Per-desktop (Space) wallpapers**: Assign a different wallpaper to each Mission Control desktop, and optionally show the desktop number in the menu bar.
 - **Automatic switching**: Switch wallpapers by macOS light/dark appearance, by weekday and time-of-day rules, or by Focus mode.
 - **Playlists**: Register multiple videos and play them in sequence, with shuffle and previous/next.
+- **Screen saver**: Install a LiveWallpaper screen saver from Settings that plays the video wallpaper on your desktop, with per-display wallpapers, trimming, and placement. Web wallpapers are not supported.
 - **Switch effects**: Wallpapers change with a cross-fade or a fade through black (off / 0.5 / 1 / 2 seconds). No effect when switching desktops or while Reduce Motion is on.
 - **Trim / loop editor**: Cut a video down to the part you want, set a separate loop start point (the first pass plays as an intro), snap to keyframes, zoom the timeline, and undo/redo.
 - **Fit editor**: Edit per-display fit mode, zoom, and offset, then save the layout per screen.
@@ -194,6 +195,11 @@ swift run --build-system native
 ```
 
 SwiftPM 6.4 and later default to the `swiftbuild` build system, which does not copy Sparkle.framework next to the executable, so the app fails to launch. Pass `--build-system native` to `swift build` / `swift run`.
+
+```bash
+# Build the screen saver so a `swift run` build can install it from Settings
+./scripts/build_screensaver.sh 0.0.0-dev
+```
 
 ```bash
 # Run the unit tests

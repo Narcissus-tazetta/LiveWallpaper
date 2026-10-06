@@ -554,6 +554,10 @@ struct SettingsView: View {
                     }
                 }
                 Group {
+                    if settingsSectionMatches(.screenSaver) {
+                        screenSaverSettingsSection
+                        settingsSectionMatchHint(.screenSaver)
+                    }
                     if settingsSectionMatches(.reset) {
                         resetSettingsSection
                         settingsSectionMatchHint(.reset)
