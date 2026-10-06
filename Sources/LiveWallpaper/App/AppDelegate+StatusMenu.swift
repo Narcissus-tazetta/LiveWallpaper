@@ -99,6 +99,15 @@ extension AppDelegate {
         shuffleItem.tag = MenuTag.shuffleToggle
         menu.addItem(shuffleItem)
 
+        let pauseItem = NSMenuItem(
+            title: pauseMenuTitle(wallpaperModel.manualPauseActive),
+            action: #selector(toggleManualPause),
+            keyEquivalent: "p"
+        )
+        pauseItem.image = pauseMenuIcon(wallpaperModel.manualPauseActive)
+        pauseItem.tag = MenuTag.pauseToggle
+        menu.addItem(pauseItem)
+
         let previousItem = NSMenuItem(
             title: localized("前の動画"),
             action: #selector(playPreviousVideo),
@@ -170,6 +179,16 @@ extension AppDelegate {
                 else { return }
                 item.title = self?.audioMenuTitle(enabled) ?? ""
                 item.image = self?.audioMenuIcon(enabled)
+            }
+            .store(in: &cancellables)
+
+        wallpaperModel.$manualPauseActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] paused in
+                guard let item = self?.statusItem?.menu?.item(withTag: MenuTag.pauseToggle)
+                else { return }
+                item.title = self?.pauseMenuTitle(paused) ?? ""
+                item.image = self?.pauseMenuIcon(paused)
             }
             .store(in: &cancellables)
 
@@ -399,6 +418,9 @@ extension AppDelegate {
         if let item = menu.item(withTag: MenuTag.shuffleToggle) {
             item.title = shuffleMenuTitle(wallpaperModel.shufflePlaybackEnabled)
         }
+        if let item = menu.item(withTag: MenuTag.pauseToggle) {
+            item.title = pauseMenuTitle(wallpaperModel.manualPauseActive)
+        }
         if let item = menu.item(withTag: MenuTag.previousVideo) {
             item.title = localized("前の動画")
         }
@@ -432,6 +454,10 @@ extension AppDelegate {
 
     func playlistMenuTitle(_ enabled: Bool) -> String {
         localized("プレイリスト連続再生") + ": " + (enabled ? localized("ON") : localized("OFF"))
+    }
+
+    func pauseMenuTitle(_ paused: Bool) -> String {
+        paused ? localized("壁紙の再生を再開") : localized("壁紙を一時停止")
     }
 
     func shuffleMenuTitle(_ enabled: Bool) -> String {
@@ -547,6 +573,13 @@ extension AppDelegate {
 
     func shuffleMenuIcon() -> NSImage? {
         menuIcon(systemSymbolName: "shuffle", accessibilityDescription: localized("シャッフル"))
+    }
+
+    func pauseMenuIcon(_ paused: Bool) -> NSImage? {
+        menuIcon(
+            systemSymbolName: paused ? "play.fill" : "pause.fill",
+            accessibilityDescription: pauseMenuTitle(paused)
+        )
     }
 
     func previousVideoMenuIcon() -> NSImage? {

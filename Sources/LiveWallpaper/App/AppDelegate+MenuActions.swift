@@ -79,6 +79,10 @@ extension AppDelegate {
     refreshPlaybackMenuState()
   }
 
+  @objc func toggleManualPause() {
+    wallpaperModel.toggleManualPause()
+  }
+
   @objc func playPreviousVideo() {
     wallpaperModel.playPreviousVideo()
   }

@@ -548,3 +548,8 @@
 "キーボードショートカット" = "Phím tắt bàn phím";
 "このショートカットは他のアプリまたはシステムと重複しているため無効です。" = "Phím tắt này không hoạt động vì trùng với một ứng dụng khác hoặc hệ thống.";
 "視差効果を減らす設定が有効な間は、この画面も静止します。" = "Màn hình này cũng sẽ dừng khi Giảm chuyển động đang bật.";
+"再開" = "Tiếp tục";
+"一時停止" = "Tạm dừng";
+"壁紙を一時停止" = "Tạm dừng hình nền";
+"壁紙の再生を再開" = "Tiếp tục phát hình nền";
+"壁紙の一時停止/再開" = "Tạm dừng/tiếp tục hình nền";

@@ -269,9 +269,9 @@ extension WallpaperModel {
     private func syncSuspendedDisplays(for screens: [NSScreen]) {
         let validDisplayIDs = Set(screens.map { displayIDString(for: $0) })
         suspendedDisplayIDs = suspendedDisplayIDs.intersection(validDisplayIDs)
-        // Reduce Motion 中は、ウィンドウ再構築で追加/変化した画面も含めて
-        // すべて静止させたままにする(intersection で消えた分を戻す)。
-        if reduceMotionFreezeActive {
+        // Reduce Motion・手動の一時停止中は、ウィンドウ再構築で追加/変化した
+        // 画面も含めてすべて静止させたままにする(intersection で消えた分を戻す)。
+        if forcedFreezeActive {
             suspendedDisplayIDs.formUnion(validDisplayIDs)
         }
     }

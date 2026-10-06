@@ -101,6 +101,7 @@ brew upgrade --cask livewallpaper
 | 前の壁紙に切り替え | ⌃⌥⌘ [ |
 | 音声のオン/オフ | ⌃⌥⌘ M |
 | デスクトップアイコンの表示/非表示 | ⌃⌥⌘ D |
+| 壁紙の一時停止/再開 | ⌃⌥⌘ P |
 
 キーの割り当ては変更できます。システムや他アプリと重複している組み合わせは「無効」として表示されます。
 
@@ -115,6 +116,9 @@ open "livewallpaper://next"
 | URL | 動作 |
 | --- | --- |
 | `livewallpaper://next` / `livewallpaper://previous` | 次／前の壁紙を再生 |
+| `livewallpaper://pause` / `livewallpaper://resume` | 壁紙を一時停止／再開（`toggle-pause` で切り替え） |
+| `livewallpaper://set?name=Ocean` | 表示名で壁紙を選んで切り替え |
+| `livewallpaper://set-playlist?name=作業用` | 表示名でプレイリストを切り替え（`name=all` で「すべての壁紙」） |
 | `livewallpaper://audio?on=1` | 音声をオン（`on` を省略するとトグル） |
 | `livewallpaper://volume?level=0.3` | 音量を設定（0.0〜1.0） |
 | `livewallpaper://desktop-icons?visible=0` | デスクトップアイコンの表示／非表示（省略でトグル） |
@@ -123,7 +127,7 @@ open "livewallpaper://next"
 | `livewallpaper://refresh` | 再生状態を再評価 |
 | `livewallpaper://settings` / `livewallpaper://wallpaper` | 設定／壁紙タブを開く |
 
-未知のコマンドは無視されます。
+名前は大文字小文字と全角／半角を区別せず、完全一致、なければ前方一致で探します。候補が複数ある・見つからない・未知のコマンドのときは何もせず、ビープ音で知らせます。一時停止はアプリを再起動すると解除されます。
 
 ## パフォーマンス
 

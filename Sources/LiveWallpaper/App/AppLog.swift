@@ -23,4 +23,5 @@ enum AppLog {
     static let continuity = Logger(subsystem: subsystem, category: "continuity")
     static let focus = Logger(subsystem: subsystem, category: "focus")
     static let store = Logger(subsystem: subsystem, category: "store")
+    static let automation = Logger(subsystem: subsystem, category: "automation")
 }

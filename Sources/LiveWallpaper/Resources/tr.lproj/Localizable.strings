@@ -548,3 +548,8 @@
 "キーボードショートカット" = "Klavye kısayolu";
 "このショートカットは他のアプリまたはシステムと重複しているため無効です。" = "Bu kısayol başka bir uygulama veya sistemle çakıştığı için devre dışı.";
 "視差効果を減らす設定が有効な間は、この画面も静止します。" = "Hareketi Azalt açıkken bu ekran da donar.";
+"再開" = "Devam et";
+"一時停止" = "Duraklat";
+"壁紙を一時停止" = "Duvar kâğıdını duraklat";
+"壁紙の再生を再開" = "Duvar kâğıdını sürdür";
+"壁紙の一時停止/再開" = "Duvar kâğıdını duraklat/sürdür";

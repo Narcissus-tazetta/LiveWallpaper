@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let updateMenu = 1011
         static let quitApp = 1012
         static let assignToCurrentSpace = 1014
+        static let pauseToggle = 1015
     }
 
     func applicationWillFinishLaunching(_: Notification) {

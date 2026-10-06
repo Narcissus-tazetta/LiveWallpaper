@@ -346,7 +346,7 @@ extension WallpaperModel {
         return registeredPlaybackEntries.firstIndex(of: currentPlaybackEntry)
     }
 
-    private func selectPlaybackEntry(_ entry: WallpaperPlaybackEntry, clearsPin: Bool) {
+    func selectPlaybackEntry(_ entry: WallpaperPlaybackEntry, clearsPin: Bool) {
         switch entry {
         case .video(let path):
             selectRegisteredVideo(path: path, clearsPin: clearsPin)

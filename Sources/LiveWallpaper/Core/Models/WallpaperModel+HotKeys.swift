@@ -21,7 +21,11 @@ extension WallpaperModel {
                 }
             }
         }
-        for action in HotKeyAction.allCases where combos[action] == nil {
+        // 後から追加された操作の既定キーを、利用者が既に別の操作へ割り当てていた
+        // 場合は奪わない(未割り当てのまま残す)。
+        for action in HotKeyAction.allCases where combos[action] == nil
+            && !combos.values.contains(action.defaultCombo)
+        {
             combos[action] = action.defaultCombo
         }
         hotKeyCombos = combos

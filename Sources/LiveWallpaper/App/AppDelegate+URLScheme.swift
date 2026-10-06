@@ -11,6 +11,7 @@ import AppKit
 ///   open "livewallpaper://next"
 ///   open "livewallpaper://volume?level=0.3"
 ///   open "livewallpaper://audio?on=1"
+///   open "livewallpaper://set?name=Ocean"
 extension AppDelegate {
     static let urlScheme = "livewallpaper"
 
@@ -36,7 +37,7 @@ extension AppDelegate {
         handleAutomationURL(url)
     }
 
-    /// URL を解釈して対応する操作を実行する。未知のコマンドは無視する。
+    /// URL を解釈して対応する操作を実行する。解釈できない URL は何もせず失敗を知らせる。
     func handleAutomationURL(_ url: URL) {
         guard url.scheme?.lowercased() == Self.urlScheme else {
             return
@@ -60,7 +61,21 @@ extension AppDelegate {
             }
         }
 
+        func stringParam(_ name: String) -> String? {
+            queryItems.first(where: { $0.name.lowercased() == name })?.value
+        }
+
         switch command {
+        case "pause":
+            wallpaperModel.setManualPauseActive(true)
+        case "resume", "play":
+            wallpaperModel.setManualPauseActive(false)
+        case "toggle-pause", "play-pause":
+            wallpaperModel.toggleManualPause()
+        case "set", "set-wallpaper":
+            selectWallpaperByName(stringParam("name"))
+        case "set-playlist":
+            selectPlaylistByName(stringParam("name"))
         case "next", "next-wallpaper":
             wallpaperModel.playNextVideo()
         case "previous", "prev", "previous-wallpaper":
@@ -100,9 +115,44 @@ extension AppDelegate {
         case "open-wallpaper", "wallpaper":
             openWallpaperTab()
         default:
-            AppLog.appDelegate.debug(
-                "unknown automation command=\(command, privacy: .public)"
-            )
+            reportAutomationFailure("unknown command \(command)")
         }
+    }
+
+    private func selectWallpaperByName(_ name: String?) {
+        guard let name else {
+            reportAutomationFailure("set: missing name parameter")
+            return
+        }
+        switch wallpaperModel.automationWallpaperMatch(named: name) {
+        case let .unique(entry):
+            wallpaperModel.selectPlaybackEntry(entry, clearsPin: true)
+        case .notFound:
+            reportAutomationFailure("set: no wallpaper named \(name)")
+        case let .ambiguous(names):
+            reportAutomationFailure("set: \(name) matches \(names)")
+        }
+    }
+
+    private func selectPlaylistByName(_ name: String?) {
+        guard let name else {
+            reportAutomationFailure("set-playlist: missing name parameter")
+            return
+        }
+        switch wallpaperModel.automationPlaylistMatch(named: name) {
+        case let .unique(playlistID):
+            wallpaperModel.selectPlaylist(playlistID)
+        case .notFound:
+            reportAutomationFailure("set-playlist: no playlist named \(name)")
+        case let .ambiguous(names):
+            reportAutomationFailure("set-playlist: \(name) matches \(names)")
+        }
+    }
+
+    /// URL スキームは呼び出し元へ結果を返せないため、失敗を黙って捨てず
+    /// 音で知らせ、原因はログ(`log show --predicate 'category == "automation"'`)に残す。
+    private func reportAutomationFailure(_ message: String) {
+        AppLog.automation.error("\(message, privacy: .public)")
+        NSSound.beep()
     }
 }

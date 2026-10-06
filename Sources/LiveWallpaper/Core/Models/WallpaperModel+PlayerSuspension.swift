@@ -196,6 +196,15 @@ extension WallpaperModel {
         guard let path = currentVideoPath else {
             return nil
         }
-        return VideoFrameCapture.capture(path: path, time: player.currentTime())
+        // 停止中に壁紙を切り替えた直後は、トリム開始位置への seek が着地する前に
+        // ここへ来る(currentTime はまだ 0)。トリムで切り落とした先頭を静止画に
+        // しないよう、トリム開始より前は開始位置へ寄せる。
+        var time = player.currentTime()
+        if let trimStart = wallpaperEditByPath[path]?.trimStart, trimStart > 0,
+           !time.isNumeric || time.seconds < trimStart
+        {
+            time = CMTime(seconds: trimStart, preferredTimescale: 600)
+        }
+        return VideoFrameCapture.capture(path: path, time: time)
     }
 }

@@ -142,6 +142,8 @@ final class WallpaperModel: ObservableObject {
     @Published var respectReduceMotionEnabled: Bool = true
     /// システムの現在の Reduce Motion 状態(NSWorkspaceから取得・監視)。
     @Published var systemReduceMotionEnabled: Bool = false
+    /// 利用者による一時停止。永続化しない(WallpaperModel+ManualPause.swift)。
+    @Published var manualPauseActive: Bool = false
     /// グローバルホットキー機能のマスタースイッチ(既定OFF・オプトイン)。
     @Published var hotKeysEnabled: Bool = false
     /// 操作ごとのキー割り当て。未登録の操作は既定の組み合わせを使う。

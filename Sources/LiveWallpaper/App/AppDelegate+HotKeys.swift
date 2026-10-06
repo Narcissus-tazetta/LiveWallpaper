@@ -52,6 +52,8 @@ extension AppDelegate {
             toggleAudioEnabled()
         case .toggleDesktopIcons:
             wallpaperModel.setDesktopIconsVisible(!wallpaperModel.desktopIconsVisible)
+        case .togglePause:
+            wallpaperModel.toggleManualPause()
         }
     }
 }
@@ -64,6 +66,7 @@ extension HotKeyAction {
         case .previousWallpaper: return 2
         case .toggleAudio: return 3
         case .toggleDesktopIcons: return 4
+        case .togglePause: return 5
         }
     }
 }

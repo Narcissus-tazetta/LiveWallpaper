@@ -546,3 +546,8 @@
 "キーボードショートカット" = "Keyboard shortcut";
 "このショートカットは他のアプリまたはシステムと重複しているため無効です。" = "This shortcut is inactive because it conflicts with another app or the system.";
 "視差効果を減らす設定が有効な間は、この画面も静止します。" = "While Reduce Motion is on, this display is frozen too.";
+"再開" = "Resume";
+"一時停止" = "Pause";
+"壁紙を一時停止" = "Pause wallpaper";
+"壁紙の再生を再開" = "Resume wallpaper";
+"壁紙の一時停止/再開" = "Pause/resume wallpaper";

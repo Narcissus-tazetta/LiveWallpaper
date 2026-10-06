@@ -7,6 +7,7 @@ enum HotKeyAction: String, CaseIterable, Codable {
     case previousWallpaper
     case toggleAudio
     case toggleDesktopIcons
+    case togglePause
 
     /// 設定UIに出す表示名(ローカライズキー=日本語)。
     var localizationKey: String {
@@ -15,6 +16,7 @@ enum HotKeyAction: String, CaseIterable, Codable {
         case .previousWallpaper: return "前の壁紙に切り替え"
         case .toggleAudio: return "音声のオン/オフ"
         case .toggleDesktopIcons: return "デスクトップアイコンの表示/非表示"
+        case .togglePause: return "壁紙の一時停止/再開"
         }
     }
 
@@ -28,6 +30,7 @@ enum HotKeyAction: String, CaseIterable, Codable {
         case .previousWallpaper: return HotKeyCombo(keyCode: UInt32(kVK_ANSI_LeftBracket), carbonModifiers: mods)
         case .toggleAudio: return HotKeyCombo(keyCode: UInt32(kVK_ANSI_M), carbonModifiers: mods)
         case .toggleDesktopIcons: return HotKeyCombo(keyCode: UInt32(kVK_ANSI_D), carbonModifiers: mods)
+        case .togglePause: return HotKeyCombo(keyCode: UInt32(kVK_ANSI_P), carbonModifiers: mods)
         }
     }
 }

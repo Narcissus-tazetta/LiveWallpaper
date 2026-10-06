@@ -712,6 +712,16 @@ extension SettingsView {
                 .disabled(registeredCount < 2)
 
                 Button {
+                    model.toggleManualPause()
+                } label: {
+                    Label(
+                        model.localizedString(model.manualPauseActive ? "再開" : "一時停止"),
+                        systemImage: model.manualPauseActive ? "play.fill" : "pause.fill"
+                    )
+                }
+                .buttonStyle(.bordered)
+
+                Button {
                     model.playNextVideo()
                 } label: {
                     Label(model.localizedString("次へ"), systemImage: "forward.fill")

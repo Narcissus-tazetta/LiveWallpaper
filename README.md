@@ -101,6 +101,7 @@ Turn on **Global Shortcuts** in Settings to control the wallpaper without bringi
 | Previous wallpaper | ⌃⌥⌘ [ |
 | Toggle audio | ⌃⌥⌘ M |
 | Show / hide desktop icons | ⌃⌥⌘ D |
+| Pause / resume wallpaper | ⌃⌥⌘ P |
 
 Each shortcut can be re-recorded, and one that conflicts with the system or another app is flagged as inactive.
 
@@ -115,6 +116,9 @@ open "livewallpaper://next"
 | URL | What it does |
 | --- | --- |
 | `livewallpaper://next` / `livewallpaper://previous` | Play the next / previous wallpaper |
+| `livewallpaper://pause` / `livewallpaper://resume` | Pause / resume the wallpaper (`toggle-pause` toggles) |
+| `livewallpaper://set?name=Ocean` | Switch to the wallpaper with this display name |
+| `livewallpaper://set-playlist?name=Work` | Switch to the playlist with this name (`name=all` for All Wallpapers) |
 | `livewallpaper://audio?on=1` | Turn audio on (omit `on` to toggle) |
 | `livewallpaper://volume?level=0.3` | Set volume (0.0–1.0) |
 | `livewallpaper://desktop-icons?visible=0` | Show / hide desktop icons (omit to toggle) |
@@ -123,7 +127,7 @@ open "livewallpaper://next"
 | `livewallpaper://refresh` | Re-evaluate playback state |
 | `livewallpaper://settings` / `livewallpaper://wallpaper` | Open Settings / the Wallpaper tab |
 
-Unknown commands are ignored.
+Names are matched case- and width-insensitively: an exact match first, otherwise a unique prefix. If a name matches several items or nothing, or the command is unknown, nothing happens and the app beeps. Pausing is cleared when the app restarts.
 
 ## Performance
 
