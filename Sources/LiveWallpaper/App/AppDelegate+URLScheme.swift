@@ -37,7 +37,7 @@ extension AppDelegate {
         handleAutomationURL(url)
     }
 
-    /// URL を解釈して対応する操作を実行する。解釈できない URL は何もせず失敗を知らせる。
+    /// Runs the action for the URL. URLs it cannot interpret do nothing and report failure.
     func handleAutomationURL(_ url: URL) {
         guard url.scheme?.lowercased() == Self.urlScheme else {
             return
@@ -149,8 +149,8 @@ extension AppDelegate {
         }
     }
 
-    /// URL スキームは呼び出し元へ結果を返せないため、失敗を黙って捨てず
-    /// 音で知らせ、原因はログ(`log show --predicate 'category == "automation"'`)に残す。
+    /// A URL scheme cannot return a result to its caller, so instead of failing
+    /// silently, beep and log the cause (`log show --predicate 'category == "automation"'`).
     private func reportAutomationFailure(_ message: String) {
         AppLog.automation.error("\(message, privacy: .public)")
         NSSound.beep()

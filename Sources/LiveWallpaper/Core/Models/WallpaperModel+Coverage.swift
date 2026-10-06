@@ -312,10 +312,10 @@ extension WallpaperModel {
     }
 
     private func applyCoveringAppSuspension(_ displayIDs: Set<String>) {
-        // ユーザーが「自動停止の対象にしない」と選んだ画面は、どの信号(占有・
-        // 高精度検出・前面アプリ)が示していようと常に除外する。その上で、
-        // Reduce Motion・手動の一時停止なら全画面の静止を上乗せする(利用者が
-        // 明示的に求めた停止は「自動停止しないディスプレイ」の除外よりも優先する)。
+        // Screens the user excluded from auto-pause are always removed, whatever the
+        // signal (occlusion, high-sensitivity detection, frontmost app). Forced
+        // freezes (Reduce Motion, user pause, battery policy) are then added on top:
+        // a stop the user explicitly asked for wins over that exclusion.
         let filtered = displayIDs.subtracting(suspendDisabledDisplayIDs)
             .union(forcedFreezeDisplayIDs())
         guard suspendedDisplayIDs != filtered else {

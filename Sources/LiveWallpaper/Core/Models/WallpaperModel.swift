@@ -142,11 +142,11 @@ final class WallpaperModel: ObservableObject {
     @Published var respectReduceMotionEnabled: Bool = true
     /// システムの現在の Reduce Motion 状態(NSWorkspaceから取得・監視)。
     @Published var systemReduceMotionEnabled: Bool = false
-    /// 利用者による一時停止。永続化しない(WallpaperModel+ManualPause.swift)。
+    /// User pause; not persisted (WallpaperModel+ManualPause.swift).
     @Published var manualPauseActive: Bool = false
-    /// バッテリー駆動中の再生方針(WallpaperModel+PowerPolicy.swift)。
+    /// Battery playback policy (WallpaperModel+PowerPolicy.swift).
     @Published var batteryPlaybackPolicy: BatteryPlaybackPolicy = .normal
-    /// 今バッテリーで動いているか。IOKit の電源通知で更新する。
+    /// Updated from IOKit power-source notifications.
     @Published var isOnBatteryPower: Bool = false
     var powerSourceRunLoopSource: CFRunLoopSource?
     /// Wallpaper switch effect length in seconds; 0 turns it off (WallpaperModel+Transition.swift).
@@ -350,7 +350,7 @@ final class WallpaperModel: ObservableObject {
         playbackEnvironment = Self.detectPlaybackEnvironment()
         configurePlayer()
         restoreState()
-        // 最初の再生で軽量プロキシを使うか決めるため、壁紙を出す前に電源状態を取る。
+        // Read the power source before the first playback so it can pick the proxy.
         configurePowerSourceMonitoring()
         recoverStaleLockScreenSyncOnLaunchIfNeeded()
         LocalizationManager.setLanguage(effectiveAppLanguageCode)

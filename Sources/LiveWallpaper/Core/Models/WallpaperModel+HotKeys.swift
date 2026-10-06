@@ -21,8 +21,8 @@ extension WallpaperModel {
                 }
             }
         }
-        // 後から追加された操作の既定キーを、利用者が既に別の操作へ割り当てていた
-        // 場合は奪わない(未割り当てのまま残す)。
+        // A newly added action does not take its default keys from an action the
+        // user already assigned them to; it stays unassigned instead.
         for action in HotKeyAction.allCases where combos[action] == nil
             && !combos.values.contains(action.defaultCombo)
         {

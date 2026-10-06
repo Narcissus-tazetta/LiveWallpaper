@@ -408,13 +408,13 @@ extension AppDelegate {
         }
     }
 
-    /// バッテリー方針で再生を変えている間だけ、その旨をメニュー先頭に出す。
-    /// 利用者が「止まっている理由」を切り分けられるようにするため。
+    /// Shown at the top of the menu only while the battery policy is changing
+    /// playback, so the user can tell why the wallpaper is frozen or lighter.
     func refreshPowerPolicyStatusItem() {
         guard let item = statusItem?.menu?.item(withTag: MenuTag.powerPolicyStatus) else {
             return
         }
-        // @Published の sink は値の確定前(willSet)に呼ばれるため、次の runloop で読む。
+        // @Published sinks fire on willSet, so read the settled values on the next turn.
         DispatchQueue.main.async { [weak self] in
             guard let self else {
                 return

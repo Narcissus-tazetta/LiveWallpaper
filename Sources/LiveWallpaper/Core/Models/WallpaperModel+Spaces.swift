@@ -242,8 +242,8 @@ extension WallpaperModel {
 
     /// activeSpaceDidChangeNotification から呼ばれる入口。
     func handleActiveSpaceChanged() {
-        // Space 切替はOSがスライドで見せているので、その最中に壁紙が変わっても
-        // (Space別壁紙・Space切替で境界を跨いだスケジュール)フェードを重ねない。
+        // The OS already animates a Space switch; wallpaper changes it causes
+        // (per-Space wallpapers, schedules crossing a boundary) get no extra fade.
         withoutWallpaperTransitions {
             applyActiveSpaceChange()
         }

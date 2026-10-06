@@ -3,14 +3,15 @@ import Foundation
 enum AutomationNameMatch<ID: Equatable>: Equatable {
     case unique(ID)
     case notFound
-    /// 同じ優先度で複数が当たった。誤った壁紙へ切り替えるより何もしない方が安全。
+    /// Several items matched at the same priority; doing nothing beats switching to the wrong one.
     case ambiguous([String])
 }
 
-/// URL スキームの `name=` を登録済みの表示名へ解決する。
+/// Resolves the URL scheme's `name=` against registered display names.
 ///
-/// 完全一致 → 前方一致の順に探し、各段階で1件に絞れたときだけ採用する。
-/// 大文字小文字と全角/半角は区別しない(ショートカット.app で手入力されるため)。
+/// Exact match first, then prefix match; a stage wins only if it narrows to one
+/// target. Case and full/half width are ignored because names are typed by hand
+/// in Shortcuts.
 enum AutomationNameResolver {
     static func resolve<ID: Equatable>(
         _ query: String,
@@ -39,7 +40,7 @@ enum AutomationNameResolver {
         guard let first = matches.first else {
             return nil
         }
-        // 同じ対象に複数の名前(別名)がある場合は、どれに当たっても曖昧ではない。
+        // Several names (aliases) for the same target are not ambiguous.
         if matches.allSatisfy({ $0.id == first.id }) {
             return .unique(first.id)
         }

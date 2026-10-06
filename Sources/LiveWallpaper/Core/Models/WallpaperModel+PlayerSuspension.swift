@@ -199,10 +199,10 @@ extension WallpaperModel {
         return captureFreezeStill(path: path, playerTime: player.currentTime())
     }
 
-    /// 静止画を1枚デコードする。`playerTime` が nil(プレイヤー未生成)か再生の
-    /// 先頭にあるときは、利用者はまだ何も見ていないので、フェードインで始まる
-    /// 動画の黒い先頭で止めないよう、サムネイルと同じ基準で情報のある絵を少し
-    /// 先から探す。途中で止めたときはその瞬間のフレームをそのまま使う。
+    /// Decodes one still. When `playerTime` is nil (no player yet) or at the start,
+    /// the user has not seen anything yet, so a video that fades in from black is
+    /// not frozen on its black head: a slightly later frame is picked with the same
+    /// test the thumbnails use. A mid-playback pause keeps its exact frame.
     func captureFreezeStill(path: String, playerTime: CMTime?) -> CGImage? {
         let time = freezeCaptureTime(playerTime ?? .invalid, path: path)
         let image = VideoFrameCapture.capture(path: path, time: time)
@@ -223,10 +223,10 @@ extension WallpaperModel {
         return image
     }
 
-    /// 停止中に壁紙を入れた直後は、AVPlayerLooper がまだアイテムを差し込んで
-    /// おらず currentTime が無効値になる(そのまま渡すとデコードに失敗して黒い
-    /// 画面になる)。トリムで切り落とした先頭も静止画にしないよう、無効値と
-    /// トリム開始より前はトリム開始位置に寄せる。
+    /// Right after a wallpaper is installed while frozen, AVPlayerLooper has not
+    /// inserted its item yet and currentTime is invalid; decoding at that time fails
+    /// and leaves the screen black. Invalid times, and times inside the trimmed-away
+    /// head, are moved to the trim start.
     func freezeCaptureTime(_ time: CMTime, path: String) -> CMTime {
         Self.freezeCaptureTime(time, trimStart: wallpaperEditByPath[path]?.trimStart ?? 0)
     }

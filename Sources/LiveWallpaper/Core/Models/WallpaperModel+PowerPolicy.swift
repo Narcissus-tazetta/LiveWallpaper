@@ -1,14 +1,14 @@
 import Foundation
 import IOKit.ps
 
-/// バッテリー駆動中の再生方針。
+/// What the wallpaper does while running on battery.
 enum BatteryPlaybackPolicy: String, CaseIterable {
     case normal
-    /// 軽量モード(縮小プロキシでの再生)をバッテリー駆動中だけ有効にする。
-    /// ローカル動画では preferredPeakBitRate がほぼ効かないため、デコード負荷を
-    /// 実際に下げられるのはプロキシ差し替えだけ。
+    /// Lightweight mode (the downscaled proxy) while on battery. preferredPeakBitRate
+    /// has almost no effect on local files, so swapping to the proxy is the only
+    /// thing that actually lowers decode load.
     case reduceLoad
-    /// 全画面を静止フレームにする(手動の一時停止と同じ経路)。
+    /// Freeze every screen (same path as the user pause).
     case freeze
 }
 
@@ -22,8 +22,8 @@ extension WallpaperModel {
         isOnBatteryPower && batteryPlaybackPolicy == .freeze
     }
 
-    /// 実際に軽量再生するか。設定値(lightweightMode)そのものはUIの表示と永続化に使い、
-    /// 再生経路はすべてこちらを見る。
+    /// Whether playback is actually lightweight. `lightweightMode` is only the user
+    /// setting (UI and persistence); every playback path reads this instead.
     var effectiveLightweightMode: Bool {
         lightweightMode || batteryReduceLoadActive
     }
@@ -43,8 +43,8 @@ extension WallpaperModel {
             .flatMap(BatteryPlaybackPolicy.init(rawValue:)) ?? .normal
     }
 
-    /// 起動時に一度呼ぶ。電源の切り替えは IOKit の通知で即座に受け取る
-    /// (既存の画質自動調整の60秒ポーリングでは、抜いてから最大1分再生し続ける)。
+    /// Call once at launch. Uses IOKit notifications so unplugging takes effect
+    /// immediately; the existing 60 s quality poll would keep playing for up to a minute.
     func configurePowerSourceMonitoring() {
         isOnBatteryPower = Self.isRunningOnBatteryPower()
         guard powerSourceRunLoopSource == nil else {
@@ -80,8 +80,8 @@ extension WallpaperModel {
         }
     }
 
-    /// 方針・電源状態のどちらが変わっても、軽量再生の切り替えと静止の適用を
-    /// 同じ手順で行う。
+    /// Applies a policy or power-source change the same way: toggle lightweight
+    /// playback if needed, then re-evaluate freezing.
     private func applyPowerPlaybackChange(_ change: () -> Void) {
         let wasLightweight = effectiveLightweightMode
         change()
