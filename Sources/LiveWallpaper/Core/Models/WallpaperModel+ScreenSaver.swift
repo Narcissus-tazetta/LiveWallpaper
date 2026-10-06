@@ -11,6 +11,8 @@ extension WallpaperModel {
         do {
             try screenSaverInstaller.install()
             screenSaverErrorMessage = nil
+            // The write is gated on the install state, so refresh it first.
+            refreshScreenSaverInstallState()
             writeScreenSaverConfigIfInstalled(force: true)
         } catch {
             AppLog.appDelegate.error("screensaver install failed: \(error.localizedDescription, privacy: .public)")

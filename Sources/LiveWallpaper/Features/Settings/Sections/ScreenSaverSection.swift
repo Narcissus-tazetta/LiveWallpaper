@@ -49,7 +49,7 @@ extension SettingsView {
                 }
                 settingsFootnote(
                     model.localizedString(
-                        "システム設定の「スクリーンセーバー」で「LiveWallpaper」を選ぶと使えます。"
+                        "システム設定のスクリーンセーバーの一覧で「LiveWallpaper」を選ぶと使えます（新しい macOS では「壁紙」設定の中にあります）。"
                     )
                 )
                 if model.isWebWallpaperActive {
@@ -71,9 +71,25 @@ extension SettingsView {
         }
     }
 
+    /// Recent macOS (27 confirmed) has no Screen Saver settings pane; .saver bundles
+    /// are listed under Wallpaper there. Open whichever pane this system has.
     private func openScreenSaverSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.ScreenSaver-Settings.extension") {
+        let paneID = Self.systemHasSettingsPane("com.apple.ScreenSaver-Settings.extension")
+            ? "com.apple.ScreenSaver-Settings.extension"
+            : "com.apple.Wallpaper-Settings.extension"
+        if let url = URL(string: "x-apple.systempreferences:\(paneID)") {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    private static func systemHasSettingsPane(_ bundleID: String) -> Bool {
+        let directory = URL(fileURLWithPath: "/System/Library/ExtensionKit/Extensions", isDirectory: true)
+        let extensions = (try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil
+        )) ?? []
+        return extensions.contains { url in
+            let plist = url.appendingPathComponent("Contents/Info.plist")
+            return (NSDictionary(contentsOf: plist)?["CFBundleIdentifier"] as? String) == bundleID
         }
     }
 }

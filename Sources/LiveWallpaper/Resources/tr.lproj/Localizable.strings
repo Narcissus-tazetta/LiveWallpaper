@@ -578,5 +578,5 @@
 "インストール" = "Yükle";
 "今デスクトップに表示している動画の壁紙を、macOS のスクリーンセーバーとして再生します。画面ごとの壁紙・トリム・配置もそのまま反映されます。" = "Masaüstünüzdeki video duvar kâğıdını macOS ekran koruyucusu olarak oynatır; ekran başına duvar kâğıtları, kırpma ve yerleşim korunur.";
 "このビルドにはスクリーンセーバーが含まれていません。" = "Bu sürümde ekran koruyucu bulunmuyor.";
-"システム設定の「スクリーンセーバー」で「LiveWallpaper」を選ぶと使えます。" = "Kullanmak için Sistem Ayarları'ndaki Ekran Koruyucu bölümünden \"LiveWallpaper\"ı seçin.";
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Web duvar kâğıtları ekran koruyucu olarak oynatılamaz. Bir video duvar kâğıdı seçin.";
+"システム設定のスクリーンセーバーの一覧で「LiveWallpaper」を選ぶと使えます（新しい macOS では「壁紙」設定の中にあります）。" = "Sistem Ayarları'ndaki ekran koruyucu listesinden \"LiveWallpaper\"ı seçin (yeni macOS sürümlerinde Duvar Kâğıdı ayarlarının içindedir).";
