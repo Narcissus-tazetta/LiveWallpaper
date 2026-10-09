@@ -7,12 +7,6 @@ extension SettingsView {
 
     var wallpaperFitEditorPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label(model.localizedString("フィット編集"), systemImage: "crop")
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer(minLength: 0)
-            }
-
             if let path = fitEditor.resolvedVideoPath(),
                !path.isEmpty
             {

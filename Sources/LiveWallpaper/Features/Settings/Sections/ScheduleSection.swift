@@ -190,7 +190,7 @@ extension SettingsView {
                 Toggle("", isOn: ruleBinding.isEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .controlSize(.small)
+                    .controlSize(.mini)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(model.scheduleRuleDisplayName(rule.name))

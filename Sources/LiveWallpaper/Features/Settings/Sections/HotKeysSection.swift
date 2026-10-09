@@ -19,7 +19,7 @@ extension SettingsView {
     @ViewBuilder
     var hotKeysSettingsSection: some View {
         Section(
-            header: Label(model.localizedString("グローバルショートカット"), systemImage: "keyboard")
+            header: SettingsSectionHeader(title: model.localizedString("グローバルショートカット"))
         ) {
             Toggle(
                 model.localizedString("グローバルショートカットを有効にする"),

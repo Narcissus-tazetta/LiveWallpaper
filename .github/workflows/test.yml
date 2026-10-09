@@ -32,3 +32,22 @@ jobs:
 
             - name: Test
               run: swift test
+
+    store-worker:
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: store-worker
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: oven-sh/setup-bun@v2
+
+            - name: Install
+              run: bun install --frozen-lockfile
+
+            - name: Typecheck
+              run: bun run typecheck
+
+            - name: Test
+              run: bun run test

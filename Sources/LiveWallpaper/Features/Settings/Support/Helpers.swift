@@ -42,9 +42,11 @@ extension SettingsView {
     func compactToggle(_ title: String, isOn: Binding<Bool>) -> some View {
         HStack(spacing: 6) {
             Text(title)
+            // Outside a Form the switch defaults to the large size; match the Form rows.
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
+                .controlSize(.mini)
                 .fixedSize()
         }
         .fixedSize(horizontal: true, vertical: false)
@@ -102,21 +104,6 @@ extension SettingsView {
                 }
             }
         }
-    }
-
-    func syncVolumeInputWithModel() {
-        let percent = Int((model.audioVolume * 100).rounded())
-        volumeInput = String(percent)
-    }
-
-    func commitVolumeInput() {
-        guard !volumeInput.isEmpty else {
-            syncVolumeInputWithModel()
-            return
-        }
-        let percent = min(max(Int(volumeInput) ?? 0, 0), 100)
-        model.setAudioVolume(Float(percent) / 100)
-        volumeInput = String(percent)
     }
 
     func currentWallpaperSummaryText() -> String {
@@ -288,6 +275,8 @@ extension SettingsView {
             )
         }
         .buttonStyle(.plain)
+        // Otherwise the first help icon takes the initial focus ring when a sheet opens.
+        .focusable(false)
         .onHover { over in
             hoveredHelpTopic = over ? topic : nil
         }

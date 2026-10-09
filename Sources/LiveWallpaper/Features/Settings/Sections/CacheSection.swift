@@ -8,7 +8,7 @@ extension SettingsView {
   ]
 
   var cacheSettingsSection: some View {
-    Section(header: Label(model.localizedString("キャッシュ"), systemImage: "externaldrive")) {
+    Section(header: SettingsSectionHeader(title: model.localizedString("キャッシュ"))) {
       HStack(spacing: 10) {
         Button(model.localizedString("保存先を開く")) {
           NotificationCenter.default.post(name: .openCacheFolder, object: nil)

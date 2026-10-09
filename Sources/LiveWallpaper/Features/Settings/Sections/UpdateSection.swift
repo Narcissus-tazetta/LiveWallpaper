@@ -10,10 +10,7 @@ extension SettingsView {
 
   var updateSettingsSection: some View {
     Section(
-      header: Label(
-        model.localizedString("アップデート"),
-        systemImage: "arrow.triangle.2.circlepath"
-      )
+      header: SettingsSectionHeader(title: model.localizedString("アップデート"))
     ) {
       Toggle(model.localizedString("アップデートを自動で確認する（起動時にも通知）"), isOn: autoUpdateBinding)
 

@@ -71,10 +71,22 @@ async function requireAdmin(request: Request, env: Env): Promise<Response | null
 		return errorResponse("too many requests", 429);
 	}
 	const key = request.headers.get("x-admin-key");
-	if (!key || key !== env.ADMIN_KEY) {
+	if (!key || !(await adminKeyMatches(key, env.ADMIN_KEY))) {
 		return errorResponse("unauthorized", 401);
 	}
 	return null;
+}
+
+/// `!==` returns as soon as a character differs, which leaks how much of the key matched
+/// through response timing. Hashing first gives timingSafeEqual the equal-length inputs it
+/// requires without revealing the key's length.
+async function adminKeyMatches(provided: string, expected: string): Promise<boolean> {
+	const encoder = new TextEncoder();
+	const [a, b] = await Promise.all([
+		crypto.subtle.digest("SHA-256", encoder.encode(provided)),
+		crypto.subtle.digest("SHA-256", encoder.encode(expected)),
+	]);
+	return crypto.subtle.timingSafeEqual(a, b);
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

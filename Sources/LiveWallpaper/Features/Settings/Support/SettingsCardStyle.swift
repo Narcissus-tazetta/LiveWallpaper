@@ -14,3 +14,60 @@ extension View {
         )
     }
 }
+
+extension View {
+    /// Controls that float over content (the playback bar, toolbar buttons) get Liquid Glass
+    /// where the OS has it; earlier systems fall back to a material with a hairline edge.
+    @ViewBuilder
+    func floatingGlass<S: InsettableShape>(in shape: S) -> some View {
+        if #available(macOS 26, *) {
+            glassEffect(.regular, in: shape)
+        } else {
+            background(.regularMaterial, in: shape)
+                .overlay(shape.strokeBorder(Color.primary.opacity(0.1), lineWidth: 1))
+                .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+        }
+    }
+}
+
+/// Section heading inside a settings pane. A heading that just repeats the pane's own title
+/// (the "Display" section in the Display pane) is left out, as System Settings does.
+struct SettingsSectionHeader: View {
+    let title: String
+    @Environment(\.settingsPaneTitle) private var paneTitle
+
+    var body: some View {
+        if title != paneTitle {
+            Text(title)
+        }
+    }
+}
+
+/// White symbol on a tinted rounded square, as in the System Settings sidebar.
+struct SettingsIconTile: View {
+    let systemImage: String
+    let tint: Color
+    var size: CGFloat = 20
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: size * 0.5, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(
+                tint.gradient,
+                in: RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
+            )
+    }
+}
+
+private struct SettingsPaneTitleKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    var settingsPaneTitle: String? {
+        get { self[SettingsPaneTitleKey.self] }
+        set { self[SettingsPaneTitleKey.self] = newValue }
+    }
+}

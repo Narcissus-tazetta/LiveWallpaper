@@ -31,6 +31,65 @@ extension SettingsView {
         case settings
     }
 
+    /// Groups the settings tab's sections so it shows a handful at a time instead of one
+    /// long form. Searching ignores the category and looks through every section.
+    enum SettingsCategory: CaseIterable, Hashable {
+        case general
+        case display
+        case integrations
+        case other
+
+        var sections: [SettingsSection] {
+            switch self {
+            case .general: return [.video, .language, .update]
+            case .display: return [.display]
+            case .integrations: return [.share, .webWallpaper, .hotKeys, .screenSaver]
+            case .other: return [.cache, .reset]
+            }
+        }
+
+        var titleKey: String {
+            switch self {
+            case .general: return "一般"
+            case .display: return "表示"
+            case .integrations: return "連携"
+            case .other: return "その他"
+            }
+        }
+
+        var subtitleKey: String {
+            switch self {
+            case .general: return "起動・動画と音声・言語・アップデート"
+            case .display: return "壁紙の表示方法・切り替え・省電力"
+            case .integrations: return "共有・Web壁紙・ショートカット・スクリーンセーバー"
+            case .other: return "キャッシュと設定の管理"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .general: return "gearshape.fill"
+            case .display: return "display"
+            case .integrations: return "link"
+            case .other: return "ellipsis"
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .general: return .gray
+            case .display: return .blue
+            case .integrations: return .green
+            case .other: return .gray
+            }
+        }
+    }
+
+    enum WallpaperTransitionChoice: Hashable {
+        case off
+        case style(WallpaperTransitionStyle)
+    }
+
     /// 「編集」タブ内のサブモード。フィット(表示位置)とトリム(カット/ループ)は
     /// 別々のコントローラ(FitEditorController/WallpaperEditorController)が持つが、
     /// タブとしては1つにまとめて切り替えられるようにする。

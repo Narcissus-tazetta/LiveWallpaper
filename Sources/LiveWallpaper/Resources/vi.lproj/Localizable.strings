@@ -17,7 +17,6 @@
 "ログイン時に自動起動する" = "Tự khởi động khi đăng nhập";
 "音声を再生する" = "Phát âm thanh";
 "音量" = "Âm lượng";
-"%" = "%";
 "壁紙の表示先" = "Vị trí hiển thị hình nền";
 "メインのみ" = "Chỉ màn hình chính";
 "全ディスプレイ" = "Tất cả màn hình";
@@ -229,8 +228,6 @@
 "軽量" = "Nhẹ";
 "高負荷" = "Nặng";
 "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Chọn cách giải mã video. Tự động theo môi trường, Cân bằng ưu tiên mượt, Tiết kiệm pin giảm CPU và điện năng.";
-"1. 「メディアを追加」を押して動画やGIFを選ぶ\n2. 選んだメディアがそのまま壁紙として再生されます" = "1. Nhấn \"Thêm phương tiện\" để chọn video hoặc GIF.\n2. Phương tiện đã chọn sẽ phát ngay làm hình nền.";
-"動画やGIFなどのファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "Bạn cũng có thể thêm video hoặc GIF bằng cách kéo và thả vào cửa sổ này.";
 "壁紙を保存するフォルダを選択してください" = "Chọn thư mục để lưu hình nền.";
 "設定を初期化" = "Đặt lại cài đặt";
 "表示・再生に関する設定を初期値へ戻します" = "Khôi phục cài đặt hiển thị và phát lại về mặc định.";
@@ -472,7 +469,6 @@
 "取り下げに失敗しました。もう一度お試しください" = "Rút lại không thành công. Vui lòng thử lại";
 
 // 検索バーUX改善(共通コンポーネント化)
-"タイトルや名前で壁紙を検索" = "Tìm hình nền theo tiêu đề hoặc tên";
 "検索をクリア" = "Xóa tìm kiếm";
 "検索条件に一致する壁紙がありません" = "Không có hình nền nào khớp với tìm kiếm của bạn";
 "アプリ名で検索" = "Tìm theo tên ứng dụng";
@@ -566,7 +562,6 @@
 "切り替えエフェクト" = "Hiệu ứng chuyển";
 "フェード" = "Mờ dần";
 "壁紙が切り替わるときに前の壁紙からなめらかに移り変わります。デスクトップ（Space）の切り替えと、視差効果を減らす設定がオンのときはフェードしません。" = "Khi đổi hình nền, hình mới sẽ chuyển mượt từ hình trước. Không có hiệu ứng khi chuyển màn hình nền (Spaces) hoặc khi bật Giảm chuyển động.";
-"エフェクトの種類" = "Kiểu hiệu ứng";
 "クロスフェード" = "Chuyển mờ chéo";
 "黒を挟む" = "Mờ qua màu đen";
 "スクリーンセーバー" = "Trình bảo vệ màn hình";
@@ -581,3 +576,24 @@
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Hình nền web không thể phát làm trình bảo vệ màn hình. Hãy chọn hình nền video.";
 "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "Khi LiveWallpaper đang chạy, ứng dụng sẽ tự động được chọn làm trình bảo vệ màn hình. Khi thoát ứng dụng hoặc gỡ cài đặt, trình bảo vệ màn hình trước đó sẽ được khôi phục.";
 "macOS の壁紙設定にスクリーンセーバーの項目が見つかりませんでした。システム設定でスクリーンセーバーを一度選んでから、もう一度お試しください。" = "Không tìm thấy mục trình bảo vệ màn hình trong cài đặt hình nền của macOS. Hãy chọn trình bảo vệ màn hình một lần trong Cài đặt hệ thống rồi thử lại.";
+"一般" = "Chung";
+"連携" = "Tích hợp";
+"その他" = "Khác";
+"ドロップして壁紙に追加" = "Thả để thêm làm hình nền";
+"動画・GIF・画像をまとめて追加できます" = "Có thể thêm nhiều video, GIF và hình ảnh cùng lúc";
+"好きな動画を壁紙にしましょう" = "Biến video yêu thích thành hình nền";
+"動画・GIF・画像をここへドラッグするか、下のボタンから選んでください。追加した壁紙はすぐにデスクトップで再生されます。" = "Kéo video, GIF hoặc hình ảnh vào đây, hoặc chọn bằng các nút bên dưới. Hình nền mới sẽ phát ngay trên màn hình nền.";
+"メディアを選ぶ" = "Chọn tệp";
+"Storeで探す" = "Tìm trong Store";
+"Web壁紙を追加" = "Thêm hình nền Web";
+"その他の操作" = "Thao tác khác";
+"一時停止中" = "Đã tạm dừng";
+"起動・動画と音声・言語・アップデート" = "Khởi động, video và âm thanh, ngôn ngữ, cập nhật";
+"壁紙の表示方法・切り替え・省電力" = "Cách hiển thị hình nền, chuyển đổi, tiết kiệm điện";
+"共有・Web壁紙・ショートカット・スクリーンセーバー" = "Chia sẻ, hình nền Web, phím tắt, trình bảo vệ màn hình";
+"キャッシュと設定の管理" = "Bộ nhớ đệm và quản lý cài đặt";
+"エフェクトの長さ" = "Thời lượng hiệu ứng";
+"詳細…" = "Chi tiết…";
+"完了" = "Xong";
+"Store には誰でも壁紙を投稿できます。アカウント登録は不要で、審査のあと「みんなの投稿」に公開されます。" = "Ai cũng có thể đăng hình nền lên Store. Không cần tài khoản — sau khi được duyệt, bài sẽ hiển thị trong mục Duyệt.";
+"並び替え" = "Sắp xếp";

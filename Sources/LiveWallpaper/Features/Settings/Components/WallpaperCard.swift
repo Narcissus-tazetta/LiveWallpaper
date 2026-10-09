@@ -18,6 +18,7 @@ extension SettingsView {
         let isDesktopAssigned = model.currentVideoPath == path && !model.isWebWallpaperActive
         let isLockScreenAssigned = model.lockScreenVideoPath == path
         let isDisplayOverrideAssigned = model.hasLiveDisplayOverride(forPath: path)
+        let isHovered = hoveredWallpaperPath == path
         let strokeColor = wallpaperCardStrokeColor(
             path: path,
             assignmentTarget: assignmentTarget,
@@ -53,6 +54,11 @@ extension SettingsView {
                         .foregroundColor(.secondary)
                 }
 
+                if hoverPreviewPath == path {
+                    LoopingVideoView(path: path)
+                        .transition(.opacity)
+                }
+
                 VStack {
                     HStack(alignment: .top, spacing: 4) {
                         wallpaperAssignmentBadges(
@@ -71,6 +77,8 @@ extension SettingsView {
                             .padding(.horizontal, 5)
                             .padding(.vertical, 3)
                             .background(.ultraThinMaterial, in: Capsule())
+                            // Steps aside for the hover "⋯" button, which takes the same corner.
+                            .padding(.trailing, isHovered ? 28 : 0)
                         }
                     }
                     .padding(.top, 6)
@@ -89,6 +97,33 @@ extension SettingsView {
             }
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .topTrailing) {
+            if isHovered {
+                // A borderless Menu drops any background drawn in its label, so the circle
+                // sits behind the menu instead.
+                Menu {
+                    wallpaperCardMenuItems(path: path)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .tint(.white)
+                .frame(width: 24, height: 24)
+                .background(.black.opacity(0.4), in: Circle())
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
+                        .allowsHitTesting(false)
+                )
+                .padding(6)
+                .help(model.localizedString("その他の操作"))
+                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+            }
+        }
 
         return VStack(alignment: .leading, spacing: 8) {
             thumbnailButton
@@ -106,7 +141,7 @@ extension SettingsView {
             } else {
                 HStack(spacing: 4) {
                     Text(model.registeredVideoDisplayName(for: path))
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -129,55 +164,88 @@ extension SettingsView {
         .padding(4)
         .frame(width: cardWidth, alignment: .leading)
         .clipped()
-        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.secondary.opacity(0.08))
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.secondary.opacity(isHovered ? 0.16 : 0.08))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(strokeColor, lineWidth: strokeColor == .clear ? 0 : 1.5)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(strokeColor, lineWidth: strokeColor == .clear ? 0 : 2)
         )
+        .shadow(
+            color: strokeColor == .clear ? .black.opacity(isHovered ? 0.3 : 0) : strokeColor.opacity(0.4),
+            radius: isHovered ? 10 : 6,
+            y: isHovered ? 5 : 0
+        )
+        .scaleEffect(isHovered && !reduceMotion ? 1.03 : 1)
+        .zIndex(isHovered ? 1 : 0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isHovered)
+        .animation(.easeOut(duration: 0.25), value: hoverPreviewPath == path)
+        .onHover { hovering in
+            handleWallpaperCardHover(path: path, hovering: hovering)
+        }
         .contextMenu {
-            Button(model.localizedString("デスクトップに設定")) {
-                model.selectRegisteredVideo(path: path)
+            wallpaperCardMenuItems(path: path)
+        }
+    }
+
+    /// Plays the hovered card only after the pointer rests on it, so sweeping across the grid
+    /// doesn't open a player per card. One card plays at a time.
+    func handleWallpaperCardHover(path: String, hovering: Bool) {
+        if hovering {
+            hoveredWallpaperPath = path
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                if hoveredWallpaperPath == path {
+                    hoverPreviewPath = path
+                }
             }
-            Button(model.localizedString("ロック画面に設定")) {
-                model.selectLockScreenVideo(path: path)
-            }
-            .disabled(!model.lockScreenSyncService.isSupported)
-            // 新規割り当てには2台以上が必要だが、接続解除後も残った古い割り当て
-            // (このパス宛て)を解除する手段は画面数によらず必ず出す。
-            if model.availableDisplayScreens().count > 1
-                || model.videoOverrideByScreenID.values.contains(path)
-            {
-                displayOverrideMenu(path: path)
-            }
-            if model.spaceWallpaperFeatureEnabled, model.isSpaceWallpaperAvailable,
-               !model.knownDesktopSpaces.isEmpty
-            {
-                spaceOverrideMenu(path: path)
-            }
-            playlistMembershipMenus(
-                isContained: { model.playlistContainsVideo($0.id, path: path) },
-                add: { playlistID in _ = model.addRegisteredVideo(path: path, to: playlistID) },
-                remove: { playlistID in _ = model.removeVideo(path: path, fromPlaylist: playlistID) },
-                addToNewPlaylist: { addToNewPlaylist(path: path) }
-            )
-            Divider()
-            Button(model.localizedString("共有…")) {
-                beginShareWallpaperSelection(path: path)
-            }
-            Button(model.localizedString("Storeに共有…")) {
-                beginStoreShare(path: path)
-            }
-            Divider()
-            Button(model.localizedString("名前を編集")) {
-                startWallpaperNameEdit(path: path)
-            }
-            Button(model.localizedString("登録から削除")) {
-                model.removeRegisteredVideo(path: path)
-            }
+        } else if hoveredWallpaperPath == path {
+            hoveredWallpaperPath = nil
+            hoverPreviewPath = nil
+        }
+    }
+
+    @ViewBuilder
+    func wallpaperCardMenuItems(path: String) -> some View {
+        Button(model.localizedString("デスクトップに設定")) {
+            model.selectRegisteredVideo(path: path)
+        }
+        Button(model.localizedString("ロック画面に設定")) {
+            model.selectLockScreenVideo(path: path)
+        }
+        .disabled(!model.lockScreenSyncService.isSupported)
+        // 新規割り当てには2台以上が必要だが、接続解除後も残った古い割り当て
+        // (このパス宛て)を解除する手段は画面数によらず必ず出す。
+        if model.availableDisplayScreens().count > 1
+            || model.videoOverrideByScreenID.values.contains(path)
+        {
+            displayOverrideMenu(path: path)
+        }
+        if model.spaceWallpaperFeatureEnabled, model.isSpaceWallpaperAvailable,
+           !model.knownDesktopSpaces.isEmpty
+        {
+            spaceOverrideMenu(path: path)
+        }
+        playlistMembershipMenus(
+            isContained: { model.playlistContainsVideo($0.id, path: path) },
+            add: { playlistID in _ = model.addRegisteredVideo(path: path, to: playlistID) },
+            remove: { playlistID in _ = model.removeVideo(path: path, fromPlaylist: playlistID) },
+            addToNewPlaylist: { addToNewPlaylist(path: path) }
+        )
+        Divider()
+        Button(model.localizedString("共有…")) {
+            beginShareWallpaperSelection(path: path)
+        }
+        Button(model.localizedString("Storeに共有…")) {
+            beginStoreShare(path: path)
+        }
+        Divider()
+        Button(model.localizedString("名前を編集")) {
+            startWallpaperNameEdit(path: path)
+        }
+        Button(model.localizedString("登録から削除")) {
+            model.removeRegisteredVideo(path: path)
         }
     }
 

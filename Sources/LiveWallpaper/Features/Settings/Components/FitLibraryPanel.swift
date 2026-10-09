@@ -14,8 +14,8 @@ extension SettingsView {
     var wallpaperFitLibraryPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label(model.localizedString("壁紙一覧"), systemImage: "square.grid.2x2")
-                    .font(.system(size: 13, weight: .semibold))
+                Text(model.localizedString("壁紙一覧"))
+                    .font(.headline)
                 Spacer(minLength: 0)
                 Text("\(model.allRegisteredVideoPaths.count) \(model.localizedString("本"))")
                     .font(.caption)

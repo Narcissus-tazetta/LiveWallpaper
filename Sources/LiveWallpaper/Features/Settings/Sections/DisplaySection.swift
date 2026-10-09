@@ -31,7 +31,7 @@ extension SettingsView {
     "動作プロファイル",
     "再生負荷",
     "切り替えエフェクト",
-    "エフェクトの種類",
+    "エフェクトの長さ",
     "クロスフェード",
     "黒を挟む",
     "フェード",
@@ -47,60 +47,56 @@ extension SettingsView {
 
   @ViewBuilder
   var displaySettingsSection: some View {
-    Section(header: Label(model.localizedString("表示"), systemImage: "display.2")) {
-      settingsInsetCard {
-        VStack(alignment: .leading, spacing: 16) {
-          displayChoicePicker(
-            title: model.localizedString("壁紙の表示先"),
-            options: [
-              (model.localizedString("メインのみ"), DisplayMode.mainOnly),
-              (model.localizedString("全ディスプレイ"), DisplayMode.allScreens)
-            ],
-            selection: displayModeBinding
-          )
+    Section(header: SettingsSectionHeader(title: model.localizedString("表示"))) {
+      settingsMenuRow(
+        title: model.localizedString("壁紙の表示先"),
+        options: [
+          (model.localizedString("メインのみ"), DisplayMode.mainOnly),
+          (model.localizedString("全ディスプレイ"), DisplayMode.allScreens)
+        ],
+        selection: displayModeBinding
+      )
 
-          displayChoicePicker(
-            title: model.localizedString("動画のフィット"),
-            options: [
-              (model.localizedString("拡大"), VideoFitMode.fill),
-              (model.localizedString("全体"), VideoFitMode.fit)
-            ],
-            selection: globalFitModeBinding,
-            helpTopic: .globalFitMode,
-            helpText: model.localizedString(
-              "この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です"
-            )
-          )
+      settingsMenuRow(
+        title: model.localizedString("動画のフィット"),
+        options: [
+          (model.localizedString("拡大"), VideoFitMode.fill),
+          (model.localizedString("全体"), VideoFitMode.fit)
+        ],
+        selection: globalFitModeBinding,
+        helpTopic: .globalFitMode,
+        helpText: model.localizedString(
+          "この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です"
+        )
+      )
 
-          displayChoicePicker(
-            title: model.localizedString("切り替えエフェクト"),
-            options: [
-              (model.localizedString("オフ"), 0.0),
-              (model.localizedString("0.5秒"), 0.5),
-              (model.localizedString("1秒"), 1.0),
-              (model.localizedString("2秒"), 2.0)
-            ],
-            selection: wallpaperTransitionDurationBinding,
-            helpTopic: .wallpaperTransition,
-            helpText: model.localizedString(
-              "壁紙が切り替わるときに前の壁紙からなめらかに移り変わります。デスクトップ（Space）の切り替えと、視差効果を減らす設定がオンのときはフェードしません。"
-            )
-          )
+      settingsMenuRow(
+        title: model.localizedString("切り替えエフェクト"),
+        options: [
+          (model.localizedString("オフ"), WallpaperTransitionChoice.off),
+          (model.localizedString("クロスフェード"), WallpaperTransitionChoice.style(.crossfade)),
+          (model.localizedString("黒を挟む"), WallpaperTransitionChoice.style(.dipToBlack))
+        ],
+        selection: wallpaperTransitionChoiceBinding,
+        helpTopic: .wallpaperTransition,
+        helpText: model.localizedString(
+          "壁紙が切り替わるときに前の壁紙からなめらかに移り変わります。デスクトップ（Space）の切り替えと、視差効果を減らす設定がオンのときはフェードしません。"
+        )
+      )
 
-          if model.wallpaperTransitionDuration > 0 {
-            displayChoicePicker(
-              title: model.localizedString("エフェクトの種類"),
-              options: [
-                (model.localizedString("クロスフェード"), WallpaperTransitionStyle.crossfade),
-                (model.localizedString("黒を挟む"), WallpaperTransitionStyle.dipToBlack)
-              ],
-              selection: wallpaperTransitionStyleBinding
-            )
-          }
-
-          desktopReadabilityDimSection
-        }
+      if model.wallpaperTransitionDuration > 0 {
+        settingsMenuRow(
+          title: model.localizedString("エフェクトの長さ"),
+          options: [
+            (model.localizedString("0.5秒"), 0.5),
+            (model.localizedString("1秒"), 1.0),
+            (model.localizedString("2秒"), 2.0)
+          ],
+          selection: wallpaperTransitionDurationBinding
+        )
       }
+
+      desktopReadabilityDimSection
 
       toggleWithHelp(
         model.localizedString("デスクトップのアイコンを表示"),
@@ -120,7 +116,7 @@ extension SettingsView {
     }
 
     Section(
-      header: Label(model.localizedString("デスクトップ切り替え"), systemImage: "square.stack.3d.up")
+      header: SettingsSectionHeader(title: model.localizedString("デスクトップ切り替え"))
     ) {
       settingsCalloutNote(
         systemImage: "info.circle",
@@ -162,7 +158,7 @@ extension SettingsView {
     }
 
     Section(
-      header: Label(model.localizedString("パフォーマンス・省電力"), systemImage: "bolt.fill")
+      header: SettingsSectionHeader(title: model.localizedString("パフォーマンス・省電力"))
     ) {
       Toggle(model.localizedString("再生の軽量モード（省電力）"), isOn: lightweightModeBinding)
       batteryPlaybackPolicyRow
@@ -198,7 +194,7 @@ extension SettingsView {
       advancedSettingsSection
     }
 
-    Section(header: Label(model.localizedString("メニューバー"), systemImage: "menubar.rectangle")) {
+    Section(header: SettingsSectionHeader(title: model.localizedString("メニューバー"))) {
       toggleWithHelp(
         model.localizedString("メニューバーを不透明にする"),
         isOn: menuBarOpaqueBinding,
@@ -218,18 +214,21 @@ extension SettingsView {
   }
 
   var desktopReadabilityDimSection: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 4) {
-        Text(model.localizedString("デスクトップの見やすさ"))
-        helpIconButton(for: .desktopReadabilityDim)
-      }
-
-      HStack(spacing: 10) {
-        Slider(value: desktopReadabilityDimOpacityBinding, in: 0...1)
-          .frame(minWidth: 180, maxWidth: .infinity)
-        Text("\(Int((model.desktopReadabilityDimOpacity * 100).rounded()))%")
-          .foregroundColor(.secondary)
-          .frame(width: 44, alignment: .trailing)
+    VStack(alignment: .leading, spacing: 4) {
+      LabeledContent {
+        HStack(spacing: 8) {
+          Slider(value: desktopReadabilityDimOpacityBinding, in: 0...1)
+            .frame(maxWidth: 220)
+          Text("\(Int((model.desktopReadabilityDimOpacity * 100).rounded()))%")
+            .monospacedDigit()
+            .foregroundColor(.secondary)
+            .frame(width: 40, alignment: .trailing)
+        }
+      } label: {
+        HStack(spacing: 4) {
+          Text(model.localizedString("デスクトップの見やすさ"))
+          helpIconButton(for: .desktopReadabilityDim)
+        }
       }
 
       helpFootnote(
@@ -239,7 +238,6 @@ extension SettingsView {
         )
       )
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   func spaceSwitchingLimitationText() -> String {
@@ -553,60 +551,103 @@ extension SettingsView {
     )
   }
 
-  func displayChoicePicker<T: Hashable>(
+  /// A label on the left and a pop-up menu on the right, the row System Settings uses for
+  /// choosing one of a few options.
+  func settingsMenuRow<T: Hashable>(
     title: String,
     options: [(String, T)],
     selection: Binding<T>,
-    titleFont: Font = .body,
-    titleColor: Color = .primary,
     helpTopic: HelpTopic? = nil,
     helpText: String? = nil
   ) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack(spacing: 4) {
-        Text(title)
-          .font(titleFont)
-          .foregroundColor(titleColor)
-        if let helpTopic {
-          helpIconButton(for: helpTopic)
+    VStack(alignment: .leading, spacing: 4) {
+      Picker(selection: selection) {
+        ForEach(options.indices, id: \.self) { index in
+          Text(options[index].0).tag(options[index].1)
+        }
+      } label: {
+        HStack(spacing: 4) {
+          Text(title)
+          if let helpTopic {
+            helpIconButton(for: helpTopic)
+          }
         }
       }
-
-      EqualSegmentedControl(
-        options: options,
-        selection: selection,
-        distribution: .fillProportionally
-      )
-      .frame(height: 24)
-      .fixedSize(horizontal: true, vertical: false)
+      .pickerStyle(.menu)
 
       if let helpTopic, let helpText {
         helpFootnote(for: helpTopic, text: helpText)
       }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
-  var advancedSettingsSection: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Button(action: { isAdvancedExpanded.toggle() }) {
-        HStack(spacing: 8) {
-          Image(systemName: isAdvancedExpanded ? "chevron.down" : "chevron.right")
-            .font(.caption.weight(.semibold))
-          Text(model.localizedString("詳細設定"))
-          Text(advancedSettingsSummaryText())
-            .font(.caption)
-            .foregroundColor(.secondary)
-          Spacer()
-        }
-        .contentShape(Rectangle())
-      }
-      .buttonStyle(.plain)
-      .padding(.leading, 10)
+  static let advancedSettingsSearchKeywords: [String] = [
+    "詳細設定",
+    "画質",
+    "動作プロファイル",
+    "再生負荷",
+    "デコード",
+    "デスクトップレベル",
+    "環境に応じて再生負荷を自動調整",
+    "バッテリー残量に応じて画質を自動調整",
+    "fullScreenAuxiliary を有効化",
+  ]
 
-      if isAdvancedExpanded {
-        advancedSettingsContent
+  /// A search hit inside the sheet would otherwise show only the "Details…" button.
+  private var advancedSettingsMatchSearch: Bool {
+    let query = settingsSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else {
+      return false
+    }
+    return Self.advancedSettingsSearchKeywords.contains { keyword in
+      keyword.localizedCaseInsensitiveContains(query)
+        || model.localizedString(keyword).localizedCaseInsensitiveContains(query)
+    }
+  }
+
+  /// Advanced options open in a sheet, as System Settings does with its "Details…" buttons,
+  /// so the main list stays short.
+  @ViewBuilder
+  var advancedSettingsSection: some View {
+    if advancedSettingsMatchSearch {
+      advancedSettingsContent
+    } else {
+      advancedSettingsButtonRow
+    }
+  }
+
+  private var advancedSettingsButtonRow: some View {
+    LabeledContent {
+      Button(model.localizedString("詳細…")) {
+        isAdvancedSettingsPresented = true
       }
+    } label: {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(model.localizedString("詳細設定"))
+        Text(advancedSettingsSummaryText())
+          .font(.caption)
+          .foregroundColor(.secondary)
+      }
+    }
+    .sheet(isPresented: $isAdvancedSettingsPresented) {
+      VStack(spacing: 0) {
+        Form {
+          Section(header: Text(model.localizedString("詳細設定"))) {
+            advancedSettingsContent
+          }
+        }
+        .formStyle(.grouped)
+
+        HStack {
+          Spacer()
+          Button(model.localizedString("完了")) {
+            isAdvancedSettingsPresented = false
+          }
+          .keyboardShortcut(.defaultAction)
+        }
+        .padding(16)
+      }
+      .frame(width: 540, height: 460)
     }
   }
 
@@ -645,104 +686,78 @@ extension SettingsView {
   }
 
   var advancedSettingsContent: some View {
-    settingsInsetCard {
-      VStack(alignment: .leading, spacing: 14) {
-        advancedSettingRow(
+    Group {
+        settingsMenuRow(
           title: model.localizedString("画質"),
-          helpTopic: .qualityPreset,
-          helpText: model.localizedString(
-            "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。"
-          )
-        ) {
-          EqualSegmentedControl(
-            options: [
+          options: [
               (model.localizedString("自動"), QualityPreset.auto),
               (model.localizedString("省電力"), QualityPreset.efficiency),
               (model.localizedString("高画質"), QualityPreset.quality)
             ],
-            selection: qualityPresetBinding
-          )
-        }
-
-        Divider().opacity(0.3)
-
-        advancedSettingRow(
-          title: model.localizedString("動作プロファイル"),
-          helpTopic: .workProfile,
+          selection: qualityPresetBinding,
+          helpTopic: .qualityPreset,
           helpText: model.localizedString(
-            "全体の再生負荷を切り替えます。通常は品質優先、低負荷は安定と省電力を重視、最小は負荷を最小限にして作業優先にします。"
+            "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。"
           )
-        ) {
-          EqualSegmentedControl(
-            options: [
+        )
+
+        settingsMenuRow(
+          title: model.localizedString("動作プロファイル"),
+          options: [
               (model.localizedString("通常"), WorkProfile.normal),
               (model.localizedString("低負荷"), WorkProfile.lowPower),
               (model.localizedString("最小"), WorkProfile.ultraLight)
             ],
-            selection: workProfileBinding
-          )
-        }
-
-        Divider().opacity(0.3)
-
-        advancedSettingRow(
-          title: model.localizedString("再生負荷"),
-          helpTopic: .frameRate,
+          selection: workProfileBinding,
+          helpTopic: .workProfile,
           helpText: model.localizedString(
-            "再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。"
+            "全体の再生負荷を切り替えます。通常は品質優先、低負荷は安定と省電力を重視、最小は負荷を最小限にして作業優先にします。"
           )
-        ) {
-          EqualSegmentedControl(
-            options: [
+        )
+
+        settingsMenuRow(
+          title: model.localizedString("再生負荷"),
+          options: [
               (model.localizedString("制限なし"), FrameRateLimit.off),
               (model.localizedString("軽量"), FrameRateLimit.fps30),
               (model.localizedString("高負荷"), FrameRateLimit.fps60)
             ],
-            selection: frameRateLimitBinding
-          )
-        }
-
-        Divider().opacity(0.3)
-
-        advancedSettingRow(
-          title: model.localizedString("デコード"),
-          helpTopic: .decode,
+          selection: frameRateLimitBinding,
+          helpTopic: .frameRate,
           helpText: model.localizedString(
-            "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。"
+            "再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。"
           )
-        ) {
-          EqualSegmentedControl(
-            options: [
+        )
+
+        settingsMenuRow(
+          title: model.localizedString("デコード"),
+          options: [
               (model.localizedString("自動"), DecodeMode.automatic),
               (model.localizedString("標準"), DecodeMode.balanced),
               (model.localizedString("省電"), DecodeMode.efficiency)
             ],
-            selection: decodeModeBinding
-          )
-        }
-
-        Divider().opacity(0.3)
-
-        advancedSettingRow(
-          title: model.localizedString("デスクトップレベル"),
-          helpTopic: .desktopLevel,
+          selection: decodeModeBinding,
+          helpTopic: .decode,
           helpText: model.localizedString(
-            "壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。"
+            "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。"
           )
-        ) {
-          EqualSegmentedControl(
-            options: [
+        )
+
+        settingsMenuRow(
+          title: model.localizedString("デスクトップレベル"),
+          options: [
               ("-1", DesktopLevelOffset.minusOne),
               ("0", DesktopLevelOffset.zero),
               ("+1", DesktopLevelOffset.plusOne)
             ],
-            selection: desktopLevelOffsetBinding
+          selection: desktopLevelOffsetBinding,
+          helpTopic: .desktopLevel,
+          helpText: model.localizedString(
+            "壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。"
           )
-        }
+        )
 
-        Divider().opacity(0.3)
-
-        VStack(alignment: .leading, spacing: 10) {
+        Group {
           Toggle(isOn: autoFrameRateBinding) {
             Text(model.localizedString("環境に応じて再生負荷を自動調整"))
           }
@@ -761,31 +776,21 @@ extension SettingsView {
             helpText: model.localizedString("フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。")
           )
         }
-      }
     }
-    .padding(.top, 6)
-    .padding(.leading, 10)
   }
 
   var batteryPlaybackPolicyRow: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 8) {
-        Text(model.localizedString("バッテリー駆動中"))
-        helpIconButton(for: .batteryPlaybackPolicy)
-        Spacer(minLength: 12)
-        EqualSegmentedControl(
-          options: [
-            (model.localizedString("通常どおり"), BatteryPlaybackPolicy.normal),
-            (model.localizedString("負荷を下げる"), BatteryPlaybackPolicy.reduceLoad),
-            (model.localizedString("静止画にする"), BatteryPlaybackPolicy.freeze)
-          ],
-          selection: batteryPlaybackPolicyBinding
-        )
-        .frame(height: 24)
-      }
-      helpFootnote(
-        for: .batteryPlaybackPolicy,
-        text: model.localizedString(
+    VStack(alignment: .leading, spacing: 4) {
+      settingsMenuRow(
+        title: model.localizedString("バッテリー駆動中"),
+        options: [
+          (model.localizedString("通常どおり"), BatteryPlaybackPolicy.normal),
+          (model.localizedString("負荷を下げる"), BatteryPlaybackPolicy.reduceLoad),
+          (model.localizedString("静止画にする"), BatteryPlaybackPolicy.freeze)
+        ],
+        selection: batteryPlaybackPolicyBinding,
+        helpTopic: .batteryPlaybackPolicy,
+        helpText: model.localizedString(
           "電源アダプタを外している間の動作を選びます。負荷を下げるは軽量モードと同じ縮小版の動画で再生し、静止画にするは壁紙を止めます。電源につなぐとすぐに元へ戻ります。"
         )
       )
@@ -794,31 +799,6 @@ extension SettingsView {
       } else if model.batteryReduceLoadActive, !model.lightweightMode {
         settingsFootnote(model.localizedString("バッテリー駆動中のため、軽量モードで再生しています。"))
       }
-    }
-  }
-
-  func advancedSettingRow<Content: View>(
-    title: String,
-    helpTopic: HelpTopic,
-    helpText: String,
-    @ViewBuilder content: () -> Content
-  ) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 16) {
-        HStack(spacing: 4) {
-          Text(title)
-            .lineLimit(1)
-          helpIconButton(for: helpTopic)
-        }
-        .frame(width: 140, alignment: .leading)
-
-        content()
-          .frame(height: 24)
-
-        Spacer(minLength: 0)
-      }
-
-      helpFootnote(for: helpTopic, text: helpText)
     }
   }
 

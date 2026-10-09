@@ -50,6 +50,12 @@ extension AppDelegate {
                 return event
             }
             if event.modifierFlags.contains(.command) {
+                if let action = Self.textEditingAction(for: event, characters: characters),
+                   NSApp.keyWindow?.firstResponder is NSTextView,
+                   NSApp.sendAction(action, to: nil, from: nil)
+                {
+                    return nil
+                }
                 if characters == "w" {
                     if let win = self?.settingsWindowController?.window, win.isKeyWindow {
                         win.close()
@@ -112,6 +118,21 @@ extension AppDelegate {
                     .environment(\.locale, wallpaperModel.appLocale)
             }
             .store(in: &cancellables)
+    }
+
+    /// An accessory app has no main menu, so the Edit menu's key equivalents that
+    /// normally route Cmd+A/C/V/X/Z to the field editor never fire.
+    private static func textEditingAction(for event: NSEvent, characters: String) -> Selector? {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        switch (flags, characters) {
+        case ([.command], "a"): return #selector(NSText.selectAll(_:))
+        case ([.command], "c"): return #selector(NSText.copy(_:))
+        case ([.command], "v"): return #selector(NSText.paste(_:))
+        case ([.command], "x"): return #selector(NSText.cut(_:))
+        case ([.command], "z"): return Selector(("undo:"))
+        case ([.command, .shift], "z"): return Selector(("redo:"))
+        default: return nil
+        }
     }
 
     @objc func showOpenPanel() {

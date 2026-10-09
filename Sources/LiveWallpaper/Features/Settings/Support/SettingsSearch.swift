@@ -71,6 +71,76 @@ extension SettingsView {
         settingsSectionMatch(section).matches
     }
 
+    /// While searching every matching section shows; otherwise only the chosen category's.
+    func settingsSectionVisible(_ section: SettingsSection) -> Bool {
+        if isSettingsSearchActive {
+            return settingsSectionMatches(section)
+        }
+        return settingsCategory.sections.contains(section)
+    }
+
+    var settingsSidebar: some View {
+        VStack(spacing: 6) {
+            settingsSearchField
+                .background(
+                    Button("") { isSettingsSearchFocused = true }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .hidden()
+                )
+                .padding(.horizontal, 10)
+                .padding(.top, 10)
+
+            List(selection: settingsSidebarSelection) {
+                ForEach(SettingsCategory.allCases, id: \.self) { category in
+                    Label {
+                        Text(model.localizedString(category.titleKey))
+                    } icon: {
+                        SettingsIconTile(systemImage: category.systemImage, tint: category.tint)
+                    }
+                    .tag(category)
+                }
+            }
+            .listStyle(.sidebar)
+        }
+    }
+
+    /// No row is highlighted while searching, since the results span every category.
+    /// Picking a row ends the search.
+    private var settingsSidebarSelection: Binding<SettingsCategory?> {
+        Binding(
+            get: { isSettingsSearchActive ? nil : settingsCategory },
+            set: { category in
+                guard let category else {
+                    return
+                }
+                settingsCategory = category
+                settingsSearchText = ""
+                isSettingsSearchFocused = false
+            }
+        )
+    }
+
+    var settingsPaneHeader: some View {
+        Section {
+            VStack(spacing: 6) {
+                SettingsIconTile(
+                    systemImage: settingsCategory.systemImage,
+                    tint: settingsCategory.tint,
+                    size: 52
+                )
+                .padding(.bottom, 4)
+                Text(model.localizedString(settingsCategory.titleKey))
+                    .font(.title2.weight(.bold))
+                Text(model.localizedString(settingsCategory.subtitleKey))
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+        }
+    }
+
     var anySettingsSectionMatches: Bool {
         SettingsSection.allCases.contains { settingsSectionMatches($0) }
     }

@@ -75,8 +75,26 @@ extension SettingsView {
         modelBinding(model.wallpaperTransitionDuration) { model.setWallpaperTransitionDuration($0) }
     }
 
-    var wallpaperTransitionStyleBinding: Binding<WallpaperTransitionStyle> {
-        modelBinding(model.wallpaperTransitionStyle) { model.setWallpaperTransitionStyle($0) }
+    /// Off is stored as a zero duration, so turning an effect back on restores a length too.
+    var wallpaperTransitionChoiceBinding: Binding<WallpaperTransitionChoice> {
+        Binding(
+            get: {
+                model.wallpaperTransitionDuration > 0
+                    ? .style(model.wallpaperTransitionStyle)
+                    : .off
+            },
+            set: { choice in
+                switch choice {
+                case .off:
+                    model.setWallpaperTransitionDuration(0)
+                case .style(let style):
+                    model.setWallpaperTransitionStyle(style)
+                    if model.wallpaperTransitionDuration <= 0 {
+                        model.setWallpaperTransitionDuration(0.5)
+                    }
+                }
+            }
+        )
     }
 
     var batteryPlaybackPolicyBinding: Binding<BatteryPlaybackPolicy> {

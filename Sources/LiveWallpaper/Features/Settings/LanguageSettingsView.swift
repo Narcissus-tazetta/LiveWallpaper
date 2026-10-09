@@ -4,7 +4,7 @@ struct LanguageSettingsView: View {
     @ObservedObject var model: WallpaperModel
 
     var body: some View {
-        Section(header: Label(model.localizedString("言語"), systemImage: "globe")) {
+        Section(header: SettingsSectionHeader(title: model.localizedString("言語"))) {
             HStack {
                 Text(model.localizedString("アプリの言語"))
                 Spacer()

@@ -8,7 +8,7 @@ extension SettingsView {
     ]
 
     var webWallpaperSettingsSection: some View {
-        Section(header: Label(model.localizedString("Web壁紙"), systemImage: "globe")) {
+        Section(header: SettingsSectionHeader(title: model.localizedString("Web壁紙"))) {
             Toggle(
                 model.localizedString("Web壁紙機能を有効にする"),
                 isOn: webWallpaperFeatureBinding
@@ -25,6 +25,7 @@ extension SettingsView {
             _ = try model.addWebWallpaper(urlString: webURLInput)
             webURLInput = ""
             isWebWallpaperURLPopoverPresented = false
+            isEmptyStateWebPopoverPresented = false
         } catch {
             if let urlError = error as? WebWallpaperURLError {
                 model.webWallpaperErrorMessage = model.localizedString(

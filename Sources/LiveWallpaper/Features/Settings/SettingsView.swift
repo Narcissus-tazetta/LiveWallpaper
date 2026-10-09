@@ -5,8 +5,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @ObservedObject var model: WallpaperModel
     @State var selectedTab: SettingsTab = .wallpaper
-    @State var isAdvancedExpanded: Bool = false
-    @State var volumeInput: String = ""
+    @State var isAdvancedSettingsPresented: Bool = false
     @State var expandedHelpTopics: Set<HelpTopic> = []
     @State var hoveredHelpTopic: HelpTopic?
     @StateObject var thumbnailCache: DiskThumbnailCache
@@ -58,8 +57,8 @@ struct SettingsView: View {
     @State var currentLockScreenPreviewThumbnailPath: String?
     @State var webURLInput: String = ""
     @State var isWebWallpaperURLPopoverPresented: Bool = false
+    @State var isEmptyStateWebPopoverPresented: Bool = false
     @State var webWallpaperNameEdit: InlineNameEdit<UUID>?
-    @FocusState var isVolumeInputFocused: Bool
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
     @FocusState var focusedWebWallpaperID: UUID?
@@ -82,6 +81,12 @@ struct SettingsView: View {
     @State var isScheduleCardExpanded: Bool = false
     @State var isFocusCardExpanded: Bool = false
     @State var hoveredTab: SettingsTab?
+    @State var hoveredWallpaperPath: String?
+    /// Card whose video is playing on hover. Separate from hoveredWallpaperPath so a quick
+    /// pass of the pointer across the grid doesn't spin up a player for every card.
+    @State var hoverPreviewPath: String?
+    @State var settingsCategory: SettingsCategory = .general
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Namespace var tabSelectionNamespace
     let wallpaperCardMinimumWidth: CGFloat = 140
     let wallpaperCardMaximumWidth: CGFloat = 220
@@ -125,6 +130,7 @@ struct SettingsView: View {
             Divider()
             tabContent
         }
+        .background(ambientBackground)
 
         let modified1 = applyMainModifiers(content)
         let modified2 = applyNotificationAndChangeModifiers(modified1)
@@ -134,15 +140,17 @@ struct SettingsView: View {
 
     private func applyMainModifiers<V: View>(_ view: V) -> some View {
         view
-            .tint(.accentColor)
             .frame(
                 minWidth: 780, idealWidth: 780, maxWidth: .infinity,
                 minHeight: 540, idealHeight: 540, maxHeight: .infinity
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isDropTargeted ? Color.accentColor : Color.clear, lineWidth: 2)
-            )
+            .overlay {
+                if isDropTargeted {
+                    dropTargetOverlay
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.15), value: isDropTargeted)
             .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
                 handleDroppedVideoProviders(providers)
             }
@@ -157,11 +165,6 @@ struct SettingsView: View {
                    !sources.contains(where: { $0.id == editingID })
                 {
                     cancelWebWallpaperNameEdit()
-                }
-            }
-            .onChange(of: model.audioVolume) { _ in
-                if !isVolumeInputFocused {
-                    syncVolumeInputWithModel()
                 }
             }
             .onChange(of: model.registeredVideoPaths) { _ in
@@ -190,11 +193,6 @@ struct SettingsView: View {
             }
             .onChange(of: model.spaceWallpaperFeatureEnabled) { _ in
                 pruneStaleScope()
-            }
-            .onChange(of: isVolumeInputFocused) { focused in
-                if !focused {
-                    commitVolumeInput()
-                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .openWallpaperTab)) { _ in
                 selectedTab = .wallpaper
@@ -262,7 +260,6 @@ struct SettingsView: View {
     private func applyLifecycleModifiers<V: View>(_ view: V) -> some View {
         view
             .onAppear {
-                syncVolumeInputWithModel()
                 pruneMissingWallpaperThumbnails()
                 requestCurrentWallpaperThumbnailIfNeeded()
                 requestLockScreenWallpaperThumbnailIfNeeded()
@@ -301,7 +298,6 @@ struct SettingsView: View {
             ) {
                 Button(model.localizedString("リセット"), role: .destructive) {
                     model.resetSettingsToDefaults()
-                    syncVolumeInputWithModel()
                 }
                 Button(model.localizedString("キャンセル"), role: .cancel) {}
             } message: {
@@ -430,6 +426,13 @@ struct SettingsView: View {
         .padding(.top, 2)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity)
+        .overlay(alignment: .trailing) {
+            if selectedTab == .wallpaper {
+                libraryToolbarItems
+                    .padding(.trailing, 14)
+                    .padding(.bottom, 6)
+            }
+        }
         // Animate only the highlight; wrapping the tab switch in withAnimation would
         // also animate the whole incoming tab (video previews, the wallpaper grid).
         .animation(.easeOut(duration: 0.18), value: selectedTab)
@@ -479,95 +482,103 @@ struct SettingsView: View {
                 storeTabContent
             }
         case .settings:
-            Form {
-                Section {
-                    settingsSearchField
-                        .background(
-                            Button("") { isSettingsSearchFocused = true }
-                                .keyboardShortcut("f", modifiers: .command)
-                                .hidden()
-                        )
-                }
-                Group {
-                    if let message = model.persistenceFailureMessage {
-                        Section {
-                            Text(message)
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                    if settingsSectionMatches(.video) {
-                        videoSettingsSection
-                        settingsSectionMatchHint(.video)
-                    }
-                    if settingsSectionMatches(.share) {
-                        shareSettingsSection
-                        settingsSectionMatchHint(.share)
-                    }
-                    if settingsSectionMatches(.webWallpaper) {
-                        webWallpaperSettingsSection
-                        settingsSectionMatchHint(.webWallpaper)
-                    }
-                    if settingsSectionMatches(.display) {
-                        displaySettingsSection
-                        settingsSectionMatchHint(.display)
-                    }
-                    if settingsSectionMatches(.hotKeys) {
-                        hotKeysSettingsSection
-                        settingsSectionMatchHint(.hotKeys)
-                    }
-                    // スケジュール本体は壁紙タブへ移動済み。検索でヒットしたとき
-                    // だけ案内行を出す(非検索時は何も出さない)。
-                    if isSettingsSearchActive, settingsSectionMatches(.schedule) {
-                        scheduleSearchRedirectSection
-                    }
-                    if isSettingsSearchActive, settingsSectionMatches(.focusFilter) {
-                        focusFilterSearchRedirectSection
-                    }
-                    if settingsSectionMatches(.language) {
-                        languageSettingsSection
-                        settingsSectionMatchHint(.language)
-                    }
-                    if settingsSectionMatches(.cache) {
-                        cacheSettingsSection
-                        settingsSectionMatchHint(.cache)
-                    }
-                }
-                Group {
-                    if settingsSectionMatches(.screenSaver) {
-                        screenSaverSettingsSection
-                        settingsSectionMatchHint(.screenSaver)
-                    }
-                    if settingsSectionMatches(.reset) {
-                        resetSettingsSection
-                        settingsSectionMatchHint(.reset)
-                    }
-                    if settingsSectionMatches(.update) {
-                        updateSettingsSection
-                        settingsSectionMatchHint(.update)
-                    }
-                    if isSettingsSearchActive, !anySettingsSectionMatches {
-                        Section {
-                            SearchEmptyState(
-                                isSearchActive: true,
-                                noContentText: "",
-                                noMatchText: model.localizedString("該当する設定がありません"),
-                                clearButtonTitle: model.localizedString("検索をクリア"),
-                                onClearSearch: { settingsSearchText = ""; isSettingsSearchFocused = true }
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                }
-
-                footerSection
+            HStack(spacing: 0) {
+                settingsSidebar
+                    .frame(width: 210)
+                Divider()
+                settingsForm
             }
-            .formStyle(.grouped)
-            #if DEBUG
-            .onAppear { SettingsView.assertAllSettingsSectionsHaveSearchKeywords() }
-            #endif
         }
+    }
+
+    private var settingsForm: some View {
+        Form {
+            if !isSettingsSearchActive {
+                settingsPaneHeader
+            }
+            Group {
+                if let message = model.persistenceFailureMessage {
+                    Section {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                if settingsSectionVisible(.video) {
+                    videoSettingsSection
+                    settingsSectionMatchHint(.video)
+                }
+                if settingsSectionVisible(.share) {
+                    shareSettingsSection
+                    settingsSectionMatchHint(.share)
+                }
+                if settingsSectionVisible(.webWallpaper) {
+                    webWallpaperSettingsSection
+                    settingsSectionMatchHint(.webWallpaper)
+                }
+                if settingsSectionVisible(.display) {
+                    displaySettingsSection
+                    settingsSectionMatchHint(.display)
+                }
+                if settingsSectionVisible(.hotKeys) {
+                    hotKeysSettingsSection
+                    settingsSectionMatchHint(.hotKeys)
+                }
+                // スケジュール本体は壁紙タブへ移動済み。検索でヒットしたとき
+                // だけ案内行を出す(非検索時は何も出さない)。
+                if isSettingsSearchActive, settingsSectionMatches(.schedule) {
+                    scheduleSearchRedirectSection
+                }
+                if isSettingsSearchActive, settingsSectionMatches(.focusFilter) {
+                    focusFilterSearchRedirectSection
+                }
+                if settingsSectionVisible(.language) {
+                    languageSettingsSection
+                    settingsSectionMatchHint(.language)
+                }
+                if settingsSectionVisible(.cache) {
+                    cacheSettingsSection
+                    settingsSectionMatchHint(.cache)
+                }
+            }
+            Group {
+                if settingsSectionVisible(.screenSaver) {
+                    screenSaverSettingsSection
+                    settingsSectionMatchHint(.screenSaver)
+                }
+                if settingsSectionVisible(.reset) {
+                    resetSettingsSection
+                    settingsSectionMatchHint(.reset)
+                }
+                if settingsSectionVisible(.update) {
+                    updateSettingsSection
+                    settingsSectionMatchHint(.update)
+                }
+                if isSettingsSearchActive, !anySettingsSectionMatches {
+                    Section {
+                        SearchEmptyState(
+                            isSearchActive: true,
+                            noContentText: "",
+                            noMatchText: model.localizedString("該当する設定がありません"),
+                            clearButtonTitle: model.localizedString("検索をクリア"),
+                            onClearSearch: { settingsSearchText = ""; isSettingsSearchFocused = true }
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+
+            footerSection
+        }
+        .formStyle(.grouped)
+        .environment(
+            \.settingsPaneTitle,
+            isSettingsSearchActive ? nil : model.localizedString(settingsCategory.titleKey)
+        )
+        #if DEBUG
+        .onAppear { SettingsView.assertAllSettingsSectionsHaveSearchKeywords() }
+        #endif
     }
 
     /// 壁紙・編集・Store は各パネルが自前のカードで区切られているため、grouped Form の
