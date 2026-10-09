@@ -9,11 +9,7 @@ extension SettingsView {
                     .foregroundColor(.red)
             }
             if storeMySubmissions.submissions.isEmpty {
-                Text(model.localizedString("まだ投稿がありません"))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 40)
+                storeMySubmissionsInvite
             } else {
                 ScrollView {
                     VStack(spacing: 8) {
@@ -26,6 +22,32 @@ extension SettingsView {
                 .frame(minHeight: 320, maxHeight: 560)
             }
         }
+    }
+
+    private var storeMySubmissionsInvite: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "square.and.arrow.up.circle.fill")
+                .font(.system(size: 36))
+                .foregroundStyle(Color.accentColor)
+            Text(model.localizedString("まだ投稿がありません"))
+                .font(.headline)
+            Text(model.localizedString("Store には誰でも壁紙を投稿できます。アカウント登録は不要で、審査のあと「みんなの投稿」に公開されます。"))
+                .font(.callout)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 360)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                isStoreSharePickerPresented = true
+            } label: {
+                Label(model.localizedString("動画を共有"), systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(model.allRegisteredVideoPaths.isEmpty)
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 40)
     }
 
     private func storeMySubmissionRow(_ submission: StoreMySubmission) -> some View {
