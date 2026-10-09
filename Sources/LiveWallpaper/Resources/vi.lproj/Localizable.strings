@@ -603,3 +603,11 @@
 "ログ" = "Nhật ký";
 "アプリ・macOS・ディスプレイの情報、設定、直近のログを1つのzipにまとめます。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Gom thông tin ứng dụng, macOS và màn hình, cài đặt của bạn cùng nhật ký gần đây vào một tệp zip. Hãy đính kèm tệp này khi báo cáo sự cố. Không bao gồm tệp video và URL hình nền web.";
 "診断情報の書き出しに失敗しました" = "Không thể xuất thông tin chẩn đoán";
+"上へ移動" = "Di chuyển lên";
+"下へ移動" = "Di chuyển xuống";
+"再読み込み" = "Tải lại";
+"デスクトップに設定中" = "Đang đặt làm màn hình nền";
+"ロック画面に設定中" = "Đang đặt làm màn hình khóa";
+"画面別に割り当て中" = "Đã gán cho một màn hình";
+"音声あり" = "Có âm thanh";
+"ヘルプ" = "Trợ giúp";

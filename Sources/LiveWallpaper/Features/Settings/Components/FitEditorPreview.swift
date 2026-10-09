@@ -112,6 +112,12 @@ extension SettingsView {
                         .onTapGesture {
                             fitEditor.isInteractionEnabled = true
                         }
+                        .accessibilityElement()
+                        .accessibilityLabel(model.localizedString("クリックして編集を開始"))
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction {
+                            fitEditor.isInteractionEnabled = true
+                        }
 
                     VStack {
                         Spacer(minLength: 0)
@@ -127,6 +133,7 @@ extension SettingsView {
                         .padding(.bottom, 14)
                     }
                     .allowsHitTesting(false)
+                    .accessibilityHidden(true)
                 }
             }
             .frame(width: canvasSize.width, height: canvasSize.height)

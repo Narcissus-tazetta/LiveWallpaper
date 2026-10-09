@@ -603,3 +603,11 @@
 "ログ" = "Günlükler";
 "アプリ・macOS・ディスプレイの情報、設定、直近のログを1つのzipにまとめます。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Uygulama, macOS ve ekran bilgilerini, ayarlarınızı ve son günlükleri tek bir zip dosyasında toplar. Sorun bildirirken bu dosyayı ekleyin. Video dosyaları ve web duvar kâğıdı URL’leri dahil edilmez.";
 "診断情報の書き出しに失敗しました" = "Tanılama bilgileri dışa aktarılamadı";
+"上へ移動" = "Yukarı Taşı";
+"下へ移動" = "Aşağı Taşı";
+"再読み込み" = "Yeniden Yükle";
+"デスクトップに設定中" = "Masaüstü olarak ayarlı";
+"ロック画面に設定中" = "Kilit ekranı olarak ayarlı";
+"画面別に割り当て中" = "Bir ekrana atanmış";
+"音声あり" = "Ses içerir";
+"ヘルプ" = "Yardım";

@@ -14,19 +14,32 @@ extension SettingsView {
         @ViewBuilder trailing: () -> Trailing
     ) -> some View {
         HStack(spacing: 8) {
-            Label(title, systemImage: systemImage)
-                .font(.system(size: 12, weight: .semibold))
-            Text(summary)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer()
+            // Labelling the whole row would hand the label to each child (three identical
+            // buttons in VoiceOver) and swallow the trailing switch, so only the title part
+            // becomes the button.
+            HStack(spacing: 8) {
+                Label(title, systemImage: systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(summary)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(title)
+            .accessibilityValue(summary)
+            .accessibilityAction {
+                isExpanded.wrappedValue.toggle()
+            }
             trailing()
             Image(systemName: "chevron.right")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(.secondary)
                 .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
+                .accessibilityHidden(true)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -34,9 +47,6 @@ extension SettingsView {
                 isExpanded.wrappedValue.toggle()
             }
         }
-        .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(title)
-        .accessibilityValue(summary)
     }
 
     /// `trailing` 不要な呼び出し向けのオーバーロード。

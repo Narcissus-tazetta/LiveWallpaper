@@ -33,7 +33,8 @@ extension SettingsView {
             SearchField(
                 placeholder: model.localizedString("壁紙を検索"),
                 text: $trimCopySearchText,
-                isFocused: $isTrimCopySearchFocused
+                isFocused: $isTrimCopySearchFocused,
+                clearButtonLabel: model.localizedString("検索をクリア")
             )
 
             let candidates = trimCopyCandidatePaths()

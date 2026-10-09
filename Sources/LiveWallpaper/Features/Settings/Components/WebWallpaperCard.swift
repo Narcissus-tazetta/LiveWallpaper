@@ -42,6 +42,8 @@ extension SettingsView {
         }
         .buttonStyle(.plain)
         .disabled(!isSelectable)
+        .accessibilityLabel(source.displayName)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
         .help(isSelectable ? "" : model.localizedString("Web壁紙はロック画面に設定できません"))
 
         return VStack(alignment: .leading, spacing: 8) {
@@ -80,6 +82,7 @@ extension SettingsView {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .iconHelp(model.localizedString("名前を編集"))
                 }
             }
         }

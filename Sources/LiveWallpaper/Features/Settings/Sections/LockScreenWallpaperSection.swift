@@ -60,6 +60,7 @@ extension SettingsView {
         }
         .controlSize(.regular)
         .menuStyle(.borderlessButton)
+        .iconHelp(model.localizedString("その他の操作"))
         .disabled(lockScreenSyncActionInProgress)
       }
 

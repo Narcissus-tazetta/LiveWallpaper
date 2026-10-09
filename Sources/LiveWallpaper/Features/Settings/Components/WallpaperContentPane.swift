@@ -422,7 +422,7 @@ extension SettingsView {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .help(model.localizedString("変換をキャンセル"))
+                    .iconHelp(model.localizedString("変換をキャンセル"))
                 }
             }
 
@@ -457,7 +457,7 @@ extension SettingsView {
                     Image(systemName: "doc.on.clipboard")
                 }
                 .buttonStyle(.bordered)
-                .help(model.localizedString("クリップボードから貼り付け"))
+                .iconHelp(model.localizedString("クリップボードから貼り付け"))
 
                 Button(model.localizedString("追加")) {
                     submitWebWallpaperURL()
@@ -679,7 +679,8 @@ extension SettingsView {
 
             HStack(spacing: 8) {
                 Text(model.localizedString("自動で次の壁紙へ"))
-                Picker("", selection: autoSwitchIntervalBinding) {
+                    .accessibilityHidden(true)
+                Picker(model.localizedString("自動で次の壁紙へ"), selection: autoSwitchIntervalBinding) {
                     Text(model.localizedString("オフ")).tag(0)
                     Text(model.localizedString("5分")).tag(5)
                     Text(model.localizedString("15分")).tag(15)

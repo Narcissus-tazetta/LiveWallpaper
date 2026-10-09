@@ -42,8 +42,9 @@ extension SettingsView {
     func compactToggle(_ title: String, isOn: Binding<Bool>) -> some View {
         HStack(spacing: 6) {
             Text(title)
+                .accessibilityHidden(true)
             // Outside a Form the switch defaults to the large size; match the Form rows.
-            Toggle("", isOn: isOn)
+            Toggle(title, isOn: isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.mini)
@@ -58,7 +59,7 @@ extension SettingsView {
         isOn: @escaping () -> Bool,
         setOn: @escaping (Bool) -> Void
     ) -> some View {
-        Toggle("", isOn: Binding(get: isOn, set: setOn))
+        Toggle(model.localizedString("プレイリスト"), isOn: Binding(get: isOn, set: setOn))
             .toggleStyle(.checkbox)
             .labelsHidden()
             .controlSize(.small)
@@ -280,6 +281,7 @@ extension SettingsView {
         .onHover { over in
             hoveredHelpTopic = over ? topic : nil
         }
+        .accessibilityLabel(model.localizedString("ヘルプ"))
     }
 
     @ViewBuilder

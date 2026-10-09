@@ -73,7 +73,7 @@ extension SettingsView {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
-                .help(model.localizedString("取り下げる"))
+                .iconHelp(model.localizedString("取り下げる"))
             } else {
                 Button {
                     storeMySubmissions.remove(id: submission.id)
@@ -81,7 +81,7 @@ extension SettingsView {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
-                .help(model.localizedString("リストから削除(投稿自体は削除されません)"))
+                .iconHelp(model.localizedString("リストから削除(投稿自体は削除されません)"))
             }
         }
         .padding(10)

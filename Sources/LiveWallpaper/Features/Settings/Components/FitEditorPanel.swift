@@ -50,7 +50,7 @@ extension SettingsView {
 
             if !fitEditor.screens.isEmpty {
                 Picker(
-                    "",
+                    model.localizedString("画面"),
                     selection: Binding<String>(
                         get: { fitEditor.resolvedScreenID() },
                         set: { fitEditor.selectScreen($0) }
@@ -137,6 +137,8 @@ extension SettingsView {
                 value: fitEditor.zoomBinding(path: path, screenID: screenID),
                 in: WallpaperGeometry.zoomRange
             )
+            .accessibilityLabel(model.localizedString("ズーム"))
+            .accessibilityValue(String(format: "%.2fx", zoomValue))
             fitEditorValueText(String(format: "%.2fx", zoomValue)) {
                 fitEditor.setDraftZoom(1.0, path: path, screenID: screenID)
             }
@@ -147,6 +149,8 @@ extension SettingsView {
                 .frame(width: fitEditorRowLabelWidth, alignment: .leading)
             Slider(value: fitEditor.offsetXBinding(path: path, screenID: screenID), in: -1 ... 1)
                 .disabled(!canPanX)
+                .accessibilityLabel(model.localizedString("横位置"))
+                .accessibilityValue(String(format: "%+.0f%%", offsetXValue * 100))
             fitEditorValueText(String(format: "%+.0f%%", offsetXValue * 100)) {
                 fitEditor.setDraftOffsetX(0, path: path, screenID: screenID)
             }
@@ -158,6 +162,8 @@ extension SettingsView {
                 .frame(width: fitEditorRowLabelWidth, alignment: .leading)
             Slider(value: fitEditor.offsetYBinding(path: path, screenID: screenID), in: -1 ... 1)
                 .disabled(!canPanY)
+                .accessibilityLabel(model.localizedString("縦位置"))
+                .accessibilityValue(String(format: "%+.0f%%", offsetYValue * 100))
             fitEditorValueText(String(format: "%+.0f%%", offsetYValue * 100)) {
                 fitEditor.setDraftOffsetY(0, path: path, screenID: screenID)
             }
@@ -264,6 +270,9 @@ extension SettingsView {
             .contentShape(Rectangle())
             .onTapGesture(count: 2, perform: resetAction)
             .help(model.localizedString("ダブルクリックで初期値に戻します"))
+            .accessibilityLabel(model.localizedString("既定に戻す"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { resetAction() }
     }
 
     private func fitEditorDimensionsText(path: String, screenID: String) -> String? {

@@ -162,7 +162,8 @@ extension SettingsView {
         SearchField(
             placeholder: model.localizedString("設定を検索"),
             text: $settingsSearchText,
-            isFocused: $isSettingsSearchFocused
+            isFocused: $isSettingsSearchFocused,
+            clearButtonLabel: model.localizedString("検索をクリア")
         )
         .frame(minWidth: 120, maxWidth: .infinity)
     }

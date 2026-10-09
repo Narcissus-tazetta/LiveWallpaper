@@ -7,12 +7,14 @@ struct SearchField: View {
     @Binding var text: String
     var isFocused: FocusState<Bool>.Binding
     var isSearching: Bool = false
+    var clearButtonLabel: String
 
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "magnifyingglass")
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .accessibilityHidden(true)
 
             // grouped Form 内では `TextField(タイトル, text:)` がタイトル付きフォーム行と
             // 見なされ、値が右寄せ/中央寄せになる(macOS 26)。`prompt:` + `.labelsHidden()`
@@ -23,6 +25,7 @@ struct SearchField: View {
                 .font(.system(size: 11))
                 .multilineTextAlignment(.leading)
                 .focused(isFocused)
+                .accessibilityLabel(placeholder)
 
             if isSearching {
                 ProgressView()
@@ -41,6 +44,8 @@ struct SearchField: View {
                 .opacity(text.isEmpty ? 0 : 1)
                 .disabled(text.isEmpty)
                 .allowsHitTesting(!text.isEmpty)
+                .accessibilityLabel(clearButtonLabel)
+                .accessibilityHidden(text.isEmpty)
             }
         }
         .padding(.horizontal, 8)
