@@ -212,12 +212,9 @@
 "今すぐ確認" = "Check Now";
 "更新が失敗する場合は、Releasesから最新版を取得して /Applications の LiveWallpaper.app を置き換えてください" = "If updates fail, download the latest release and replace /Applications/LiveWallpaper.app.";
 "メディアを追加" = "Add Media";
-"%" = "%";
 "(選択なし)" = "(None selected)";
 "X" = "X";
 "Y" = "Y";
-"1. 「メディアを追加」を押して動画やGIFを選ぶ\n2. 選んだメディアがそのまま壁紙として再生されます" = "1. Press \"Add Media\" to choose a video or GIF.\n2. The selected media plays as your wallpaper.";
-"動画やGIFなどのファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "You can also add videos or GIFs by dragging them onto this window.";
 "壁紙を保存するフォルダを選択してください" = "Choose a folder to save the wallpaper.";
 "静止画" = "Still";
 "設定をリセット" = "Reset Settings";
@@ -470,7 +467,6 @@
 "取り下げに失敗しました。もう一度お試しください" = "Failed to withdraw. Please try again";
 
 // 検索バーUX改善(共通コンポーネント化)
-"タイトルや名前で壁紙を検索" = "Search wallpapers by title or name";
 "検索をクリア" = "Clear search";
 "検索条件に一致する壁紙がありません" = "No wallpapers match your search";
 "アプリ名で検索" = "Search by app name";
@@ -564,7 +560,6 @@
 "切り替えエフェクト" = "Switch effect";
 "フェード" = "Fade";
 "壁紙が切り替わるときに前の壁紙からなめらかに移り変わります。デスクトップ（Space）の切り替えと、視差効果を減らす設定がオンのときはフェードしません。" = "Smoothly cross-fades from the previous wallpaper when the wallpaper changes. There is no fade when switching desktops (Spaces) or while Reduce Motion is on.";
-"エフェクトの種類" = "Effect";
 "クロスフェード" = "Cross-fade";
 "黒を挟む" = "Fade through black";
 "スクリーンセーバー" = "Screen Saver";
@@ -579,3 +574,23 @@
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Web wallpapers can't play as a screen saver. Choose a video wallpaper to use it.";
 "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "While LiveWallpaper is running, it is selected as your screen saver automatically. Quitting the app or uninstalling switches back to your previous screen saver.";
 "macOS の壁紙設定にスクリーンセーバーの項目が見つかりませんでした。システム設定でスクリーンセーバーを一度選んでから、もう一度お試しください。" = "Couldn't find the screen saver entry in the macOS wallpaper settings. Choose a screen saver once in System Settings, then try again.";
+"一般" = "General";
+"連携" = "Integrations";
+"その他" = "Other";
+"ドロップして壁紙に追加" = "Drop to Add as Wallpaper";
+"動画・GIF・画像をまとめて追加できます" = "Add videos, GIFs and images all at once";
+"好きな動画を壁紙にしましょう" = "Turn your favorite video into a wallpaper";
+"動画・GIF・画像をここへドラッグするか、下のボタンから選んでください。追加した壁紙はすぐにデスクトップで再生されます。" = "Drag videos, GIFs or images here, or choose them with the buttons below. New wallpapers start playing on your desktop right away.";
+"メディアを選ぶ" = "Choose Media";
+"Storeで探す" = "Browse the Store";
+"Webサイトを壁紙にするときは「Web壁紙を追加」からURLを入力します" = "To use a website as your wallpaper, enter its URL with “Add Web Wallpaper”.";
+"Web壁紙を追加" = "Add Web Wallpaper";
+"その他の操作" = "More Actions";
+"一時停止中" = "Paused";
+"起動・動画と音声・言語・アップデート" = "Startup, video and sound, language, updates";
+"壁紙の表示方法・切り替え・省電力" = "How wallpapers are shown, switching, power saving";
+"共有・Web壁紙・ショートカット・スクリーンセーバー" = "Sharing, web wallpapers, shortcuts, screen saver";
+"キャッシュと設定の管理" = "Cache and settings management";
+"エフェクトの長さ" = "Effect Length";
+"詳細…" = "Details…";
+"完了" = "Done";

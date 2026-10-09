@@ -12,7 +12,7 @@ extension SettingsView {
     @ViewBuilder
     var screenSaverSettingsSection: some View {
         Section(
-            header: Label(model.localizedString("スクリーンセーバー"), systemImage: "moon.zzz")
+            header: SettingsSectionHeader(title: model.localizedString("スクリーンセーバー"))
         ) {
             settingsFootnote(
                 model.localizedString(

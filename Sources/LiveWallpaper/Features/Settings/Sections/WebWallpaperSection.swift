@@ -8,7 +8,7 @@ extension SettingsView {
     ]
 
     var webWallpaperSettingsSection: some View {
-        Section(header: Label(model.localizedString("Web壁紙"), systemImage: "globe")) {
+        Section(header: SettingsSectionHeader(title: model.localizedString("Web壁紙"))) {
             Toggle(
                 model.localizedString("Web壁紙機能を有効にする"),
                 isOn: webWallpaperFeatureBinding

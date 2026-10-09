@@ -18,35 +18,51 @@ private enum WallpaperListEntry: Identifiable {
 extension SettingsView {
     var wallpaperContentPane: some View {
         VStack(alignment: .leading, spacing: 10) {
-            wallpaperContentHeader
-            wallpaperActionToolbar
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    wallpaperContentHeader
+                    wallpaperActionToolbar
+                }
 
-            if let importErrorMessage = model.mediaImportErrorMessage {
-                Text(importErrorMessage)
-                    .font(.caption)
-                    .foregroundColor(.orange)
+                if let importErrorMessage = model.mediaImportErrorMessage {
+                    Text(importErrorMessage)
+                        .font(.callout)
+                        .foregroundColor(.orange)
+                }
+
+                wallpaperListContent
             }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .settingsCardBackground()
 
-            wallpaperListContent
-
-            if let screenID = activeDisplayOverrideScreenID {
-                displayOverridePlaybackControls(forScreenID: screenID)
-            } else if let spaceUUID = activeSpaceScopeUUID {
-                spaceScopeControls(forSpaceUUID: spaceUUID)
-            } else if selectedAssignmentTarget == .desktop,
-                      !model.registeredPlaybackEntries.isEmpty
-            {
-                playlistPlaybackControls
-            }
-
-            if selectedAssignmentTarget == .lockScreen {
-                Divider()
-                lockScreenSyncControls
+            if hasPlaybackControls {
+                playbackControlsPanel
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .floatingGlass(in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .settingsCardBackground()
+    }
+
+    private var hasPlaybackControls: Bool {
+        activeDisplayOverrideScreenID != nil
+            || activeSpaceScopeUUID != nil
+            || selectedAssignmentTarget == .lockScreen
+            || !model.registeredPlaybackEntries.isEmpty
+    }
+
+    @ViewBuilder
+    private var playbackControlsPanel: some View {
+        if let screenID = activeDisplayOverrideScreenID {
+            displayOverridePlaybackControls(forScreenID: screenID)
+        } else if let spaceUUID = activeSpaceScopeUUID {
+            spaceScopeControls(forSpaceUUID: spaceUUID)
+        } else if selectedAssignmentTarget == .lockScreen {
+            lockScreenSyncControls
+        } else {
+            playlistPlaybackControls
+        }
     }
 
     private var librarySearchQuery: String {
@@ -104,16 +120,10 @@ extension SettingsView {
         HStack(spacing: 10) {
             playlistFilterControl
 
-            SearchField(
-                placeholder: model.localizedString("タイトルや名前で壁紙を検索"),
-                text: $librarySearchText,
-                isFocused: $isLibrarySearchFocused
-            )
-            .frame(minWidth: 120, maxWidth: .infinity)
-
             Text("\(displayedItemCount) \(model.localizedString("本"))")
-                .font(.caption)
+                .font(.callout)
                 .foregroundColor(.secondary)
+                .fixedSize()
 
             if model.isWebWallpaperActive {
                 HStack(spacing: 4) {
@@ -323,7 +333,7 @@ extension SettingsView {
                 isSearchActive: hasAnySource && !librarySearchQuery.isEmpty,
                 clearButtonTitle: model.localizedString("検索をクリア"),
                 onClearSearch: { librarySearchText = ""; isLibrarySearchFocused = true },
-                noContent: { wallpaperEmptyStateText },
+                noContent: { wallpaperEmptyState },
                 noMatch: {
                     Text(model.localizedString("該当する壁紙がありません"))
                         .font(.caption)
@@ -352,19 +362,19 @@ extension SettingsView {
         HStack(spacing: 8) {
             if activeDisplayOverrideScreenID != nil {
                 Text(model.localizedString("カードをクリックするとこの画面に割り当てられます"))
-                    .font(.caption2)
+                    .font(.callout)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             } else if activeSpaceScopeUUID != nil {
                 Text(model.localizedString("カードをクリックするとこのデスクトップに割り当てられます"))
-                    .font(.caption2)
+                    .font(.callout)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             } else if let summaryText = selectedPlaylistSummaryText {
                 Text(summaryText)
-                    .font(.caption2)
+                    .font(.callout)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -374,8 +384,10 @@ extension SettingsView {
                 isWallpaperShareSheetPresented = true
             } label: {
                 Label(model.localizedString("壁紙を共有"), systemImage: "square.and.arrow.up")
+                    .labelStyle(.iconOnly)
             }
             .buttonStyle(.bordered)
+            .help(model.localizedString("壁紙を共有"))
             .disabled(model.libraryVideoPaths.isEmpty)
 
             if selectedAssignmentTarget == .desktop, activeDisplayOverrideScreenID == nil,
@@ -385,8 +397,10 @@ extension SettingsView {
                     isWebWallpaperURLPopoverPresented = true
                 } label: {
                     Label(model.localizedString("Web壁紙を追加"), systemImage: "globe")
+                        .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.bordered)
+                .help(model.localizedString("Web壁紙を追加"))
                 .popover(isPresented: $isWebWallpaperURLPopoverPresented) {
                     webWallpaperURLInputSection
                         .padding(16)
@@ -412,13 +426,6 @@ extension SettingsView {
                 }
             }
 
-            Button {
-                NotificationCenter.default.post(name: .chooseVideo, object: nil)
-            } label: {
-                Label(model.localizedString("メディアを追加"), systemImage: "plus")
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(model.isImportingMedia)
         }
     }
 
@@ -463,23 +470,6 @@ extension SettingsView {
                 Text(errorMessage)
                     .font(.caption)
                     .foregroundColor(.orange)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var wallpaperEmptyStateText: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(model.localizedString("1. 「メディアを追加」を押して動画やGIFを選ぶ\n2. 選んだメディアがそのまま壁紙として再生されます"))
-                .font(.caption)
-                .foregroundColor(.secondary)
-            Text(model.localizedString("動画やGIFなどのファイルをウィンドウにドラッグ&ドロップして追加することもできます"))
-                .font(.caption2)
-                .foregroundColor(.secondary.opacity(0.85))
-            if model.webWallpaperFeatureEnabled {
-                Text(model.localizedString("「Web壁紙を追加」からWebサイトのURLを壁紙として追加することもできます"))
-                    .font(.caption2)
-                    .foregroundColor(.secondary.opacity(0.85))
             }
         }
     }
@@ -549,8 +539,6 @@ extension SettingsView {
         let currentIndex = model.videoOverride(forScreenID: screenID)
             .flatMap { paths.firstIndex(of: $0) }
         return VStack(alignment: .leading, spacing: 6) {
-            Divider()
-
             HStack(spacing: 14) {
                 Text(model.localizedString("この画面専用のプレイリストです"))
                     .font(.caption2)
@@ -589,8 +577,6 @@ extension SettingsView {
     /// 再生コントロールは持たず説明と割り当て解除だけを出す。
     private func spaceScopeControls(forSpaceUUID uuid: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Divider()
-
             Text(
                 model.localizedString(
                     "このデスクトップに固定表示する動画です。未割り当てのデスクトップは通常の壁紙を表示します。"
@@ -615,8 +601,6 @@ extension SettingsView {
     private var playlistPlaybackControls: some View {
         let registeredCount = model.registeredPlaybackEntries.count
         return VStack(alignment: .leading, spacing: 6) {
-            Divider()
-
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     compactToggle(

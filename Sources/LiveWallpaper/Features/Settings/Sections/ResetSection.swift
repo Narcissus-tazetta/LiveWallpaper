@@ -14,10 +14,7 @@ extension SettingsView {
 
   var resetSettingsSection: some View {
     Section(
-      header: Label(
-        model.localizedString("設定の管理"),
-        systemImage: "arrow.counterclockwise"
-      )
+      header: SettingsSectionHeader(title: model.localizedString("設定の管理"))
     ) {
       HStack(spacing: 10) {
         Button(model.localizedString("再生をリフレッシュ")) {
@@ -83,7 +80,6 @@ extension SettingsView {
     }
     do {
       try SettingsTransfer.importSettings(from: url, into: model)
-      syncVolumeInputWithModel()
       showSettingsTransferAlert(
         message: model.localizedString("設定を読み込みました"),
         informative: nil,

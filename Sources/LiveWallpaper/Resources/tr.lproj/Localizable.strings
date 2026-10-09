@@ -17,7 +17,6 @@
 "ログイン時に自動起動する" = "Oturum açarken otomatik başlat";
 "音声を再生する" = "Sesi oynat";
 "音量" = "Ses Düzeyi";
-"%" = "%";
 "壁紙の表示先" = "Duvar kâğıdı görüntüleme hedefi";
 "メインのみ" = "Yalnızca ana ekran";
 "全ディスプレイ" = "Tüm ekranlar";
@@ -231,8 +230,6 @@
 "軽量" = "Hafif";
 "高負荷" = "Yüksek";
 "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Video kod çözme yöntemini seçin. Otomatik ortama göre, Dengeli akıcılığı, Güç Tasarrufu CPU ve güç tüketimini azaltır.";
-"1. 「メディアを追加」を押して動画やGIFを選ぶ\n2. 選んだメディアがそのまま壁紙として再生されます" = "1. Video veya GIF seçmek için \"Medya Ekle\"ye basın.\n2. Seçilen medya doğrudan duvar kâğıdı olarak oynatılır.";
-"動画やGIFなどのファイルをウィンドウにドラッグ&ドロップして追加することもできます" = "Ayrıca bir videoyu veya GIF'i bu pencereye sürükleyerek de ekleyebilirsiniz.";
 "壁紙を保存するフォルダを選択してください" = "Duvar kâğıdını kaydetmek için bir klasör seçin.";
 "高度な共有を有効にする" = "Gelişmiş paylaşımı etkinleştir";
 "オフのときは動画ファイルだけを書き出します。オンにすると配置情報を含む .lwpkg も一緒に書き出します。" = "Kapalıyken yalnızca video dosyası dışa aktarılır. Açıkken yerleşim bilgilerini içeren bir .lwpkg paketi de dışa aktarılır.";
@@ -472,7 +469,6 @@
 "取り下げに失敗しました。もう一度お試しください" = "Geri çekilemedi. Lütfen tekrar deneyin";
 
 // 検索バーUX改善(共通コンポーネント化)
-"タイトルや名前で壁紙を検索" = "Başlığa veya ada göre duvar kâğıdı ara";
 "検索をクリア" = "Aramayı temizle";
 "検索条件に一致する壁紙がありません" = "Aramanızla eşleşen duvar kâğıdı yok";
 "アプリ名で検索" = "Uygulama adına göre ara";
@@ -566,7 +562,6 @@
 "切り替えエフェクト" = "Geçiş efekti";
 "フェード" = "Solma";
 "壁紙が切り替わるときに前の壁紙からなめらかに移り変わります。デスクトップ（Space）の切り替えと、視差効果を減らす設定がオンのときはフェードしません。" = "Duvar kâğıdı değiştiğinde öncekinden yumuşak bir geçişle değişir. Masaüstleri (Spaces) arasında geçerken ve Hareketi Azalt açıkken geçiş yapılmaz.";
-"エフェクトの種類" = "Efekt türü";
 "クロスフェード" = "Çapraz geçiş";
 "黒を挟む" = "Siyahtan geçiş";
 "スクリーンセーバー" = "Ekran Koruyucu";
@@ -581,3 +576,23 @@
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Web duvar kâğıtları ekran koruyucu olarak oynatılamaz. Bir video duvar kâğıdı seçin.";
 "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "LiveWallpaper çalışırken ekran koruyucu olarak otomatik seçilir. Uygulamadan çıktığınızda veya kaldırdığınızda önceki ekran koruyucunuza geri dönülür.";
 "macOS の壁紙設定にスクリーンセーバーの項目が見つかりませんでした。システム設定でスクリーンセーバーを一度選んでから、もう一度お試しください。" = "macOS duvar kâğıdı ayarlarında ekran koruyucu kaydı bulunamadı. Sistem Ayarları'nda bir kez ekran koruyucu seçip yeniden deneyin.";
+"一般" = "Genel";
+"連携" = "Entegrasyonlar";
+"その他" = "Diğer";
+"ドロップして壁紙に追加" = "Duvar kâğıdı olarak eklemek için bırakın";
+"動画・GIF・画像をまとめて追加できます" = "Videoları, GIF'leri ve görselleri birlikte ekleyebilirsiniz";
+"好きな動画を壁紙にしましょう" = "En sevdiğiniz videoyu duvar kâğıdı yapın";
+"動画・GIF・画像をここへドラッグするか、下のボタンから選んでください。追加した壁紙はすぐにデスクトップで再生されます。" = "Videoları, GIF'leri veya görselleri buraya sürükleyin ya da aşağıdaki düğmelerle seçin. Eklenen duvar kâğıtları hemen masaüstünüzde oynatılır.";
+"メディアを選ぶ" = "Medya Seç";
+"Storeで探す" = "Store'da Göz At";
+"Webサイトを壁紙にするときは「Web壁紙を追加」からURLを入力します" = "Bir web sitesini duvar kâğıdı yapmak için URL'sini “Web Duvar Kâğıdı Ekle” ile girin.";
+"Web壁紙を追加" = "Web Duvar Kâğıdı Ekle";
+"その他の操作" = "Diğer İşlemler";
+"一時停止中" = "Duraklatıldı";
+"起動・動画と音声・言語・アップデート" = "Başlangıç, video ve ses, dil, güncellemeler";
+"壁紙の表示方法・切り替え・省電力" = "Duvar kâğıdının gösterimi, geçişler, güç tasarrufu";
+"共有・Web壁紙・ショートカット・スクリーンセーバー" = "Paylaşım, web duvar kâğıtları, kısayollar, ekran koruyucu";
+"キャッシュと設定の管理" = "Önbellek ve ayar yönetimi";
+"エフェクトの長さ" = "Efekt süresi";
+"詳細…" = "Ayrıntılar…";
+"完了" = "Bitti";

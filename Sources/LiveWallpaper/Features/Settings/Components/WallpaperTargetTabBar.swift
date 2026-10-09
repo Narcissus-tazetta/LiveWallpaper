@@ -196,9 +196,19 @@ extension SettingsView {
                         .frame(width: 72, height: 40)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Label(targetTitle(for: target), systemImage: targetIconName(for: target))
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(isSelected ? tint : .primary)
+                        HStack(spacing: 6) {
+                            Label(targetTitle(for: target), systemImage: targetIconName(for: target))
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(isSelected ? tint : .primary)
+                            if target == .desktop, model.manualPauseActive {
+                                Label(model.localizedString("一時停止中"), systemImage: "pause.fill")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.secondary.opacity(0.15), in: Capsule())
+                            }
+                        }
                         Text(targetSummary(for: target))
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -265,6 +275,15 @@ extension SettingsView {
         }
     }
 
+    /// The current-wallpaper thumbnail loops only while the wallpaper itself is moving, so it
+    /// never shows motion the desktop doesn't.
+    private var isDesktopPreviewLive: Bool {
+        !model.isWebWallpaperActive
+            && !model.manualPauseActive
+            && !model.batteryFreezeActive
+            && !(model.respectReduceMotionEnabled && model.systemReduceMotionEnabled)
+    }
+
     func targetTint(for target: WallpaperAssignmentTarget) -> Color {
         switch target {
         case .desktop:
@@ -311,6 +330,13 @@ extension SettingsView {
                 spaceScopeWallpaperPreview(forSpaceUUID: uuid)
             } else {
                 desktopWallpaperPreview
+                    .overlay {
+                        if let path = model.currentVideoPath, isDesktopPreviewLive {
+                            LoopingVideoView(path: path)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .allowsHitTesting(false)
+                        }
+                    }
             }
         case .lockScreen:
             lockScreenWallpaperPreview
