@@ -185,15 +185,13 @@ Swift / SwiftUI / AppKit で作られています。
 
 ```bash
 # 依存関係の解決とビルド
-swift build --build-system native -c release
+swift build -c release
 ```
 
 ```bash
 # ソースから起動
-swift run --build-system native
+swift run
 ```
-
-SwiftPM 6.4 以降は既定のビルドシステムが `swiftbuild` になり、Sparkle.framework が実行ファイルの隣にコピーされないため起動に失敗します。`swift build` / `swift run` には `--build-system native` を付けてください。
 
 ```bash
 # swift run で起動したアプリから設定画面でインストールできるよう、スクリーンセーバーをビルドする
