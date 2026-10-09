@@ -205,7 +205,7 @@ final class RemoteThumbnailCache: ObservableObject {
     }
     ioQueue.async { [weak self] in
       let data = try? Data(contentsOf: fileURL)
-      Task { @MainActor in
+      DispatchQueue.main.async { MainActor.assumeIsolated {
         guard let self else {
           return
         }
@@ -222,7 +222,7 @@ final class RemoteThumbnailCache: ObservableObject {
         self.touch(entryID)
         self.trimInMemoryIfNeeded()
         self.bumpRevision()
-      }
+      } }
     }
   }
 
@@ -242,7 +242,7 @@ final class RemoteThumbnailCache: ObservableObject {
       } catch {
         return
       }
-      Task { @MainActor in
+      DispatchQueue.main.async { MainActor.assumeIsolated {
         guard let self else {
           return
         }
@@ -252,7 +252,7 @@ final class RemoteThumbnailCache: ObservableObject {
         )
         self.persistMetadata()
         self.trimDiskIfNeeded()
-      }
+      } }
     }
   }
 
@@ -334,7 +334,7 @@ final class RemoteThumbnailCache: ObservableObject {
         return
       }
 
-      Task { @MainActor in
+      DispatchQueue.main.async { MainActor.assumeIsolated {
         guard let self else {
           return
         }
@@ -347,7 +347,7 @@ final class RemoteThumbnailCache: ObservableObject {
           self.inMemoryLastAccess.removeValue(forKey: entryID)
         }
         self.persistMetadata()
-      }
+      } }
     }
   }
 
@@ -359,9 +359,9 @@ final class RemoteThumbnailCache: ObservableObject {
   private func scheduleMetadataFlush() {
     metadataFlushWorkItem?.cancel()
     let workItem = DispatchWorkItem { [weak self] in
-      Task { @MainActor in
+      DispatchQueue.main.async { MainActor.assumeIsolated {
         self?.flushMetadataIfNeeded()
-      }
+      } }
     }
     metadataFlushWorkItem = workItem
     DispatchQueue.main.asyncAfter(deadline: .now() + metadataFlushDelay, execute: workItem)
@@ -411,7 +411,7 @@ final class RemoteThumbnailCache: ObservableObject {
         loadedMetadata = decoded
       }
 
-      Task { @MainActor in
+      DispatchQueue.main.async { MainActor.assumeIsolated {
         guard let self else {
           return
         }
@@ -423,7 +423,7 @@ final class RemoteThumbnailCache: ObservableObject {
           self.request(entryID: entryID)
         }
         self.bumpRevision()
-      }
+      } }
     }
   }
 

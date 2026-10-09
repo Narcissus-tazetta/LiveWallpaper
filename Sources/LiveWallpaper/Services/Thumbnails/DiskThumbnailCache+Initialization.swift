@@ -35,7 +35,7 @@ extension DiskThumbnailCache {
         shouldPersist = true
       }
 
-      Task { @MainActor in
+      DispatchQueue.main.async { MainActor.assumeIsolated {
         guard let self else {
           return
         }
@@ -67,7 +67,7 @@ extension DiskThumbnailCache {
           self.request(path: path)
         }
         self.bumpRevision()
-      }
+      } }
     }
   }
 }

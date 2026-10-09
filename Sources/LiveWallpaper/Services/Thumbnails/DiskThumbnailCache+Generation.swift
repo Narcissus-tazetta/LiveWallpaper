@@ -36,14 +36,14 @@ extension DiskThumbnailCache {
       ) else {
         return
       }
-      Task { @MainActor in
+      DispatchQueue.main.async { MainActor.assumeIsolated {
         guard let self else {
           return
         }
         self.metadata.entries[path] = entry
         self.persistMetadata()
         self.trimDiskIfNeeded()
-      }
+      } }
     }
   }
 

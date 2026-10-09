@@ -123,7 +123,7 @@ extension DiskThumbnailCache {
         return
       }
 
-      Task { @MainActor in
+      DispatchQueue.main.async { MainActor.assumeIsolated {
         guard let self else {
           return
         }
@@ -149,7 +149,7 @@ extension DiskThumbnailCache {
         }
         self.persistMetadata()
         self.bumpRevision()
-      }
+      } }
     }
   }
 
@@ -161,9 +161,9 @@ extension DiskThumbnailCache {
   func scheduleMetadataFlush() {
     metadataFlushWorkItem?.cancel()
     let workItem = DispatchWorkItem { [weak self] in
-      Task { @MainActor in
+      DispatchQueue.main.async { MainActor.assumeIsolated {
         self?.flushMetadataIfNeeded()
-      }
+      } }
     }
     metadataFlushWorkItem = workItem
     DispatchQueue.main.asyncAfter(
