@@ -581,9 +581,42 @@ extension SettingsView {
     }
   }
 
+  static let advancedSettingsSearchKeywords: [String] = [
+    "詳細設定",
+    "画質",
+    "動作プロファイル",
+    "再生負荷",
+    "デコード",
+    "デスクトップレベル",
+    "環境に応じて再生負荷を自動調整",
+    "バッテリー残量に応じて画質を自動調整",
+    "fullScreenAuxiliary を有効化",
+  ]
+
+  /// A search hit inside the sheet would otherwise show only the "Details…" button.
+  private var advancedSettingsMatchSearch: Bool {
+    let query = settingsSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else {
+      return false
+    }
+    return Self.advancedSettingsSearchKeywords.contains { keyword in
+      keyword.localizedCaseInsensitiveContains(query)
+        || model.localizedString(keyword).localizedCaseInsensitiveContains(query)
+    }
+  }
+
   /// Advanced options open in a sheet, as System Settings does with its "Details…" buttons,
   /// so the main list stays short.
+  @ViewBuilder
   var advancedSettingsSection: some View {
+    if advancedSettingsMatchSearch {
+      advancedSettingsContent
+    } else {
+      advancedSettingsButtonRow
+    }
+  }
+
+  private var advancedSettingsButtonRow: some View {
     LabeledContent {
       Button(model.localizedString("詳細…")) {
         isAdvancedSettingsPresented = true

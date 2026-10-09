@@ -25,6 +25,7 @@ extension SettingsView {
             _ = try model.addWebWallpaper(urlString: webURLInput)
             webURLInput = ""
             isWebWallpaperURLPopoverPresented = false
+            isEmptyStateWebPopoverPresented = false
         } catch {
             if let urlError = error as? WebWallpaperURLError {
                 model.webWallpaperErrorMessage = model.localizedString(

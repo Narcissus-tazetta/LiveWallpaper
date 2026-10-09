@@ -28,6 +28,11 @@ extension SettingsView {
             .frame(maxWidth: 240)
           Image(systemName: "speaker.wave.3.fill")
             .foregroundStyle(.secondary)
+          Text("\(Int((model.audioVolume * 100).rounded()))%")
+            .font(.body)
+            .monospacedDigit()
+            .foregroundColor(.secondary)
+            .frame(width: 40, alignment: .trailing)
         }
         .font(.caption)
       }

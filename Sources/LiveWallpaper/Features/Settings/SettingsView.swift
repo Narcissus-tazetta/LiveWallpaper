@@ -57,6 +57,7 @@ struct SettingsView: View {
     @State var currentLockScreenPreviewThumbnailPath: String?
     @State var webURLInput: String = ""
     @State var isWebWallpaperURLPopoverPresented: Bool = false
+    @State var isEmptyStateWebPopoverPresented: Bool = false
     @State var webWallpaperNameEdit: InlineNameEdit<UUID>?
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?

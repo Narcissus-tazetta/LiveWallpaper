@@ -77,6 +77,8 @@ extension SettingsView {
                             .padding(.horizontal, 5)
                             .padding(.vertical, 3)
                             .background(.ultraThinMaterial, in: Capsule())
+                            // Steps aside for the hover "⋯" button, which takes the same corner.
+                            .padding(.trailing, isHovered ? 28 : 0)
                         }
                     }
                     .padding(.top, 6)

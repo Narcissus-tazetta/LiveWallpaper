@@ -475,8 +475,12 @@ extension SettingsView {
     }
 
     private var wallpaperGrid: some View {
-        GeometryReader { proxy in
-            let layout = wallpaperGridLayout(for: proxy.size.width)
+        // Hovered cards scale up and cast a shadow; the scroll view clips both at its edges,
+        // so the grid sits inset and the scroll view reaches out into the card padding by
+        // the same amount to keep the cards aligned with the header.
+        let inset: CGFloat = 10
+        return GeometryReader { proxy in
+            let layout = wallpaperGridLayout(for: proxy.size.width - inset * 2)
             ScrollView {
                 LazyVGrid(
                     columns: layout.0,
@@ -525,10 +529,11 @@ extension SettingsView {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 2)
+                .padding(inset)
             }
         }
         .frame(minHeight: wallpaperLibraryGridMinHeight, maxHeight: 340)
+        .padding(-inset)
     }
 
     /// 画面割り当てモード用の再生コントロール。専用プレイヤーは常にループする

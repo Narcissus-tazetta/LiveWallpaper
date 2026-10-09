@@ -111,12 +111,24 @@ extension SettingsView {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
-            }
 
-            if model.webWallpaperFeatureEnabled {
-                Text(model.localizedString("Webサイトを壁紙にするときは「Web壁紙を追加」からURLを入力します"))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                // The toolbar's Web button is icon-only, so first-time users get a labelled one here.
+                if selectedAssignmentTarget == .desktop, activeDisplayOverrideScreenID == nil,
+                   model.webWallpaperFeatureEnabled
+                {
+                    Button {
+                        isEmptyStateWebPopoverPresented = true
+                    } label: {
+                        Label(model.localizedString("Web壁紙を追加"), systemImage: "globe")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .popover(isPresented: $isEmptyStateWebPopoverPresented) {
+                        webWallpaperURLInputSection
+                            .padding(16)
+                            .frame(width: 360)
+                    }
+                }
             }
         }
         .padding(.vertical, 28)
