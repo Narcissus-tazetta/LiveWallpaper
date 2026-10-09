@@ -155,9 +155,10 @@ rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp -f "$EXEC_PATH" "$APP_DIR/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
-# The swiftbuild build system records the deployment target as the SDK version (sdk 13.0).
-# AppKit then treats the app as linked against macOS 13 and draws the old controls and no
-# Liquid Glass, so stamp the SDK this build actually used.
+# The swiftbuild build system records the deployment target as the SDK version (sdk 13.0),
+# and AppKit then draws the old controls and no Liquid Glass. Package.swift passes the real
+# version to the linker when it can find the SDK; stamp it here too so a release never ships
+# with the wrong one.
 MIN_MACOS="$(otool -l "$EXEC_PATH" | awk '/minos/ {print $2; exit}')"
 SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
 vtool -set-build-version macos "$MIN_MACOS" "$SDK_VERSION" -replace \
