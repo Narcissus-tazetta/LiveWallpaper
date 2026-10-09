@@ -4,14 +4,25 @@ extension View {
     /// 壁紙・編集・Store タブで内容を区切るカードの共通背景。設定タブの grouped Form の
     /// セクションと同じ濃さに揃え、ライトモードでも輪郭が消えないよう細い縁を付ける。
     func settingsCardBackground(cornerRadius: CGFloat = 12) -> some View {
-        background(
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(Color.primary.opacity(0.045))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
-        )
+        modifier(SettingsCardBackground(cornerRadius: cornerRadius))
+    }
+}
+
+private struct SettingsCardBackground: ViewModifier {
+    let cornerRadius: CGFloat
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    func body(content: Content) -> some View {
+        let increased = contrast == .increased
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.primary.opacity(increased ? 0.08 : 0.045))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(increased ? 0.35 : 0.07), lineWidth: 1)
+            )
     }
 }
 
@@ -69,5 +80,14 @@ extension EnvironmentValues {
     var settingsPaneTitle: String? {
         get { self[SettingsPaneTitleKey.self] }
         set { self[SettingsPaneTitleKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// For icon-only controls. VoiceOver names such a control after its SF Symbol ("pencil",
+    /// "chevron.up") and reads a tooltip only as extra help, so the tooltip text doubles as the
+    /// accessibility label.
+    func iconHelp(_ text: String) -> some View {
+        help(text).accessibilityLabel(text)
     }
 }

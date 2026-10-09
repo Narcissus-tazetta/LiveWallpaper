@@ -187,7 +187,7 @@ extension SettingsView {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 scheduleRulePriorityBadge(priority)
-                Toggle("", isOn: ruleBinding.isEnabled)
+                Toggle(model.scheduleRuleDisplayName(rule.name), isOn: ruleBinding.isEnabled)
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.mini)
@@ -206,11 +206,19 @@ extension SettingsView {
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
+                // Only the title block becomes the expand button, so the enable switch next
+                // to it stays its own control.
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction {
+                    expandedScheduleRuleID = isExpanded ? nil : id
+                }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(.secondary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
             .onTapGesture {
@@ -326,6 +334,7 @@ extension SettingsView {
                 .buttonStyle(.borderless)
                 .controlSize(.small)
                 .disabled(!canMoveUp)
+                .iconHelp(model.localizedString("上へ移動"))
                 Button {
                     model.moveScheduleRule(id: id, direction: .down)
                 } label: {
@@ -334,6 +343,7 @@ extension SettingsView {
                 .buttonStyle(.borderless)
                 .controlSize(.small)
                 .disabled(!canMoveDown)
+                .iconHelp(model.localizedString("下へ移動"))
                 Button {
                     if let newID = model.duplicateScheduleRule(id: id) {
                         withAnimation(.easeInOut(duration: 0.15)) {
@@ -354,6 +364,7 @@ extension SettingsView {
                 .buttonStyle(.borderless)
                 .controlSize(.small)
                 .tint(.red)
+                .iconHelp(model.localizedString("削除"))
                 .confirmationDialog(
                     model.localizedString("このルールを削除しますか？"),
                     isPresented: scheduleDeleteConfirmationBinding(for: id),

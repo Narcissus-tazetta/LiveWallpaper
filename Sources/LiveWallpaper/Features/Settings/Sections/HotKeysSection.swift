@@ -68,7 +68,7 @@ extension SettingsView {
                 Image(systemName: "arrow.uturn.backward")
             }
             .buttonStyle(.borderless)
-            .help(model.localizedString("既定に戻す"))
+            .iconHelp(model.localizedString("既定に戻す"))
         }
         if model.hotKeyRegistrationFailures.contains(action) {
             settingsFootnote(

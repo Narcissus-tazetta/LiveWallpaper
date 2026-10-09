@@ -219,10 +219,13 @@ extension SettingsView {
         HStack(spacing: 8) {
           Slider(value: desktopReadabilityDimOpacityBinding, in: 0...1)
             .frame(maxWidth: 220)
+            .accessibilityLabel(model.localizedString("デスクトップの見やすさ"))
+            .accessibilityValue("\(Int((model.desktopReadabilityDimOpacity * 100).rounded()))%")
           Text("\(Int((model.desktopReadabilityDimOpacity * 100).rounded()))%")
             .monospacedDigit()
             .foregroundColor(.secondary)
             .frame(width: 40, alignment: .trailing)
+            .accessibilityHidden(true)
         }
       } label: {
         HStack(spacing: 4) {
@@ -463,7 +466,8 @@ extension SettingsView {
       SearchField(
         placeholder: model.localizedString("アプリ名で検索"),
         text: $suspendExclusionAppPickerSearchText,
-        isFocused: $isSuspendExclusionSearchFocused
+        isFocused: $isSuspendExclusionSearchFocused,
+        clearButtonLabel: model.localizedString("検索をクリア")
       )
       .background(
         Button("") { isSuspendExclusionSearchFocused = true }

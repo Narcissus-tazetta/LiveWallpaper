@@ -7,6 +7,7 @@ extension SettingsView {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.secondary.opacity(0.15))
                     .frame(height: cardWidth * 9 / 16)
+                    .accessibilityHidden(true)
                 if let image = remoteThumbnailCache.image(for: entry) {
                     Image(nsImage: image)
                         .resizable()
@@ -20,6 +21,7 @@ extension SettingsView {
                         .foregroundColor(.secondary)
                 }
             }
+            .accessibilityHidden(true)
 
             Text(entry.title)
                 .font(.system(size: 12, weight: .medium))
@@ -45,6 +47,7 @@ extension SettingsView {
                 Text(storeEntrySizeText(entry.sizeBytes))
                 if entry.hasAudio == true {
                     Image(systemName: "speaker.wave.2.fill")
+                        .accessibilityLabel(model.localizedString("音声あり"))
                 }
             }
             .font(.caption2)
@@ -60,9 +63,19 @@ extension SettingsView {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                // Every card has an "Add" button; naming the wallpaper tells them apart.
+                .accessibilityLabel("\(model.localizedString("追加")) \(entry.title)")
             }
         }
         .frame(width: cardWidth, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityActions {
+            if !storeCatalog.reportedEntryIDs.contains(entry.id) {
+                Button(model.localizedString("この動画を通報")) {
+                    storeReportTargetEntry = entry
+                }
+            }
+        }
         // LazyVGrid内でcontextMenuにid()を付けないと、スクロール後にAppKit側が
         // 別セルのメニュー(と閉じたクロージャが捕えたentry)を使い回すことがあり、
         // 右クリックしたカードと違うentryが通報される不具合につながる。

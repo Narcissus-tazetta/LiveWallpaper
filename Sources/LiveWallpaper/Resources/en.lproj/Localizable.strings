@@ -601,3 +601,11 @@
 "ログ" = "Logs";
 "アプリ・macOS・ディスプレイの情報、設定、直近のログを1つのzipにまとめます。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Bundles app, macOS and display info, your settings and recent logs into one zip. Attach it when you report a problem. Video files and web wallpaper URLs are not included.";
 "診断情報の書き出しに失敗しました" = "Couldn’t export diagnostics";
+"上へ移動" = "Move Up";
+"下へ移動" = "Move Down";
+"再読み込み" = "Reload";
+"デスクトップに設定中" = "Set as desktop";
+"ロック画面に設定中" = "Set as lock screen";
+"画面別に割り当て中" = "Assigned to a display";
+"音声あり" = "Has audio";
+"ヘルプ" = "Help";

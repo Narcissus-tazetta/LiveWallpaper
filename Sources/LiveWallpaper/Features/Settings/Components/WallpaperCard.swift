@@ -77,6 +77,7 @@ extension SettingsView {
                             .padding(.horizontal, 5)
                             .padding(.vertical, 3)
                             .background(.ultraThinMaterial, in: Capsule())
+                            .accessibilityHidden(true)
                             // Steps aside for the hover "⋯" button, which takes the same corner.
                             .padding(.trailing, isHovered ? 28 : 0)
                         }
@@ -97,6 +98,21 @@ extension SettingsView {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(model.registeredVideoDisplayName(for: path))
+        .accessibilityValue(
+            wallpaperAssignmentDescription(
+                isDesktopAssigned: isDesktopAssigned,
+                isLockScreenAssigned: isLockScreenAssigned,
+                isDisplayOverrideAssigned: isDisplayOverrideAssigned,
+                isPinned: model.pinCurrentVideo && isDesktopAssigned
+            )
+        )
+        .accessibilityAddTraits(strokeColor == .clear ? [] : .isSelected)
+        // The "⋯" button only exists while the pointer is over the card, so its actions are
+        // offered here too for VoiceOver and keyboard users.
+        .accessibilityActions {
+            wallpaperCardAccessibilityActions(path: path)
+        }
         .overlay(alignment: .topTrailing) {
             if isHovered {
                 // A borderless Menu drops any background drawn in its label, so the circle
@@ -120,8 +136,8 @@ extension SettingsView {
                         .allowsHitTesting(false)
                 )
                 .padding(6)
-                .help(model.localizedString("その他の操作"))
-                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                .iconHelp(model.localizedString("その他の操作"))
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.85)))
             }
         }
 
@@ -158,6 +174,7 @@ extension SettingsView {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .iconHelp(model.localizedString("名前を編集"))
                 }
             }
         }
@@ -180,7 +197,7 @@ extension SettingsView {
         )
         .scaleEffect(isHovered && !reduceMotion ? 1.03 : 1)
         .zIndex(isHovered ? 1 : 0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isHovered)
+        .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.8), value: isHovered)
         .animation(.easeOut(duration: 0.25), value: hoverPreviewPath == path)
         .onHover { hovering in
             handleWallpaperCardHover(path: path, hovering: hovering)
@@ -195,6 +212,10 @@ extension SettingsView {
     func handleWallpaperCardHover(path: String, hovering: Bool) {
         if hovering {
             hoveredWallpaperPath = path
+            // Same rule as the Desktop tab's live thumbnail: Reduce Motion means no autoplay.
+            guard !reduceMotion else {
+                return
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                 if hoveredWallpaperPath == path {
                     hoverPreviewPath = path
@@ -338,6 +359,7 @@ extension SettingsView {
                     .foregroundStyle(.white)
                     .frame(width: 18, height: 18)
                     .background(Color.accentColor, in: Circle())
+                    .help(model.localizedString("デスクトップに設定中"))
             }
             if isLockScreenAssigned {
                 Image(systemName: "lock.fill")
@@ -345,6 +367,7 @@ extension SettingsView {
                     .foregroundStyle(.white)
                     .frame(width: 18, height: 18)
                     .background(Color.orange, in: Circle())
+                    .help(model.localizedString("ロック画面に設定中"))
             }
             if isDisplayOverrideAssigned {
                 Image(systemName: "rectangle.on.rectangle")
@@ -352,9 +375,52 @@ extension SettingsView {
                     .foregroundStyle(.white)
                     .frame(width: 18, height: 18)
                     .background(Color.purple, in: Circle())
+                    .help(model.localizedString("画面別に割り当て中"))
             }
         }
         .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
+        .accessibilityHidden(true)
+    }
+
+    /// What the colour-only badges say, for VoiceOver.
+    func wallpaperAssignmentDescription(
+        isDesktopAssigned: Bool,
+        isLockScreenAssigned: Bool,
+        isDisplayOverrideAssigned: Bool,
+        isPinned: Bool = false
+    ) -> String {
+        var parts: [String] = []
+        if isDesktopAssigned { parts.append(model.localizedString("デスクトップに設定中")) }
+        if isLockScreenAssigned { parts.append(model.localizedString("ロック画面に設定中")) }
+        if isDisplayOverrideAssigned { parts.append(model.localizedString("画面別に割り当て中")) }
+        if isPinned { parts.append(model.localizedString("固定中")) }
+        return parts.joined(separator: ", ")
+    }
+
+    /// Flat version of the card menu: accessibility actions can't hold submenus, so display,
+    /// Space and playlist assignment stay in the context menu (VO-Shift-M opens it).
+    @ViewBuilder
+    func wallpaperCardAccessibilityActions(path: String) -> some View {
+        Button(model.localizedString("デスクトップに設定")) {
+            model.selectRegisteredVideo(path: path)
+        }
+        if model.lockScreenSyncService.isSupported {
+            Button(model.localizedString("ロック画面に設定")) {
+                model.selectLockScreenVideo(path: path)
+            }
+        }
+        Button(model.localizedString("共有…")) {
+            beginShareWallpaperSelection(path: path)
+        }
+        Button(model.localizedString("Storeに共有…")) {
+            beginStoreShare(path: path)
+        }
+        Button(model.localizedString("名前を編集")) {
+            startWallpaperNameEdit(path: path)
+        }
+        Button(model.localizedString("登録から削除")) {
+            model.removeRegisteredVideo(path: path)
+        }
     }
 
     func wallpaperCardStrokeColor(

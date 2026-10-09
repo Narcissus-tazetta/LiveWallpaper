@@ -162,7 +162,7 @@ extension SettingsView {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(model.localizedString("画面ごとに壁紙を切り替え"))
+        .iconHelp(model.localizedString("画面ごとに壁紙を切り替え"))
     }
 
     /// 「デスクトップ2 (現在)」のような Space の表示名。

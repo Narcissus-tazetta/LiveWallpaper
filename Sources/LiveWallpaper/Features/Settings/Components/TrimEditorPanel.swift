@@ -208,7 +208,7 @@ extension SettingsView {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .disabled(!wallpaperEditor.canZoomOut)
-            .help(model.localizedString("タイムラインを縮小"))
+            .iconHelp(model.localizedString("タイムラインを縮小"))
 
             Button {
                 wallpaperEditor.zoomTimeline(by: wallpaperEditor.zoomStepFactor)
@@ -218,7 +218,7 @@ extension SettingsView {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .disabled(!wallpaperEditor.canZoomIn)
-            .help(model.localizedString("タイムラインを拡大(トラックパッドのピンチでも操作できます)"))
+            .iconHelp(model.localizedString("タイムラインを拡大(トラックパッドのピンチでも操作できます)"))
 
             Button(model.localizedString("範囲へ")) {
                 wallpaperEditor.zoomTimelineToSelection()
@@ -245,7 +245,7 @@ extension SettingsView {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .disabled(!wallpaperEditor.canUndo)
-            .help(model.localizedString("取り消す(⌘Z)"))
+            .iconHelp(model.localizedString("取り消す(⌘Z)"))
 
             Button {
                 wallpaperEditor.redo()
@@ -255,7 +255,7 @@ extension SettingsView {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .disabled(!wallpaperEditor.canRedo)
-            .help(model.localizedString("やり直す(⇧⌘Z)"))
+            .iconHelp(model.localizedString("やり直す(⇧⌘Z)"))
         }
     }
 

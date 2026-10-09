@@ -87,6 +87,8 @@ struct SettingsView: View {
     @State var hoverPreviewPath: String?
     @State var settingsCategory: SettingsCategory = .general
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
+    @Environment(\.colorSchemeContrast) var colorSchemeContrast
     @Namespace var tabSelectionNamespace
     let wallpaperCardMinimumWidth: CGFloat = 140
     let wallpaperCardMaximumWidth: CGFloat = 220
@@ -435,7 +437,7 @@ struct SettingsView: View {
         }
         // Animate only the highlight; wrapping the tab switch in withAnimation would
         // also animate the whole incoming tab (video previews, the wallpaper grid).
-        .animation(.easeOut(duration: 0.18), value: selectedTab)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: selectedTab)
     }
 
     @ViewBuilder
@@ -460,7 +462,7 @@ struct SettingsView: View {
             )
         case .wallpaperFit:
             tabScrollPane {
-                Picker("", selection: $editorSubMode) {
+                Picker(model.localizedString("編集"), selection: $editorSubMode) {
                     Text(model.localizedString("フィット編集")).tag(EditorSubMode.fit)
                     Text(model.localizedString("トリム編集")).tag(EditorSubMode.trim)
                 }

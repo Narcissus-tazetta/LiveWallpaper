@@ -4,7 +4,7 @@ extension SettingsView {
     var storeTabContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Picker("", selection: $storeTabMode) {
+                Picker(model.localizedString("Store"), selection: $storeTabMode) {
                     Text(model.localizedString("みんなの投稿")).tag(StoreTabMode.browse)
                     Text(model.localizedString("自分の投稿")).tag(StoreTabMode.mine)
                 }
@@ -43,6 +43,7 @@ extension SettingsView {
                     Image(systemName: "arrow.clockwise")
                 }
                 .buttonStyle(.bordered)
+                .iconHelp(model.localizedString("再読み込み"))
                 .disabled(storeTabMode == .browse ? storeCatalog.isLoading : storeMySubmissions.isRefreshing)
             }
 
@@ -78,7 +79,8 @@ extension SettingsView {
                         set: { storeCatalog.setSearchQuery($0) }
                     ),
                     isFocused: $isStoreSearchFocused,
-                    isSearching: storeCatalog.isSearching
+                    isSearching: storeCatalog.isSearching,
+                    clearButtonLabel: model.localizedString("検索をクリア")
                 )
                 .frame(maxWidth: 260)
                 .background(

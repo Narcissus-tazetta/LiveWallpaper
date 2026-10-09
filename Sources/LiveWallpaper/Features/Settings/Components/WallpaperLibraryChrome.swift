@@ -9,7 +9,8 @@ extension SettingsView {
             SearchField(
                 placeholder: model.localizedString("壁紙を検索"),
                 text: $librarySearchText,
-                isFocused: $isLibrarySearchFocused
+                isFocused: $isLibrarySearchFocused,
+                clearButtonLabel: model.localizedString("検索をクリア")
             )
             .frame(width: 150)
 
@@ -65,9 +66,11 @@ extension SettingsView {
 
     /// A faint wash of the current wallpaper's average colour behind the window content. The
     /// settings tab's grouped form is opaque and would leave it showing only behind the tab strip.
+    /// Left out under Reduce Transparency and Increase Contrast, where a tinted backdrop lowers
+    /// the contrast those settings ask for.
     @ViewBuilder
     var ambientBackground: some View {
-        if selectedTab != .settings,
+        if selectedTab != .settings, !reduceTransparency, colorSchemeContrast != .increased,
            let path = model.currentVideoPath, !model.isWebWallpaperActive,
            let image = thumbnailCache.image(for: path),
            let color = AmbientColorCache.color(for: path, image: image)
@@ -80,7 +83,7 @@ extension SettingsView {
             )
             .ignoresSafeArea()
             .allowsHitTesting(false)
-            .animation(.easeInOut(duration: 0.6), value: path)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.6), value: path)
         }
     }
 
