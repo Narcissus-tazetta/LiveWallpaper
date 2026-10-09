@@ -5,9 +5,7 @@ extension SettingsView {
     func tabButton(_ tab: SettingsTab, title: String, systemImage: String) -> some View {
         let isSelected = selectedTab == tab
         return Button {
-            withAnimation(.easeOut(duration: 0.18)) {
-                selectedTab = tab
-            }
+            selectedTab = tab
         } label: {
             VStack(spacing: 3) {
                 Image(systemName: systemImage)

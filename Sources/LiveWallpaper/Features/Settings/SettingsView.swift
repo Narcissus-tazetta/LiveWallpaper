@@ -430,6 +430,9 @@ struct SettingsView: View {
         .padding(.top, 2)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity)
+        // Animate only the highlight; wrapping the tab switch in withAnimation would
+        // also animate the whole incoming tab (video previews, the wallpaper grid).
+        .animation(.easeOut(duration: 0.18), value: selectedTab)
     }
 
     @ViewBuilder
