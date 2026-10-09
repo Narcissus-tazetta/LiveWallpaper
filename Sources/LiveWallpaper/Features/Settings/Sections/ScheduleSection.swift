@@ -29,10 +29,7 @@ extension SettingsView {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.secondary.opacity(0.08))
-        )
+        .settingsCardBackground()
     }
 
     private var scheduleCardHeader: some View {
