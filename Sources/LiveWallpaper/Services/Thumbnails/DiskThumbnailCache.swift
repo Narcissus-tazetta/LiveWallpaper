@@ -254,10 +254,7 @@ final class DiskThumbnailCache: ObservableObject {
         entry: entry,
         fileURL: fileURL
       )
-      // Not `Task { @MainActor in }`: hopped from this utility queue, those jobs
-      // stalled until the settings window was re-rendered for another reason, so
-      // thumbnails loaded while the window was closed never appeared on first open.
-      DispatchQueue.main.async { MainActor.assumeIsolated {
+      Task { @MainActor in
         guard let self else {
           return
         }
@@ -280,14 +277,14 @@ final class DiskThumbnailCache: ObservableObject {
         case .invalidSource, .missingData:
           self.removeEntry(path)
         }
-      } }
+      }
     }
   }
 
   private func verifySourceExistsAndGenerate(path: String) {
     ioQueue.async { [weak self] in
       let exists = FileManager.default.fileExists(atPath: path)
-      DispatchQueue.main.async { MainActor.assumeIsolated {
+      Task { @MainActor in
         guard let self else {
           return
         }
@@ -297,7 +294,7 @@ final class DiskThumbnailCache: ObservableObject {
           return
         }
         self.generate(path: path)
-      } }
+      }
     }
   }
 }
