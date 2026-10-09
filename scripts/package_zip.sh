@@ -155,6 +155,18 @@ rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp -f "$EXEC_PATH" "$APP_DIR/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
+# The swiftbuild build system records the deployment target as the SDK version (sdk 13.0).
+# AppKit then treats the app as linked against macOS 13 and draws the old controls and no
+# Liquid Glass, so stamp the SDK this build actually used.
+MIN_MACOS="$(otool -l "$EXEC_PATH" | awk '/minos/ {print $2; exit}')"
+SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
+vtool -set-build-version macos "$MIN_MACOS" "$SDK_VERSION" -replace \
+  -output "$APP_DIR/Contents/MacOS/$APP_NAME" "$APP_DIR/Contents/MacOS/$APP_NAME" 2>/dev/null
+STAMPED_SDK="$(otool -l "$APP_DIR/Contents/MacOS/$APP_NAME" | awk '/ sdk / {print $2; exit}')"
+if [[ "$STAMPED_SDK" != "$SDK_VERSION" ]]; then
+  echo "Failed to stamp SDK version ${SDK_VERSION} (binary says ${STAMPED_SDK})" >&2
+  exit 1
+fi
 cp -f "$ICON_PATH" "$APP_DIR/Contents/Resources/AppIcon.icns"
 if [[ -d "$ROOT_DIR/Sources/LiveWallpaper/Resources" ]]; then
   for lproj in "$ROOT_DIR"/Sources/LiveWallpaper/Resources/*.lproj; do
