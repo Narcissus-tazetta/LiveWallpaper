@@ -57,6 +57,10 @@ extension DiskThumbnailCache {
           self.persistMetadata()
           self.flushMetadataIfNeeded()
         }
+        if let validPaths = self.deferredPruneValidPaths {
+          self.deferredPruneValidPaths = nil
+          self.prune(validPaths: validPaths)
+        }
         let pending = self.deferredRequests
         self.deferredRequests.removeAll()
         for path in pending {

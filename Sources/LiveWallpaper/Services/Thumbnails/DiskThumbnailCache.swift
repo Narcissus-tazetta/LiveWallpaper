@@ -46,6 +46,7 @@ final class DiskThumbnailCache: ObservableObject {
   var inFlight: Set<String> = []
   var inFlightReads: Set<String> = []
   var deferredRequests: Set<String> = []
+  var deferredPruneValidPaths: Set<String>?
   var metadata: Metadata = .init(version: 1, entries: [:])
   var initializationState: InitializationState = .idle
   var metadataDirty: Bool = false
@@ -171,6 +172,13 @@ final class DiskThumbnailCache: ObservableObject {
 
   func prune(validPaths: Set<String>) {
     ensureInitialized()
+
+    // Pruning the still-empty in-memory metadata would flush an empty index over
+    // the one being loaded, orphaning every thumbnail on disk at each launch.
+    guard initializationState == .ready else {
+      deferredPruneValidPaths = validPaths
+      return
+    }
 
     let stale = Set(metadata.entries.keys).subtracting(validPaths)
     for path in stale {
