@@ -8,6 +8,7 @@ extension WallpaperModel {
     }
 
     func installScreenSaver() {
+        UserDefaults.standard.set(true, forKey: PrefsKey.screenSaverEnabled)
         do {
             try screenSaverInstaller.install()
             screenSaverErrorMessage = nil
@@ -22,6 +23,7 @@ extension WallpaperModel {
     }
 
     func uninstallScreenSaver() {
+        UserDefaults.standard.set(false, forKey: PrefsKey.screenSaverEnabled)
         do {
             try screenSaverInstaller.uninstall()
             screenSaverErrorMessage = nil
@@ -33,14 +35,15 @@ extension WallpaperModel {
         refreshScreenSaverInstallState()
     }
 
-    /// Call once at launch. Brings an installed saver up to date after an app update
-    /// and keeps its config following whatever the desktop shows.
+    /// Call once at launch. Puts the saver back (removed at the last quit) and keeps its
+    /// config following whatever the desktop shows.
     func configureScreenSaverSync() {
         refreshScreenSaverInstallState()
-        if screenSaverInstallState == .updateAvailable {
+        // Installs made before the preference existed count as enabled.
+        let enabled = UserDefaults.standard.object(forKey: PrefsKey.screenSaverEnabled) as? Bool
+            ?? isScreenSaverInstalled
+        if enabled, screenSaverInstallState != .unavailable {
             installScreenSaver()
-        } else {
-            writeScreenSaverConfigIfInstalled(force: true)
         }
 
         let triggers: [AnyPublisher<Void, Never>] = [
@@ -65,8 +68,26 @@ extension WallpaperModel {
             }
     }
 
+    /// Quitting takes the saver out the same way uninstall does, so the previous screen
+    /// saver comes back and nothing is left behind if the app is then deleted. The
+    /// preference stays on, so the next launch puts it back.
+    func removeScreenSaverBeforeExit() {
+        guard isScreenSaverInstalled else {
+            return
+        }
+        do {
+            try screenSaverInstaller.uninstall()
+        } catch {
+            AppLog.appDelegate.error("screensaver removal before exit failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private var isScreenSaverInstalled: Bool {
+        screenSaverInstallState == .installed || screenSaverInstallState == .updateAvailable
+    }
+
     private func writeScreenSaverConfigIfInstalled(force: Bool) {
-        guard screenSaverInstallState == .installed || screenSaverInstallState == .updateAvailable else {
+        guard isScreenSaverInstalled else {
             return
         }
         let config = makeScreenSaverConfig()

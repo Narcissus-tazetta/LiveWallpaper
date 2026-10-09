@@ -82,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        wallpaperModel.removeScreenSaverBeforeExit()
         wallpaperModel.restoreLockScreenSyncBeforeExit()
     }
 
