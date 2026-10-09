@@ -21,6 +21,11 @@ let package = Package(
             path: "Sources/LiveWallpaper",
             resources: [
                 .process("Resources")
+            ],
+            // The swiftbuild build system copies Sparkle.framework next to the
+            // executable but, unlike the native one, adds no rpath to find it.
+            linkerSettings: [
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path"])
             ]
         ),
         .testTarget(

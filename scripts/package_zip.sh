@@ -19,10 +19,6 @@ DIST_DIR="$ROOT_DIR/dist"
 APP_DIR="$DIST_DIR/${APP_NAME}.app"
 ZIP_PATH="$DIST_DIR/${APP_NAME}-macos-v${VERSION}.zip"
 DMG_PATH="$DIST_DIR/${APP_NAME}-macos-v${VERSION}.dmg"
-ARM_EXEC_PATH="$ROOT_DIR/.build/arm64-apple-macosx/release/${APP_NAME}"
-X64_EXEC_PATH="$ROOT_DIR/.build/x86_64-apple-macosx/release/${APP_NAME}"
-UNIVERSAL_EXEC_PATH="$DIST_DIR/${APP_NAME}-universal"
-EXEC_PATH="$ARM_EXEC_PATH"
 ICON_PATH="$ROOT_DIR/Sources/LiveWallpaper/Resources/AppIcon.icns"
 SPARKLE_FRAMEWORK_PATH="$ROOT_DIR/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 PUBLIC_KEY_FILE="$ROOT_DIR/sparkle-public.pem"
@@ -106,31 +102,28 @@ mkdir -p "$DIST_DIR"
 
 cd "$ROOT_DIR"
 echo "[1/6] Building release binary..."
-# SwiftPM 6.4 defaults to the swiftbuild system, which writes elsewhere and does
-# not embed Sparkle; the paths above would silently pick up a stale binary.
 if [[ "$ARCH_MODE" == "universal" ]]; then
-  swift build --build-system native -c release --arch arm64
-  swift build --build-system native -c release --arch x86_64
-
-  if [[ ! -f "$ARM_EXEC_PATH" ]]; then
-    echo "arm64 release binary not found: $ARM_EXEC_PATH" >&2
-    exit 1
-  fi
-
-  if [[ ! -f "$X64_EXEC_PATH" ]]; then
-    echo "x86_64 release binary not found: $X64_EXEC_PATH" >&2
-    exit 1
-  fi
-
-  lipo -create "$ARM_EXEC_PATH" "$X64_EXEC_PATH" -output "$UNIVERSAL_EXEC_PATH"
-  EXEC_PATH="$UNIVERSAL_EXEC_PATH"
+  ARCH_FLAGS=(--arch arm64 --arch x86_64)
+  EXPECTED_ARCHS="x86_64 arm64"
 else
-  swift build --build-system native -c release --arch arm64
-  EXEC_PATH="$ARM_EXEC_PATH"
+  ARCH_FLAGS=(--arch arm64)
+  EXPECTED_ARCHS="arm64"
 fi
+
+# Building each arch separately and lipo-ing breaks under the swiftbuild build
+# system, which writes every arch to the same directory. The output directory
+# also differs per build system, so ask SwiftPM for it.
+swift build -c release "${ARCH_FLAGS[@]}"
+EXEC_PATH="$(swift build -c release "${ARCH_FLAGS[@]}" --show-bin-path)/${APP_NAME}"
 
 if [[ ! -f "$EXEC_PATH" ]]; then
   echo "Release binary not found: $EXEC_PATH" >&2
+  exit 1
+fi
+
+ACTUAL_ARCHS="$(lipo -archs "$EXEC_PATH")"
+if [[ "$ACTUAL_ARCHS" != "$EXPECTED_ARCHS" ]]; then
+  echo "Release binary has archs '${ACTUAL_ARCHS}', expected '${EXPECTED_ARCHS}': $EXEC_PATH" >&2
   exit 1
 fi
 
@@ -278,8 +271,5 @@ if [[ -f "$DMG_PATH" ]]; then
   ls -lh "$DMG_PATH"
 fi
 
-if [[ -f "$UNIVERSAL_EXEC_PATH" ]]; then
-  rm -f "$UNIVERSAL_EXEC_PATH"
-fi
 
  open dist/LiveWallpaper.app

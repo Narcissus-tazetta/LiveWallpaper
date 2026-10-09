@@ -186,15 +186,13 @@ Built with Swift, SwiftUI, and AppKit.
 
 ```bash
 # Resolve dependencies and build
-swift build --build-system native -c release
+swift build -c release
 ```
 
 ```bash
 # Run from source
-swift run --build-system native
+swift run
 ```
-
-SwiftPM 6.4 and later default to the `swiftbuild` build system, which does not copy Sparkle.framework next to the executable, so the app fails to launch. Pass `--build-system native` to `swift build` / `swift run`.
 
 ```bash
 # Build the screen saver so a `swift run` build can install it from Settings
