@@ -12,7 +12,7 @@
                 AppLog.sparkle.error("feedURL is empty")
                 return
             }
-            AppLog.sparkle.debug("feedURL=\(feedURL, privacy: .public)")
+            AppLog.sparkle.info("feedURL=\(feedURL, privacy: .public)")
 
             let updaterController = SPUStandardUpdaterController(
                 startingUpdater: false,
@@ -30,12 +30,12 @@
             do {
                 try updater.start()
                 sparkleStarted = true
-                AppLog.sparkle.debug("updater.start() succeeded")
+                AppLog.sparkle.info("updater.start() succeeded")
                 if canUseAutomaticUpdates {
                     updater.checkForUpdatesInBackground()
-                    AppLog.sparkle.debug("checkForUpdatesInBackground() requested")
+                    AppLog.sparkle.info("checkForUpdatesInBackground() requested")
                 } else {
-                    AppLog.sparkle.debug("automatic updates are disabled due to update prerequisites")
+                    AppLog.sparkle.info("automatic updates are disabled due to update prerequisites")
                 }
             } catch {
                 Self.reportSparkleError(error)
@@ -88,7 +88,7 @@
             settingsWindowController?.showWindow(nil)
             settingsWindowController?.window?.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
-            AppLog.sparkle.debug("manual checkForUpdates() requested")
+            AppLog.sparkle.info("manual checkForUpdates() requested")
             manualUpdateCheckPending = true
             guard let updater = updaterController?.updater else {
                 AppLog.sparkle.error("updaterController is nil")
@@ -100,7 +100,7 @@
                 do {
                     try updater.start()
                     sparkleStarted = true
-                    AppLog.sparkle.debug("updater.start() succeeded from manual check")
+                    AppLog.sparkle.info("updater.start() succeeded from manual check")
                 } catch {
                     Self.reportSparkleError(error)
                     manualUpdateCheckPending = false

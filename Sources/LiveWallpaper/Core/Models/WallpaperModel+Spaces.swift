@@ -210,7 +210,7 @@ extension WallpaperModel {
             currentSpaceUUIDByDisplayID = current
         }
         orderedSpaceUUIDsByDisplayID = orderedByDisplay
-        AppLog.spaces.debug(
+        AppLog.spaces.info(
             "snapshot desktops=\(self.knownDesktopSpaces.count) current=\(current, privacy: .public)"
         )
     }

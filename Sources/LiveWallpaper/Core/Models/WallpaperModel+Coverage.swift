@@ -321,7 +321,7 @@ extension WallpaperModel {
         guard suspendedDisplayIDs != filtered else {
             return
         }
-        AppLog.suspend.debug(
+        AppLog.suspend.info(
             "transition from=\(String(describing: self.suspendedDisplayIDs), privacy: .public) to=\(String(describing: filtered), privacy: .public) at=\(CFAbsoluteTimeGetCurrent(), format: .fixed(precision: 3))"
         )
         suspendedDisplayIDs = filtered

@@ -16,6 +16,7 @@ extension SettingsView {
         case language
         case cache
         case reset
+        case support
         case update
     }
 
@@ -40,6 +41,7 @@ extension SettingsView {
         case .language: return languageSearchKeywords
         case .cache: return cacheSearchKeywords
         case .reset: return resetSearchKeywords
+        case .support: return supportSearchKeywords
         case .update: return updateSearchKeywords
         }
     }

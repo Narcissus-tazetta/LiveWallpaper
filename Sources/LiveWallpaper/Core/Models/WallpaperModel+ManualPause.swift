@@ -13,7 +13,7 @@ extension WallpaperModel {
             return
         }
         manualPauseActive = paused
-        AppLog.suspend.debug("manual pause -> \(paused)")
+        AppLog.suspend.info("manual pause -> \(paused)")
         evaluateForegroundCoverageState()
     }
 

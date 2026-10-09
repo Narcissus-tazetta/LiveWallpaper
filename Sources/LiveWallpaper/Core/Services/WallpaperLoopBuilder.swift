@@ -127,7 +127,7 @@ enum WallpaperLoopBuilder {
 
         func retry() {
             guard elapsed + pollInterval < giveUpAfter else {
-                AppLog.continuity.debug(
+                AppLog.continuity.info(
                     "intro skipped (never became ready) context=\(context, privacy: .public)"
                 )
                 return
@@ -160,14 +160,14 @@ enum WallpaperLoopBuilder {
             return
         }
         guard looper.loopCount == 0 else {
-            AppLog.continuity.debug(
+            AppLog.continuity.info(
                 "intro skipped (already looping) context=\(context, privacy: .public)"
             )
             return
         }
         let now = player.currentTime()
         guard now.isNumeric, now.seconds <= loopStart.seconds + maxRewind else {
-            AppLog.continuity.debug(
+            AppLog.continuity.info(
                 "intro skipped (already past the loop start) context=\(context, privacy: .public)"
             )
             return

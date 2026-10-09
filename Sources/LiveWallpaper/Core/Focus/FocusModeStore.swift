@@ -209,7 +209,7 @@ final class FocusModeMonitor {
                 && (nsError.code == NSFileReadNoPermissionError
                     || nsError.code == NSFileReadUnknownError)
             newState = isPermission ? .denied : .unknown
-            AppLog.focus.debug(
+            AppLog.focus.info(
                 "focus DB read failed: \(nsError.domain, privacy: .public)#\(nsError.code, privacy: .public)"
             )
         }

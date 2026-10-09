@@ -61,7 +61,7 @@ extension WallpaperModel {
         }
         pruneWallpaperPresentationsForExistingPaths()
         pruneWallpaperEditsForExistingPaths()
-        AppLog.persistence.debug(
+        AppLog.persistence.info(
             "pruned missing video paths count=\(ordered.count)"
         )
     }

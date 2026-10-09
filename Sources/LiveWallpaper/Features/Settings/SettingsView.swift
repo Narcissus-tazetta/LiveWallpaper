@@ -551,6 +551,10 @@ struct SettingsView: View {
                     resetSettingsSection
                     settingsSectionMatchHint(.reset)
                 }
+                if settingsSectionVisible(.support) {
+                    supportSettingsSection
+                    settingsSectionMatchHint(.support)
+                }
                 if settingsSectionVisible(.update) {
                     updateSettingsSection
                     settingsSectionMatchHint(.update)

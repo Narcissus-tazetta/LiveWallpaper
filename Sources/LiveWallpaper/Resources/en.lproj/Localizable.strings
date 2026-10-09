@@ -589,9 +589,15 @@
 "起動・動画と音声・言語・アップデート" = "Startup, video and sound, language, updates";
 "壁紙の表示方法・切り替え・省電力" = "How wallpapers are shown, switching, power saving";
 "共有・Web壁紙・ショートカット・スクリーンセーバー" = "Sharing, web wallpapers, shortcuts, screen saver";
-"キャッシュと設定の管理" = "Cache and settings management";
 "エフェクトの長さ" = "Effect Length";
 "詳細…" = "Details…";
 "完了" = "Done";
 "Store には誰でも壁紙を投稿できます。アカウント登録は不要で、審査のあと「みんなの投稿」に公開されます。" = "Anyone can post wallpapers to the Store. No account needed — after a quick review, they appear under Browse.";
 "並び替え" = "Sort";
+"キャッシュ・設定の管理・サポート" = "Cache, settings management and support";
+"サポート" = "Support";
+"診断情報を書き出す…" = "Export Diagnostics…";
+"不具合を報告…" = "Report a Problem…";
+"ログ" = "Logs";
+"アプリ・macOS・ディスプレイの情報、設定、直近のログを1つのzipにまとめます。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Bundles app, macOS and display info, your settings and recent logs into one zip. Attach it when you report a problem. Video files and web wallpaper URLs are not included.";
+"診断情報の書き出しに失敗しました" = "Couldn’t export diagnostics";

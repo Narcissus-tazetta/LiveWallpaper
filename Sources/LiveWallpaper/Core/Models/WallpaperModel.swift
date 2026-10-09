@@ -347,7 +347,7 @@ final class WallpaperModel: ObservableObject {
         // 画面名(「画面1 (メイン)」)は localizedString で組み立てるため、
         // 言語切替後に作り直す。LocalizationManager 更新後である必要がある。
         refreshDisplayScreens()
-        AppLog.localization.debug(
+        AppLog.localization.info(
             "setAppLanguage -> \(String(describing: language), privacy: .public) effective=\(language.effectiveLanguageCode, privacy: .public)"
         )
     }

@@ -83,6 +83,7 @@ If that happens:
 - **Thumbnail cache**: Fast library browsing with disk and memory thumbnail caching.
 - **Drag & drop**: Add videos by drag and drop, organize playlists, and rename entries.
 - **Search**: Filter the wallpaper library, playlists, web wallpapers, and the Store catalog from the search field at the top of each list.
+- **Problem reports**: Settings › Other › Support › **Export Diagnostics…** bundles app, macOS and display info, your settings and recent logs into one zip. **Report a Problem…** opens a GitHub issue to attach it to. Video files and web wallpaper URLs are left out, and your home folder path is written as `~`.
 
 ## Automatic Switching
 

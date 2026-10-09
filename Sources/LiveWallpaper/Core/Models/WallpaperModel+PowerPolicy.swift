@@ -72,7 +72,7 @@ extension WallpaperModel {
         guard onBattery != isOnBatteryPower else {
             return
         }
-        AppLog.suspend.debug(
+        AppLog.suspend.info(
             "power source onBattery=\(onBattery) policy=\(self.batteryPlaybackPolicy.rawValue, privacy: .public)"
         )
         applyPowerPlaybackChange {

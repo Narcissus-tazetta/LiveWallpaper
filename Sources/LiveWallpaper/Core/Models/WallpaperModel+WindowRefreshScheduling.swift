@@ -79,7 +79,7 @@ extension WallpaperModel {
                 else {
                     return
                 }
-                AppLog.windowRefresh.debug(
+                AppLog.windowRefresh.info(
                     "finderLaunchDetected at=\(Self.windowRefreshTimestamp(), privacy: .public)"
                 )
                 self?.scheduleFinderRestartWindowRefresh()
@@ -97,7 +97,7 @@ extension WallpaperModel {
 
     private func scheduleWallpaperWindowRefresh(reason: WindowRefreshReason) {
         if reason == .activeSpaceTransition, !shouldRefreshWindowsForActiveSpace() {
-            AppLog.windowRefresh.debug(
+            AppLog.windowRefresh.info(
                 "skip reason=\(reason.rawValue, privacy: .public) unchanged-signature at=\(Self.windowRefreshTimestamp(), privacy: .public)"
             )
             return
@@ -107,7 +107,7 @@ extension WallpaperModel {
         let delays = Self.refreshDelays(for: reason)
         let allowReorder = Self.allowsWindowReorder(for: reason)
 
-        AppLog.windowRefresh.debug(
+        AppLog.windowRefresh.info(
             "schedule reason=\(reason.rawValue, privacy: .public) allowReorder=\(allowReorder, privacy: .public) delays=\(String(describing: delays), privacy: .public) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
         )
 
@@ -134,7 +134,7 @@ extension WallpaperModel {
             uniqueKeysWithValues: targetScreens().map { (displayIDString(for: $0), $0) }
         )
 
-        AppLog.windowRefresh.debug(
+        AppLog.windowRefresh.info(
             "run reason=\(reason.rawValue, privacy: .public) allowReorder=\(allowReorder, privacy: .public) windowCount=\(self.windows.count) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
         )
 
@@ -180,7 +180,7 @@ extension WallpaperModel {
     /// ウィンドウ構築(Windowing)側からも呼ばれる。
     func reassertWallpaperOrdering(_ window: NSWindow) {
         guard !isActiveSpaceTransitioning else {
-            AppLog.windowRefresh.debug(
+            AppLog.windowRefresh.info(
                 "skip-reorder active-space-transition at=\(Self.windowRefreshTimestamp(), privacy: .public)"
             )
             return
@@ -194,7 +194,7 @@ extension WallpaperModel {
     ) {
         activeSpaceTransitionLockWorkItem?.cancel()
         isActiveSpaceTransitioning = true
-        AppLog.spaceTransition.debug(
+        AppLog.spaceTransition.info(
             "lock-start reason=\(reason, privacy: .public) duration=\(duration, format: .fixed(precision: 2)) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
         )
         let workItem = DispatchWorkItem { [weak self] in
@@ -203,7 +203,7 @@ extension WallpaperModel {
             }
             isActiveSpaceTransitioning = false
             activeSpaceTransitionLockWorkItem = nil
-            AppLog.spaceTransition.debug(
+            AppLog.spaceTransition.info(
                 "lock-end reason=\(reason, privacy: .public) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
             )
         }

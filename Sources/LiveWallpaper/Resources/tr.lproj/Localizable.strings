@@ -591,9 +591,15 @@
 "起動・動画と音声・言語・アップデート" = "Başlangıç, video ve ses, dil, güncellemeler";
 "壁紙の表示方法・切り替え・省電力" = "Duvar kâğıdının gösterimi, geçişler, güç tasarrufu";
 "共有・Web壁紙・ショートカット・スクリーンセーバー" = "Paylaşım, web duvar kâğıtları, kısayollar, ekran koruyucu";
-"キャッシュと設定の管理" = "Önbellek ve ayar yönetimi";
 "エフェクトの長さ" = "Efekt süresi";
 "詳細…" = "Ayrıntılar…";
 "完了" = "Bitti";
 "Store には誰でも壁紙を投稿できます。アカウント登録は不要で、審査のあと「みんなの投稿」に公開されます。" = "Herkes Store'a duvar kağıdı gönderebilir. Hesap gerekmez; incelemeden sonra Gözat bölümünde yayınlanır.";
 "並び替え" = "Sırala";
+"キャッシュ・設定の管理・サポート" = "Önbellek, ayar yönetimi ve destek";
+"サポート" = "Destek";
+"診断情報を書き出す…" = "Tanılama Bilgilerini Dışa Aktar…";
+"不具合を報告…" = "Sorun Bildir…";
+"ログ" = "Günlükler";
+"アプリ・macOS・ディスプレイの情報、設定、直近のログを1つのzipにまとめます。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Uygulama, macOS ve ekran bilgilerini, ayarlarınızı ve son günlükleri tek bir zip dosyasında toplar. Sorun bildirirken bu dosyayı ekleyin. Video dosyaları ve web duvar kâğıdı URL’leri dahil edilmez.";
+"診断情報の書き出しに失敗しました" = "Tanılama bilgileri dışa aktarılamadı";
