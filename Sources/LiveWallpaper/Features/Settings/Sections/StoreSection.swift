@@ -4,15 +4,13 @@ extension SettingsView {
     var storeTabContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label(model.localizedString("Store"), systemImage: "square.grid.2x2.fill")
-                    .font(.system(size: 13, weight: .semibold))
-
                 Picker("", selection: $storeTabMode) {
                     Text(model.localizedString("みんなの投稿")).tag(StoreTabMode.browse)
                     Text(model.localizedString("自分の投稿")).tag(StoreTabMode.mine)
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 220)
+                .labelsHidden()
+                .fixedSize()
 
                 Spacer(minLength: 0)
                 if let message = storeCatalog.reportResultMessage {
@@ -89,8 +87,9 @@ extension SettingsView {
                         .hidden()
                 )
 
+                Spacer(minLength: 0)
+
                 Picker(
-                    "",
                     selection: Binding(
                         get: { storeCatalog.sortOption },
                         set: { storeCatalog.setSortOption($0) }
@@ -98,11 +97,13 @@ extension SettingsView {
                 ) {
                     Text(model.localizedString("新着順")).tag(StoreSortOption.newest)
                     Text(model.localizedString("人気順")).tag(StoreSortOption.popular)
+                } label: {
+                    Label(model.localizedString("並び替え"), systemImage: "arrow.up.arrow.down")
+                        .labelStyle(.iconOnly)
                 }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 160)
-
-                Spacer(minLength: 0)
+                .pickerStyle(.menu)
+                .fixedSize()
+                .help(model.localizedString("並び替え"))
             }
 
             if let errorMessage = storeCatalog.errorMessage {

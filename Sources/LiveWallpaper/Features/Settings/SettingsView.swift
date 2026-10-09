@@ -139,7 +139,6 @@ struct SettingsView: View {
 
     private func applyMainModifiers<V: View>(_ view: V) -> some View {
         view
-            .tint(.accentColor)
             .frame(
                 minWidth: 780, idealWidth: 780, maxWidth: .infinity,
                 minHeight: 540, idealHeight: 540, maxHeight: .infinity

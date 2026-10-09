@@ -574,9 +574,6 @@ extension SettingsView {
         }
       }
       .pickerStyle(.menu)
-      // The window-wide accent tint would colour the chosen value; System Settings shows it
-      // in the label colour.
-      .tint(.primary)
 
       if let helpTopic, let helpText {
         helpFootnote(for: helpTopic, text: helpText)

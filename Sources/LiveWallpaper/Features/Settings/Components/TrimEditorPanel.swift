@@ -3,13 +3,10 @@ import SwiftUI
 extension SettingsView {
     var wallpaperTrimEditorPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label(model.localizedString("トリム編集"), systemImage: "scissors")
-                    .font(.system(size: 13, weight: .semibold))
-
-                if let path = wallpaperEditor.resolvedVideoPath(),
-                   wallpaperEditor.isDraftDirty(path: path)
-                {
+            if let path = wallpaperEditor.resolvedVideoPath(),
+               wallpaperEditor.isDraftDirty(path: path)
+            {
+                HStack {
                     Text(model.localizedString("未保存"))
                         .font(.system(size: 10, weight: .semibold))
                         .padding(.horizontal, 6)
@@ -18,9 +15,8 @@ extension SettingsView {
                             Capsule().fill(Color.orange.opacity(0.22))
                         )
                         .foregroundColor(.orange)
+                    Spacer(minLength: 0)
                 }
-
-                Spacer(minLength: 0)
             }
 
             if let path = wallpaperEditor.resolvedVideoPath(), !path.isEmpty {
