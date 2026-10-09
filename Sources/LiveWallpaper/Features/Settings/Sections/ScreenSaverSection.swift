@@ -49,7 +49,7 @@ extension SettingsView {
                 }
                 settingsFootnote(
                     model.localizedString(
-                        "システム設定のスクリーンセーバーの一覧で、一番下の「その他」にある「LiveWallpaper」を選ぶと使えます。新しい macOS では「壁紙」設定の「スクリーンセーバー…」ボタンから一覧を開けます。"
+                        "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。"
                     )
                 )
                 if model.isWebWallpaperActive {

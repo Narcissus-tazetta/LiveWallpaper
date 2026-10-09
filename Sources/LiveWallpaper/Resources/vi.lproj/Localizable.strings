@@ -579,4 +579,5 @@
 "今デスクトップに表示している動画の壁紙を、macOS のスクリーンセーバーとして再生します。画面ごとの壁紙・トリム・配置もそのまま反映されます。" = "Phát hình nền video đang hiển thị trên màn hình nền làm trình bảo vệ màn hình macOS, giữ nguyên hình nền từng màn hình, phần cắt và vị trí.";
 "このビルドにはスクリーンセーバーが含まれていません。" = "Bản dựng này không có trình bảo vệ màn hình.";
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Hình nền web không thể phát làm trình bảo vệ màn hình. Hãy chọn hình nền video.";
-"システム設定のスクリーンセーバーの一覧で、一番下の「その他」にある「LiveWallpaper」を選ぶと使えます。新しい macOS では「壁紙」設定の「スクリーンセーバー…」ボタンから一覧を開けます。" = "Chọn \"LiveWallpaper\" trong mục Khác ở cuối danh sách trình bảo vệ màn hình trong Cài đặt hệ thống. Trên macOS mới, mở danh sách bằng nút \"Trình bảo vệ màn hình…\" trong cài đặt Hình nền.";
+"LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "Khi LiveWallpaper đang chạy, ứng dụng sẽ tự động được chọn làm trình bảo vệ màn hình. Khi thoát ứng dụng hoặc gỡ cài đặt, trình bảo vệ màn hình trước đó sẽ được khôi phục.";
+"macOS の壁紙設定にスクリーンセーバーの項目が見つかりませんでした。システム設定でスクリーンセーバーを一度選んでから、もう一度お試しください。" = "Không tìm thấy mục trình bảo vệ màn hình trong cài đặt hình nền của macOS. Hãy chọn trình bảo vệ màn hình một lần trong Cài đặt hệ thống rồi thử lại.";

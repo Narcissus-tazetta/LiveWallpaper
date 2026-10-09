@@ -40,6 +40,7 @@ enum PrefsKey {
     static let registeredVideoPaths = "registeredVideoPaths"
     static let respectReduceMotionEnabled = "respectReduceMotionEnabled"
     static let scheduleRulesData = "scheduleRulesData"
+    static let screenSaverEnabled = "screenSaverEnabled"
     static let screenPlaylistByScreenID = "screenPlaylistByScreenID"
     static let selectedPlaylistID = "selectedPlaylistID"
     static let shufflePlaybackEnabled = "shufflePlaybackEnabled"

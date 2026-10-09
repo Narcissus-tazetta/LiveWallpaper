@@ -577,4 +577,5 @@
 "今デスクトップに表示している動画の壁紙を、macOS のスクリーンセーバーとして再生します。画面ごとの壁紙・トリム・配置もそのまま反映されます。" = "Plays the video wallpaper currently on your desktop as the macOS screen saver, including per-display wallpapers, trimming, and placement.";
 "このビルドにはスクリーンセーバーが含まれていません。" = "This build does not include the screen saver.";
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Web wallpapers can't play as a screen saver. Choose a video wallpaper to use it.";
-"システム設定のスクリーンセーバーの一覧で、一番下の「その他」にある「LiveWallpaper」を選ぶと使えます。新しい macOS では「壁紙」設定の「スクリーンセーバー…」ボタンから一覧を開けます。" = "Choose \"LiveWallpaper\" under Other at the bottom of the screen saver list in System Settings. On recent macOS, open the list with the \"Screen Saver…\" button in Wallpaper settings.";
+"LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "While LiveWallpaper is running, it is selected as your screen saver automatically. Quitting the app or uninstalling switches back to your previous screen saver.";
+"macOS の壁紙設定にスクリーンセーバーの項目が見つかりませんでした。システム設定でスクリーンセーバーを一度選んでから、もう一度お試しください。" = "Couldn't find the screen saver entry in the macOS wallpaper settings. Choose a screen saver once in System Settings, then try again.";
