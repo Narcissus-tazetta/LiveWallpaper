@@ -96,7 +96,7 @@ extension AppDelegate {
 
   func verifyUpdatePrerequisites() {
     let bundlePath: String = bundleURL().path
-    AppLog.sparkle.debug("Bundle path: \(bundlePath, privacy: .public)")
+    AppLog.sparkle.info("Bundle path: \(bundlePath, privacy: .public)")
     let issues = currentUpdateEnvironmentIssues()
     if !issues.isEmpty {
       for issue in issues {

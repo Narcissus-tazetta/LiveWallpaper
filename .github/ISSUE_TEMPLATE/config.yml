@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+    - name: Latest release / 最新版のダウンロード
+      url: https://github.com/Narcissus-tazetta/LiveWallpaper/releases/latest
+      about: Please check the problem still happens on the latest version. / 最新版でも起きるか確認してください。
+    - name: Report a Store wallpaper / Store の壁紙を通報
+      url: https://github.com/Narcissus-tazetta/LiveWallpaper#readme
+      about: Right-click the wallpaper in the Store tab and choose “Report this video” instead of opening an issue. / issue ではなく、Store タブで壁紙を右クリックして「この動画を通報」を選んでください。

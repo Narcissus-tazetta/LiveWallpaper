@@ -6,6 +6,10 @@ import OSLog
 /// which matters here because several of these categories log from hot paths
 /// (window occlusion changes, space transitions) that can fire many times per
 /// second.
+///
+/// Log state changes at `.info` or above, not `.debug`: Export Diagnostics reads this
+/// process's log, which keeps `.info` in memory but never records `.debug`. Interpolated
+/// strings show as `<private>` there unless marked `privacy: .public`.
 enum AppLog {
     private static let subsystem = "com.sakana.livewallpaper"
 

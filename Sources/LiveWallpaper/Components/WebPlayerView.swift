@@ -168,7 +168,7 @@ final class WebPlayerView: NSView {
         loadGeneration &+= 1
         webView.stopLoading()
         webView.loadHTMLString("", baseURL: nil)
-        AppLog.suspend.debug("web page unloaded")
+        AppLog.suspend.info("web page unloaded")
     }
 
     /// Rebuilds the torn-down page behind the freeze image. The live page is only
@@ -183,7 +183,7 @@ final class WebPlayerView: NSView {
         retryCount = 0
         awaitsEmbedPlayerReady = request.awaitsEmbedPlayerReady
         loadGeneration &+= 1
-        AppLog.suspend.debug("web page reloading after deep suspend")
+        AppLog.suspend.info("web page reloading after deep suspend")
         // Deliberately no .loading report: this is our own resource bookkeeping,
         // not a reload the user asked for, so the settings UI shouldn't blink
         // through a loading state every time the wallpaper is uncovered.
@@ -230,7 +230,7 @@ final class WebPlayerView: NSView {
         webView.isHidden = false
         freezeImageView.isHidden = true
         freezeImageView.image = nil
-        AppLog.suspend.debug("web page revealed after deep suspend")
+        AppLog.suspend.info("web page revealed after deep suspend")
     }
 
     private func performLoad(request: WebWallpaperPlaybackRequest) {

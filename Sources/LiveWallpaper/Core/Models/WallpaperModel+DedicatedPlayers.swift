@@ -85,12 +85,12 @@ extension WallpaperModel {
         }
 
         if restoresPosition, let remembered = dedicatedResumeTimeByKey[resumeKey] {
-            AppLog.continuity.debug(
+            AppLog.continuity.info(
                 "restore requested display=\(screenID, privacy: .public) seconds=\(remembered.seconds) path=\((path as NSString).lastPathComponent, privacy: .public)"
             )
             seekDedicatedSlot(player: player, screenID: screenID, path: path)
         } else {
-            AppLog.continuity.debug(
+            AppLog.continuity.info(
                 "no saved position display=\(screenID, privacy: .public) path=\((path as NSString).lastPathComponent, privacy: .public)"
             )
         }
@@ -125,7 +125,7 @@ extension WallpaperModel {
             return
         }
         let evictTime = slot.player.currentTime()
-        AppLog.continuity.debug(
+        AppLog.continuity.info(
             "evict display=\(screenID, privacy: .public) seconds=\(evictTime.isNumeric ? evictTime.seconds : -1) path=\((path as NSString).lastPathComponent, privacy: .public)"
         )
         if dedicatedPlaybackContinuityEnabled {
@@ -247,7 +247,7 @@ extension WallpaperModel {
 
     private func recordResumeTime(_ time: CMTime, forScreenID screenID: String, path: String) {
         guard time.isNumeric, time.seconds > 0 else {
-            AppLog.continuity.debug(
+            AppLog.continuity.info(
                 "record skipped (not numeric/positive) display=\(screenID, privacy: .public) path=\((path as NSString).lastPathComponent, privacy: .public)"
             )
             return
@@ -289,7 +289,7 @@ extension WallpaperModel {
     ) {
         let giveUpAfter: TimeInterval = 15
         guard elapsed < giveUpAfter else {
-            AppLog.continuity.debug(
+            AppLog.continuity.info(
                 "restore gave up after \(elapsed)s display=\(screenID, privacy: .public) path=\((path as NSString).lastPathComponent, privacy: .public)"
             )
             return
@@ -335,7 +335,7 @@ extension WallpaperModel {
             path: path,
             itemDurationSeconds: item.duration.seconds
         ) else {
-            AppLog.continuity.debug(
+            AppLog.continuity.info(
                 "restore skipped (outside loop range) display=\(screenID, privacy: .public) seconds=\(requestedTime.seconds) path=\((path as NSString).lastPathComponent, privacy: .public)"
             )
             return
@@ -345,7 +345,7 @@ extension WallpaperModel {
             preferredTimescale: requestedTime.timescale > 0 ? requestedTime.timescale : 600
         )
         player.seek(to: safeTime, toleranceBefore: .zero, toleranceAfter: .zero) { finished in
-            AppLog.continuity.debug(
+            AppLog.continuity.info(
                 "restore seek finished=\(finished) target=\(safeSeconds) actual=\(player.currentTime().seconds)"
             )
         }
@@ -481,7 +481,7 @@ extension WallpaperModel {
                     layer.contents = freeze
                 }
                 player?.pause()
-                AppLog.suspend.debug(
+                AppLog.suspend.info(
                     "dedicated suspend display=\(displayID, privacy: .public) hasPlayer=\(player != nil)"
                 )
             } else {
@@ -497,7 +497,7 @@ extension WallpaperModel {
                     }
                 }
                 player.play()
-                AppLog.suspend.debug(
+                AppLog.suspend.info(
                     "dedicated play display=\(displayID, privacy: .public) rate=\(player.rate)"
                 )
             }

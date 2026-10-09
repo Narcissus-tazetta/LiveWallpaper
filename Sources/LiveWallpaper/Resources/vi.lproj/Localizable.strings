@@ -591,9 +591,15 @@
 "起動・動画と音声・言語・アップデート" = "Khởi động, video và âm thanh, ngôn ngữ, cập nhật";
 "壁紙の表示方法・切り替え・省電力" = "Cách hiển thị hình nền, chuyển đổi, tiết kiệm điện";
 "共有・Web壁紙・ショートカット・スクリーンセーバー" = "Chia sẻ, hình nền Web, phím tắt, trình bảo vệ màn hình";
-"キャッシュと設定の管理" = "Bộ nhớ đệm và quản lý cài đặt";
 "エフェクトの長さ" = "Thời lượng hiệu ứng";
 "詳細…" = "Chi tiết…";
 "完了" = "Xong";
 "Store には誰でも壁紙を投稿できます。アカウント登録は不要で、審査のあと「みんなの投稿」に公開されます。" = "Ai cũng có thể đăng hình nền lên Store. Không cần tài khoản — sau khi được duyệt, bài sẽ hiển thị trong mục Duyệt.";
 "並び替え" = "Sắp xếp";
+"キャッシュ・設定の管理・サポート" = "Bộ nhớ đệm, quản lý cài đặt và hỗ trợ";
+"サポート" = "Hỗ trợ";
+"診断情報を書き出す…" = "Xuất thông tin chẩn đoán…";
+"不具合を報告…" = "Báo cáo sự cố…";
+"ログ" = "Nhật ký";
+"アプリ・macOS・ディスプレイの情報、設定、直近のログを1つのzipにまとめます。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Gom thông tin ứng dụng, macOS và màn hình, cài đặt của bạn cùng nhật ký gần đây vào một tệp zip. Hãy đính kèm tệp này khi báo cáo sự cố. Không bao gồm tệp video và URL hình nền web.";
+"診断情報の書き出しに失敗しました" = "Không thể xuất thông tin chẩn đoán";

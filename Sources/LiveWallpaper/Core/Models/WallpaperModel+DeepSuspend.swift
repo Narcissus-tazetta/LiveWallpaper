@@ -112,7 +112,7 @@ extension WallpaperModel {
         else {
             return
         }
-        AppLog.suspend.debug(
+        AppLog.suspend.info(
             "web deep suspend: unloading views=\(self.webPlayerViews.count)"
         )
         for view in webPlayerViews {
