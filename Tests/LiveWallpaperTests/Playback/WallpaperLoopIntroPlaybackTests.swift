@@ -13,13 +13,67 @@ import XCTest
 ///    (= 継ぎ目で固まらない。過去2回の不具合はまさにここで止まっていた)。
 @MainActor
 final class WallpaperLoopIntroPlaybackTests: XCTestCase {
-    private func sampleVideoURL() -> URL? {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/LiveWallpaper/Videos")
-        let files =
-            (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil))
-                ?? []
-        return files.first { ["mp4", "mov"].contains($0.pathExtension.lowercased()) }
+    private var fixtureDirectory: URL!
+    private var videoURL: URL!
+
+    /// Generated per run instead of reading the user's library: the library's directory
+    /// order (and its contents) changes, and CI has no library at all, so these tests
+    /// used to pick an arbitrary video locally and silently skip on CI.
+    override func setUp() async throws {
+        fixtureDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("WallpaperLoopIntroPlaybackTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: fixtureDirectory, withIntermediateDirectories: true)
+        videoURL = fixtureDirectory.appendingPathComponent("fixture.mp4")
+        try await Self.writeFixtureVideo(to: videoURL, seconds: 6, fps: 30)
+    }
+
+    override func tearDown() async throws {
+        try? FileManager.default.removeItem(at: fixtureDirectory)
+    }
+
+    private static func writeFixtureVideo(to url: URL, seconds: Int, fps: Int32) async throws {
+        let size = 64
+        let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
+        let input = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: [
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: size,
+                AVVideoHeightKey: size,
+                AVVideoCompressionPropertiesKey: [AVVideoMaxKeyFrameIntervalKey: Int(fps)],
+            ]
+        )
+        input.expectsMediaDataInRealTime = false
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: input,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: size,
+                kCVPixelBufferHeightKey as String: size,
+            ]
+        )
+        writer.add(input)
+        XCTAssertTrue(writer.startWriting(), "writer failed: \(String(describing: writer.error))")
+        writer.startSession(atSourceTime: .zero)
+
+        let frameCount = seconds * Int(fps)
+        for frame in 0..<frameCount {
+            while !input.isReadyForMoreMediaData {
+                try await Task.sleep(nanoseconds: 5_000_000)
+            }
+            let pool = try XCTUnwrap(adaptor.pixelBufferPool)
+            var buffer: CVPixelBuffer?
+            CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
+            let pixelBuffer = try XCTUnwrap(buffer)
+            CVPixelBufferLockBaseAddress(pixelBuffer, [])
+            let base = try XCTUnwrap(CVPixelBufferGetBaseAddress(pixelBuffer))
+            memset(base, Int32(frame % 256), CVPixelBufferGetDataSize(pixelBuffer))
+            CVPixelBufferUnlockBaseAddress(pixelBuffer, [])
+            XCTAssertTrue(adaptor.append(pixelBuffer, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: fps)))
+        }
+        input.markAsFinished()
+        await writer.finishWriting()
+        XCTAssertEqual(writer.status, .completed, "writer failed: \(String(describing: writer.error))")
     }
 
     /// 壁時計で `seconds` だけ待つ(その間メインループは回り続けるので、
@@ -31,12 +85,7 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
     }
 
     func testIntroPlaysFromTheCutStartThenKeepsLooping() throws {
-        guard let url = sampleVideoURL() else {
-            throw XCTSkip("no sample video available in the LiveWallpaper Videos dir")
-        }
-        let asset = AVURLAsset(url: url)
-        let duration = CMTimeGetSeconds(asset.duration)
-        try XCTSkipIf(duration < 4.0, "sample video is too short for this timing test")
+        let asset = AVURLAsset(url: videoURL)
 
         let trimStart = 0.5
         let loopStart = 2.0
@@ -77,7 +126,9 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
             "after the seam playback must be inside the loop range, was \(afterSeam)"
         )
 
-        wait(seconds: 1.0)
+        // Not a multiple of the 1 s loop range: a full lap would land on the same playhead
+        // and read as frozen.
+        wait(seconds: 0.4)
         let later = player.currentTime().seconds
         XCTAssertNotEqual(
             later, afterSeam,
@@ -90,11 +141,7 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
     /// ループ開始位置なし(= イントロなし)のときは、従来どおりカット開始位置から
     /// 素直にループする。イントロ経路を足したことで通常経路が壊れていないことの確認。
     func testPlainCutRangeStillLoopsWithoutAnIntro() throws {
-        guard let url = sampleVideoURL() else {
-            throw XCTSkip("no sample video available in the LiveWallpaper Videos dir")
-        }
-        let asset = AVURLAsset(url: url)
-        try XCTSkipIf(CMTimeGetSeconds(asset.duration) < 4.0, "sample video is too short")
+        let asset = AVURLAsset(url: videoURL)
 
         let player = AVQueuePlayer()
         player.isMuted = true
