@@ -35,10 +35,7 @@ extension SettingsView {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.secondary.opacity(0.08))
-        )
+        .settingsCardBackground()
     }
 
     /// スケジュールカード(scheduleCardHeader)と同じ折りたたみヘッダー(collapsibleCardHeader)。

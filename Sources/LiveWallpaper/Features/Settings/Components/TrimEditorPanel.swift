@@ -32,10 +32,7 @@ extension SettingsView {
             }
         }
         .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.secondary.opacity(0.08))
-        )
+        .settingsCardBackground()
         .sheet(isPresented: $isTrimCopyPickerPresented) {
             trimCopyPickerSheet
         }

@@ -527,14 +527,11 @@ extension SettingsView {
     .onAppear { isSuspendExclusionSearchFocused = true }
   }
 
+  /// grouped Form のセクション自体が背景を持つため、ここでは枠を重ねず余白だけ揃える。
   func settingsInsetCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
     content()
-      .padding(12)
+      .padding(.vertical, 4)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(
-        RoundedRectangle(cornerRadius: 10)
-          .fill(Color.secondary.opacity(0.08))
-      )
   }
 
   func settingsCalloutNote(systemImage: String, text: String) -> some View {

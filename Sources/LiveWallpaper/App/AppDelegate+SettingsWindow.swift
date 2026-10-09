@@ -15,6 +15,9 @@ extension AppDelegate {
         let window = NSWindow(contentViewController: hosting)
         window.title = localized("Live Wallpaper 設定")
         window.styleMask.insert(.resizable)
+        // Lets the icon tab bar read as part of the titlebar, like a toolbar.
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
         window.minSize = NSSize(width: 780, height: 540)
         window.setContentSize(NSSize(width: 780, height: 540))
         if !window.setFrameUsingName(Self.settingsWindowFrameAutosaveName) {

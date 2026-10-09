@@ -3,39 +3,42 @@ import SwiftUI
 
 extension SettingsView {
     func tabButton(_ tab: SettingsTab, title: String, systemImage: String) -> some View {
-        Button {
-            selectedTab = tab
+        let isSelected = selectedTab == tab
+        return Button {
+            withAnimation(.easeOut(duration: 0.18)) {
+                selectedTab = tab
+            }
         } label: {
-            Label(title, systemImage: systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .padding(.horizontal, 18)
-                .padding(.vertical, 10)
-                .frame(minWidth: 130)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(selectedTab == tab ? Color.accentColor : Color.clear)
-                )
-                .foregroundColor(
-                    selectedTab == tab ? selectedTabForegroundColor : Color.primary
-                )
-                .contentShape(Rectangle())
+            VStack(spacing: 3) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 17, weight: .regular))
+                    .frame(height: 20)
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+            }
+            .foregroundColor(isSelected ? .accentColor : .secondary)
+            .frame(minWidth: 64)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(0.08))
+                        .matchedGeometryEffect(id: "selectedTab", in: tabSelectionNamespace)
+                } else if hoveredTab == tab {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(0.04))
+                }
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(selectedTab == tab ? [.isSelected] : [])
-    }
-
-    /// White text on the accent-color fill above reads fine for the default
-    /// blue/purple/red accents, but macOS also offers light accents (Yellow,
-    /// Green) where white loses contrast. Picking black vs. white by the
-    /// accent color's own luminance keeps this readable under every system
-    /// accent color choice instead of assuming it's always dark.
-    private var selectedTabForegroundColor: Color {
-        guard let rgb = NSColor(Color.accentColor).usingColorSpace(.deviceRGB) else {
-            return .white
+        .onHover { hovering in
+            hoveredTab = hovering ? tab : (hoveredTab == tab ? nil : hoveredTab)
         }
-        let luminance =
-            0.299 * rgb.redComponent + 0.587 * rgb.greenComponent + 0.114 * rgb.blueComponent
-        return luminance > 0.6 ? .black : .white
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     func compactToggle(_ title: String, isOn: Binding<Bool>) -> some View {

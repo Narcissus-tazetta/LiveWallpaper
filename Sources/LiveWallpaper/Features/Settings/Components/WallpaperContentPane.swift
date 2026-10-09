@@ -46,10 +46,7 @@ extension SettingsView {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.secondary.opacity(0.08))
-        )
+        .settingsCardBackground()
     }
 
     private var librarySearchQuery: String {
@@ -373,8 +370,10 @@ extension SettingsView {
                     .truncationMode(.tail)
             }
             Spacer(minLength: 8)
-            Button(model.localizedString("壁紙を共有")) {
+            Button {
                 isWallpaperShareSheetPresented = true
+            } label: {
+                Label(model.localizedString("壁紙を共有"), systemImage: "square.and.arrow.up")
             }
             .buttonStyle(.bordered)
             .disabled(model.libraryVideoPaths.isEmpty)
@@ -382,8 +381,10 @@ extension SettingsView {
             if selectedAssignmentTarget == .desktop, activeDisplayOverrideScreenID == nil,
                model.webWallpaperFeatureEnabled
             {
-                Button(model.localizedString("Web壁紙を追加")) {
+                Button {
                     isWebWallpaperURLPopoverPresented = true
+                } label: {
+                    Label(model.localizedString("Web壁紙を追加"), systemImage: "globe")
                 }
                 .buttonStyle(.bordered)
                 .popover(isPresented: $isWebWallpaperURLPopoverPresented) {
@@ -411,8 +412,10 @@ extension SettingsView {
                 }
             }
 
-            Button(model.localizedString("メディアを追加")) {
+            Button {
                 NotificationCenter.default.post(name: .chooseVideo, object: nil)
+            } label: {
+                Label(model.localizedString("メディアを追加"), systemImage: "plus")
             }
             .buttonStyle(.borderedProminent)
             .disabled(model.isImportingMedia)

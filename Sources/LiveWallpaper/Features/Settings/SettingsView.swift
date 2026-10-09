@@ -81,6 +81,8 @@ struct SettingsView: View {
     /// 設定検索の案内行から飛んできたときは開いた状態にする。
     @State var isScheduleCardExpanded: Bool = false
     @State var isFocusCardExpanded: Bool = false
+    @State var hoveredTab: SettingsTab?
+    @Namespace var tabSelectionNamespace
     let wallpaperCardMinimumWidth: CGFloat = 140
     let wallpaperCardMaximumWidth: CGFloat = 220
     let wallpaperGridColumnSpacing: CGFloat = 6
@@ -118,25 +120,10 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        // タブバーはコンテンツの Form とは別の(スクロール無効な)Form として描画する。
-        // 同じ grouped スタイルを使うことで横幅・インセットが本文のセクションと揃い、
-        // かつコンテンツをスクロールしてもタブバーは常に見える。
         let content = VStack(spacing: 0) {
-            Form {
-                tabBarSection
-            }
-            .formStyle(.grouped)
-            .scrollDisabled(true)
-            // grouped Form の上マージン(約20pt) + タブバー行(72pt+行パディング)が
-            // 収まる高さ。小さすぎるとタブバーが下に見切れる。
-            .frame(height: 112)
-
-            Form {
-                tabContentSection
-
-                footerSection
-            }
-            .formStyle(.grouped)
+            tabBar
+            Divider()
+            tabContent
         }
 
         let modified1 = applyMainModifiers(content)
@@ -147,7 +134,6 @@ struct SettingsView: View {
 
     private func applyMainModifiers<V: View>(_ view: V) -> some View {
         view
-            .font(.system(size: 14, weight: .medium))
             .tint(.accentColor)
             .frame(
                 minWidth: 780, idealWidth: 780, maxWidth: .infinity,
@@ -417,88 +403,80 @@ struct SettingsView: View {
         }
     }
 
-    private var tabBarSection: some View {
-        Section {
-            HStack(spacing: 10) {
-                tabButton(
-                    .wallpaper,
-                    title: model.localizedString("壁紙"),
-                    systemImage: "photo.on.rectangle"
-                )
-                tabButton(
-                    .wallpaperFit,
-                    title: model.localizedString("編集"),
-                    systemImage: "viewfinder"
-                )
-                tabButton(
-                    .store,
-                    title: model.localizedString("Store"),
-                    systemImage: "square.grid.2x2.fill"
-                )
-                tabButton(
-                    .settings,
-                    title: model.localizedString("設定"),
-                    systemImage: "gearshape"
-                )
-                Spacer(minLength: 0)
-            }
-            .padding(8)
-            .frame(minHeight: 72)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.secondary.opacity(0.12))
+    /// macOS の設定ウィンドウと同じ、アイコンの下にラベルを置くツールバー型のタブ。
+    private var tabBar: some View {
+        HStack(spacing: 4) {
+            tabButton(
+                .wallpaper,
+                title: model.localizedString("壁紙"),
+                systemImage: "photo.on.rectangle.angled"
+            )
+            tabButton(
+                .wallpaperFit,
+                title: model.localizedString("編集"),
+                systemImage: "crop"
+            )
+            tabButton(
+                .store,
+                title: model.localizedString("Store"),
+                systemImage: "bag"
+            )
+            tabButton(
+                .settings,
+                title: model.localizedString("設定"),
+                systemImage: "gearshape"
             )
         }
+        .padding(.top, 2)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
-    private var tabContentSection: some View {
+    private var tabContent: some View {
         switch selectedTab {
         case .wallpaper:
-            WallpaperTabView(title: model.localizedString("壁紙")) {
-                VStack(alignment: .leading, spacing: 12) {
-                    wallpaperTargetTabBar
-                    wallpaperContentPane
+            tabScrollPane {
+                wallpaperTargetTabBar
+                wallpaperContentPane
 
-                    // 集中モード連携・スケジュールのターゲットはデスクトップ壁紙のみの
-                    // ため、ロック画面タブでは出さない。
-                    if selectedAssignmentTarget == .desktop {
-                        wallpaperFocusFilterCard
-                        wallpaperScheduleCard
-                    }
+                // 集中モード連携・スケジュールのターゲットはデスクトップ壁紙のみの
+                // ため、ロック画面タブでは出さない。
+                if selectedAssignmentTarget == .desktop {
+                    wallpaperFocusFilterCard
+                    wallpaperScheduleCard
                 }
-                .background(
-                    Button("") { isLibrarySearchFocused = true }
-                        .keyboardShortcut("f", modifiers: .command)
-                        .hidden()
-                )
             }
+            .background(
+                Button("") { isLibrarySearchFocused = true }
+                    .keyboardShortcut("f", modifiers: .command)
+                    .hidden()
+            )
         case .wallpaperFit:
-            WallpaperFitTabView(title: model.localizedString("編集")) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Picker("", selection: $editorSubMode) {
-                        Text(model.localizedString("フィット編集")).tag(EditorSubMode.fit)
-                        Text(model.localizedString("トリム編集")).tag(EditorSubMode.trim)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-
-                    switch editorSubMode {
-                    case .fit:
-                        wallpaperFitEditorPanel
-                    case .trim:
-                        wallpaperTrimEditorPanel
-                    }
+            tabScrollPane {
+                Picker("", selection: $editorSubMode) {
+                    Text(model.localizedString("フィット編集")).tag(EditorSubMode.fit)
+                    Text(model.localizedString("トリム編集")).tag(EditorSubMode.trim)
                 }
-            } library: {
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 320)
+                .frame(maxWidth: .infinity)
+
+                switch editorSubMode {
+                case .fit:
+                    wallpaperFitEditorPanel
+                case .trim:
+                    wallpaperTrimEditorPanel
+                }
                 wallpaperFitLibraryPanel
             }
         case .store:
-            WallpaperTabView(title: model.localizedString("Store")) {
+            tabScrollPane {
                 storeTabContent
             }
         case .settings:
-            SettingsTabView {
+            Form {
                 Section {
                     settingsSearchField
                         .background(
@@ -579,10 +557,32 @@ struct SettingsView: View {
                         }
                     }
                 }
+
+                footerSection
             }
+            .formStyle(.grouped)
             #if DEBUG
             .onAppear { SettingsView.assertAllSettingsSectionsHaveSearchKeywords() }
             #endif
+        }
+    }
+
+    /// 壁紙・編集・Store は各パネルが自前のカードで区切られているため、grouped Form の
+    /// セクションに入れず直接並べる(Form に入れるとカードが二重の箱になる)。
+    private func tabScrollPane<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                content()
+                footerCreditText
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 6)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
         }
     }
 
