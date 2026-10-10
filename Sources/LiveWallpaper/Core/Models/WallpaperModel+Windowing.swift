@@ -163,6 +163,7 @@ extension WallpaperModel {
                 window.setFrame(screen.frame, display: true)
             }
             applyPlayerPresentation(to: playerView, screen: screen)
+            playerView.setHighDynamicRange(effectiveHDRDisplay)
             // オーバーライド画面への専用プレイヤーの付け替えは、この後の
             // applySuspensionStateToPlayers に任せる。
             if isSharedPlayerDisplay(displayID),

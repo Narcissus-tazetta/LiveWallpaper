@@ -102,8 +102,11 @@ enum WallpaperTrimExporter {
             throw ExportError.emptyRange
         }
         let asset = AVURLAsset(url: URL(fileURLWithPath: sourcePath))
+        let presetName = preset == .reEncode
+            ? try await HDRVideo.reEncodePreset(for: asset, sdrPreset: preset.presetName)
+            : preset.presetName
         guard
-            let session = AVAssetExportSession(asset: asset, presetName: preset.presetName)
+            let session = AVAssetExportSession(asset: asset, presetName: presetName)
         else {
             throw ExportError.sessionUnavailable
         }

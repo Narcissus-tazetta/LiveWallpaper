@@ -139,6 +139,7 @@ extension SettingsView {
         case fullScreenAuxiliary
         case batteryAwareQuality
         case batteryPlaybackPolicy
+        case hdrDisplay
         case wallpaperTransition
         case videoLoop
         case menuBarOpaque

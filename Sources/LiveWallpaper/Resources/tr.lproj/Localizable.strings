@@ -611,3 +611,6 @@
 "画面別に割り当て中" = "Bir ekrana atanmış";
 "音声あり" = "Ses içerir";
 "ヘルプ" = "Yardım";
+"HDR 動画を HDR で表示" = "HDR videoları HDR olarak göster";
+"HDR 対応のディスプレイで、HDR 動画の明るい部分を本来の明るさで表示します。ほかのウィンドウと並んでも眩しくなりすぎないよう、明るさは控えめに調整されます。オフにすると SDR で表示します。" = "HDR destekli bir ekranda HDR videoların parlak bölümleri tam parlaklıkta gösterilir. Duvar kağıdı diğer pencerelerin yanında göz kamaştırmasın diye parlaklık biraz kısılır. Kapatırsanız SDR olarak gösterilir.";
+"バッテリー駆動中のため、HDR 動画を SDR で表示しています。" = "Mac pil gücünde olduğu için HDR videolar SDR olarak gösteriliyor.";

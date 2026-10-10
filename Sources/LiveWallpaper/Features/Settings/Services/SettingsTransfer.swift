@@ -23,6 +23,7 @@ struct SettingsSnapshot: Codable {
     var autoFrameRateEnabled: Bool?
     var batteryAwareQualityEnabled: Bool?
     var batteryPlaybackPolicy: String?
+    var hdrDisplayEnabled: Bool?
     var wallpaperTransitionDuration: Double?
     var wallpaperTransitionStyle: String?
     var desktopLevelOffset: Int?
@@ -84,6 +85,7 @@ enum SettingsTransfer {
             autoFrameRateEnabled: model.autoFrameRateEnabled,
             batteryAwareQualityEnabled: model.batteryAwareQualityEnabled,
             batteryPlaybackPolicy: model.batteryPlaybackPolicy.rawValue,
+            hdrDisplayEnabled: model.hdrDisplayEnabled,
             wallpaperTransitionDuration: model.wallpaperTransitionDuration,
             wallpaperTransitionStyle: model.wallpaperTransitionStyle.rawValue,
             desktopLevelOffset: model.desktopLevelOffset.rawValue,
@@ -157,6 +159,9 @@ enum SettingsTransfer {
         }
         if let value = snapshot.batteryPlaybackPolicy.flatMap(BatteryPlaybackPolicy.init(rawValue:)) {
             model.setBatteryPlaybackPolicy(value)
+        }
+        if let value = snapshot.hdrDisplayEnabled {
+            model.setHDRDisplayEnabled(value)
         }
         if let value = snapshot.wallpaperTransitionDuration,
            WallpaperModel.wallpaperTransitionDurationOptions.contains(value)

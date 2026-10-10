@@ -97,6 +97,10 @@ extension SettingsView {
         )
     }
 
+    var hdrDisplayEnabledBinding: Binding<Bool> {
+        modelBinding(model.hdrDisplayEnabled) { model.setHDRDisplayEnabled($0) }
+    }
+
     var batteryPlaybackPolicyBinding: Binding<BatteryPlaybackPolicy> {
         modelBinding(model.batteryPlaybackPolicy) { model.setBatteryPlaybackPolicy($0) }
     }

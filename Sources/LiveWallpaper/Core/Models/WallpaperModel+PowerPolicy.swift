@@ -28,6 +28,27 @@ extension WallpaperModel {
         lightweightMode || batteryReduceLoadActive
     }
 
+    /// EDR raises the backlight, so the battery "reduce load" policy shows HDR video as
+    /// SDR along with switching to the downscaled proxy.
+    var effectiveHDRDisplay: Bool {
+        hdrDisplayEnabled && !batteryReduceLoadActive
+    }
+
+    func setHDRDisplayEnabled(_ enabled: Bool) {
+        guard hdrDisplayEnabled != enabled else {
+            return
+        }
+        hdrDisplayEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.hdrDisplayEnabled)
+        applyDynamicRange()
+    }
+
+    func applyDynamicRange() {
+        for view in playerViews {
+            view.setHighDynamicRange(effectiveHDRDisplay)
+        }
+    }
+
     func setBatteryPlaybackPolicy(_ policy: BatteryPlaybackPolicy) {
         guard batteryPlaybackPolicy != policy else {
             return
@@ -89,6 +110,7 @@ extension WallpaperModel {
             applyLightweightSettings()
             requestPlaybackReconfiguration()
         }
+        applyDynamicRange()
         evaluateForegroundCoverageState()
     }
 

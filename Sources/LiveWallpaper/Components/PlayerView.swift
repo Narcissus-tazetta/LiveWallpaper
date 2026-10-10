@@ -97,6 +97,18 @@ final class PlayerView: NSView {
         addSubview(readabilityDimOverlayView, positioned: .above, relativeTo: nil)
     }
 
+    /// Before macOS 26 there is no per-layer control and AVPlayerLayer shows HDR video
+    /// as HDR regardless. On 26+ the wallpaper uses the constrained range Apple meant
+    /// for content that shares the screen with other windows, rather than `.high`.
+    func setHighDynamicRange(_ enabled: Bool) {
+        guard #available(macOS 26, *) else {
+            return
+        }
+        let range: CALayer.DynamicRange = enabled ? .constrainedHigh : .standard
+        playerLayer.preferredDynamicRange = range
+        transitionLayer.preferredDynamicRange = range
+    }
+
     /// Pins what is on screen now as the "before" image of a wallpaper switch.
     /// The frame and gravity are copied from playerLayer so that a different fit
     /// on the new wallpaper does not make the old picture jump mid-fade. The

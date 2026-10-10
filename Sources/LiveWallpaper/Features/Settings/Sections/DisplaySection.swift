@@ -14,6 +14,7 @@ extension SettingsView {
     "デスクトップの見やすさ",
     "デスクトップのアイコンを表示",
     "再生の軽量モード（省電力）",
+    "HDR 動画を HDR で表示",
     "視差効果を減らす設定に合わせて壁紙を静止",
     "作業中は壁紙の再生を自動停止",
     "ほかのアプリを使っている間は再生を停止",
@@ -162,6 +163,9 @@ extension SettingsView {
     ) {
       Toggle(model.localizedString("再生の軽量モード（省電力）"), isOn: lightweightModeBinding)
       batteryPlaybackPolicyRow
+      if #available(macOS 26, *) {
+        hdrDisplayRow
+      }
       if model.lightweightProxyState == .generating {
         settingsFootnote(model.localizedString("軽量版を生成中..."))
       }
@@ -780,6 +784,22 @@ extension SettingsView {
             helpText: model.localizedString("フルスクリーン空間でも壁紙を維持しやすくします。環境によっては表示が不安定になる場合があります。")
           )
         }
+    }
+  }
+
+  var hdrDisplayRow: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      toggleWithHelp(
+        model.localizedString("HDR 動画を HDR で表示"),
+        isOn: hdrDisplayEnabledBinding,
+        helpTopic: .hdrDisplay,
+        helpText: model.localizedString(
+          "HDR 対応のディスプレイで、HDR 動画の明るい部分を本来の明るさで表示します。ほかのウィンドウと並んでも眩しくなりすぎないよう、明るさは控えめに調整されます。オフにすると SDR で表示します。"
+        )
+      )
+      if model.hdrDisplayEnabled, model.batteryReduceLoadActive {
+        settingsFootnote(model.localizedString("バッテリー駆動中のため、HDR 動画を SDR で表示しています。"))
+      }
     }
   }
 
