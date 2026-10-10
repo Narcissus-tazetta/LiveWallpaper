@@ -52,12 +52,10 @@ final class LightweightProxyCache {
         }
     }
 
-    // Bumped from 1: earlier proxies were transcoded with a mis-scaled video
-    // composition transform (renderSize was shrunk without scaling the layer
-    // instruction transform), which cropped/zoomed into the frame instead of
-    // scaling it down. Bumping this discards those bad cached proxies so they
-    // get regenerated with the fix.
-    nonisolated static let metadataVersion = 2
+    // Bump whenever the encoding of proxies changes (e.g. a fixed scaling transform,
+    // keeping HDR sources HDR): a version mismatch wipes the cached files so they get
+    // regenerated, instead of serving proxies made under the old scheme.
+    nonisolated static let metadataVersion = 3
     nonisolated static let metadataFileName = "metadata.json"
     /// Target long edge, in pixels, for the transcoded proxy. Sources at or below this
     /// (and at or below the frame-rate cap) are treated as passthrough — see +Generation.swift.

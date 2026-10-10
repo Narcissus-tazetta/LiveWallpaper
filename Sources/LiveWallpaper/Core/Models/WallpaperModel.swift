@@ -117,6 +117,7 @@ final class WallpaperModel: ObservableObject {
     @Published var displayMode: DisplayMode = .mainOnly
     @Published var fitMode: VideoFitMode = .fill
     @Published var lightweightMode: Bool = false
+    @Published var hdrDisplayEnabled: Bool = true
     @Published var lightweightProxyState: LightweightProxyCache.ProxyGenerationState = .idle
     @Published var audioEnabled: Bool = false
     @Published var audioVolume: Float = 1.0

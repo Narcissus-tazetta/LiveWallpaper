@@ -4,7 +4,7 @@ import AppKit
 extension LightweightProxyCache {
     private enum TranscodeEligibility {
         case passthrough
-        case needsTranscode(AVMutableVideoComposition)
+        case needsTranscode(AVMutableVideoComposition, presetName: String)
     }
 
     private final class ExportSessionBox: @unchecked Sendable {
@@ -32,7 +32,7 @@ extension LightweightProxyCache {
             return .failed
         }
 
-        guard case .needsTranscode(let composition) = eligibility else {
+        guard case let .needsTranscode(composition, presetName) = eligibility else {
             recordEntry(
                 path: path,
                 fileName: nil,
@@ -54,7 +54,7 @@ extension LightweightProxyCache {
 
         guard let exportSession = AVAssetExportSession(
             asset: asset,
-            presetName: AVAssetExportPresetMediumQuality
+            presetName: presetName
         ) else {
             return .failed
         }
@@ -177,6 +177,9 @@ extension LightweightProxyCache {
         if composition.frameDuration < minFrameDuration {
             composition.frameDuration = minFrameDuration
         }
-        return .needsTranscode(composition)
+        let presetName = try await HDRVideo.reEncodePreset(
+            for: asset, sdrPreset: AVAssetExportPresetMediumQuality
+        )
+        return .needsTranscode(composition, presetName: presetName)
     }
 }

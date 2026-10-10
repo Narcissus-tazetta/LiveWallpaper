@@ -611,3 +611,6 @@
 "画面別に割り当て中" = "Đã gán cho một màn hình";
 "音声あり" = "Có âm thanh";
 "ヘルプ" = "Trợ giúp";
+"HDR 動画を HDR で表示" = "Hiển thị video HDR ở chế độ HDR";
+"HDR 対応のディスプレイで、HDR 動画の明るい部分を本来の明るさで表示します。ほかのウィンドウと並んでも眩しくなりすぎないよう、明るさは控えめに調整されます。オフにすると SDR で表示します。" = "Trên màn hình hỗ trợ HDR, phần sáng của video HDR được hiển thị với độ sáng đầy đủ. Độ sáng được giảm nhẹ để hình nền không bị chói khi nằm cạnh các cửa sổ khác. Tắt tùy chọn này để hiển thị ở chế độ SDR.";
+"バッテリー駆動中のため、HDR 動画を SDR で表示しています。" = "Đang hiển thị video HDR ở chế độ SDR vì máy đang dùng pin.";

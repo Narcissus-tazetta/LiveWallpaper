@@ -68,6 +68,13 @@ enum VideoFrameCapture {
         let asset = AVURLAsset(url: URL(fileURLWithPath: path))
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
+        if #available(macOS 26, *) {
+            // The still replaces a paused HDR video in the same layer; an SDR still would
+            // visibly dim the wallpaper at every pause. The layer's preferredDynamicRange
+            // (PlayerView.setHighDynamicRange) still tone-maps it when HDR display is off.
+            // Earlier systems keep SDR: they have no per-layer switch to turn it back off.
+            generator.dynamicRangePolicy = .matchSource
+        }
         let tolerance = CMTime(seconds: 1, preferredTimescale: 600)
         generator.requestedTimeToleranceBefore = tolerance
         generator.requestedTimeToleranceAfter = tolerance

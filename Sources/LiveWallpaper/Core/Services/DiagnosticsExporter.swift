@@ -101,6 +101,7 @@ enum DiagnosticsExporter {
         lines.append("Web wallpaper load state: \(model.webWallpaperLoadState)")
         lines.append("Manual pause: \(model.manualPauseActive)")
         lines.append("On battery: \(model.isOnBatteryPower)")
+        lines.append("HDR display: \(model.effectiveHDRDisplay) (setting: \(model.hdrDisplayEnabled))")
         lines.append("System Reduce Motion: \(model.systemReduceMotionEnabled)")
         lines.append("Screen recording trusted (coverage): \(model.screenRecordingTrustedForCoverage)")
         lines.append("Screen saver: \(model.screenSaverInstallState)")

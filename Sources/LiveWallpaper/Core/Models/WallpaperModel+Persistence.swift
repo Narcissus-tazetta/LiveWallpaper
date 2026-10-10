@@ -60,6 +60,8 @@ extension WallpaperModel {
         pinCurrentVideo = false
         lightweightMode =
             UserDefaults.standard.object(forKey: PrefsKey.lightweightMode) as? Bool ?? false
+        hdrDisplayEnabled =
+            UserDefaults.standard.object(forKey: PrefsKey.hdrDisplayEnabled) as? Bool ?? true
         restoreBatteryPlaybackPolicy()
         restoreWallpaperTransitionSettings()
         respectReduceMotionEnabled =

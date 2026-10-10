@@ -46,9 +46,10 @@ struct AerialVideoExporter {
             if fileManager.fileExists(atPath: destinationURL.path) {
                 try? fileManager.removeItem(at: destinationURL)
             }
-            try await exportVideo(
-                asset, to: destinationURL, presetName: AVAssetExportPresetHighestQuality
+            let presetName = try await HDRVideo.reEncodePreset(
+                for: asset, sdrPreset: AVAssetExportPresetHighestQuality
             )
+            try await exportVideo(asset, to: destinationURL, presetName: presetName)
         }
         try await validatePreparedVideo(at: destinationURL)
     }
