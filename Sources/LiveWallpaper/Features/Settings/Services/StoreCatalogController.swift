@@ -203,8 +203,8 @@ final class StoreCatalogController: ObservableObject {
         var request = URLRequest(url: StoreClient.baseURL.appendingPathComponent("report"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "content-type")
-        request.httpBody = try? JSONEncoder().encode(ReportBody(entryId: entry.id, reason: reason))
         do {
+            request.httpBody = try JSONEncoder().encode(ReportBody(entryId: entry.id, reason: reason))
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse,
                   (200 ..< 300).contains(http.statusCode)
@@ -215,6 +215,7 @@ final class StoreCatalogController: ObservableObject {
             reportedEntryIDs.insert(entry.id)
             reportResultMessage = Self.localized("通報しました。ご協力ありがとうございます")
         } catch {
+            AppLog.store.error("report failed error=\(error.localizedDescription, privacy: .public)")
             reportResultMessage = Self.localized("通報に失敗しました。もう一度お試しください")
         }
     }

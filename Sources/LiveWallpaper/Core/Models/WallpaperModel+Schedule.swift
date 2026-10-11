@@ -525,9 +525,9 @@ extension WallpaperModel {
     // MARK: - 永続化
 
     func restoreScheduleState() {
-        if let data = UserDefaults.standard.data(forKey: PrefsKey.scheduleRulesData),
-           var decoded = try? JSONDecoder().decode([ScheduleRule].self, from: data)
-        {
+        if var decoded = UserDefaults.standard.decodedJSON(
+            [ScheduleRule].self, forKey: PrefsKey.scheduleRulesData
+        ) {
             // 「時間帯で切り替える」簡易UIは曜日スケジュールへ統合され廃止したため、
             // 旧バージョンが作った simpleTimeRange ルールは advanced として扱う。
             // id・時間帯・有効状態はそのまま引き継がれるので、統合後のリストにも

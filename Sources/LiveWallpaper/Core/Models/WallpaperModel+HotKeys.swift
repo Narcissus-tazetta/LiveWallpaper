@@ -12,9 +12,9 @@ extension WallpaperModel {
         hotKeysEnabled = UserDefaults.standard.object(forKey: Self.hotKeysEnabledKey) as? Bool ?? false
 
         var combos: [HotKeyAction: HotKeyCombo] = [:]
-        if let data = UserDefaults.standard.data(forKey: Self.hotKeyCombosKey),
-           let decoded = try? JSONDecoder().decode([String: HotKeyCombo].self, from: data)
-        {
+        if let decoded = UserDefaults.standard.decodedJSON(
+            [String: HotKeyCombo].self, forKey: Self.hotKeyCombosKey
+        ) {
             for (rawAction, combo) in decoded {
                 if let action = HotKeyAction(rawValue: rawAction) {
                     combos[action] = combo
@@ -72,8 +72,10 @@ extension WallpaperModel {
         for (action, combo) in hotKeyCombos {
             encodable[action.rawValue] = combo
         }
-        if let data = try? JSONEncoder().encode(encodable) {
-            UserDefaults.standard.set(data, forKey: Self.hotKeyCombosKey)
+        do {
+            try UserDefaults.standard.set(JSONEncoder().encode(encodable), forKey: Self.hotKeyCombosKey)
+        } catch {
+            recordPersistenceFailure(key: Self.hotKeyCombosKey, error: error)
         }
     }
 }

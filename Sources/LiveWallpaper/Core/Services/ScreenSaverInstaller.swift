@@ -133,7 +133,7 @@ struct ScreenSaverInstaller {
             throw ScreenSaverInstallerError.noScreenSaverSetting
         }
         var store = try readStore()
-        let replaced = ScreenSaverSelection.select(saverURL: installedSaverURL, in: &store)
+        let replaced = try ScreenSaverSelection.select(saverURL: installedSaverURL, in: &store)
         guard ScreenSaverSelection.selectedCount(saverURL: installedSaverURL, in: store) > 0 else {
             throw ScreenSaverInstallerError.noScreenSaverSetting
         }

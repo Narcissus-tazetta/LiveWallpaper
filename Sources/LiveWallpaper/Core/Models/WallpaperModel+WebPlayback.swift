@@ -187,9 +187,9 @@ extension WallpaperModel {
             wallpaperKind = restoredKind
         }
 
-        if let data = UserDefaults.standard.data(forKey: PrefsKey.webWallpaperSourcesData),
-           let decoded = try? JSONDecoder().decode([WebWallpaperSource].self, from: data)
-        {
+        if let decoded = UserDefaults.standard.decodedJSON(
+            [WebWallpaperSource].self, forKey: PrefsKey.webWallpaperSourcesData
+        ) {
             webWallpaperSources = decoded.filter { source in
                 (try? WebWallpaperURLResolver.validateURL(source.url)) != nil
             }

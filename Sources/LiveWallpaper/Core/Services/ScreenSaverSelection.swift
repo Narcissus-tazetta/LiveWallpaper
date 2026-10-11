@@ -18,7 +18,9 @@ enum ScreenSaverSelection {
     /// Points every Idle surface at the saver and returns the surfaces it replaced.
     /// Surfaces already showing the saver are not returned, so a re-select never
     /// records the saver as the "original".
-    static func select(saverURL: URL, in store: inout [String: Any]) -> [SavedIdle] {
+    static func select(saverURL: URL, in store: inout [String: Any]) throws -> [SavedIdle] {
+        let choice = try saverChoice(saverURL: saverURL)
+        let options = try emptyOptions()
         var replaced: [SavedIdle] = []
         for path in statePaths(in: store) {
             guard var state = value(at: path, in: store) as? [String: Any],
@@ -30,8 +32,8 @@ enum ScreenSaverSelection {
                 replaced.append(SavedIdle(path: path, idle: idle))
             }
             state["Idle"] = surface(
-                choice: saverChoice(saverURL: saverURL),
-                options: emptyOptions,
+                choice: choice,
+                options: options,
                 base: idle
             )
             setValue(state, at: path, in: &store)
@@ -175,16 +177,16 @@ enum ScreenSaverSelection {
     }
 
     /// Same shape System Settings writes when a .saver is picked from the list.
-    private static func saverChoice(saverURL: URL) -> [String: Any] {
-        [
+    private static func saverChoice(saverURL: URL) throws -> [String: Any] {
+        try [
             "Provider": provider,
             "Files": [Any](),
             "Configuration": plistData(["module": ["relative": moduleString(saverURL)]])
         ]
     }
 
-    private static var emptyOptions: Data {
-        plistData(["values": [String: Any]()])
+    private static func emptyOptions() throws -> Data {
+        try plistData(["values": [String: Any]()])
     }
 
     private static func isSaver(_ idle: [String: Any], saverURL: URL) -> Bool {
@@ -215,11 +217,7 @@ enum ScreenSaverSelection {
         string.hasSuffix("/") ? String(string.dropLast()) : string
     }
 
-    private static func plistData(_ object: [String: Any]) -> Data {
-        (try? PropertyListSerialization.data(
-            fromPropertyList: object,
-            format: .binary,
-            options: 0
-        )) ?? Data()
+    private static func plistData(_ object: [String: Any]) throws -> Data {
+        try PropertyListSerialization.data(fromPropertyList: object, format: .binary, options: 0)
     }
 }

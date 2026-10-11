@@ -157,9 +157,9 @@ extension WallpaperModel {
     private func restoreLibraryAndPlaylistState() {
         // 存在しないパスの間引きは verifyRestoredVideoPaths() が起動後に行う
         // (restoreState() 全体の注記を参照)。
-        if let playlistData = UserDefaults.standard.data(forKey: PrefsKey.playlistsData),
-           let decoded = try? JSONDecoder().decode([WallpaperPlaylist].self, from: playlistData)
-        {
+        if let decoded = UserDefaults.standard.decodedJSON(
+            [WallpaperPlaylist].self, forKey: PrefsKey.playlistsData
+        ) {
             playlists = decoded
         }
 
@@ -226,20 +226,16 @@ extension WallpaperModel {
 
     private func restorePresentationAndEditState() {
         let allPaths = Set(libraryVideoPaths)
-        if let data = UserDefaults.standard.data(forKey: wallpaperPresentationStorageKey),
-           let decoded = try? JSONDecoder().decode(
-               [String: [String: WallpaperPresentation]].self,
-               from: data
-           )
-        {
+        if let decoded = UserDefaults.standard.decodedJSON(
+            [String: [String: WallpaperPresentation]].self,
+            forKey: wallpaperPresentationStorageKey
+        ) {
             wallpaperPresentationByPath = decoded.filter { allPaths.contains($0.key) }
         }
-        if let editData = UserDefaults.standard.data(forKey: wallpaperEditStorageKey),
-           let decodedEdits = try? JSONDecoder().decode(
-               [String: WallpaperEditMetadata].self,
-               from: editData
-           )
-        {
+        if let decodedEdits = UserDefaults.standard.decodedJSON(
+            [String: WallpaperEditMetadata].self,
+            forKey: wallpaperEditStorageKey
+        ) {
             wallpaperEditByPath = decodedEdits.filter { allPaths.contains($0.key) }
         }
     }

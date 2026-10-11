@@ -139,10 +139,12 @@ extension LightweightProxyCache {
             return
         }
         ioQueue.async {
-            guard let data = try? JSONEncoder().encode(snapshot) else {
-                return
+            do {
+                let data = try JSONEncoder().encode(snapshot)
+                try data.write(to: metadataURL, options: .atomic)
+            } catch {
+                AppLog.proxyCache.error("metadata flush failed error=\(error.localizedDescription, privacy: .public)")
             }
-            try? data.write(to: metadataURL, options: .atomic)
         }
     }
 
@@ -159,10 +161,12 @@ extension LightweightProxyCache {
             return
         }
         ioQueue.sync {
-            guard let data = try? JSONEncoder().encode(snapshot) else {
-                return
+            do {
+                let data = try JSONEncoder().encode(snapshot)
+                try data.write(to: metadataURL, options: .atomic)
+            } catch {
+                AppLog.proxyCache.error("metadata flush failed error=\(error.localizedDescription, privacy: .public)")
             }
-            try? data.write(to: metadataURL, options: .atomic)
         }
     }
 

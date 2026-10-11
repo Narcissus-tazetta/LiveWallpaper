@@ -21,7 +21,9 @@ extension LightweightProxyCache {
 
             do {
                 try fileManager.createDirectory(at: dataURL, withIntermediateDirectories: true)
-            } catch {}
+            } catch {
+                AppLog.proxyCache.error("creating cache directory failed error=\(error.localizedDescription, privacy: .public)")
+            }
 
             var shouldWipeDataDirectory = false
             if let data = try? Data(contentsOf: metadataURL),

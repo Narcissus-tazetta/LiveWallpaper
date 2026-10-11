@@ -380,10 +380,14 @@ final class RemoteThumbnailCache: ObservableObject {
       return
     }
     ioQueue.async {
-      guard let data = try? JSONEncoder().encode(snapshot) else {
-        return
+      do {
+        let data = try JSONEncoder().encode(snapshot)
+        try data.write(to: metadataURL, options: .atomic)
+      } catch {
+        AppLog.thumbnailCache.error(
+          "remote metadata flush failed error=\(error.localizedDescription, privacy: .public)"
+        )
       }
-      try? data.write(to: metadataURL, options: .atomic)
     }
   }
 
@@ -402,7 +406,13 @@ final class RemoteThumbnailCache: ObservableObject {
       let fileManager = FileManager.default
       var loadedMetadata = Metadata(version: RemoteThumbnailCache.metadataVersion, entries: [:])
 
-      try? fileManager.createDirectory(at: dataURL, withIntermediateDirectories: true)
+      do {
+        try fileManager.createDirectory(at: dataURL, withIntermediateDirectories: true)
+      } catch {
+        AppLog.thumbnailCache.error(
+          "creating remote cache directory failed error=\(error.localizedDescription, privacy: .public)"
+        )
+      }
 
       if let data = try? Data(contentsOf: metadataURL),
         let decoded = try? JSONDecoder().decode(Metadata.self, from: data),

@@ -79,9 +79,11 @@ final class StoreMySubmissionsController: ObservableObject {
 
         var anySucceeded = false
         for index in submissions.indices {
-            if let status = try? await fetchStatus(id: submissions[index].id) {
-                submissions[index].lastKnownStatus = status
+            do {
+                submissions[index].lastKnownStatus = try await fetchStatus(id: submissions[index].id)
                 anySucceeded = true
+            } catch {
+                AppLog.store.error("status refresh failed error=\(error.localizedDescription, privacy: .public)")
             }
         }
         if !anySucceeded {
@@ -114,16 +116,15 @@ final class StoreMySubmissionsController: ObservableObject {
     }
 
     private func persist() {
-        guard let data = try? JSONEncoder().encode(submissions) else {
-            return
+        do {
+            try defaults.set(JSONEncoder().encode(submissions), forKey: Self.storageKey)
+        } catch {
+            AppLog.store.error("saving submissions failed error=\(error.localizedDescription, privacy: .public)")
         }
-        defaults.set(data, forKey: Self.storageKey)
     }
 
     private static func load(from defaults: UserDefaults) -> [StoreMySubmission] {
-        guard let data = defaults.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([StoreMySubmission].self, from: data)
-        else {
+        guard let decoded = defaults.decodedJSON([StoreMySubmission].self, forKey: storageKey) else {
             return []
         }
         return decoded

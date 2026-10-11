@@ -176,7 +176,13 @@ final class LockScreenSyncService {
             try? fileManager.removeItem(at: temporaryVideoURL)
             throw CancellationError()
         } catch {
-            try? restoreOriginalAerial(assetID: borrowedAsset.id)
+            do {
+                try restoreOriginalAerial(assetID: borrowedAsset.id)
+            } catch let rollbackError {
+                AppLog.lockScreenSync.error(
+                    "rollback of aerial \(borrowedAsset.id, privacy: .public) failed error=\(rollbackError.localizedDescription, privacy: .public)"
+                )
+            }
             throw error
         }
     }
@@ -342,8 +348,10 @@ final class LockScreenSyncService {
                 .object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
                 ?? "unknown"
         )
-        if let data = try? JSONEncoder().encode(lease) {
-            UserDefaults.standard.set(data, forKey: leaseDefaultsKey)
+        do {
+            try UserDefaults.standard.set(JSONEncoder().encode(lease), forKey: leaseDefaultsKey)
+        } catch {
+            AppLog.lockScreenSync.error("saving lease failed error=\(error.localizedDescription, privacy: .public)")
         }
         UserDefaults.standard.set(asset.id, forKey: legacyBorrowedAerialIDKey)
         UserDefaults.standard.set(asset.name, forKey: legacyBorrowedAerialNameKey)
@@ -451,7 +459,7 @@ final class LockScreenSyncService {
         }
 
         let transactionBackupURL = try backupWallpaperStore(indexURL)
-        WallpaperStorePatcher.applySelection(assetID: assetID, to: &store)
+        try WallpaperStorePatcher.applySelection(assetID: assetID, to: &store)
         let outputData = try PropertyListSerialization.data(
             fromPropertyList: store,
             format: .binary,
@@ -462,7 +470,13 @@ final class LockScreenSyncService {
             try verifyLinkedWallpaperSelection(assetID: assetID, at: indexURL)
         } catch {
             // この同期の直前バックアップだけを戻し、古い壁紙状態への巻き戻しを防ぐ。
-            try? restoreWallpaperStore(from: transactionBackupURL, to: indexURL)
+            do {
+                try restoreWallpaperStore(from: transactionBackupURL, to: indexURL)
+            } catch let rollbackError {
+                AppLog.lockScreenSync.error(
+                    "rollback of wallpaper store failed error=\(rollbackError.localizedDescription, privacy: .public)"
+                )
+            }
             throw error
         }
     }
@@ -596,6 +610,12 @@ final class LockScreenSyncService {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
         process.arguments = [processName]
-        try? process.run()
+        do {
+            try process.run()
+        } catch {
+            AppLog.lockScreenSync.error(
+                "killall \(processName, privacy: .public) failed error=\(error.localizedDescription, privacy: .public)"
+            )
+        }
     }
 }

@@ -5,8 +5,8 @@ import Foundation
 /// 一切行わない純粋関数の集まりで、呼び出し元([[LockScreenSyncService]])が
 /// 読み込み・バックアップ・書き込みを担う。
 enum WallpaperStorePatcher {
-    static func applySelection(assetID: String, to store: inout [String: Any]) {
-        let choice = aerialChoice(assetID: assetID, template: findAerialChoice(in: store))
+    static func applySelection(assetID: String, to store: inout [String: Any]) throws {
+        let choice = try aerialChoice(assetID: assetID, template: findAerialChoice(in: store))
         applyLinkedWallpaperChoice(choice, to: &store)
     }
 
@@ -44,7 +44,7 @@ enum WallpaperStorePatcher {
         return verifiedStateCount > 0
     }
 
-    private static func aerialChoice(assetID: String, template: [String: Any]?) -> [String: Any] {
+    private static func aerialChoice(assetID: String, template: [String: Any]?) throws -> [String: Any] {
         var choice = template ?? [
             "Provider": "com.apple.wallpaper.choice.aerials",
             "Files": [],
@@ -54,18 +54,12 @@ enum WallpaperStorePatcher {
         if choice["Files"] == nil {
             choice["Files"] = []
         }
-        choice["Configuration"] = aerialConfigurationData(assetID: assetID)
+        choice["Configuration"] = try PropertyListSerialization.data(
+            fromPropertyList: ["assetID": assetID],
+            format: .binary,
+            options: 0
+        )
         return choice
-    }
-
-    private static func aerialConfigurationData(assetID: String) -> Data {
-        (
-            try? PropertyListSerialization.data(
-                fromPropertyList: ["assetID": assetID],
-                format: .binary,
-                options: 0
-            )
-        ) ?? Data()
     }
 
     private static func findAerialChoice(in object: Any) -> [String: Any]? {

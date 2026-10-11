@@ -50,7 +50,12 @@ extension LightweightProxyCache {
         guard let dataURL = Self.dataDirectoryURL() else {
             return .failed
         }
-        try? FileManager.default.createDirectory(at: dataURL, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: dataURL, withIntermediateDirectories: true)
+        } catch {
+            AppLog.proxyCache.error("creating cache directory failed error=\(error.localizedDescription, privacy: .public)")
+            return .failed
+        }
 
         guard let exportSession = AVAssetExportSession(
             asset: asset,

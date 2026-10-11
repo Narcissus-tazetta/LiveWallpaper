@@ -24,7 +24,11 @@ extension DiskThumbnailCache {
           at: dataURL,
           withIntermediateDirectories: true
         )
-      } catch {}
+      } catch {
+        AppLog.thumbnailCache.error(
+          "creating cache directory failed error=\(error.localizedDescription, privacy: .public)"
+        )
+      }
 
       if let data = try? Data(contentsOf: metadataURL),
         let decoded = try? JSONDecoder().decode(Metadata.self, from: data),
