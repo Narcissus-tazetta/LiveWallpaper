@@ -26,6 +26,7 @@ enum AppLog {
     static let thumbnailCache = Logger(subsystem: subsystem, category: "thumbnailCache")
     static let proxyCache = Logger(subsystem: subsystem, category: "proxyCache")
     static let continuity = Logger(subsystem: subsystem, category: "continuity")
+    static let schedule = Logger(subsystem: subsystem, category: "schedule")
     static let focus = Logger(subsystem: subsystem, category: "focus")
     static let store = Logger(subsystem: subsystem, category: "store")
     static let automation = Logger(subsystem: subsystem, category: "automation")

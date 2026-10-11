@@ -52,7 +52,7 @@ If that happens:
 - **Separate desktop and lock screen videos**: Assign different videos for desktop live wallpaper and lock screen sync (lock screen sync requires macOS 26 or later).
 - **Multi-display support**: Main display only or all connected displays, with per-display assignments.
 - **Per-desktop (Space) wallpapers**: Assign a different wallpaper to each Mission Control desktop, and optionally show the desktop number in the menu bar.
-- **Automatic switching**: Switch wallpapers by macOS light/dark appearance, by weekday and time-of-day rules, or by Focus mode.
+- **Automatic switching**: Switch wallpapers by macOS light/dark appearance, by weekday and time-of-day rules (including sunrise and sunset), or by Focus mode.
 - **Playlists**: Register multiple videos and play them in sequence, with shuffle and previous/next.
 - **Screen saver**: Install a LiveWallpaper screen saver from Settings that plays the video wallpaper on your desktop, with per-display wallpapers, trimming, and placement. It is selected as the screen saver while the app runs, and your previous screen saver comes back when you quit or uninstall. Web wallpapers are not supported.
 - **Switch effects**: Wallpapers change with a cross-fade or a fade through black (off / 0.5 / 1 / 2 seconds). No effect when switching desktops or while Reduce Motion is on.
@@ -90,7 +90,7 @@ If that happens:
 Three independent rules can pick the wallpaper for you. All of them are configured in the **Wallpaper** tab.
 
 - **Appearance**: Choose a light-mode wallpaper and a dark-mode wallpaper, and the shared wallpaper follows macOS Dark Mode.
-- **Weekly schedule**: Build rules from weekday + time range + appearance. Rules higher in the list win, and the first match applies. Overnight ranges such as 22:00–06:00 are supported. If you pick a wallpaper manually while a rule is active, your choice stays until the next time boundary.
+- **Weekly schedule**: Build rules from weekday + time range + appearance. Rules higher in the list win, and the first match applies. Overnight ranges such as 22:00–06:00 are supported. A range can also start or end at sunrise or sunset (for example, sunset–sunrise for nights only). The location defaults to your time zone's representative city (Tokyo for all of Japan); use "Change Location…" to search for a city instead. Location Services permission is not needed. If you pick a wallpaper manually while a rule is active, your choice stays until the next time boundary.
 - **Focus modes**: Assign a wallpaper per Focus mode. macOS does not expose Focus state to apps, so this reads the notification-center database directly and therefore needs **Full Disk Access**; the app walks you through granting it.
 
 ## Automation

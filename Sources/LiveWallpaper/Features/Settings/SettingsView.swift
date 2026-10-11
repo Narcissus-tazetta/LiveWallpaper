@@ -79,6 +79,7 @@ struct SettingsView: View {
     /// 壁紙タブのスケジュールカードの開閉。既定は閉(1行サマリーのみ)で、
     /// 設定検索の案内行から飛んできたときは開いた状態にする。
     @State var isScheduleCardExpanded: Bool = false
+    @State var isScheduleLocationEditorPresented: Bool = false
     @State var isFocusCardExpanded: Bool = false
     @State var hoveredTab: SettingsTab?
     @State var hoveredWallpaperPath: String?

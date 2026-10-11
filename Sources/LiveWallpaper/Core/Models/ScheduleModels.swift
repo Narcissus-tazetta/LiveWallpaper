@@ -20,30 +20,82 @@ struct ScheduleTarget: Codable, Equatable {
     }
 }
 
+enum ScheduleSolarEvent: String, Codable {
+    case sunrise
+    case sunset
+}
+
 /// 時刻(時・分のみ、タイムゾーンなし・端末ローカル)。
 struct ScheduleTimeOfDay: Codable, Equatable, Comparable {
     var hour: Int
     var minute: Int
+    /// Set when the time follows the sun. hour/minute then hold the last resolved time so
+    /// a version without this field still reads a sensible fixed time instead of failing.
+    var solarEvent: ScheduleSolarEvent? = nil
 
     var minutesFromMidnight: Int { hour * 60 + minute }
 
     static func < (lhs: ScheduleTimeOfDay, rhs: ScheduleTimeOfDay) -> Bool {
         lhs.minutesFromMidnight < rhs.minutesFromMidnight
     }
+
+    /// nil when the time follows the sun and no location is known.
+    func resolvedMinutes(sun: ScheduleSunTimes?) -> Int? {
+        switch solarEvent {
+        case nil: minutesFromMidnight
+        case .sunrise: sun?.sunrise
+        case .sunset: sun?.sunset
+        }
+    }
 }
 
-/// 時間帯([start, end) の半開区間)。start == end は終日、start > end は日またぎ
-/// (例: 22:00-06:00)として扱う。
+/// Sunrise and sunset of one day as minutes from local midnight (0...1440).
+/// Polar day is sunrise 0 / sunset 1440 and polar night the reverse, so
+/// "sunrise–sunset" covers the whole day or none of it and "sunset–sunrise" the opposite.
+struct ScheduleSunTimes: Equatable {
+    var sunrise: Int
+    var sunset: Int
+
+    init(sunrise: Int, sunset: Int) {
+        self.sunrise = sunrise
+        self.sunset = sunset
+    }
+
+    init(_ day: SolarDay, calendar: Calendar) {
+        func minutes(_ date: Date) -> Int {
+            let c = calendar.dateComponents([.hour, .minute], from: date)
+            return c.hour! * 60 + c.minute!
+        }
+        switch day {
+        case let .normal(sunrise, sunset):
+            self.init(sunrise: minutes(sunrise), sunset: minutes(sunset))
+        case .polarDay:
+            self.init(sunrise: 0, sunset: 1440)
+        case .polarNight:
+            self.init(sunrise: 1440, sunset: 0)
+        }
+    }
+}
+
+/// 時間帯([start, end) の半開区間)。固定時刻どうしで start == end は終日、start > end は
+/// 日またぎ(例: 22:00-06:00)として扱う。
 struct ScheduleTimeRange: Codable, Equatable {
     var start: ScheduleTimeOfDay
     var end: ScheduleTimeOfDay
 
-    func contains(_ time: ScheduleTimeOfDay) -> Bool {
-        let s = start.minutesFromMidnight
-        let e = end.minutesFromMidnight
+    var followsSun: Bool {
+        start.solarEvent != nil || end.solarEvent != nil
+    }
+
+    func contains(_ time: ScheduleTimeOfDay, sun: ScheduleSunTimes? = nil) -> Bool {
+        guard let s = start.resolvedMinutes(sun: sun), let e = end.resolvedMinutes(sun: sun) else {
+            return false
+        }
         let t = time.minutesFromMidnight
         if s == e {
-            return true
+            // Only an explicit fixed range like 0:00–0:00 means all day. Solar ends meet
+            // only in polar edge cases, where the range is empty.
+            return !followsSun
         }
         if s < e {
             return t >= s && t < e

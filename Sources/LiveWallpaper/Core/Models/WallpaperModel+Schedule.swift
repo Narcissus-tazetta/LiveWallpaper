@@ -9,6 +9,7 @@ enum ScheduleEvaluationTrigger {
     case wake
     case unlock
     case ruleListChanged
+    case locationChanged
     case launch
     case spaceChanged
     case displayConfigurationChanged
@@ -56,11 +57,18 @@ extension WallpaperModel {
         now: Date,
         appearance: ScheduleAppearanceCondition,
         calendar: Calendar = .current,
-        focusFilterEnabled: Bool = true
+        focusFilterEnabled: Bool = true,
+        location: SolarLocation? = nil
     ) -> ScheduleRule? {
         let weekday = calendar.component(.weekday, from: now)
         let components = calendar.dateComponents([.hour, .minute], from: now)
         let time = ScheduleTimeOfDay(hour: components.hour ?? 0, minute: components.minute ?? 0)
+        let sun = location.map {
+            ScheduleSunTimes(
+                SolarDay.compute(for: now, latitude: $0.latitude, longitude: $0.longitude, calendar: calendar),
+                calendar: calendar
+            )
+        }
         func matches(_ rule: ScheduleRule) -> Bool {
             guard rule.isEnabled, rule.scope == scope else {
                 return false
@@ -68,7 +76,7 @@ extension WallpaperModel {
             guard rule.weekdays.isEmpty || rule.weekdays.contains(weekday) else {
                 return false
             }
-            if let range = rule.timeRange, !range.contains(time) {
+            if let range = rule.timeRange, !range.contains(time, sun: sun) {
                 return false
             }
             guard rule.appearance == .any || rule.appearance == appearance else {
@@ -115,7 +123,8 @@ extension WallpaperModel {
     ) {
         let matched = Self.matchingScheduleRule(
             in: scheduleRules, scope: scope, now: now, appearance: appearance,
-            focusFilterEnabled: focusFilterIntegrationEnabled
+            focusFilterEnabled: focusFilterIntegrationEnabled,
+            location: scheduleLocation
         )
         let newState: ScheduleApplicationState = matched.map { .rule($0.id) } ?? .none
         // ルール境界を跨いでいなくても、適用中ルールのターゲット自体が編集された
@@ -255,8 +264,63 @@ extension WallpaperModel {
         return Self.matchingScheduleRule(
             in: scheduleRules, scope: rule.scope,
             now: scheduleNowProvider(), appearance: scheduleAppearanceProvider(),
-            focusFilterEnabled: focusFilterIntegrationEnabled
+            focusFilterEnabled: focusFilterIntegrationEnabled,
+            location: scheduleLocation
         )?.id == id
+    }
+
+    // MARK: - 日の出・日の入り
+
+    var scheduleLocation: SolarLocation? {
+        scheduleLocationOverride ?? timeZoneSolarLocation
+    }
+
+    var isScheduleLocationFromTimeZone: Bool {
+        scheduleLocationOverride == nil
+    }
+
+    private var timeZoneSolarLocation: SolarLocation? {
+        let timeZone = TimeZone.current
+        if let cache = timeZoneSolarLocationCache, cache.identifier == timeZone.identifier {
+            return cache.location
+        }
+        let location = SolarLocation.fromTimeZone(timeZone)
+        if location == nil {
+            AppLog.schedule.error("no zone.tab entry for time zone \(timeZone.identifier, privacy: .public)")
+        }
+        timeZoneSolarLocationCache = (timeZone.identifier, location)
+        return location
+    }
+
+    /// Today's sunrise/sunset for the settings UI, or nil when no location is known.
+    func todaySunTimes() -> ScheduleSunTimes? {
+        guard let location = scheduleLocation else {
+            return nil
+        }
+        let calendar = Calendar.current
+        return ScheduleSunTimes(
+            SolarDay.compute(
+                for: scheduleNowProvider(), latitude: location.latitude,
+                longitude: location.longitude, calendar: calendar
+            ),
+            calendar: calendar
+        )
+    }
+
+    func setScheduleLocationOverride(_ location: SolarLocation?) {
+        scheduleLocationOverride = location
+        if let location {
+            do {
+                try UserDefaults.standard.set(
+                    JSONEncoder().encode(location), forKey: PrefsKey.scheduleLocationData
+                )
+            } catch {
+                recordPersistenceFailure(key: PrefsKey.scheduleLocationData, error: error)
+            }
+        } else {
+            UserDefaults.standard.removeObject(forKey: PrefsKey.scheduleLocationData)
+        }
+        evaluateSchedule(trigger: .locationChanged)
     }
 
     // MARK: - CRUD(高度ルールビルダー)
@@ -537,6 +601,9 @@ extension WallpaperModel {
             }
             scheduleRules = decoded
         }
+        scheduleLocationOverride = UserDefaults.standard.decodedJSON(
+            SolarLocation.self, forKey: PrefsKey.scheduleLocationData
+        )
         // 未保存(初回起動・旧バージョンからの更新)はデフォルトON。
         if UserDefaults.standard.object(forKey: PrefsKey.focusFilterIntegrationEnabled) != nil {
             focusFilterIntegrationEnabled = UserDefaults.standard

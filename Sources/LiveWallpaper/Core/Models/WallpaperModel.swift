@@ -292,6 +292,10 @@ final class WallpaperModel: ObservableObject {
     }
 
     @Published var scheduleRules: [ScheduleRule] = []
+    /// Where sunrise/sunset rules are computed for. nil follows the time zone's city.
+    @Published var scheduleLocationOverride: SolarLocation?
+    /// zone.tab lookup for the current time zone, redone only when the zone changes.
+    var timeZoneSolarLocationCache: (identifier: String, location: SolarLocation?)?
     /// 集中モード連携のマスタースイッチ。OFFの間もDB監視は続けるが、評価時に
     /// focusFilter ルールを無視する(WallpaperModel+Schedule.swift参照)。
     @Published var focusFilterIntegrationEnabled: Bool = true

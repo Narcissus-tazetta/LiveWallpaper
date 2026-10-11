@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 extension SettingsView {
@@ -12,6 +13,8 @@ extension SettingsView {
         "毎日",
         "適用中",
         "複製",
+        "日の出",
+        "日の入り",
     ]
 
     /// 壁紙タブの一覧ペインの下に置く折りたたみカード。スケジュールはルール自身が
@@ -158,6 +161,10 @@ extension SettingsView {
                 )
             )
 
+            if model.scheduleRules.contains(where: { $0.timeRange?.followsSun == true }) {
+                scheduleSunLocationRow
+            }
+
             let advancedRules = model.scheduleRules.filter { $0.origin == .advanced }
             if advancedRules.isEmpty {
                 settingsFootnote(model.localizedString("曜日スケジュールのルールはまだありません"))
@@ -284,18 +291,10 @@ extension SettingsView {
                     .toggleStyle(.checkbox)
                     .controlSize(.small)
                 if let range = rule.timeRange {
-                    DatePicker(
-                        "", selection: scheduleTimeBinding(ruleBinding, isStart: true),
-                        displayedComponents: .hourAndMinute
-                    )
-                    .labelsHidden()
+                    scheduleTimeEndpoint(ruleBinding, isStart: true)
                     Text("–")
-                    DatePicker(
-                        "", selection: scheduleTimeBinding(ruleBinding, isStart: false),
-                        displayedComponents: .hourAndMinute
-                    )
-                    .labelsHidden()
-                    if range.start.minutesFromMidnight > range.end.minutesFromMidnight {
+                    scheduleTimeEndpoint(ruleBinding, isStart: false)
+                    if scheduleRangeCrossesMidnight(range) {
                         Text(model.localizedString("(翌日)"))
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -439,14 +438,138 @@ extension SettingsView {
     }
 
     private func timeRangeSummary(_ range: ScheduleTimeRange) -> String {
-        let base = String(
-            format: "%d:%02d–%d:%02d",
-            range.start.hour, range.start.minute, range.end.hour, range.end.minute
-        )
-        guard range.start.minutesFromMidnight > range.end.minutesFromMidnight else {
+        let base = timeOfDaySummary(range.start) + "–" + timeOfDaySummary(range.end)
+        guard scheduleRangeCrossesMidnight(range) else {
             return base
         }
         return base + " " + model.localizedString("(翌日)")
+    }
+
+    private func timeOfDaySummary(_ time: ScheduleTimeOfDay) -> String {
+        switch time.solarEvent {
+        case nil: String(format: "%d:%02d", time.hour, time.minute)
+        case .sunrise: model.localizedString("日の出")
+        case .sunset: model.localizedString("日の入り")
+        }
+    }
+
+    /// Uses today's sun times, so "sunset–sunrise" reads as overnight.
+    private func scheduleRangeCrossesMidnight(_ range: ScheduleTimeRange) -> Bool {
+        let sun = model.todaySunTimes()
+        guard let start = range.start.resolvedMinutes(sun: sun),
+              let end = range.end.resolvedMinutes(sun: sun)
+        else {
+            return false
+        }
+        return start > end
+    }
+
+    // MARK: - 日の出・日の入り
+
+    private func scheduleTimeEndpoint(_ ruleBinding: Binding<ScheduleRule>, isStart: Bool) -> some View {
+        let time = isStart ? ruleBinding.wrappedValue.timeRange?.start : ruleBinding.wrappedValue.timeRange?.end
+        return HStack(spacing: 4) {
+            Picker("", selection: scheduleSolarEventBinding(ruleBinding, isStart: isStart)) {
+                Text(model.localizedString("時刻")).tag(ScheduleSolarEvent?.none)
+                Text(model.localizedString("日の出")).tag(ScheduleSolarEvent?.some(.sunrise))
+                Text(model.localizedString("日の入り")).tag(ScheduleSolarEvent?.some(.sunset))
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
+            .accessibilityLabel(model.localizedString(isStart ? "開始時刻" : "終了時刻"))
+            if time?.solarEvent == nil {
+                DatePicker(
+                    "", selection: scheduleTimeBinding(ruleBinding, isStart: isStart),
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+            }
+        }
+    }
+
+    private func scheduleSolarEventBinding(
+        _ ruleBinding: Binding<ScheduleRule>, isStart: Bool
+    ) -> Binding<ScheduleSolarEvent?> {
+        Binding(
+            get: {
+                let range = ruleBinding.wrappedValue.timeRange
+                return isStart ? range?.start.solarEvent : range?.end.solarEvent
+            },
+            set: { event in
+                guard var range = ruleBinding.wrappedValue.timeRange else {
+                    return
+                }
+                var time = isStart ? range.start : range.end
+                time.solarEvent = event
+                // Bake today's time into hour/minute so the fixed time a version without
+                // sun support falls back to is close, and switching back to a fixed time
+                // starts from where the sun was.
+                if let event, let sun = model.todaySunTimes() {
+                    let minutes = min(event == .sunrise ? sun.sunrise : sun.sunset, 1439)
+                    time.hour = minutes / 60
+                    time.minute = minutes % 60
+                }
+                if isStart {
+                    range.start = time
+                } else {
+                    range.end = time
+                }
+                ruleBinding.wrappedValue.timeRange = range
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var scheduleSunLocationRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sun.horizon")
+                .foregroundColor(.secondary)
+                .accessibilityHidden(true)
+            if let location = model.scheduleLocation, let sun = model.todaySunTimes() {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(String(
+                        format: model.localizedString("今日の日の出 %@ · 日の入り %@"),
+                        sunTimeLabel(sun.sunrise, sun: sun), sunTimeLabel(sun.sunset, sun: sun)
+                    ))
+                    .font(.caption)
+                    Text(model.isScheduleLocationFromTimeZone
+                        ? String(format: model.localizedString("%@(タイムゾーンから推定)"), location.name)
+                        : location.name)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                Text(model.localizedString(
+                    "場所が分からないため、日の出・日の入りを使うルールは適用されません。場所を設定してください。"
+                ))
+                .font(.caption)
+                .foregroundColor(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Button(model.localizedString("場所を変更…")) {
+                isScheduleLocationEditorPresented = true
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .popover(isPresented: $isScheduleLocationEditorPresented, arrowEdge: .bottom) {
+                ScheduleLocationEditor(model: model) {
+                    isScheduleLocationEditorPresented = false
+                }
+            }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+    }
+
+    /// Polar day/night show as a dash: there is no sunrise or sunset that day.
+    private func sunTimeLabel(_ minutes: Int, sun: ScheduleSunTimes) -> String {
+        guard sun.sunrise != 1440, sun.sunset != 1440 else {
+            return "—"
+        }
+        return String(format: "%d:%02d", minutes / 60, minutes % 60)
     }
 
     // MARK: - スコープピッカー
@@ -797,5 +920,84 @@ private struct ScheduleRuleNameField: View {
         .labelsHidden()
         .frame(maxWidth: 220)
         .id(ruleID)
+    }
+}
+
+/// Sets the place sunrise/sunset rules use by looking up a city name. Forward geocoding
+/// needs the network but not Location Services permission.
+private struct ScheduleLocationEditor: View {
+    @ObservedObject var model: WallpaperModel
+    let dismiss: () -> Void
+    @State private var query = ""
+    @State private var isSearching = false
+    @State private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(model.localizedString("日の出・日の入りを計算する場所"))
+                .font(.headline)
+            HStack(spacing: 6) {
+                TextField(
+                    model.localizedString("都市名"), text: $query,
+                    prompt: Text(model.localizedString("都市名"))
+                )
+                .textFieldStyle(.roundedBorder)
+                .labelsHidden()
+                .onSubmit(search)
+                Button(model.localizedString("検索"), action: search)
+                    .disabled(isSearching || query.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            if isSearching {
+                ProgressView().controlSize(.small)
+            } else if let message {
+                Text(message)
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !model.isScheduleLocationFromTimeZone {
+                Button(model.localizedString("タイムゾーンから推定に戻す")) {
+                    model.setScheduleLocationOverride(nil)
+                    dismiss()
+                }
+                .buttonStyle(.link)
+            }
+        }
+        .padding(14)
+        .frame(width: 300)
+    }
+
+    private func search() {
+        let text = query.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty, !isSearching else {
+            return
+        }
+        isSearching = true
+        message = nil
+        CLGeocoder().geocodeAddressString(text) { placemarks, error in
+            DispatchQueue.main.async {
+                isSearching = false
+                if let error {
+                    let notFound = (error as? CLError)?.code == .geocodeFoundNoResult
+                    if !notFound {
+                        AppLog.schedule.error("geocoding failed error=\(error.localizedDescription, privacy: .public)")
+                    }
+                    message = model.localizedString(
+                        notFound ? "見つかりませんでした" : "検索に失敗しました。ネットワーク接続を確認してください"
+                    )
+                    return
+                }
+                guard let placemark = placemarks?.first, let coordinate = placemark.location?.coordinate else {
+                    message = model.localizedString("見つかりませんでした")
+                    return
+                }
+                model.setScheduleLocationOverride(SolarLocation(
+                    name: placemark.locality ?? placemark.name ?? text,
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                ))
+                dismiss()
+            }
+        }
     }
 }

@@ -614,3 +614,17 @@
 "HDR 動画を HDR で表示" = "Hiển thị video HDR ở chế độ HDR";
 "HDR 対応のディスプレイで、HDR 動画の明るい部分を本来の明るさで表示します。ほかのウィンドウと並んでも眩しくなりすぎないよう、明るさは控えめに調整されます。オフにすると SDR で表示します。" = "Trên màn hình hỗ trợ HDR, phần sáng của video HDR được hiển thị với độ sáng đầy đủ. Độ sáng được giảm nhẹ để hình nền không bị chói khi nằm cạnh các cửa sổ khác. Tắt tùy chọn này để hiển thị ở chế độ SDR.";
 "バッテリー駆動中のため、HDR 動画を SDR で表示しています。" = "Đang hiển thị video HDR ở chế độ SDR vì máy đang dùng pin.";
+"時刻" = "Giờ";
+"日の出" = "Bình minh";
+"日の入り" = "Hoàng hôn";
+"開始時刻" = "Thời gian bắt đầu";
+"終了時刻" = "Thời gian kết thúc";
+"今日の日の出 %@ · 日の入り %@" = "Hôm nay: bình minh %@ · hoàng hôn %@";
+"%@(タイムゾーンから推定)" = "%@ (theo múi giờ)";
+"場所が分からないため、日の出・日の入りを使うルールは適用されません。場所を設定してください。" = "Không xác định được vị trí nên các quy tắc dùng bình minh hoặc hoàng hôn sẽ không được áp dụng. Hãy đặt vị trí.";
+"場所を変更…" = "Đổi vị trí…";
+"日の出・日の入りを計算する場所" = "Vị trí để tính bình minh và hoàng hôn";
+"都市名" = "Tên thành phố";
+"見つかりませんでした" = "Không tìm thấy địa điểm phù hợp";
+"検索に失敗しました。ネットワーク接続を確認してください" = "Tìm kiếm không thành công. Hãy kiểm tra kết nối mạng.";
+"タイムゾーンから推定に戻す" = "Dùng lại múi giờ";

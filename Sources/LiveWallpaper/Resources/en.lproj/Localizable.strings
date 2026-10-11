@@ -612,3 +612,17 @@
 "HDR 動画を HDR で表示" = "Show HDR videos in HDR";
 "HDR 対応のディスプレイで、HDR 動画の明るい部分を本来の明るさで表示します。ほかのウィンドウと並んでも眩しくなりすぎないよう、明るさは控えめに調整されます。オフにすると SDR で表示します。" = "On an HDR-capable display, the bright parts of HDR videos are shown at their full brightness. Brightness is held back a little so the wallpaper does not glare next to other windows. Turn this off to show them in SDR.";
 "バッテリー駆動中のため、HDR 動画を SDR で表示しています。" = "Showing HDR videos in SDR because the Mac is on battery.";
+"時刻" = "Time";
+"日の出" = "Sunrise";
+"日の入り" = "Sunset";
+"開始時刻" = "Start time";
+"終了時刻" = "End time";
+"今日の日の出 %@ · 日の入り %@" = "Today: sunrise %@ · sunset %@";
+"%@(タイムゾーンから推定)" = "%@ (from your time zone)";
+"場所が分からないため、日の出・日の入りを使うルールは適用されません。場所を設定してください。" = "Rules that use sunrise or sunset are not applied because the location is unknown. Set a location.";
+"場所を変更…" = "Change Location…";
+"日の出・日の入りを計算する場所" = "Location for sunrise and sunset";
+"都市名" = "City";
+"見つかりませんでした" = "No matching place found";
+"検索に失敗しました。ネットワーク接続を確認してください" = "The search failed. Check your network connection.";
+"タイムゾーンから推定に戻す" = "Use Time Zone Instead";

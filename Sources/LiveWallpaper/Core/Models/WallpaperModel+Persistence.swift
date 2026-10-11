@@ -658,6 +658,7 @@ extension WallpaperModel {
         // オーバーライド解除まで行う。残すとリセット直後の外観変化や時刻境界で壁紙が
         // 勝手に切り替わり、リセットが効いていないように見える。
         resetScheduleState()
+        setScheduleLocationOverride(nil)
         startAutoFrameRateMonitoring()
     }
 }
