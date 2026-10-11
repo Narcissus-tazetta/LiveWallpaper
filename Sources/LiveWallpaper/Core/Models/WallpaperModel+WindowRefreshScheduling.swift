@@ -175,6 +175,7 @@ extension WallpaperModel {
         }
         applyMenuBarMaskState()
         applyDesktopReadabilityDimState()
+        refreshCursorEffects()
     }
 
     /// ウィンドウ構築(Windowing)側からも呼ばれる。

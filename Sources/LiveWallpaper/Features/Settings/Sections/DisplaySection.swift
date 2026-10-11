@@ -44,6 +44,10 @@ extension SettingsView {
     "環境に応じて再生負荷を自動調整",
     "バッテリー残量に応じて画質を自動調整",
     "fullScreenAuxiliary を有効化",
+    "カーソルのエフェクト",
+    "マウスに合わせて動かす（視差効果）",
+    "スポットライト",
+    "カーソルの軌跡",
   ]
 
   @ViewBuilder
@@ -115,6 +119,8 @@ extension SettingsView {
       model.refreshDesktopIconsVisibility()
       model.refreshMenuBarAutoHideState()
     }
+
+    cursorEffectsSection
 
     Section(
       header: SettingsSectionHeader(title: model.localizedString("デスクトップ切り替え"))

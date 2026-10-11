@@ -316,8 +316,9 @@ extension WallpaperModel {
         // signal (occlusion, high-sensitivity detection, frontmost app). Forced
         // freezes (Reduce Motion, user pause, battery policy) are then added on top:
         // a stop the user explicitly asked for wins over that exclusion.
-        let filtered = displayIDs.subtracting(suspendDisabledDisplayIDs)
-            .union(forcedFreezeDisplayIDs())
+        coveredDisplayIDs = displayIDs.subtracting(suspendDisabledDisplayIDs)
+        let filtered = coveredDisplayIDs.union(forcedFreezeDisplayIDs())
+        refreshCursorEffects()
         guard suspendedDisplayIDs != filtered else {
             return
         }

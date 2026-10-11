@@ -126,6 +126,7 @@ extension WallpaperModel {
         }
         applyMenuBarMaskState()
         applyDesktopReadabilityDimState()
+        refreshCursorEffects()
     }
 
     private func rebuildVideoWindows() {

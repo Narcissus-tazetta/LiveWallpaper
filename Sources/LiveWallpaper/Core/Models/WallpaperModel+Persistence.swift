@@ -63,6 +63,7 @@ extension WallpaperModel {
         hdrDisplayEnabled =
             UserDefaults.standard.object(forKey: PrefsKey.hdrDisplayEnabled) as? Bool ?? true
         restoreBatteryPlaybackPolicy()
+        restoreCursorEffects()
         restoreWallpaperTransitionSettings()
         respectReduceMotionEnabled =
             UserDefaults.standard
@@ -659,6 +660,7 @@ extension WallpaperModel {
         // 勝手に切り替わり、リセットが効いていないように見える。
         resetScheduleState()
         setScheduleLocationOverride(nil)
+        setCursorEffects(CursorEffectsSettings())
         startAutoFrameRateMonitoring()
     }
 }

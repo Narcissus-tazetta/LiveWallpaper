@@ -40,6 +40,7 @@ enum PrefsKey {
     static let registeredVideoDisplayNames = "registeredVideoDisplayNames"
     static let registeredVideoPaths = "registeredVideoPaths"
     static let respectReduceMotionEnabled = "respectReduceMotionEnabled"
+    static let cursorEffectsData = "cursorEffectsData"
     static let scheduleLocationData = "scheduleLocationData"
     static let scheduleRulesData = "scheduleRulesData"
     static let screenSaverEnabled = "screenSaverEnabled"

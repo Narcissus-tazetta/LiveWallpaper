@@ -3,6 +3,9 @@ import AVFoundation
 
 final class PlayerView: NSView {
     let playerLayer: AVPlayerLayer = .init()
+    /// Holds the video and the switch-effect picture so the cursor parallax can move
+    /// them as one without touching playerLayer's own fit/zoom frame.
+    private let contentLayer: CALayer = .init()
     /// Shows the pre-switch content (the old player, or the still while paused)
     /// above the new content for the duration of a wallpaper switch effect.
     private let transitionLayer: AVPlayerLayer = .init()
@@ -19,6 +22,8 @@ final class PlayerView: NSView {
         view.isHidden = true
         return view
     }()
+
+    private let cursorOverlayView = CursorEffectsOverlayView()
 
     private lazy var readabilityDimOverlayView: NSView = {
         let view = NSView()
@@ -65,8 +70,13 @@ final class PlayerView: NSView {
     override func layout() {
         super.layout()
         layer?.frame = bounds
+        // bounds/position rather than frame: frame is undefined once the parallax
+        // transform is set.
+        contentLayer.bounds = CGRect(origin: .zero, size: bounds.size)
+        contentLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
         blackoutLayer.frame = bounds
         readabilityDimOverlayView.frame = bounds
+        cursorOverlayView.frame = bounds
         layoutMenuBarMask()
     }
 
@@ -76,8 +86,9 @@ final class PlayerView: NSView {
         layer?.backgroundColor = NSColor.clear.cgColor
         playerLayer.backgroundColor = NSColor.clear.cgColor
         playerLayer.needsDisplayOnBoundsChange = true
-        if playerLayer.superlayer == nil {
-            layer?.addSublayer(playerLayer)
+        if contentLayer.superlayer == nil {
+            layer?.addSublayer(contentLayer)
+            contentLayer.addSublayer(playerLayer)
         }
         transitionLayer.isHidden = true
         transitionLayer.backgroundColor = NSColor.clear.cgColor
@@ -86,8 +97,8 @@ final class PlayerView: NSView {
         if transitionLayer.superlayer == nil {
             // Above the live video but below the dim overlay and menu bar mask
             // (subviews), so the effect does not change readability styling.
-            layer?.insertSublayer(transitionLayer, above: playerLayer)
-            layer?.insertSublayer(blackoutLayer, above: transitionLayer)
+            contentLayer.insertSublayer(transitionLayer, above: playerLayer)
+            layer?.insertSublayer(blackoutLayer, above: contentLayer)
         }
         // 減光オーバーレイはメニューバーマスクより上に載せる。マスク
         // (NSVisualEffectView, .withinWindow)は下のコンテンツをサンプルするため、
@@ -95,6 +106,44 @@ final class PlayerView: NSView {
         // 上下逆にして、壁紙全体に均一な減光がかかるようにする。
         addSubview(menuBarMaskView, positioned: .above, relativeTo: nil)
         addSubview(readabilityDimOverlayView, positioned: .above, relativeTo: nil)
+        addSubview(cursorOverlayView, positioned: .above, relativeTo: nil)
+    }
+
+    // MARK: - Cursor effects
+
+    /// `offset` and `scale` come from CursorEffectGeometry; identity turns it off.
+    func setParallax(offset: CGSize, scale: CGFloat) {
+        let target = CATransform3DMakeAffineTransform(
+            CGAffineTransform(translationX: offset.width, y: offset.height).scaledBy(x: scale, y: scale)
+        )
+        guard !CATransform3DEqualToTransform(contentLayer.transform, target) else {
+            return
+        }
+        // Start from what is on screen, so a new cursor position mid-animation
+        // bends the motion instead of jumping back to the previous target.
+        let current = contentLayer.presentation()?.transform ?? contentLayer.transform
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        contentLayer.transform = target
+        CATransaction.commit()
+        let animation = CABasicAnimation(keyPath: "transform")
+        animation.fromValue = current
+        animation.toValue = target
+        animation.duration = 0.3
+        animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        contentLayer.add(animation, forKey: "parallax")
+    }
+
+    func setSpotlight(radius: CGFloat?, opacity: CGFloat, center: CGPoint?) {
+        cursorOverlayView.setSpotlight(radius: radius, opacity: opacity, center: center)
+    }
+
+    func configureTrail(color: CursorTrailColor, customColor: NSColor, birthRate: Float) {
+        cursorOverlayView.configureTrail(color: color, customColor: customColor, birthRate: birthRate)
+    }
+
+    func setTrail(position: CGPoint?, emitting: Bool) {
+        cursorOverlayView.setTrail(position: position, emitting: emitting)
     }
 
     /// Before macOS 26 there is no per-layer control and AVPlayerLayer shows HDR video

@@ -150,6 +150,9 @@ extension SettingsView {
         case perVideoFitMode
         case fitLiveApply
         case desktopReadabilityDim
+        case cursorParallax
+        case cursorSpotlight
+        case cursorTrail
         case scheduleFollowAppearance
         case scheduleAdvancedRules
     }
