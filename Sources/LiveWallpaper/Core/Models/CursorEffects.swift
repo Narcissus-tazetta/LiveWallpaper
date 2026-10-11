@@ -46,8 +46,12 @@ struct RGBAColor: Codable, Equatable {
         )
     }
 
+    /// Clamped: packages can come from anyone.
     var nsColor: NSColor {
-        NSColor(srgbRed: red, green: green, blue: blue, alpha: alpha)
+        func unit(_ value: Double) -> CGFloat {
+            CGFloat(min(max(value.isFinite ? value : 1, 0), 1))
+        }
+        return NSColor(srgbRed: unit(red), green: unit(green), blue: unit(blue), alpha: unit(alpha))
     }
 }
 
@@ -72,27 +76,37 @@ struct CursorEffectsSettings: Codable, Equatable {
 
     init() {}
 
-    // Missing keys fall back to the defaults so settings saved by an older build,
-    // before an effect existed, still load.
+    // Missing keys, and values this version does not know (a shape added later, say),
+    // fall back to the default for that field only: settings arrive in packages made
+    // by other versions, and one unknown value must not fail the whole import.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = CursorEffectsSettings()
-        parallaxEnabled = try c.decodeIfPresent(Bool.self, forKey: .parallaxEnabled) ?? d.parallaxEnabled
-        parallaxStrength = try c.decodeIfPresent(CursorEffectLevel.self, forKey: .parallaxStrength) ?? d.parallaxStrength
-        spotlightEnabled = try c.decodeIfPresent(Bool.self, forKey: .spotlightEnabled) ?? d.spotlightEnabled
-        spotlightSize = try c.decodeIfPresent(CursorEffectLevel.self, forKey: .spotlightSize) ?? d.spotlightSize
-        spotlightDarkness = try c.decodeIfPresent(CursorEffectLevel.self, forKey: .spotlightDarkness) ?? d.spotlightDarkness
-        trailEnabled = try c.decodeIfPresent(Bool.self, forKey: .trailEnabled) ?? d.trailEnabled
-        trailColor = try c.decodeIfPresent(CursorEffectColor.self, forKey: .trailColor) ?? d.trailColor
-        trailCustomColor = try c.decodeIfPresent(RGBAColor.self, forKey: .trailCustomColor) ?? d.trailCustomColor
-        trailAmount = try c.decodeIfPresent(CursorEffectLevel.self, forKey: .trailAmount) ?? d.trailAmount
-        trailShape = try c.decodeIfPresent(CursorTrailShape.self, forKey: .trailShape) ?? d.trailShape
-        clickEnabled = try c.decodeIfPresent(Bool.self, forKey: .clickEnabled) ?? d.clickEnabled
-        clickStyle = try c.decodeIfPresent(CursorClickStyle.self, forKey: .clickStyle) ?? d.clickStyle
-        clickColor = try c.decodeIfPresent(CursorEffectColor.self, forKey: .clickColor) ?? d.clickColor
-        clickCustomColor = try c.decodeIfPresent(RGBAColor.self, forKey: .clickCustomColor) ?? d.clickCustomColor
-        onlyWhileDesktopActive = try c.decodeIfPresent(Bool.self, forKey: .onlyWhileDesktopActive)
-            ?? d.onlyWhileDesktopActive
+        func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
+            do {
+                return try c.decodeIfPresent(T.self, forKey: key) ?? fallback
+            } catch {
+                AppLog.persistence.error(
+                    "cursor effect setting \(key.stringValue, privacy: .public) unreadable; using the default"
+                )
+                return fallback
+            }
+        }
+        parallaxEnabled = value(.parallaxEnabled, d.parallaxEnabled)
+        parallaxStrength = value(.parallaxStrength, d.parallaxStrength)
+        spotlightEnabled = value(.spotlightEnabled, d.spotlightEnabled)
+        spotlightSize = value(.spotlightSize, d.spotlightSize)
+        spotlightDarkness = value(.spotlightDarkness, d.spotlightDarkness)
+        trailEnabled = value(.trailEnabled, d.trailEnabled)
+        trailColor = value(.trailColor, d.trailColor)
+        trailCustomColor = value(.trailCustomColor, d.trailCustomColor)
+        trailAmount = value(.trailAmount, d.trailAmount)
+        trailShape = value(.trailShape, d.trailShape)
+        clickEnabled = value(.clickEnabled, d.clickEnabled)
+        clickStyle = value(.clickStyle, d.clickStyle)
+        clickColor = value(.clickColor, d.clickColor)
+        clickCustomColor = value(.clickCustomColor, d.clickCustomColor)
+        onlyWhileDesktopActive = value(.onlyWhileDesktopActive, d.onlyWhileDesktopActive)
     }
 
     var anyEnabled: Bool {

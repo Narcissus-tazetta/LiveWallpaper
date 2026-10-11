@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 /// Why an enabled cursor effect is not running, shown under its setting.
 enum CursorEffectBlockReason: Equatable {
@@ -36,6 +37,9 @@ extension WallpaperModel {
         cursorEffects = UserDefaults.standard.decodedJSON(
             CursorEffectsSettings.self, forKey: PrefsKey.cursorEffectsData
         ) ?? CursorEffectsSettings()
+        cursorEffectsByPath = UserDefaults.standard.decodedJSON(
+            [String: CursorEffectsSettings].self, forKey: PrefsKey.cursorEffectsByPathData
+        ) ?? [:]
     }
 
     /// For parallax and trail. The spotlight is only blocked by web wallpapers.
@@ -67,33 +71,98 @@ extension WallpaperModel {
         cursorEffects.onlyWhileDesktopActive && !isDesktopAppFrontmost
     }
 
-    private var cursorMotionActive: Bool {
+    private var cursorMotionAllowed: Bool {
         cursorMotionBlockReason == nil && !manualPauseActive && !cursorEffectsPausedForOtherApp
     }
 
-    private var parallaxActive: Bool {
-        cursorEffects.parallaxEnabled && cursorMotionActive
-    }
-
-    private var trailActive: Bool {
-        cursorEffects.trailEnabled && cursorMotionActive
+    private var spotlightAllowed: Bool {
+        cursorSpotlightBlockReason == nil && !cursorEffectsPausedForOtherApp
     }
 
     /// Not tied to the frontmost app: the click that brings the desktop forward
     /// happens while another app is still frontmost, and clicks are rare enough
     /// that watching them costs nothing.
-    private var clickActive: Bool {
-        cursorEffects.clickEnabled && cursorMotionBlockReason == nil && !manualPauseActive
+    private var clickAllowed: Bool {
+        cursorMotionBlockReason == nil && !manualPauseActive
     }
 
-    private var spotlightActive: Bool {
-        cursorEffects.spotlightEnabled && cursorSpotlightBlockReason == nil && !cursorEffectsPausedForOtherApp
+    // MARK: - Per wallpaper
+
+    func cursorEffectsOverride(path: String) -> CursorEffectsSettings? {
+        cursorEffectsByPath[path]
+    }
+
+    /// nil makes the wallpaper follow the app-wide settings again.
+    func setCursorEffectsOverride(_ settings: CursorEffectsSettings?, path: String) {
+        guard cursorEffectsByPath[path] != settings else {
+            return
+        }
+        cursorEffectsByPath[path] = settings
+        persistCursorEffectsByPath()
+        refreshCursorEffects()
+    }
+
+    func persistCursorEffectsByPath() {
+        do {
+            try UserDefaults.standard.set(
+                JSONEncoder().encode(cursorEffectsByPath), forKey: PrefsKey.cursorEffectsByPathData
+            )
+        } catch {
+            recordPersistenceFailure(key: PrefsKey.cursorEffectsByPathData, error: error)
+        }
+    }
+
+    /// The settings for the wallpaper `displayID` shows. "Only while using the
+    /// desktop" is a performance switch, so it always comes from the app-wide settings.
+    func effectiveCursorEffects(forDisplayID displayID: String) -> CursorEffectsSettings {
+        guard let path = resolvedOverridePath(forScreenID: displayID) ?? currentVideoPath,
+              var settings = cursorEffectsByPath[path]
+        else {
+            return cursorEffects
+        }
+        settings.onlyWhileDesktopActive = cursorEffects.onlyWhileDesktopActive
+        return settings
+    }
+
+    private struct CursorEffectTarget {
+        let view: PlayerView
+        let displayID: String
+        let settings: CursorEffectsSettings
+    }
+
+    private func cursorEffectTargets() -> [CursorEffectTarget] {
+        playerViews.compactMap { view in
+            guard let window = view.window, let displayID = displayIDByWindow[ObjectIdentifier(window)] else {
+                return nil
+            }
+            return CursorEffectTarget(
+                view: view, displayID: displayID, settings: effectiveCursorEffects(forDisplayID: displayID)
+            )
+        }
+    }
+
+    /// Re-applies the settings when what a screen shows changes (playlist advance,
+    /// per-screen or per-Space wallpapers), since each wallpaper can have its own.
+    func configureCursorEffectsObservation() {
+        // @Published fires before the new value is stored, so read it a turn later.
+        cursorEffectsCancellable = Publishers.MergeMany(
+            $currentVideoPath.map { _ in () }.eraseToAnyPublisher(),
+            $videoOverrideByScreenID.map { _ in () }.eraseToAnyPublisher(),
+            $videoBySpaceUUID.map { _ in () }.eraseToAnyPublisher(),
+            $currentSpaceUUIDByDisplayID.map { _ in () }.eraseToAnyPublisher()
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] in
+            MainActor.assumeIsolated {
+                self?.refreshCursorEffects()
+            }
+        }
     }
 
     /// Frontmost app, Low Power Mode and thermal state, watched only while some
     /// effect is enabled.
     private func updateCursorEffectsObservers() {
-        guard cursorEffects.anyEnabled else {
+        guard cursorEffects.anyEnabled || cursorEffectsByPath.values.contains(where: \.anyEnabled) else {
             for observer in cursorEffectsObservers {
                 NSWorkspace.shared.notificationCenter.removeObserver(observer)
                 NotificationCenter.default.removeObserver(observer)
@@ -147,22 +216,17 @@ extension WallpaperModel {
     /// Cheap enough to call on every coverage, power or window change.
     func refreshCursorEffects() {
         updateCursorEffectsObservers()
-        updateClickMonitor()
-        let settings = cursorEffects
-        let visible = allWallpaperDisplayIDs().subtracting(coveredDisplayIDs)
-        let needsTracking = (parallaxActive || trailActive || spotlightActive) && !visible.isEmpty
-
-        for view in playerViews {
-            view.configureTrail(settings.trailAppearance)
-            if !parallaxActive {
-                view.setParallax(offset: .zero, scale: 1)
-            }
-            if !spotlightActive {
-                view.setSpotlight(radius: nil, opacity: 0, center: nil)
-            }
-            if !trailActive {
-                view.setTrail(position: nil, emitting: false)
-            }
+        let targets = cursorEffectTargets()
+        updateClickMonitor(targets: targets)
+        let motion = cursorMotionAllowed
+        let spotlight = spotlightAllowed
+        let needsTracking = targets.contains { target in
+            !coveredDisplayIDs.contains(target.displayID)
+                && ((motion && (target.settings.parallaxEnabled || target.settings.trailEnabled))
+                    || (spotlight && target.settings.spotlightEnabled))
+        }
+        for target in targets {
+            resetInactiveEffects(target)
         }
 
         if needsTracking {
@@ -184,24 +248,35 @@ extension WallpaperModel {
         }
     }
 
+    private func resetInactiveEffects(_ target: CursorEffectTarget) {
+        let view = target.view
+        view.configureTrail(target.settings.trailAppearance)
+        if !(cursorMotionAllowed && target.settings.parallaxEnabled) {
+            view.setParallax(offset: .zero, scale: 1)
+        }
+        if !(spotlightAllowed && target.settings.spotlightEnabled) {
+            view.setSpotlight(radius: nil, opacity: 0, center: nil)
+        }
+        if !(cursorMotionAllowed && target.settings.trailEnabled) {
+            view.setTrail(position: nil, emitting: false)
+        }
+    }
+
     private func handleCursorMoved(to location: CGPoint, moved: Bool) {
-        let settings = cursorEffects
-        let parallax = parallaxActive
-        let spotlight = spotlightActive
-        let trail = trailActive && moved
-        for view in playerViews {
-            guard let window = view.window,
-                  let displayID = displayIDByWindow[ObjectIdentifier(window)]
-            else {
+        let motion = cursorMotionAllowed
+        let spotlight = spotlightAllowed
+        var emitted = false
+        for target in cursorEffectTargets() {
+            let settings = target.settings
+            let view = target.view
+            guard let frame = view.window?.frame else {
                 continue
             }
-            let frame = window.frame
-            let covered = coveredDisplayIDs.contains(displayID)
-            let local: CGPoint? = frame.contains(location) && !covered
+            let local: CGPoint? = frame.contains(location) && !coveredDisplayIDs.contains(target.displayID)
                 ? CGPoint(x: location.x - frame.minX, y: location.y - frame.minY)
                 : nil
 
-            if parallax {
+            if motion, settings.parallaxEnabled {
                 // Screens without the cursor ease back to centre but stay scaled up,
                 // so the picture does not visibly zoom when the cursor arrives.
                 let offset = local.map {
@@ -214,16 +289,18 @@ extension WallpaperModel {
                     scale: CursorEffectGeometry.parallaxScale(amplitude: settings.parallaxAmplitude)
                 )
             }
-            if spotlight {
+            if spotlight, settings.spotlightEnabled {
                 view.setSpotlight(
                     radius: settings.spotlightRadius, opacity: settings.spotlightOpacity, center: local
                 )
             }
-            if trailActive {
-                view.setTrail(position: local, emitting: trail)
+            if motion, settings.trailEnabled {
+                view.configureTrail(settings.trailAppearance)
+                view.setTrail(position: local, emitting: moved)
+                emitted = emitted || (moved && local != nil)
             }
         }
-        guard trail else {
+        guard emitted else {
             return
         }
         trailIdleWorkItem?.cancel()
@@ -240,7 +317,8 @@ extension WallpaperModel {
 
     // MARK: - Click
 
-    private func updateClickMonitor() {
+    private func updateClickMonitor(targets: [CursorEffectTarget]) {
+        let clickActive = clickAllowed && targets.contains { $0.settings.clickEnabled }
         if clickActive, clickMonitor == nil {
             clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
                 MainActor.assumeIsolated {
@@ -270,12 +348,12 @@ extension WallpaperModel {
         guard isDesktop else {
             return
         }
-        let settings = cursorEffects
-        for view in playerViews {
-            guard let frame = view.window?.frame, frame.contains(location) else {
+        for target in cursorEffectTargets() where target.settings.clickEnabled {
+            let settings = target.settings
+            guard let frame = target.view.window?.frame, frame.contains(location) else {
                 continue
             }
-            view.showClick(
+            target.view.showClick(
                 at: CGPoint(x: location.x - frame.minX, y: location.y - frame.minY),
                 style: settings.clickStyle, color: settings.clickColor, customColor: settings.clickCustomColor
             )

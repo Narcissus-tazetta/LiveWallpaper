@@ -96,6 +96,7 @@ extension SettingsView {
     enum EditorSubMode: String, CaseIterable, Hashable {
         case fit
         case trim
+        case effects
     }
 
     enum StoreShareStatus: Equatable {

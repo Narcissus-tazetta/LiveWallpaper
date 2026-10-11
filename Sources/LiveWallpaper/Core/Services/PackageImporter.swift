@@ -171,6 +171,12 @@ final class PackageImporter {
             }
         }
 
+        for video in manifest.videos {
+            if let videoPath = importedVideoPaths[video.id], let effects = video.cursorEffects {
+                model.setCursorEffectsOverride(effects, path: videoPath)
+            }
+        }
+
         var importedPlaylistIDs: [UUID] = []
         for playlist in manifest.playlists {
             let videoPaths = playlist.videoIds.compactMap { importedVideoPaths[$0] }

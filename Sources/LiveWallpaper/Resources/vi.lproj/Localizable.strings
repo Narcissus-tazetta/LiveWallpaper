@@ -671,3 +671,8 @@
 "種類" = "Kiểu";
 "波紋" = "Gợn sóng";
 "はじける" = "Bùng nổ";
+"エフェクト" = "Hiệu ứng";
+"この壁紙だけの設定を使う" = "Dùng cài đặt riêng cho hình nền này";
+"変更はすぐに壁紙へ反映されます。この設定は、壁紙の書き出しや Store への投稿にも含まれます。" = "Thay đổi được áp dụng cho hình nền ngay lập tức. Cài đặt này cũng được đưa vào khi xuất hình nền hoặc đăng lên Store.";
+"設定の「カーソルのエフェクト」に従います。" = "Theo mục Hiệu ứng con trỏ trong Cài đặt.";
+"下の壁紙一覧から動画を選択すると、この壁紙だけのカーソルのエフェクトを設定できます" = "Chọn một video trong danh sách hình nền bên dưới để đặt hiệu ứng con trỏ chỉ cho hình nền đó";

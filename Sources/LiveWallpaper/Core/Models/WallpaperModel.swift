@@ -127,9 +127,12 @@ final class WallpaperModel: ObservableObject {
     /// 壁紙を暗くしてデスクトップアイコン・ファイル名を読みやすくする度合い(0...1)。0はオフ。
     @Published var desktopReadabilityDimOpacity: Double = 0
     @Published var cursorEffects = CursorEffectsSettings()
+    /// Video path → cursor effects used instead of `cursorEffects` for that wallpaper.
+    @Published var cursorEffectsByPath: [String: CursorEffectsSettings] = [:]
     var cursorTracker: CursorTracker?
     var cursorEffectsObservers: [NSObjectProtocol] = []
     var clickMonitor: Any?
+    var cursorEffectsCancellable: AnyCancellable?
     /// Finder (the desktop) or this app is frontmost; see onlyWhileDesktopActive.
     @Published var isDesktopAppFrontmost: Bool = true
     @Published var isLowPowerModeOn: Bool = false
@@ -397,6 +400,7 @@ final class WallpaperModel: ObservableObject {
         configureWallpaperWindowRefreshMonitoring()
         configureForegroundCoverageMonitoring()
         configureReduceMotionMonitoring()
+        configureCursorEffectsObservation()
         startAutoFrameRateMonitoring()
         // 復元では実在確認を省いているので、壁紙を出した後で確認して間引く。
         verifyRestoredVideoPaths()

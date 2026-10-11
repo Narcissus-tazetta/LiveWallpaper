@@ -671,3 +671,8 @@
 "種類" = "Stil";
 "波紋" = "Dalga";
 "はじける" = "Patlama";
+"エフェクト" = "Efektler";
+"この壁紙だけの設定を使う" = "Yalnızca Bu Duvar Kâğıdı İçin Ayar Kullan";
+"変更はすぐに壁紙へ反映されます。この設定は、壁紙の書き出しや Store への投稿にも含まれます。" = "Değişiklikler duvar kâğıdına hemen uygulanır. Bu ayarlar, duvar kâğıdını dışa aktarırken veya Store'a gönderirken de eklenir.";
+"設定の「カーソルのエフェクト」に従います。" = "Ayarlar'daki İmleç Efektleri'ni izler.";
+"下の壁紙一覧から動画を選択すると、この壁紙だけのカーソルのエフェクトを設定できます" = "Yalnızca o duvar kâğıdı için imleç efektlerini ayarlamak üzere aşağıdaki listeden bir video seçin";
