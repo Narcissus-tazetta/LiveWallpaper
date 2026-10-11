@@ -88,8 +88,16 @@ final class CursorEffectsTests: XCTestCase {
 
     // MARK: - When effects turn off
 
-    func testBatteryReduceLoadStopsMotionButNotTheSpotlight() {
+    /// The model reads the host's Reduce Motion at launch, and CI runners have it on,
+    /// so pin it to keep these tests about the battery policy alone.
+    private func modelWithoutReduceMotion() -> WallpaperModel {
         let model = WallpaperModel()
+        model.systemReduceMotionEnabled = false
+        return model
+    }
+
+    func testBatteryReduceLoadStopsMotionButNotTheSpotlight() {
+        let model = modelWithoutReduceMotion()
         model.batteryPlaybackPolicy = .reduceLoad
         model.isOnBatteryPower = true
         XCTAssertEqual(model.cursorMotionBlockReason, .battery)
@@ -100,7 +108,7 @@ final class CursorEffectsTests: XCTestCase {
     }
 
     func testBatteryNormalPolicyKeepsMotion() {
-        let model = WallpaperModel()
+        let model = modelWithoutReduceMotion()
         model.batteryPlaybackPolicy = .normal
         model.isOnBatteryPower = true
         XCTAssertNil(model.cursorMotionBlockReason)
