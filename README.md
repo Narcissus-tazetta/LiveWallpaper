@@ -62,6 +62,7 @@ If that happens:
 - **Audio controls**: Adjust wallpaper audio volume from within the app.
 - **Desktop icon visibility**: Show or hide desktop icons, similar to macOS System Settings.
 - **Readability options**: Dim the wallpaper so desktop icons stay readable, and make the menu bar opaque.
+- **Cursor effects**: On video wallpapers, add a parallax that shifts the wallpaper slightly with the mouse, a spotlight that keeps only the area around the pointer bright, and a trail of light particles behind the pointer (any colour from the palette). No permission is needed. Parallax and the trail turn off while the system's Reduce Motion is on and while playback load is reduced on battery. Not available for web wallpapers.
 - **Global shortcuts & automation**: System-wide hotkeys and a `livewallpaper://` URL scheme for Shortcuts, Raycast, or `open`.
 - **Mac-focused optimization**:
     - Automatically pauses playback when another app heavily covers the screen.

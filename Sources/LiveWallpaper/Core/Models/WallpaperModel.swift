@@ -76,6 +76,9 @@ final class WallpaperModel: ObservableObject {
     var playerItemEndObserver: NSObjectProtocol?
     var reduceMotionObserver: NSObjectProtocol?
     var suspendedDisplayIDs: Set<String> = []
+    /// Screens auto-paused because windows cover them, without the forced freezes
+    /// (pause, battery, Reduce Motion) that suspendedDisplayIDs also contains.
+    var coveredDisplayIDs: Set<String> = []
     var lastCapturedFreezeFrameVideoPath: String?
     var lastCapturedFreezeFrameTime: CMTime?
     var lastCapturedFreezeFrameImage: CGImage?
@@ -123,6 +126,9 @@ final class WallpaperModel: ObservableObject {
     @Published var audioVolume: Float = 1.0
     /// 壁紙を暗くしてデスクトップアイコン・ファイル名を読みやすくする度合い(0...1)。0はオフ。
     @Published var desktopReadabilityDimOpacity: Double = 0
+    @Published var cursorEffects = CursorEffectsSettings()
+    var cursorTracker: CursorTracker?
+    var trailIdleWorkItem: DispatchWorkItem?
     @Published var frameRateLimit: FrameRateLimit = .off
     @Published var decodeMode: DecodeMode = .automatic
     @Published var qualityPreset: QualityPreset = .auto

@@ -112,6 +112,7 @@ extension WallpaperModel {
         }
         applyDynamicRange()
         evaluateForegroundCoverageState()
+        refreshCursorEffects()
     }
 
     private static func isRunningOnBatteryPower() -> Bool {
