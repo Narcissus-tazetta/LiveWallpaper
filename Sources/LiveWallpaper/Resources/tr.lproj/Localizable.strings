@@ -285,8 +285,6 @@
 "ほかのアプリを使っている間は再生を停止" = "Diğer uygulamaları kullanırken oynatmayı duraklat";
 "壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。" = "Duvar kâğıdının görünür olup olmadığına bakılmaksızın, başka bir uygulama öndeyken oynatma duraklatılır.";
 "画面がほぼ隠れたら停止（高精度）" = "Ekran büyük ölçüde kapandığında duraklat (hassas)";
-"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。" = "Duvar kâğıdı az da olsa görünse bile, ekranın büyük bölümü pencerelerle kaplandığında oynatma duraklatılır. Bu algılama için Ekran Kaydı izni gerekir.";
-"高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "Hassas algılama için Ekran Kaydı izni gerekir. İzin verilene kadar standart yöntem kullanılır.";
 "再生を止めないアプリ" = "Oynatmayı hiç duraklatmayan uygulamalar";
 "再生を止めないアプリはまだ登録されていません" = "Henüz hariç tutulan uygulama yok";
 
@@ -657,3 +655,5 @@
 "Web壁紙の表示中は使えません。" = "Web duvar kâğıdı gösterilirken kullanılamaz.";
 "システムの「視差効果を減らす」が有効なため、オフになっています。" = "Sistemin Hareketi Azalt ayarı açık olduğu için kapalı.";
 "バッテリー駆動中で再生の負荷を下げているため、オフになっています。" = "Pil gücündeyken oynatma yükü azaltıldığı için kapalı.";
+"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。" = "Duvar kâğıdı biraz görünse bile, pencereler ekranın büyük kısmını kapladığında oynatma duraklatılır.";
+"このMacでは、許可なしではほかのアプリのウィンドウの位置を読み取れません。高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "Bu Mac'te diğer uygulamaların pencere konumları izin olmadan okunamıyor, bu yüzden hassas algılama Ekran Kaydı izni gerektirir. İzin verilene kadar standart algılama yöntemi kullanılır.";

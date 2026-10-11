@@ -317,8 +317,6 @@
 "ほかのアプリを使っている間は再生を停止" = "Pause playback while using other apps";
 "壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。" = "Pauses playback whenever another app is in front, regardless of whether the wallpaper is visible.";
 "画面がほぼ隠れたら停止（高精度）" = "Pause when the screen is mostly covered (precise)";
-"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。" = "Even if the wallpaper is slightly visible, playback pauses when windows cover most of the screen. This detection requires Screen Recording permission.";
-"高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "Precise detection requires Screen Recording permission. Until granted, the standard detection method is used.";
 "再生を止めないアプリ" = "Apps that never pause playback";
 "再生を止めないアプリはまだ登録されていません" = "No excluded apps yet";
 
@@ -655,3 +653,5 @@
 "Web壁紙の表示中は使えません。" = "Not available while a web wallpaper is shown.";
 "システムの「視差効果を減らす」が有効なため、オフになっています。" = "Off because the system's Reduce Motion is on.";
 "バッテリー駆動中で再生の負荷を下げているため、オフになっています。" = "Off because playback load is reduced while on battery.";
+"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。" = "Even if the wallpaper is slightly visible, playback pauses when windows cover most of the screen.";
+"このMacでは、許可なしではほかのアプリのウィンドウの位置を読み取れません。高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "On this Mac, other apps' window positions cannot be read without permission, so precise detection needs Screen Recording permission. Until it is granted, the standard detection method is used.";

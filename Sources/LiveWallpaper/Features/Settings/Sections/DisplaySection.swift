@@ -282,7 +282,7 @@ extension SettingsView {
           isOn: suspendHighSensitivityBinding,
           helpTopic: .suspendHighSensitivity,
           helpText: model.localizedString(
-            "壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。"
+            "壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。"
           )
         )
         if shouldShowScreenRecordingCoverageWarning {
@@ -354,11 +354,11 @@ extension SettingsView {
   var shouldShowScreenRecordingCoverageWarning: Bool {
     model.suspendWhenOtherAppFullScreen
       && model.suspendHighSensitivityEnabled
-      && !model.screenRecordingTrustedForCoverage
+      && !model.windowBoundsReadableForCoverage
   }
 
   func screenRecordingCoverageWarningText() -> String {
-    model.localizedString("高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。")
+    model.localizedString("このMacでは、許可なしではほかのアプリのウィンドウの位置を読み取れません。高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。")
   }
 
   var suspendExclusionContent: some View {
