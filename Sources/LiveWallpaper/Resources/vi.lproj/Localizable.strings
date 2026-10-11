@@ -657,3 +657,17 @@
 "バッテリー駆動中で再生の負荷を下げているため、オフになっています。" = "Đang tắt vì tải phát lại được giảm khi dùng pin.";
 "壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。" = "Ngay cả khi hình nền còn lộ ra một chút, phát lại sẽ tạm dừng khi cửa sổ che phần lớn màn hình.";
 "このMacでは、許可なしではほかのアプリのウィンドウの位置を読み取れません。高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "Trên máy Mac này, không thể đọc vị trí cửa sổ của ứng dụng khác nếu chưa được cấp quyền, nên phát hiện chính xác cần quyền Ghi màn hình. Cho đến khi được cấp, phương pháp phát hiện thông thường sẽ được dùng.";
+"形" = "Hình dạng";
+"光" = "Ánh sáng";
+"キラキラ" = "Lấp lánh";
+"泡" = "Bong bóng";
+"雪" = "Tuyết";
+"低電力モードのため、オフになっています。" = "Đang tắt vì Chế độ nguồn điện thấp đang bật.";
+"Macの温度が高いため、オフになっています。" = "Đang tắt vì máy Mac đang nóng.";
+"デスクトップを使っているときだけ動かす" = "Chỉ chạy khi đang dùng màn hình nền";
+"ほかのアプリを使っている間は、マウスの監視ごとエフェクトを止めて負荷をなくします。デスクトップ（Finder）かこのアプリが前面にあるときだけ動きます。" = "Khi bạn dùng ứng dụng khác, hiệu ứng và việc theo dõi chuột sẽ dừng hẳn nên không tốn tài nguyên. Chỉ chạy khi màn hình nền (Finder) hoặc ứng dụng này ở phía trước.";
+"クリックの演出" = "Hiệu ứng khi nhấp";
+"デスクトップをクリックした場所に、波紋が広がるか光の粒がはじけます。ほかのアプリやメニューバーでのクリックには反応しません。" = "Khi nhấp vào màn hình nền, gợn sóng hoặc các hạt sáng sẽ tỏa ra tại chỗ nhấp. Không phản ứng với cú nhấp trong ứng dụng khác hoặc thanh menu.";
+"種類" = "Kiểu";
+"波紋" = "Gợn sóng";
+"はじける" = "Bùng nổ";

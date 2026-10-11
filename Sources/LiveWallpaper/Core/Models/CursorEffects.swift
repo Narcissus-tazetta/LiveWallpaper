@@ -6,7 +6,19 @@ enum CursorEffectLevel: String, Codable, CaseIterable {
     case high
 }
 
-enum CursorTrailColor: String, Codable, CaseIterable {
+enum CursorTrailShape: String, Codable, CaseIterable {
+    case glow
+    case sparkle
+    case bubble
+    case snow
+}
+
+enum CursorClickStyle: String, Codable, CaseIterable {
+    case ripple
+    case burst
+}
+
+enum CursorEffectColor: String, Codable, CaseIterable {
     case white
     case accent
     case rainbow
@@ -47,9 +59,16 @@ struct CursorEffectsSettings: Codable, Equatable {
     var spotlightSize: CursorEffectLevel = .medium
     var spotlightDarkness: CursorEffectLevel = .medium
     var trailEnabled = false
-    var trailColor: CursorTrailColor = .white
+    var trailColor: CursorEffectColor = .white
     var trailCustomColor = RGBAColor(red: 1, green: 0.8, blue: 0.35, alpha: 1)
     var trailAmount: CursorEffectLevel = .medium
+    var trailShape: CursorTrailShape = .glow
+    var clickEnabled = false
+    var clickStyle: CursorClickStyle = .ripple
+    var clickColor: CursorEffectColor = .white
+    var clickCustomColor = RGBAColor(red: 0.45, green: 0.75, blue: 1, alpha: 1)
+    /// Stop everything, mouse monitoring included, while another app is frontmost.
+    var onlyWhileDesktopActive = true
 
     init() {}
 
@@ -64,13 +83,20 @@ struct CursorEffectsSettings: Codable, Equatable {
         spotlightSize = try c.decodeIfPresent(CursorEffectLevel.self, forKey: .spotlightSize) ?? d.spotlightSize
         spotlightDarkness = try c.decodeIfPresent(CursorEffectLevel.self, forKey: .spotlightDarkness) ?? d.spotlightDarkness
         trailEnabled = try c.decodeIfPresent(Bool.self, forKey: .trailEnabled) ?? d.trailEnabled
-        trailColor = try c.decodeIfPresent(CursorTrailColor.self, forKey: .trailColor) ?? d.trailColor
+        trailColor = try c.decodeIfPresent(CursorEffectColor.self, forKey: .trailColor) ?? d.trailColor
         trailCustomColor = try c.decodeIfPresent(RGBAColor.self, forKey: .trailCustomColor) ?? d.trailCustomColor
         trailAmount = try c.decodeIfPresent(CursorEffectLevel.self, forKey: .trailAmount) ?? d.trailAmount
+        trailShape = try c.decodeIfPresent(CursorTrailShape.self, forKey: .trailShape) ?? d.trailShape
+        clickEnabled = try c.decodeIfPresent(Bool.self, forKey: .clickEnabled) ?? d.clickEnabled
+        clickStyle = try c.decodeIfPresent(CursorClickStyle.self, forKey: .clickStyle) ?? d.clickStyle
+        clickColor = try c.decodeIfPresent(CursorEffectColor.self, forKey: .clickColor) ?? d.clickColor
+        clickCustomColor = try c.decodeIfPresent(RGBAColor.self, forKey: .clickCustomColor) ?? d.clickCustomColor
+        onlyWhileDesktopActive = try c.decodeIfPresent(Bool.self, forKey: .onlyWhileDesktopActive)
+            ?? d.onlyWhileDesktopActive
     }
 
     var anyEnabled: Bool {
-        parallaxEnabled || spotlightEnabled || trailEnabled
+        parallaxEnabled || spotlightEnabled || trailEnabled || clickEnabled
     }
 
     /// Largest shift as a fraction of the screen size; the content is scaled up by
@@ -99,12 +125,66 @@ struct CursorEffectsSettings: Codable, Equatable {
         }
     }
 
+    var trailAppearance: CursorTrailAppearance {
+        CursorTrailAppearance(
+            shape: trailShape, color: trailColor, customColor: trailCustomColor, birthRate: trailBirthRate
+        )
+    }
+
     var trailBirthRate: Float {
         switch trailAmount {
         case .low: 40
         case .medium: 90
         case .high: 180
         }
+    }
+}
+
+struct CursorTrailAppearance: Equatable {
+    var shape: CursorTrailShape
+    var color: CursorEffectColor
+    var customColor: RGBAColor
+    var birthRate: Float
+}
+
+/// One on-screen window as CGWindowList reports it (front to back), reduced to
+/// what deciding "was this click on the desktop" needs. Readable without Screen
+/// Recording permission; only window titles are withheld.
+struct OnScreenWindow: Equatable {
+    var ownerPID: pid_t
+    /// Owned by the window server itself (menu bar, backdrop strips), which has no
+    /// running-application entry to match by PID.
+    var isWindowServer: Bool
+    var layer: Int
+    /// Global coordinates with the origin at the top-left of the main display.
+    var bounds: CGRect
+    var alpha: Double
+}
+
+enum DesktopClickDetector {
+    /// kCGDesktopIconWindowLevel: Finder's desktop (icons) window.
+    static let desktopIconLayer = Int(CGWindowLevelForKey(.desktopIconWindow))
+
+    /// Whether the frontmost window under `point` is Finder's desktop. The Dock owns a
+    /// transparent window over the whole screen and the window server owns
+    /// invisible strips below the menu bar, so those are looked through. Desktop
+    /// widgets sit just above the desktop and do count as being in front of it.
+    static func isDesktopClick(
+        at point: CGPoint, windows: [OnScreenWindow], finderPID: pid_t?, dockPID: pid_t?, ownPID: pid_t
+    ) -> Bool {
+        for window in windows {
+            guard window.alpha > 0, !window.bounds.isEmpty, window.bounds.contains(point) else {
+                continue
+            }
+            if window.ownerPID == dockPID || window.ownerPID == ownPID {
+                continue
+            }
+            if window.isWindowServer, window.layer < 0 {
+                continue
+            }
+            return window.ownerPID == finderPID && window.layer == desktopIconLayer
+        }
+        return false
     }
 }
 

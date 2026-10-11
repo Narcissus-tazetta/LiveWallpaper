@@ -153,6 +153,8 @@ extension SettingsView {
         case cursorParallax
         case cursorSpotlight
         case cursorTrail
+        case cursorOnlyOnDesktop
+        case cursorClick
         case scheduleFollowAppearance
         case scheduleAdvancedRules
     }

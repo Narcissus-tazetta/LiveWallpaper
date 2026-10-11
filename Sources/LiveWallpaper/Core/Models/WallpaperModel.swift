@@ -128,6 +128,12 @@ final class WallpaperModel: ObservableObject {
     @Published var desktopReadabilityDimOpacity: Double = 0
     @Published var cursorEffects = CursorEffectsSettings()
     var cursorTracker: CursorTracker?
+    var cursorEffectsObservers: [NSObjectProtocol] = []
+    var clickMonitor: Any?
+    /// Finder (the desktop) or this app is frontmost; see onlyWhileDesktopActive.
+    @Published var isDesktopAppFrontmost: Bool = true
+    @Published var isLowPowerModeOn: Bool = false
+    @Published var isThermallyConstrained: Bool = false
     var trailIdleWorkItem: DispatchWorkItem?
     @Published var frameRateLimit: FrameRateLimit = .off
     @Published var decodeMode: DecodeMode = .automatic

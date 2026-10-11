@@ -5,6 +5,8 @@ enum CursorEffectBlockReason: Equatable {
     case webWallpaper
     case reduceMotion
     case battery
+    case lowPowerMode
+    case thermal
 }
 
 /// Parallax, spotlight and trail driven by the cursor (CursorTracker).
@@ -12,8 +14,9 @@ enum CursorEffectBlockReason: Equatable {
 /// Parallax and trail are motion: they stop for Reduce Motion, while the battery
 /// policy lowers or freezes playback, and while the wallpaper is paused. The
 /// spotlight only follows the cursor, so it keeps working on a paused wallpaper.
-/// All of them stop on screens covered by windows, and the tracker stops when no
-/// screen needs it.
+/// All of them stop on screens covered by windows, in Low Power Mode, when the Mac
+/// is hot, and (by default) while another app is frontmost; the tracker stops when
+/// no screen needs it, since waking for mouse events is most of the cost.
 @MainActor
 extension WallpaperModel {
     func setCursorEffects(_ settings: CursorEffectsSettings) {
@@ -43,18 +46,29 @@ extension WallpaperModel {
         if reduceMotionFreezeActive {
             return .reduceMotion
         }
-        if batteryReduceLoadActive || batteryFreezeActive {
-            return .battery
+        return cursorPowerBlockReason ?? ((batteryReduceLoadActive || batteryFreezeActive) ? .battery : nil)
+    }
+
+    var cursorSpotlightBlockReason: CursorEffectBlockReason? {
+        isWebWallpaperActive ? .webWallpaper : cursorPowerBlockReason
+    }
+
+    private var cursorPowerBlockReason: CursorEffectBlockReason? {
+        if isLowPowerModeOn {
+            return .lowPowerMode
+        }
+        if isThermallyConstrained {
+            return .thermal
         }
         return nil
     }
 
-    var cursorSpotlightBlockReason: CursorEffectBlockReason? {
-        isWebWallpaperActive ? .webWallpaper : nil
+    private var cursorEffectsPausedForOtherApp: Bool {
+        cursorEffects.onlyWhileDesktopActive && !isDesktopAppFrontmost
     }
 
     private var cursorMotionActive: Bool {
-        cursorMotionBlockReason == nil && !manualPauseActive
+        cursorMotionBlockReason == nil && !manualPauseActive && !cursorEffectsPausedForOtherApp
     }
 
     private var parallaxActive: Bool {
@@ -65,23 +79,81 @@ extension WallpaperModel {
         cursorEffects.trailEnabled && cursorMotionActive
     }
 
+    /// Not tied to the frontmost app: the click that brings the desktop forward
+    /// happens while another app is still frontmost, and clicks are rare enough
+    /// that watching them costs nothing.
+    private var clickActive: Bool {
+        cursorEffects.clickEnabled && cursorMotionBlockReason == nil && !manualPauseActive
+    }
+
     private var spotlightActive: Bool {
-        cursorEffects.spotlightEnabled && cursorSpotlightBlockReason == nil
+        cursorEffects.spotlightEnabled && cursorSpotlightBlockReason == nil && !cursorEffectsPausedForOtherApp
+    }
+
+    /// Frontmost app, Low Power Mode and thermal state, watched only while some
+    /// effect is enabled.
+    private func updateCursorEffectsObservers() {
+        guard cursorEffects.anyEnabled else {
+            for observer in cursorEffectsObservers {
+                NSWorkspace.shared.notificationCenter.removeObserver(observer)
+                NotificationCenter.default.removeObserver(observer)
+            }
+            cursorEffectsObservers = []
+            return
+        }
+        readCursorEffectsEnvironment()
+        guard cursorEffectsObservers.isEmpty else {
+            return
+        }
+        let handler: @Sendable (Notification) -> Void = { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else {
+                    return
+                }
+                self.readCursorEffectsEnvironment()
+                self.refreshCursorEffects()
+            }
+        }
+        cursorEffectsObservers = [
+            NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main, using: handler
+            ),
+            NotificationCenter.default.addObserver(
+                forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main, using: handler
+            ),
+            NotificationCenter.default.addObserver(
+                forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main, using: handler
+            ),
+        ]
+    }
+
+    private func readCursorEffectsEnvironment() {
+        let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let desktop = frontmost == "com.apple.finder" || frontmost == Bundle.main.bundleIdentifier
+        if isDesktopAppFrontmost != desktop {
+            isDesktopAppFrontmost = desktop
+        }
+        let lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+        if isLowPowerModeOn != lowPower {
+            isLowPowerModeOn = lowPower
+        }
+        let hot = ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue
+        if isThermallyConstrained != hot {
+            isThermallyConstrained = hot
+        }
     }
 
     /// Re-applies the settings to every screen and starts or stops the tracker.
     /// Cheap enough to call on every coverage, power or window change.
     func refreshCursorEffects() {
+        updateCursorEffectsObservers()
+        updateClickMonitor()
         let settings = cursorEffects
         let visible = allWallpaperDisplayIDs().subtracting(coveredDisplayIDs)
         let needsTracking = (parallaxActive || trailActive || spotlightActive) && !visible.isEmpty
 
         for view in playerViews {
-            view.configureTrail(
-                color: settings.trailColor,
-                customColor: settings.trailCustomColor.nsColor,
-                birthRate: settings.trailBirthRate
-            )
+            view.configureTrail(settings.trailAppearance)
             if !parallaxActive {
                 view.setParallax(offset: .zero, scale: 1)
             }
@@ -164,5 +236,70 @@ extension WallpaperModel {
         }
         trailIdleWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: workItem)
+    }
+
+    // MARK: - Click
+
+    private func updateClickMonitor() {
+        if clickActive, clickMonitor == nil {
+            clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.handleClick(at: NSEvent.mouseLocation)
+                }
+            }
+        } else if !clickActive, let monitor = clickMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickMonitor = nil
+        }
+    }
+
+    private func handleClick(at location: CGPoint) {
+        guard let primaryHeight = NSScreen.screens.first?.frame.height else {
+            return
+        }
+        let topLeftPoint = CGPoint(x: location.x, y: primaryHeight - location.y)
+        let isDesktop = DesktopClickDetector.isDesktopClick(
+            at: topLeftPoint,
+            windows: Self.onScreenWindows(),
+            finderPID: NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
+                .first?.processIdentifier,
+            dockPID: NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
+                .first?.processIdentifier,
+            ownPID: ProcessInfo.processInfo.processIdentifier
+        )
+        guard isDesktop else {
+            return
+        }
+        let settings = cursorEffects
+        for view in playerViews {
+            guard let frame = view.window?.frame, frame.contains(location) else {
+                continue
+            }
+            view.showClick(
+                at: CGPoint(x: location.x - frame.minX, y: location.y - frame.minY),
+                style: settings.clickStyle, color: settings.clickColor, customColor: settings.clickCustomColor
+            )
+        }
+    }
+
+    private static func onScreenWindows() -> [OnScreenWindow] {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+        return list.compactMap { info in
+            guard let pid = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
+                  let boundsDictionary = info[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: boundsDictionary)
+            else {
+                return nil
+            }
+            return OnScreenWindow(
+                ownerPID: pid,
+                isWindowServer: info[kCGWindowOwnerName as String] as? String == "Window Server",
+                layer: (info[kCGWindowLayer as String] as? NSNumber)?.intValue ?? 0,
+                bounds: bounds,
+                alpha: (info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1
+            )
+        }
     }
 }
