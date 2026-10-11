@@ -71,7 +71,7 @@ If that happens:
     - Lowers playback load automatically when the battery drops to 10% or less.
     - Choose what happens on battery power: play as usual, play the smaller Lightweight version, or freeze the wallpaper. It switches back the moment you plug in.
     - Freezes the wallpaper when the system's **Reduce Motion** accessibility setting is on.
-- **Localization**: Full UI translation (menus, Settings, notifications) in Japanese, English, Traditional Chinese, Vietnamese, and Turkish. Follows your macOS language automatically, or can be set manually in Settings.
+- **Localization**: Full UI translation (menus, Settings, notifications) in Japanese, English, Simplified Chinese, Traditional Chinese, Korean, Spanish, French, German, Brazilian Portuguese, Vietnamese, and Turkish. Follows your macOS language automatically, or can be set manually in Settings.
 - **Auto updates**: Integrated with Sparkle for in-app updates.
 
 <video src="https://github.com/user-attachments/assets/b5f19e23-928b-4f37-a03b-d229949b905a" width="60%" controls autoplay loop muted></video>

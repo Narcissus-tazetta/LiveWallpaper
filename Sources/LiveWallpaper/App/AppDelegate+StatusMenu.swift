@@ -491,12 +491,16 @@ extension AppDelegate {
         settingsWindowController?.window?.title = localized("Live Wallpaper 設定")
     }
 
+    private func toggleMenuTitle(_ label: String, _ enabled: Bool) -> String {
+        String(format: localized("%@: %@"), label, enabled ? localized("ON") : localized("OFF"))
+    }
+
     func audioMenuTitle(_ enabled: Bool) -> String {
-        localized("音声を再生") + ": " + (enabled ? localized("ON") : localized("OFF"))
+        toggleMenuTitle(localized("音声を再生"), enabled)
     }
 
     func playlistMenuTitle(_ enabled: Bool) -> String {
-        localized("プレイリスト連続再生") + ": " + (enabled ? localized("ON") : localized("OFF"))
+        toggleMenuTitle(localized("プレイリスト連続再生"), enabled)
     }
 
     func pauseMenuTitle(_ paused: Bool) -> String {
@@ -504,11 +508,11 @@ extension AppDelegate {
     }
 
     func shuffleMenuTitle(_ enabled: Bool) -> String {
-        localized("シャッフル") + ": " + (enabled ? localized("ON") : localized("OFF"))
+        toggleMenuTitle(localized("シャッフル"), enabled)
     }
 
     func pinCurrentVideoMenuTitle(_ enabled: Bool) -> String {
-        localized("この動画で固定") + ": " + (enabled ? localized("ON") : localized("OFF"))
+        toggleMenuTitle(localized("この動画で固定"), enabled)
     }
 
     /// 「この動画を現在のデスクトップに割り当て」を表示できる状態か。
@@ -538,8 +542,7 @@ extension AppDelegate {
         {
             title = String(format: localized("この動画をデスクトップ%dに割り当て"), ordinal)
         }
-        return title + ": "
-            + (isCurrentVideoAssignedToCurrentSpace ? localized("ON") : localized("OFF"))
+        return toggleMenuTitle(title, isCurrentVideoAssignedToCurrentSpace)
     }
 
     func assignToCurrentSpaceMenuIcon() -> NSImage? {

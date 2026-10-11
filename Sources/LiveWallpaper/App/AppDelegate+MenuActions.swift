@@ -144,7 +144,7 @@ extension AppDelegate {
         } catch let PackageImporter.ImportError.duplicateVideo(name) {
           let duplicateAlert = NSAlert()
           duplicateAlert.messageText = localized("重複するビデオが見つかりました")
-          duplicateAlert.informativeText = "\(name) " + localized("は既に存在します。置き換えますか？")
+          duplicateAlert.informativeText = String(format: localized("%@ は既に存在します。置き換えますか？"), name)
           duplicateAlert.alertStyle = .warning
           duplicateAlert.addButton(withTitle: localized("中止"))
           duplicateAlert.addButton(withTitle: localized("置き換える"))

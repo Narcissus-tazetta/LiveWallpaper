@@ -89,7 +89,7 @@ extension SettingsView {
     case .syncing:
       return model.localizedString("同期中")
     case let .borrowed(name):
-      return "\(model.localizedString("借用中")): \(name)"
+      return String(format: model.localizedString("%@: %@"), model.localizedString("借用中"), name)
     case .recovering:
       return model.localizedString("前回のロック画面設定を復元中")
     case .removing:
@@ -103,7 +103,7 @@ extension SettingsView {
     case .noAerialDownloaded:
       return model.localizedString("Aerial動画が未ダウンロードです")
     case let .failed(message):
-      return "\(model.localizedString("同期に失敗しました")): \(message)"
+      return String(format: model.localizedString("%@: %@"), model.localizedString("同期に失敗しました"), message)
     }
   }
 

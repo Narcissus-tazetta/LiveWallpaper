@@ -12,7 +12,6 @@
 "新規プレイリスト" = "Yeni Oynatma Listesi";
 "プレイリスト・設定" = "Oynatma Listesi ve Ayarlar";
 "選択中" = "Seçili";
-"本" = "öğe";
 "クリック貫通を有効にする" = "Tıklama geçişini etkinleştir";
 "ログイン時に自動起動する" = "Oturum açarken otomatik başlat";
 "音声を再生する" = "Sesi oynat";
@@ -162,7 +161,6 @@
 "パッケージが正常にインポートされました。" = "Paket başarıyla içe aktarıldı.";
 "インポートに失敗" = "İçe aktarma başarısız";
 "重複するビデオが見つかりました" = "Yinelenen video bulundu";
-"は既に存在します。置き換えますか？" = "zaten mevcut. Üzerine yazılsın mı?";
 "中止" = "Vazgeç";
 "置き換える" = "Değiştir";
 "アップデートを確認する前に移動が必要です" = "Güncellemeleri kontrol etmek için önce uygulamayı taşıyın.";
@@ -471,7 +469,6 @@
 "検索条件に一致する壁紙がありません" = "Aramanızla eşleşen duvar kâğıdı yok";
 "アプリ名で検索" = "Uygulama adına göre ara";
 "除外できるアプリがありません" = "Hariç tutulabilecek uygulama yok";
-"一致" = "Eşleşme";
 
 /* トリム編集: ズーム・キーボード操作・Undo・コピー・書き出し */
 "いまのカット・ループ設定を、選んだ壁紙にもそのまま適用します" = "Geçerli kesme ve döngü ayarlarını seçtiğiniz duvar kâğıtlarına uygular.";
@@ -496,8 +493,6 @@
 "ループ開始にする" = "Döngü Başlangıcı Yap";
 "一致する壁紙がありません" = "Eşleşen duvar kâğıdı yok";
 "他の壁紙へコピー…" = "Diğer Duvar Kâğıtlarına Kopyala…";
-"件にコピーしました" = " duvar kâğıdı güncellendi";
-"件は尺が足りずスキップしました" = " tanesi çok kısa olduğu için atlandı";
 "保存して切り替える" = "Kaydet ve Geç";
 "再エンコードして書き出す(正確)" = "Yeniden kodlayarak dışa aktar (hassas)";
 "再生/一時停止(Space)" = "Oynat/Duraklat (Boşluk)";
@@ -676,3 +671,58 @@
 "変更はすぐに壁紙へ反映されます。この設定は、壁紙の書き出しや Store への投稿にも含まれます。" = "Değişiklikler duvar kâğıdına hemen uygulanır. Bu ayarlar, duvar kâğıdını dışa aktarırken veya Store'a gönderirken de eklenir.";
 "設定の「カーソルのエフェクト」に従います。" = "Ayarlar'daki İmleç Efektleri'ni izler.";
 "下の壁紙一覧から動画を選択すると、この壁紙だけのカーソルのエフェクトを設定できます" = "Yalnızca o duvar kâğıdı için imleç efektlerini ayarlamak üzere aşağıdaki listeden bir video seçin";
+
+// Added with Simplified Chinese, Korean, Spanish, French, German and Brazilian Portuguese
+"简体中文" = "Basitleştirilmiş Çince";
+"한국어" = "Korece";
+"Español" = "İspanyolca";
+"Français" = "Fransızca";
+"Deutsch" = "Almanca";
+"Português (Brasil)" = "Portekizce (Brezilya)";
+"・" = ", ";
+"・%@" = "• %@";
+"%@(%@)" = "%@ (%@)";
+"一致: %@" = "Eşleşme: %@";
+"%d本" = "%d öğe";
+"%d件にコピーしました" = "%d duvar kâğıdına kopyalandı";
+"%d件は尺が足りずスキップしました" = "%d tanesi çok kısa olduğu için atlandı";
+"%@ は既に存在します。置き換えますか？" = "“%@” zaten var. Değiştirmek istiyor musunuz?";
+"Web壁紙再生中" = "Web duvar kâğıdı oynatılıyor";
+"Web壁紙はロック画面に設定できません" = "Web duvar kâğıtları kilit ekranı olarak ayarlanamaz";
+"ここで変更すると、この動画・この画面だけの表示方法を上書きします。未設定の場合は設定タブの既定値が使われます" = "Burada yapılan değişiklikler yalnızca bu videonun bu ekrandaki görünümünü geçersiz kılar. Ayarlanmamışsa Ayarlar sekmesindeki varsayılan değer kullanılır.";
+"この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です" = "Bir video için Düzen sekmesinde ayrıca geçersiz kılınmadığında kullanılan varsayılan gösterim biçimi.";
+"軽量版を生成中..." = "Hafif sürüm oluşturuluyor…";
+"軽量版の生成に失敗しました。元の画質で再生しています。" = "Hafif sürüm oluşturulamadı. Özgün kalitede oynatılıyor.";
+"オンにすると壁紙タブの一覧にWeb壁紙を追加できるようになります。実験的な機能です。" = "Açıldığında Duvar Kâğıdı sekmesindeki listeye web duvar kâğıtları ekleyebilirsiniz. Bu deneysel bir özelliktir.";
+"アニメ画像" = "Animasyonlu görüntüler";
+"バックアップ" = "Yedek";
+"フルディスクアクセス" = "Tam Disk Erişimi";
+"音声" = "Ses";
+"ロック画面動画同期は macOS 26 以降で利用できます。" = "Kilit ekranı video eşzamanlaması macOS 26 veya sonrasında kullanılabilir.";
+"Application Support フォルダを取得できませんでした。" = "Application Support klasörüne erişilemedi.";
+"macOS の Aerial ディレクトリが見つかりません: %@" = "macOS Aerial klasörü bulunamadı: %@";
+"macOS の Aerial manifest が見つかりません: %@" = "macOS Aerial bildirimi bulunamadı: %@";
+"macOS の Aerial manifest を読み込めませんでした: %@" = "macOS Aerial bildirimi okunamadı: %@";
+"ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。" = "İndirilmiş dinamik duvar kâğıdı bulunamadı. Sistem Ayarları’nda Apple’ın dinamik duvar kâğıtlarından birini indirin.";
+"動画をロック画面用 mov に変換できませんでした。" = "Video, kilit ekranı için .mov dosyasına dönüştürülemedi.";
+"macOS の壁紙設定ファイルを取得できませんでした。" = "macOS duvar kâğıdı ayar dosyasına erişilemedi.";
+"復元できる LiveWallpaper のバックアップが見つかりませんでした。" = "Geri yüklenecek LiveWallpaper yedeği bulunamadı.";
+"復元対象の Aerial バックアップが見つかりませんでした。" = "Geri yüklenecek Aerial yedeği bulunamadı.";
+"macOS の壁紙設定に Aerial を正しく適用できませんでした。" = "Aerial, macOS duvar kâğıdı ayarlarına doğru şekilde uygulanamadı.";
+"動画の mov 変換に失敗しました。" = "Video .mov dosyasına dönüştürülemedi.";
+"動画の mov 変換が完了しませんでした。" = "Videonun .mov dönüştürmesi tamamlanmadı.";
+"ロック画面用の動画を読み込めませんでした: %@" = "Kilit ekranı videosu yüklenemedi: %@";
+"ロック画面用の動画を再生可能として読み込めませんでした。" = "Kilit ekranı videosu oynatılabilir olarak yüklenemedi.";
+"ロック画面用の動画が短すぎるか、長さを読み取れませんでした。" = "Kilit ekranı videosu çok kısa veya süresi okunamadı.";
+"ロック画面用の動画に映像トラックがありません。" = "Kilit ekranı videosunda video izi yok.";
+"不正なパッケージ形式です" = "Paket biçimi geçersiz.";
+"metadata.jsonが見つかりません" = "metadata.json bulunamadı.";
+"metadata.jsonが破損しています: %@" = "metadata.json bozuk: %@";
+"サポートされていないパッケージバージョンです" = "Bu paket sürümü desteklenmiyor.";
+"重複するビデオが既に存在します: %@" = "Yinelenen bir video zaten var: %@";
+"ビデオファイルが見つかりません: %@" = "Video dosyası bulunamadı: %@";
+"ビデオファイルが破損しています: %@" = "Video dosyası bozuk: %@";
+"ビデオファイルのチェックサムが一致しません: %@" = "Video dosyasının sağlama toplamı eşleşmiyor: %@";
+"パッケージの展開に失敗しました" = "Paket açılamadı.";
+"不正なファイル参照が含まれています: %@" = "Paket geçersiz bir dosya başvurusu içeriyor: %@";
+"%@: %@" = "%@: %@";

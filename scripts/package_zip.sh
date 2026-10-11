@@ -206,7 +206,13 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <array>
     <string>ja</string>
     <string>en</string>
+    <string>zh-Hans</string>
     <string>zh-Hant</string>
+    <string>ko</string>
+    <string>es</string>
+    <string>fr</string>
+    <string>de</string>
+    <string>pt-BR</string>
     <string>vi</string>
     <string>tr</string>
   </array>

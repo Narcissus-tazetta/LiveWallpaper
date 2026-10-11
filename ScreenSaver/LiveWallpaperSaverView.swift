@@ -66,19 +66,37 @@ final class LiveWallpaperSaverView: ScreenSaverView {
         // host created this (possibly long-lived) instance.
         stopPlayback()
         guard let config = Self.loadConfig() else {
-            showMessage(Self.localized(
-                ja: "LiveWallpaper を起動して壁紙を選ぶと、ここに表示されます。",
-                en: "Open LiveWallpaper and choose a wallpaper to show it here."
-            ))
+            showMessage(Self.localized([
+                "ja": "LiveWallpaper を起動して壁紙を選ぶと、ここに表示されます。",
+                "en": "Open LiveWallpaper and choose a wallpaper to show it here.",
+                "zh-Hans": "打开 LiveWallpaper 并选择墙纸后，墙纸会显示在这里。",
+                "zh-Hant": "打開 LiveWallpaper 並選擇桌布後，桌布會顯示在這裡。",
+                "ko": "LiveWallpaper를 열고 배경화면을 선택하면 여기에 표시됩니다.",
+                "es": "Abre LiveWallpaper y elige un fondo de pantalla para mostrarlo aquí.",
+                "fr": "Ouvrez LiveWallpaper et choisissez un fond d’écran pour l’afficher ici.",
+                "de": "Öffne LiveWallpaper und wähle ein Hintergrundbild aus, um es hier anzuzeigen.",
+                "pt-BR": "Abra o LiveWallpaper e escolha uma imagem de fundo para exibi-la aqui.",
+                "vi": "Mở LiveWallpaper và chọn một hình nền để hiển thị tại đây.",
+                "tr": "Burada göstermek için LiveWallpaper’ı açın ve bir duvar kâğıdı seçin.",
+            ]))
             return
         }
         guard let display = config.display(forDisplayID: displayID()),
               FileManager.default.fileExists(atPath: display.videoPath)
         else {
-            showMessage(Self.localized(
-                ja: "この画面に表示できる動画の壁紙がありません。",
-                en: "There is no video wallpaper for this display."
-            ))
+            showMessage(Self.localized([
+                "ja": "この画面に表示できる動画の壁紙がありません。",
+                "en": "There is no video wallpaper for this display.",
+                "zh-Hans": "此显示器没有可显示的视频墙纸。",
+                "zh-Hant": "此螢幕沒有可顯示的影片桌布。",
+                "ko": "이 디스플레이에 표시할 수 있는 비디오 배경화면이 없습니다.",
+                "es": "No hay ningún fondo de pantalla de vídeo para esta pantalla.",
+                "fr": "Aucun fond d’écran vidéo n’est disponible pour cet écran.",
+                "de": "Für diesen Bildschirm gibt es kein Video-Hintergrundbild.",
+                "pt-BR": "Não há nenhuma imagem de fundo em vídeo para esta tela.",
+                "vi": "Không có hình nền video nào cho màn hình này.",
+                "tr": "Bu ekran için video duvar kâğıdı yok.",
+            ]))
             return
         }
         messageLayer.isHidden = true
@@ -205,7 +223,13 @@ final class LiveWallpaperSaverView: ScreenSaverView {
         return URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
     }
 
-    private static func localized(ja: String, en: String) -> String {
-        Locale.preferredLanguages.first?.hasPrefix("ja") == true ? ja : en
+    /// The saver bundle ships no .lproj folders, so the language is matched by hand
+    /// against the same set the app supports.
+    private static func localized(_ translations: [String: String]) -> String {
+        let language = Bundle.preferredLocalizations(
+            from: Array(translations.keys),
+            forPreferences: Locale.preferredLanguages
+        ).first ?? "en"
+        return translations[language] ?? translations["en"]!
     }
 }

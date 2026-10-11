@@ -67,7 +67,6 @@
 "パッケージが正常にインポートされました。" = "The package was imported successfully.";
 "インポートに失敗" = "Import failed";
 "重複するビデオが見つかりました" = "Duplicate video found";
-"は既に存在します。置き換えますか？" = "already exists. Replace it?";
 "中止" = "Cancel";
 "置き換える" = "Replace";
 "アップデートを確認する前に移動が必要です" = "Move the app before checking for updates.";
@@ -139,7 +138,6 @@
 "繁體中文" = "Traditional Chinese";
 "Tiếng Việt" = "Vietnamese";
 "Türkçe" = "Turkish";
-"本" = "items";
 "選択中" = "Selected";
 "壁紙一覧" = "Wallpaper Library";
 "すべての壁紙" = "All Wallpapers";
@@ -469,7 +467,6 @@
 "検索条件に一致する壁紙がありません" = "No wallpapers match your search";
 "アプリ名で検索" = "Search by app name";
 "除外できるアプリがありません" = "No apps available to exclude";
-"一致" = "Match";
 
 /* トリム編集: ズーム・キーボード操作・Undo・コピー・書き出し */
 "いまのカット・ループ設定を、選んだ壁紙にもそのまま適用します" = "Applies the current cut and loop settings to the wallpapers you pick.";
@@ -494,8 +491,6 @@
 "ループ開始にする" = "Set Loop Start";
 "一致する壁紙がありません" = "No matching wallpapers";
 "他の壁紙へコピー…" = "Copy to Other Wallpapers…";
-"件にコピーしました" = " wallpapers updated";
-"件は尺が足りずスキップしました" = " skipped because they are too short";
 "保存して切り替える" = "Save and Switch";
 "再エンコードして書き出す(正確)" = "Re-encode and export (precise)";
 "再生/一時停止(Space)" = "Play/Pause (Space)";
@@ -674,3 +669,58 @@
 "変更はすぐに壁紙へ反映されます。この設定は、壁紙の書き出しや Store への投稿にも含まれます。" = "Changes apply to the wallpaper right away. These settings are included when you export the wallpaper or post it to the Store.";
 "設定の「カーソルのエフェクト」に従います。" = "Follows Cursor Effects in Settings.";
 "下の壁紙一覧から動画を選択すると、この壁紙だけのカーソルのエフェクトを設定できます" = "Choose a video from the wallpaper list below to set cursor effects for that wallpaper only";
+
+// Added with Simplified Chinese, Korean, Spanish, French, German and Brazilian Portuguese
+"简体中文" = "Simplified Chinese";
+"한국어" = "Korean";
+"Español" = "Spanish";
+"Français" = "French";
+"Deutsch" = "German";
+"Português (Brasil)" = "Portuguese (Brazil)";
+"・" = ", ";
+"・%@" = "• %@";
+"%@(%@)" = "%@ (%@)";
+"一致: %@" = "Match: %@";
+"%d本" = "%d items";
+"%d件にコピーしました" = "Copied to %d wallpapers";
+"%d件は尺が足りずスキップしました" = "%d skipped because they are too short";
+"%@ は既に存在します。置き換えますか？" = "“%@” already exists. Do you want to replace it?";
+"Web壁紙再生中" = "Playing a web wallpaper";
+"Web壁紙はロック画面に設定できません" = "Web wallpapers can’t be set as the Lock Screen";
+"ここで変更すると、この動画・この画面だけの表示方法を上書きします。未設定の場合は設定タブの既定値が使われます" = "Changes here override how this video is shown on this display only. If nothing is set, the default from the Settings tab is used.";
+"この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です" = "The default display method, used unless a video overrides it in the Layout tab.";
+"軽量版を生成中..." = "Creating the lightweight version…";
+"軽量版の生成に失敗しました。元の画質で再生しています。" = "Couldn’t create the lightweight version. Playing at the original quality.";
+"オンにすると壁紙タブの一覧にWeb壁紙を追加できるようになります。実験的な機能です。" = "When on, you can add web wallpapers to the list in the Wallpaper tab. This is an experimental feature.";
+"アニメ画像" = "Animated images";
+"バックアップ" = "Backup";
+"フルディスクアクセス" = "Full Disk Access";
+"音声" = "Audio";
+"ロック画面動画同期は macOS 26 以降で利用できます。" = "Lock Screen video sync is available on macOS 26 or later.";
+"Application Support フォルダを取得できませんでした。" = "Couldn’t access the Application Support folder.";
+"macOS の Aerial ディレクトリが見つかりません: %@" = "The macOS Aerial folder wasn’t found: %@";
+"macOS の Aerial manifest が見つかりません: %@" = "The macOS Aerial manifest wasn’t found: %@";
+"macOS の Aerial manifest を読み込めませんでした: %@" = "Couldn’t read the macOS Aerial manifest: %@";
+"ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。" = "No downloaded dynamic wallpaper was found. Download one of Apple’s dynamic wallpapers in System Settings.";
+"動画をロック画面用 mov に変換できませんでした。" = "Couldn’t convert the video to a .mov for the Lock Screen.";
+"macOS の壁紙設定ファイルを取得できませんでした。" = "Couldn’t access the macOS wallpaper settings file.";
+"復元できる LiveWallpaper のバックアップが見つかりませんでした。" = "No LiveWallpaper backup to restore was found.";
+"復元対象の Aerial バックアップが見つかりませんでした。" = "No Aerial backup to restore was found.";
+"macOS の壁紙設定に Aerial を正しく適用できませんでした。" = "Couldn’t apply the Aerial to the macOS wallpaper settings.";
+"動画の mov 変換に失敗しました。" = "Couldn’t convert the video to .mov.";
+"動画の mov 変換が完了しませんでした。" = "The video’s conversion to .mov didn’t finish.";
+"ロック画面用の動画を読み込めませんでした: %@" = "Couldn’t load the video for the Lock Screen: %@";
+"ロック画面用の動画を再生可能として読み込めませんでした。" = "The video for the Lock Screen couldn’t be loaded as playable.";
+"ロック画面用の動画が短すぎるか、長さを読み取れませんでした。" = "The video for the Lock Screen is too short, or its length couldn’t be read.";
+"ロック画面用の動画に映像トラックがありません。" = "The video for the Lock Screen has no video track.";
+"不正なパッケージ形式です" = "The package format is invalid.";
+"metadata.jsonが見つかりません" = "metadata.json wasn’t found.";
+"metadata.jsonが破損しています: %@" = "metadata.json is damaged: %@";
+"サポートされていないパッケージバージョンです" = "This package version isn’t supported.";
+"重複するビデオが既に存在します: %@" = "A duplicate video already exists: %@";
+"ビデオファイルが見つかりません: %@" = "The video file wasn’t found: %@";
+"ビデオファイルが破損しています: %@" = "The video file is damaged: %@";
+"ビデオファイルのチェックサムが一致しません: %@" = "The video file’s checksum doesn’t match: %@";
+"パッケージの展開に失敗しました" = "Couldn’t extract the package.";
+"不正なファイル参照が含まれています: %@" = "The package contains an invalid file reference: %@";
+"%@: %@" = "%@: %@";

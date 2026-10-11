@@ -20,31 +20,31 @@ enum LockScreenSyncError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupportedOS:
-            return "ロック画面動画同期は macOS 26 以降で利用できます。"
+            return NSLocalizedString("ロック画面動画同期は macOS 26 以降で利用できます。", comment: "")
         case .applicationSupportUnavailable:
-            return "Application Support フォルダを取得できませんでした。"
+            return NSLocalizedString("Application Support フォルダを取得できませんでした。", comment: "")
         case let .aerialsDirectoryMissing(url):
-            return "macOS の Aerial ディレクトリが見つかりません: \(url.path)"
+            return String(format: NSLocalizedString("macOS の Aerial ディレクトリが見つかりません: %@", comment: ""), url.path)
         case let .manifestMissing(url):
-            return "macOS の Aerial manifest が見つかりません: \(url.path)"
+            return String(format: NSLocalizedString("macOS の Aerial manifest が見つかりません: %@", comment: ""), url.path)
         case let .invalidManifest(url):
-            return "macOS の Aerial manifest を読み込めませんでした: \(url.path)"
+            return String(format: NSLocalizedString("macOS の Aerial manifest を読み込めませんでした: %@", comment: ""), url.path)
         case .noDownloadedAerials:
-            return "ダウンロード済みのダイナミック壁紙が見つかりません。System Settings で Apple のダイナミック壁紙を1つダウンロードしてください。"
+            return NSLocalizedString("ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。", comment: "")
         case .exportSessionUnavailable:
-            return "動画をロック画面用 mov に変換できませんでした。"
+            return NSLocalizedString("動画をロック画面用 mov に変換できませんでした。", comment: "")
         case let .exportFailed(message):
             return message
         case let .invalidVideo(message):
             return message
         case .wallpaperStoreUnavailable:
-            return "macOS の壁紙設定ファイルを取得できませんでした。"
+            return NSLocalizedString("macOS の壁紙設定ファイルを取得できませんでした。", comment: "")
         case .backupUnavailable:
-            return "復元できる LiveWallpaper のバックアップが見つかりませんでした。"
+            return NSLocalizedString("復元できる LiveWallpaper のバックアップが見つかりませんでした。", comment: "")
         case .borrowedAerialUnavailable:
-            return "復元対象の Aerial バックアップが見つかりませんでした。"
+            return NSLocalizedString("復元対象の Aerial バックアップが見つかりませんでした。", comment: "")
         case .wallpaperStoreVerificationFailed:
-            return "macOS の壁紙設定に Aerial を正しく適用できませんでした。"
+            return NSLocalizedString("macOS の壁紙設定に Aerial を正しく適用できませんでした。", comment: "")
         }
     }
 }

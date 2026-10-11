@@ -25,25 +25,25 @@ final class PackageImporter {
         var errorDescription: String? {
             switch self {
             case .invalidPackageFormat:
-                return "不正なパッケージ形式です"
+                return NSLocalizedString("不正なパッケージ形式です", comment: "")
             case .missingMetadata:
-                return "metadata.jsonが見つかりません"
+                return NSLocalizedString("metadata.jsonが見つかりません", comment: "")
             case let .invalidMetadataJSON(details):
-                return "metadata.jsonが破損しています: \(details)"
+                return String(format: NSLocalizedString("metadata.jsonが破損しています: %@", comment: ""), details)
             case .unsupportedPackageVersion:
-                return "サポートされていないパッケージバージョンです"
+                return NSLocalizedString("サポートされていないパッケージバージョンです", comment: "")
             case let .duplicateVideo(name):
-                return "重複するビデオが既に存在します: \(name)"
+                return String(format: NSLocalizedString("重複するビデオが既に存在します: %@", comment: ""), name)
             case let .videoNotFound(name):
-                return "ビデオファイルが見つかりません: \(name)"
+                return String(format: NSLocalizedString("ビデオファイルが見つかりません: %@", comment: ""), name)
             case let .corruptedVideoFile(name):
-                return "ビデオファイルが破損しています: \(name)"
+                return String(format: NSLocalizedString("ビデオファイルが破損しています: %@", comment: ""), name)
             case let .invalidChecksum(name):
-                return "ビデオファイルのチェックサムが一致しません: \(name)"
+                return String(format: NSLocalizedString("ビデオファイルのチェックサムが一致しません: %@", comment: ""), name)
             case .extractionFailed:
-                return "パッケージの展開に失敗しました"
+                return NSLocalizedString("パッケージの展開に失敗しました", comment: "")
             case let .unsafeFileReference(name):
-                return "不正なファイル参照が含まれています: \(name)"
+                return String(format: NSLocalizedString("不正なファイル参照が含まれています: %@", comment: ""), name)
             }
         }
     }

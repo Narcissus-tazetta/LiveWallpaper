@@ -17,7 +17,7 @@ extension SettingsView {
                 Text(model.localizedString("壁紙一覧"))
                     .font(.headline)
                 Spacer(minLength: 0)
-                Text("\(model.allRegisteredVideoPaths.count) \(model.localizedString("本"))")
+                Text(String(format: model.localizedString("%d本"), locale: model.appLocale, model.allRegisteredVideoPaths.count))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

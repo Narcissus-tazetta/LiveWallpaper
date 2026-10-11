@@ -63,13 +63,12 @@ extension WallpaperEditorController {
     }
 
     private func copyResultMessage(applied: Int, skipped: Int) -> String {
-        let appliedText =
-            "\(applied)\(model.localizedString("件にコピーしました"))"
+        let appliedText = String(format: model.localizedString("%d件にコピーしました"), locale: model.appLocale, applied)
         guard skipped > 0 else {
             return appliedText
         }
-        return
-            "\(appliedText)(\(skipped)\(model.localizedString("件は尺が足りずスキップしました"))）"
+        let skippedText = String(format: model.localizedString("%d件は尺が足りずスキップしました"), locale: model.appLocale, skipped)
+        return String(format: model.localizedString("%@(%@)"), appliedText, skippedText)
     }
 
     // MARK: - ファイルの書き出し

@@ -12,7 +12,6 @@
 "新規プレイリスト" = "Danh sách phát mới";
 "プレイリスト・設定" = "Danh sách phát và cài đặt";
 "選択中" = "Đang chọn";
-"本" = "mục";
 "クリック貫通を有効にする" = "Cho phép nhấp xuyên qua";
 "ログイン時に自動起動する" = "Tự khởi động khi đăng nhập";
 "音声を再生する" = "Phát âm thanh";
@@ -162,7 +161,6 @@
 "パッケージが正常にインポートされました。" = "Gói đã được nhập thành công.";
 "インポートに失敗" = "Nhập thất bại";
 "重複するビデオが見つかりました" = "Đã tìm thấy video trùng lặp";
-"は既に存在します。置き換えますか？" = "đã tồn tại. Bạn có muốn thay thế không?";
 "中止" = "Hủy";
 "置き換える" = "Thay thế";
 "アップデートを確認する前に移動が必要です" = "Cần di chuyển ứng dụng trước khi kiểm tra cập nhật.";
@@ -471,7 +469,6 @@
 "検索条件に一致する壁紙がありません" = "Không có hình nền nào khớp với tìm kiếm của bạn";
 "アプリ名で検索" = "Tìm theo tên ứng dụng";
 "除外できるアプリがありません" = "Không có ứng dụng nào để loại trừ";
-"一致" = "Khớp";
 
 /* トリム編集: ズーム・キーボード操作・Undo・コピー・書き出し */
 "いまのカット・ループ設定を、選んだ壁紙にもそのまま適用します" = "Áp dụng thiết lập cắt và lặp hiện tại cho các hình nền bạn chọn.";
@@ -496,8 +493,6 @@
 "ループ開始にする" = "Đặt điểm bắt đầu lặp";
 "一致する壁紙がありません" = "Không có hình nền phù hợp";
 "他の壁紙へコピー…" = "Sao chép sang hình nền khác…";
-"件にコピーしました" = " hình nền đã cập nhật";
-"件は尺が足りずスキップしました" = " bị bỏ qua vì quá ngắn";
 "保存して切り替える" = "Lưu và chuyển";
 "再エンコードして書き出す(正確)" = "Mã hóa lại và xuất (chính xác)";
 "再生/一時停止(Space)" = "Phát/Tạm dừng (Space)";
@@ -676,3 +671,58 @@
 "変更はすぐに壁紙へ反映されます。この設定は、壁紙の書き出しや Store への投稿にも含まれます。" = "Thay đổi được áp dụng cho hình nền ngay lập tức. Cài đặt này cũng được đưa vào khi xuất hình nền hoặc đăng lên Store.";
 "設定の「カーソルのエフェクト」に従います。" = "Theo mục Hiệu ứng con trỏ trong Cài đặt.";
 "下の壁紙一覧から動画を選択すると、この壁紙だけのカーソルのエフェクトを設定できます" = "Chọn một video trong danh sách hình nền bên dưới để đặt hiệu ứng con trỏ chỉ cho hình nền đó";
+
+// Added with Simplified Chinese, Korean, Spanish, French, German and Brazilian Portuguese
+"简体中文" = "Tiếng Trung giản thể";
+"한국어" = "Tiếng Hàn";
+"Español" = "Tiếng Tây Ban Nha";
+"Français" = "Tiếng Pháp";
+"Deutsch" = "Tiếng Đức";
+"Português (Brasil)" = "Tiếng Bồ Đào Nha (Brazil)";
+"・" = ", ";
+"・%@" = "• %@";
+"%@(%@)" = "%@ (%@)";
+"一致: %@" = "Khớp: %@";
+"%d本" = "%d mục";
+"%d件にコピーしました" = "Đã sao chép sang %d hình nền";
+"%d件は尺が足りずスキップしました" = "Đã bỏ qua %d mục vì quá ngắn";
+"%@ は既に存在します。置き換えますか？" = "“%@” đã tồn tại. Bạn có muốn thay thế không?";
+"Web壁紙再生中" = "Đang phát hình nền Web";
+"Web壁紙はロック画面に設定できません" = "Không thể đặt hình nền Web làm màn hình khóa";
+"ここで変更すると、この動画・この画面だけの表示方法を上書きします。未設定の場合は設定タブの既定値が使われます" = "Thay đổi tại đây chỉ ghi đè cách hiển thị của video này trên màn hình này. Nếu chưa đặt, giá trị mặc định trong tab Cài đặt sẽ được dùng.";
+"この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です" = "Cách hiển thị mặc định, được dùng khi video chưa được ghi đè riêng trong tab Bố trí.";
+"軽量版を生成中..." = "Đang tạo phiên bản nhẹ…";
+"軽量版の生成に失敗しました。元の画質で再生しています。" = "Không thể tạo phiên bản nhẹ. Đang phát ở chất lượng gốc.";
+"オンにすると壁紙タブの一覧にWeb壁紙を追加できるようになります。実験的な機能です。" = "Khi bật, bạn có thể thêm hình nền Web vào danh sách trong tab Hình nền. Đây là tính năng thử nghiệm.";
+"アニメ画像" = "Ảnh động";
+"バックアップ" = "Bản sao lưu";
+"フルディスクアクセス" = "Toàn quyền truy cập ổ đĩa";
+"音声" = "Âm thanh";
+"ロック画面動画同期は macOS 26 以降で利用できます。" = "Đồng bộ video màn hình khóa khả dụng trên macOS 26 trở lên.";
+"Application Support フォルダを取得できませんでした。" = "Không thể truy cập thư mục Application Support.";
+"macOS の Aerial ディレクトリが見つかりません: %@" = "Không tìm thấy thư mục Aerial của macOS: %@";
+"macOS の Aerial manifest が見つかりません: %@" = "Không tìm thấy tệp kê khai Aerial của macOS: %@";
+"macOS の Aerial manifest を読み込めませんでした: %@" = "Không thể đọc tệp kê khai Aerial của macOS: %@";
+"ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。" = "Không tìm thấy hình nền động nào đã tải về. Hãy tải về một hình nền động của Apple trong Cài đặt hệ thống.";
+"動画をロック画面用 mov に変換できませんでした。" = "Không thể chuyển đổi video sang tệp .mov cho màn hình khóa.";
+"macOS の壁紙設定ファイルを取得できませんでした。" = "Không thể truy cập tệp cài đặt hình nền của macOS.";
+"復元できる LiveWallpaper のバックアップが見つかりませんでした。" = "Không tìm thấy bản sao lưu LiveWallpaper nào để khôi phục.";
+"復元対象の Aerial バックアップが見つかりませんでした。" = "Không tìm thấy bản sao lưu Aerial nào để khôi phục.";
+"macOS の壁紙設定に Aerial を正しく適用できませんでした。" = "Không thể áp dụng Aerial đúng cách vào cài đặt hình nền của macOS.";
+"動画の mov 変換に失敗しました。" = "Không thể chuyển đổi video sang tệp .mov.";
+"動画の mov 変換が完了しませんでした。" = "Quá trình chuyển đổi video sang .mov chưa hoàn tất.";
+"ロック画面用の動画を読み込めませんでした: %@" = "Không thể tải video cho màn hình khóa: %@";
+"ロック画面用の動画を再生可能として読み込めませんでした。" = "Không thể tải video cho màn hình khóa ở trạng thái phát được.";
+"ロック画面用の動画が短すぎるか、長さを読み取れませんでした。" = "Video cho màn hình khóa quá ngắn hoặc không đọc được thời lượng.";
+"ロック画面用の動画に映像トラックがありません。" = "Video cho màn hình khóa không có rãnh hình ảnh.";
+"不正なパッケージ形式です" = "Định dạng gói không hợp lệ.";
+"metadata.jsonが見つかりません" = "Không tìm thấy metadata.json.";
+"metadata.jsonが破損しています: %@" = "metadata.json bị hỏng: %@";
+"サポートされていないパッケージバージョンです" = "Phiên bản gói này không được hỗ trợ.";
+"重複するビデオが既に存在します: %@" = "Đã có video trùng lặp: %@";
+"ビデオファイルが見つかりません: %@" = "Không tìm thấy tệp video: %@";
+"ビデオファイルが破損しています: %@" = "Tệp video bị hỏng: %@";
+"ビデオファイルのチェックサムが一致しません: %@" = "Tổng kiểm tra của tệp video không khớp: %@";
+"パッケージの展開に失敗しました" = "Không thể giải nén gói.";
+"不正なファイル参照が含まれています: %@" = "Gói chứa tham chiếu tệp không hợp lệ: %@";
+"%@: %@" = "%@: %@";

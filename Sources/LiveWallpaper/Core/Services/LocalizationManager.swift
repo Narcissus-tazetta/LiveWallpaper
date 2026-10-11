@@ -18,8 +18,9 @@ enum LocalizationManager {
         }
     }
 
+    /// "ja" also gets an explicit bundle: falling back to Bundle.main would pick the
+    /// system's preferred localization (e.g. en) even though the user chose Japanese.
     static func setLanguage(_ code: String) {
-        if code == "ja" { bundle = nil; return }
         if let path = Bundle.main.path(forResource: code, ofType: "lproj"),
            let b = Bundle(path: path)
         {
