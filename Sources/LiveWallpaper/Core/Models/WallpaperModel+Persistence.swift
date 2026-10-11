@@ -326,6 +326,11 @@ extension WallpaperModel {
             wallpaperEditByPath = pruned
             persistWallpaperEditState()
         }
+        let prunedEffects = cursorEffectsByPath.filter { validPaths.contains($0.key) }
+        if prunedEffects != cursorEffectsByPath {
+            cursorEffectsByPath = prunedEffects
+            persistCursorEffectsByPath()
+        }
     }
 
     func persistWallpaperEditState() {

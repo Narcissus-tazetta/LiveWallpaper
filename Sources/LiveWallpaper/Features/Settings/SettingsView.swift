@@ -466,10 +466,11 @@ struct SettingsView: View {
                 Picker(model.localizedString("編集"), selection: $editorSubMode) {
                     Text(model.localizedString("フィット編集")).tag(EditorSubMode.fit)
                     Text(model.localizedString("トリム編集")).tag(EditorSubMode.trim)
+                    Text(model.localizedString("エフェクト")).tag(EditorSubMode.effects)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(maxWidth: 320)
+                .frame(maxWidth: 420)
                 .frame(maxWidth: .infinity)
 
                 switch editorSubMode {
@@ -477,6 +478,8 @@ struct SettingsView: View {
                     wallpaperFitEditorPanel
                 case .trim:
                     wallpaperTrimEditorPanel
+                case .effects:
+                    wallpaperEffectsEditorPanel
                 }
                 wallpaperFitLibraryPanel
             }

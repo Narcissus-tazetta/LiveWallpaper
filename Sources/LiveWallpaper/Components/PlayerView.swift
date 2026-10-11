@@ -138,12 +138,16 @@ final class PlayerView: NSView {
         cursorOverlayView.setSpotlight(radius: radius, opacity: opacity, center: center)
     }
 
-    func configureTrail(color: CursorTrailColor, customColor: NSColor, birthRate: Float) {
-        cursorOverlayView.configureTrail(color: color, customColor: customColor, birthRate: birthRate)
+    func configureTrail(_ appearance: CursorTrailAppearance) {
+        cursorOverlayView.configureTrail(appearance)
     }
 
     func setTrail(position: CGPoint?, emitting: Bool) {
         cursorOverlayView.setTrail(position: position, emitting: emitting)
+    }
+
+    func showClick(at point: CGPoint, style: CursorClickStyle, color: CursorEffectColor, customColor: RGBAColor) {
+        cursorOverlayView.showClick(at: point, style: style, color: color, customColor: customColor)
     }
 
     /// Before macOS 26 there is no per-layer control and AVPlayerLayer shows HDR video

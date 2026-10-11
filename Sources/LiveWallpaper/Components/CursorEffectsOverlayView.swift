@@ -9,9 +9,8 @@ final class CursorEffectsOverlayView: NSView {
     private var spotlightMaskSize: CGSize = .zero
 
     private let emitterLayer = CAEmitterLayer()
-    private let emitterCell = CAEmitterCell()
     private var isEmitting = false
-    private var trailConfiguration: (color: CursorTrailColor, customColor: NSColor, birthRate: Float)?
+    private var trailAppearance: CursorTrailAppearance?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -40,19 +39,8 @@ final class CursorEffectsOverlayView: NSView {
         spotlightLayer.isHidden = true
         layer?.addSublayer(spotlightLayer)
 
-        emitterCell.contents = Self.particleImage
-        emitterCell.lifetime = 0.7
-        emitterCell.lifetimeRange = 0.3
-        emitterCell.velocity = 25
-        emitterCell.velocityRange = 20
-        emitterCell.emissionRange = .pi * 2
-        emitterCell.scale = 0.55
-        emitterCell.scaleRange = 0.2
-        emitterCell.scaleSpeed = -0.4
-        emitterCell.alphaSpeed = -1.4
         emitterLayer.emitterShape = .point
         emitterLayer.renderMode = .additive
-        emitterLayer.emitterCells = [emitterCell]
         emitterLayer.birthRate = 0
         layer?.addSublayer(emitterLayer)
     }
@@ -140,34 +128,171 @@ final class CursorEffectsOverlayView: NSView {
 
     // MARK: - Trail
 
-    func configureTrail(color: CursorTrailColor, customColor: NSColor, birthRate: Float) {
-        // Reassigning the cells restarts the emitter, and this is called on every
+    func configureTrail(_ appearance: CursorTrailAppearance) {
+        // Replacing the cells restarts the emitter, and this is called on every
         // coverage change, so skip it when nothing changed.
-        if let current = trailConfiguration, current.color == color, current.customColor == customColor,
-           current.birthRate == birthRate
-        {
+        guard appearance != trailAppearance else {
             return
         }
-        trailConfiguration = (color, customColor, birthRate)
-        emitterCell.birthRate = birthRate
-        emitterCell.redRange = 0
-        emitterCell.greenRange = 0
-        emitterCell.blueRange = 0
+        trailAppearance = appearance
+        let cell = Self.trailCell(shape: appearance.shape)
+        cell.birthRate = appearance.birthRate
+        Self.applyColor(appearance.color, custom: appearance.customColor, to: cell)
+        emitterLayer.emitterCells = [cell]
+    }
+
+    /// Layer y points up here, so positive yAcceleration rises.
+    private static func trailCell(shape: CursorTrailShape) -> CAEmitterCell {
+        let cell = CAEmitterCell()
+        cell.emissionRange = .pi * 2
+        switch shape {
+        case .glow:
+            cell.contents = softDotImage
+            cell.lifetime = 0.7
+            cell.lifetimeRange = 0.3
+            cell.velocity = 25
+            cell.velocityRange = 20
+            cell.scale = 0.55
+            cell.scaleRange = 0.2
+            cell.scaleSpeed = -0.4
+            cell.alphaSpeed = -1.4
+        case .sparkle:
+            cell.contents = sparkleImage
+            cell.lifetime = 0.8
+            cell.lifetimeRange = 0.3
+            cell.velocity = 20
+            cell.velocityRange = 15
+            cell.scale = 0.5
+            cell.scaleRange = 0.25
+            cell.scaleSpeed = -0.35
+            cell.spin = 2
+            cell.spinRange = 3
+            cell.alphaSpeed = -1.2
+        case .bubble:
+            cell.contents = bubbleImage
+            cell.lifetime = 1.3
+            cell.lifetimeRange = 0.4
+            cell.velocity = 12
+            cell.velocityRange = 10
+            cell.yAcceleration = 60
+            cell.xAcceleration = 0
+            cell.scale = 0.45
+            cell.scaleRange = 0.25
+            cell.alphaSpeed = -0.7
+        case .snow:
+            cell.contents = softDotImage
+            cell.lifetime = 1.6
+            cell.lifetimeRange = 0.4
+            cell.velocity = 10
+            cell.velocityRange = 8
+            cell.yAcceleration = -45
+            cell.scale = 0.35
+            cell.scaleRange = 0.15
+            cell.alphaSpeed = -0.6
+        }
+        return cell
+    }
+
+    static func applyColor(_ color: CursorEffectColor, custom: RGBAColor, to cell: CAEmitterCell) {
         switch color {
         case .white:
-            emitterCell.color = NSColor.white.cgColor
+            cell.color = NSColor.white.cgColor
         case .accent:
-            emitterCell.color = NSColor.controlAccentColor.usingColorSpace(.sRGB)?.cgColor ?? NSColor.white.cgColor
+            cell.color = NSColor.controlAccentColor.usingColorSpace(.sRGB)?.cgColor ?? NSColor.white.cgColor
         case .rainbow:
-            emitterCell.color = NSColor(srgbRed: 0.6, green: 0.6, blue: 0.6, alpha: 1).cgColor
-            emitterCell.redRange = 0.4
-            emitterCell.greenRange = 0.4
-            emitterCell.blueRange = 0.4
+            cell.color = NSColor(srgbRed: 0.6, green: 0.6, blue: 0.6, alpha: 1).cgColor
+            cell.redRange = 0.4
+            cell.greenRange = 0.4
+            cell.blueRange = 0.4
         case .custom:
-            emitterCell.color = customColor.cgColor
+            cell.color = custom.nsColor.cgColor
         }
-        // Cell properties are copied when the cells are assigned.
-        emitterLayer.emitterCells = [emitterCell]
+    }
+
+    // MARK: - Click
+
+    func showClick(at point: CGPoint, style: CursorClickStyle, color: CursorEffectColor, customColor: RGBAColor) {
+        switch style {
+        case .ripple:
+            showRipple(at: point, color: Self.resolvedColor(color, custom: customColor))
+        case .burst:
+            showBurst(at: point, color: color, customColor: customColor)
+        }
+    }
+
+    /// Rainbow has no single colour, so a ripple picks a random hue each click.
+    private static func resolvedColor(_ color: CursorEffectColor, custom: RGBAColor) -> CGColor {
+        switch color {
+        case .white:
+            NSColor.white.cgColor
+        case .accent:
+            NSColor.controlAccentColor.usingColorSpace(.sRGB)?.cgColor ?? NSColor.white.cgColor
+        case .rainbow:
+            NSColor(hue: .random(in: 0 ... 1), saturation: 0.6, brightness: 1, alpha: 1).cgColor
+        case .custom:
+            custom.nsColor.cgColor
+        }
+    }
+
+    private func showRipple(at point: CGPoint, color: CGColor) {
+        let radius: CGFloat = 60
+        let ring = CAShapeLayer()
+        ring.bounds = CGRect(x: 0, y: 0, width: radius * 2, height: radius * 2)
+        ring.position = point
+        ring.path = CGPath(ellipseIn: ring.bounds.insetBy(dx: 2, dy: 2), transform: nil)
+        ring.fillColor = nil
+        ring.strokeColor = color
+        ring.lineWidth = 3
+        ring.opacity = 0
+        layer?.addSublayer(ring)
+
+        let grow = CABasicAnimation(keyPath: "transform.scale")
+        grow.fromValue = 0.15
+        grow.toValue = 1
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.9
+        fade.toValue = 0
+        let group = CAAnimationGroup()
+        group.animations = [grow, fade]
+        group.duration = 0.6
+        group.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { ring.removeFromSuperlayer() }
+        ring.add(group, forKey: "ripple")
+        CATransaction.commit()
+    }
+
+    private func showBurst(at point: CGPoint, color: CursorEffectColor, customColor: RGBAColor) {
+        let cell = CAEmitterCell()
+        cell.contents = Self.softDotImage
+        cell.birthRate = 600
+        cell.lifetime = 0.55
+        cell.lifetimeRange = 0.2
+        cell.velocity = 140
+        cell.velocityRange = 60
+        cell.emissionRange = .pi * 2
+        cell.scale = 0.5
+        cell.scaleRange = 0.2
+        cell.scaleSpeed = -0.6
+        cell.alphaSpeed = -1.6
+        Self.applyColor(color, custom: customColor, to: cell)
+
+        // Its own emitter so a burst never disturbs the trail. It emits for one
+        // short moment and removes itself once the particles are gone.
+        let burst = CAEmitterLayer()
+        burst.frame = bounds
+        burst.emitterShape = .point
+        burst.emitterPosition = point
+        burst.renderMode = .additive
+        burst.beginTime = CACurrentMediaTime()
+        burst.emitterCells = [cell]
+        layer?.addSublayer(burst)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            burst.birthRate = 0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            burst.removeFromSuperlayer()
+        }
     }
 
     func setTrail(position: CGPoint?, emitting: Bool) {
@@ -189,7 +314,7 @@ final class CursorEffectsOverlayView: NSView {
         CATransaction.commit()
     }
 
-    private static let particleImage: CGImage? = {
+    private static let softDotImage: CGImage? = {
         let size = 32
         guard let context = CGContext(
             data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
@@ -205,6 +330,58 @@ final class CursorEffectsOverlayView: NSView {
             gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: CGFloat(size) / 2,
             options: []
         )
+        return context.makeImage()
+    }()
+
+    private static func particleContext(size: Int) -> CGContext? {
+        CGContext(
+            data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+    }
+
+    /// Four-pointed star with a soft glow behind it.
+    private static let sparkleImage: CGImage? = {
+        let size = 32
+        guard let context = particleContext(size: size) else {
+            return nil
+        }
+        let c = CGFloat(size) / 2
+        let colors = [NSColor.white.withAlphaComponent(0.5).cgColor, NSColor.white.withAlphaComponent(0).cgColor] as CFArray
+        let glow = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1])!
+        context.drawRadialGradient(
+            glow, startCenter: CGPoint(x: c, y: c), startRadius: 0, endCenter: CGPoint(x: c, y: c), endRadius: c * 0.6,
+            options: []
+        )
+        let outer = c * 0.95
+        let inner = c * 0.18
+        context.move(to: CGPoint(x: c, y: c + outer))
+        for index in 1 ..< 8 {
+            let angle = CGFloat(index) * .pi / 4 + .pi / 2
+            let radius = index.isMultiple(of: 2) ? outer : inner
+            context.addLine(to: CGPoint(x: c + cos(angle) * radius, y: c + sin(angle) * radius))
+        }
+        context.closePath()
+        context.setFillColor(NSColor.white.cgColor)
+        context.fillPath()
+        return context.makeImage()
+    }()
+
+    /// Hollow ring with a small highlight, so it reads as a bubble.
+    private static let bubbleImage: CGImage? = {
+        let size = 32
+        guard let context = particleContext(size: size) else {
+            return nil
+        }
+        let rect = CGRect(x: 3, y: 3, width: size - 6, height: size - 6)
+        context.setStrokeColor(NSColor.white.withAlphaComponent(0.9).cgColor)
+        context.setLineWidth(2)
+        context.strokeEllipse(in: rect)
+        context.setFillColor(NSColor.white.withAlphaComponent(0.15).cgColor)
+        context.fillEllipse(in: rect)
+        context.setFillColor(NSColor.white.withAlphaComponent(0.9).cgColor)
+        context.fillEllipse(in: CGRect(x: CGFloat(size) * 0.58, y: CGFloat(size) * 0.58, width: 5, height: 5))
         return context.makeImage()
     }()
 }

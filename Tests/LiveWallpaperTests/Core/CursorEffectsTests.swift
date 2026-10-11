@@ -67,6 +67,7 @@ final class CursorEffectsTests: XCTestCase {
         XCTAssertTrue(settings.parallaxEnabled)
         XCTAssertFalse(settings.trailEnabled)
         XCTAssertEqual(settings.trailColor, .white)
+        XCTAssertEqual(settings.trailShape, .glow)
     }
 
     func testSettingsRoundTrip() throws {
@@ -123,5 +124,26 @@ final class CursorEffectsTests: XCTestCase {
 
         model.respectReduceMotionEnabled = false
         XCTAssertNil(model.cursorMotionBlockReason)
+    }
+
+    func testLowPowerModeAndHeatStopEveryEffect() {
+        let model = modelWithoutReduceMotion()
+        model.isLowPowerModeOn = true
+        XCTAssertEqual(model.cursorMotionBlockReason, .lowPowerMode)
+        XCTAssertEqual(model.cursorSpotlightBlockReason, .lowPowerMode)
+
+        model.isLowPowerModeOn = false
+        model.isThermallyConstrained = true
+        XCTAssertEqual(model.cursorMotionBlockReason, .thermal)
+        XCTAssertEqual(model.cursorSpotlightBlockReason, .thermal)
+
+        model.isThermallyConstrained = false
+        XCTAssertNil(model.cursorMotionBlockReason)
+        XCTAssertNil(model.cursorSpotlightBlockReason)
+    }
+
+    func testOnlyWhileDesktopActiveDefaultsOnForOldSettings() throws {
+        let settings = try JSONDecoder().decode(CursorEffectsSettings.self, from: Data(#"{"trailEnabled":true}"#.utf8))
+        XCTAssertTrue(settings.onlyWhileDesktopActive)
     }
 }

@@ -88,7 +88,8 @@ final class PackageManifestBuilder {
                     )] : presentations,
                     edit: editMetadata(model: model, path: path),
                     duration: duration,
-                    hasAudio: hasAudio
+                    hasAudio: hasAudio,
+                    cursorEffects: model.cursorEffectsOverride(path: path)
                 )
             )
         }
@@ -169,7 +170,8 @@ final class PackageManifestBuilder {
             )] : presentations,
             edit: editMetadata(model: model, path: videoPath),
             duration: duration,
-            hasAudio: hasAudio
+            hasAudio: hasAudio,
+            cursorEffects: model.cursorEffectsOverride(path: videoPath)
         )
 
         return PackageManifest(

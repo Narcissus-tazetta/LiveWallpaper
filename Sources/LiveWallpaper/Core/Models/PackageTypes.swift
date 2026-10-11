@@ -29,6 +29,9 @@ struct PackageManifest: Codable {
         var duration: Double?
         /// 音声トラックの有無。ダウンロード後の音声デフォルト挙動の判断材料。
         var hasAudio: Bool?
+        /// This wallpaper's own cursor effects; absent means it follows the receiver's
+        /// app-wide settings. Older versions ignore the key.
+        var cursorEffects: CursorEffectsSettings?
 
         struct VideoSource: Codable {
             let fileName: String

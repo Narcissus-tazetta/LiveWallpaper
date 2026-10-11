@@ -96,6 +96,7 @@ extension SettingsView {
     enum EditorSubMode: String, CaseIterable, Hashable {
         case fit
         case trim
+        case effects
     }
 
     enum StoreShareStatus: Equatable {
@@ -153,6 +154,8 @@ extension SettingsView {
         case cursorParallax
         case cursorSpotlight
         case cursorTrail
+        case cursorOnlyOnDesktop
+        case cursorClick
         case scheduleFollowAppearance
         case scheduleAdvancedRules
     }
