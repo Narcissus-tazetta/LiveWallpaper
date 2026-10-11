@@ -11,7 +11,13 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     case automatic
     case japanese
     case english
+    case simplifiedChinese
     case traditionalChinese
+    case korean
+    case spanish
+    case french
+    case german
+    case brazilianPortuguese
     case vietnamese
     case turkish
 
@@ -38,24 +44,46 @@ enum AppLanguage: String, CaseIterable, Identifiable {
                 aliases: ["en", "en-US", "en-GB", "en-AU", "en-CA"]
             ),
             LanguageOption(
+                language: .simplifiedChinese,
+                code: "zh-Hans",
+                displayNameKey: "简体中文",
+                aliases: ["zh-Hans", "zh-CN", "zh-SG", "zh-CHS"]
+            ),
+            LanguageOption(
                 language: .traditionalChinese,
                 code: "zh-Hant",
                 displayNameKey: "繁體中文",
-                aliases: [
-                    "zh-Hant",
-                    "zh-TW",
-                    "zh-HK",
-                    "zh-MO",
-                    "zh-CHT",
-                    "zh-Hant-TW",
-                    "zh-Hant-HK",
-                    "zh-Hant-MO",
-                    "zh-Hant-CHT",
-                    "zh-Hans",
-                    "zh-CN",
-                    "zh-SG",
-                    "zh-CHS",
-                ]
+                aliases: ["zh-Hant", "zh-TW", "zh-HK", "zh-MO", "zh-CHT"]
+            ),
+            LanguageOption(
+                language: .korean,
+                code: "ko",
+                displayNameKey: "한국어",
+                aliases: ["ko", "ko-KR"]
+            ),
+            LanguageOption(
+                language: .spanish,
+                code: "es",
+                displayNameKey: "Español",
+                aliases: ["es", "es-ES", "es-419", "es-MX"]
+            ),
+            LanguageOption(
+                language: .french,
+                code: "fr",
+                displayNameKey: "Français",
+                aliases: ["fr", "fr-FR", "fr-CA"]
+            ),
+            LanguageOption(
+                language: .german,
+                code: "de",
+                displayNameKey: "Deutsch",
+                aliases: ["de", "de-DE", "de-AT", "de-CH"]
+            ),
+            LanguageOption(
+                language: .brazilianPortuguese,
+                code: "pt-BR",
+                displayNameKey: "Português (Brasil)",
+                aliases: ["pt", "pt-BR", "pt-PT"]
             ),
             LanguageOption(
                 language: .vietnamese,
@@ -127,7 +155,7 @@ extension AppLanguage {
         if let base = normalized.split(separator: "-").first {
             let baseCode = String(base)
             if baseCode == "zh" {
-                return optionByLanguage[.traditionalChinese]
+                return optionByLanguage[usesTraditionalChinese(normalized) ? .traditionalChinese : .simplifiedChinese]
             }
             for option in supportedOptions {
                 if normalizeIdentifier(option.code) == baseCode {
@@ -140,6 +168,16 @@ extension AppLanguage {
         }
 
         return nil
+    }
+
+    /// Identifiers such as "zh-Hant-JP" or "zh-TW" carry the script or region only as a
+    /// suffix, so they miss the exact aliases above.
+    fileprivate static func usesTraditionalChinese(_ normalized: String) -> Bool {
+        let parts = normalized.split(separator: "-").dropFirst()
+        if parts.contains("hans") {
+            return false
+        }
+        return parts.contains { ["hant", "tw", "hk", "mo"].contains($0) }
     }
 
     fileprivate static func normalizeIdentifier(_ identifier: String) -> String {

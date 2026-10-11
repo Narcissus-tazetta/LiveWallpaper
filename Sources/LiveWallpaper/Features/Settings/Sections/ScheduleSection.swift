@@ -55,7 +55,7 @@ extension SettingsView {
             let name = model.scheduleRuleDisplayName(active.name)
             return String(format: model.localizedString("適用中: %@"), name)
         }
-        return String(format: model.localizedString("%d件のルールが有効"), enabledRules.count)
+        return String(format: model.localizedString("%d件のルールが有効"), locale: model.appLocale, enabledRules.count)
     }
 
     /// 設定タブの検索でスケジュール関連のキーワードにヒットしたときの案内行。
@@ -416,6 +416,7 @@ extension SettingsView {
             return model.localizedString("毎日")
         }
         let symbols = WeekdaySelector.symbols(for: model.appLocale)
+        let separator = model.localizedString("・")
         var runs: [(start: Int, end: Int)] = []
         for day in effective.sorted() {
             if let last = runs.last, day == last.end + 1 {
@@ -429,10 +430,10 @@ extension SettingsView {
                 return symbols[run.start - 1]
             }
             if run.end == run.start + 1 {
-                return symbols[run.start - 1] + "・" + symbols[run.end - 1]
+                return symbols[run.start - 1] + separator + symbols[run.end - 1]
             }
             return symbols[run.start - 1] + "–" + symbols[run.end - 1]
-        }.joined(separator: "・")
+        }.joined(separator: separator)
     }
 
     private func timeRangeSummary(_ range: ScheduleTimeRange) -> String {

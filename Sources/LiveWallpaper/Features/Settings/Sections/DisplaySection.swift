@@ -698,7 +698,7 @@ extension SettingsView {
         model.localizedString("高負荷")
       }
 
-    return "\(qualityText)・\(workProfileText)・\(frameRateText)"
+    return [qualityText, workProfileText, frameRateText].joined(separator: model.localizedString("・"))
   }
 
   var advancedSettingsContent: some View {

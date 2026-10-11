@@ -84,12 +84,12 @@ struct AerialVideoExporter {
                         } else {
                             let message =
                                 exportSessionBox.session.error?.localizedDescription
-                                    ?? "動画の mov 変換に失敗しました。"
+                                    ?? NSLocalizedString("動画の mov 変換に失敗しました。", comment: "")
                             continuation.resume(throwing: LockScreenSyncError.exportFailed(message))
                         }
                     default:
                         continuation.resume(
-                            throwing: LockScreenSyncError.exportFailed("動画の mov 変換が完了しませんでした。")
+                            throwing: LockScreenSyncError.exportFailed(NSLocalizedString("動画の mov 変換が完了しませんでした。", comment: ""))
                         )
                     }
                 }
@@ -113,17 +113,22 @@ struct AerialVideoExporter {
             videoTracks = try await asset.loadTracks(withMediaType: .video)
         } catch {
             throw LockScreenSyncError
-                .invalidVideo("ロック画面用の動画を読み込めませんでした: \(error.localizedDescription)")
+                .invalidVideo(
+                    String(
+                        format: NSLocalizedString("ロック画面用の動画を読み込めませんでした: %@", comment: ""),
+                        error.localizedDescription
+                    )
+                )
         }
 
         guard isPlayable else {
-            throw LockScreenSyncError.invalidVideo("ロック画面用の動画を再生可能として読み込めませんでした。")
+            throw LockScreenSyncError.invalidVideo(NSLocalizedString("ロック画面用の動画を再生可能として読み込めませんでした。", comment: ""))
         }
         guard duration.seconds.isFinite, duration.seconds >= 1.0 else {
-            throw LockScreenSyncError.invalidVideo("ロック画面用の動画が短すぎるか、長さを読み取れませんでした。")
+            throw LockScreenSyncError.invalidVideo(NSLocalizedString("ロック画面用の動画が短すぎるか、長さを読み取れませんでした。", comment: ""))
         }
         guard !videoTracks.isEmpty else {
-            throw LockScreenSyncError.invalidVideo("ロック画面用の動画に映像トラックがありません。")
+            throw LockScreenSyncError.invalidVideo(NSLocalizedString("ロック画面用の動画に映像トラックがありません。", comment: ""))
         }
     }
 }

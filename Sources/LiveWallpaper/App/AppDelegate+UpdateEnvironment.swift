@@ -70,7 +70,7 @@ extension AppDelegate {
     }
     let bulletText =
       issues
-      .map { "・\(updateEnvironmentIssueDescription($0))" }
+      .map { String(format: localized("・%@"), updateEnvironmentIssueDescription($0)) }
       .joined(separator: "\n")
 
     let alert = NSAlert()

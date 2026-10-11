@@ -120,7 +120,7 @@ extension SettingsView {
         HStack(spacing: 10) {
             playlistFilterControl
 
-            Text("\(displayedItemCount) \(model.localizedString("本"))")
+            Text(String(format: model.localizedString("%d本"), locale: model.appLocale, displayedItemCount))
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .fixedSize()
@@ -353,7 +353,7 @@ extension SettingsView {
         }
         var text = "\(model.localizedString("チェックした動画がこのプレイリストで再生されます")) (\(playlist.videoPaths.count))"
         if !playlist.webWallpaperIDs.isEmpty {
-            text += " ・ \(model.localizedString("Web壁紙")) \(playlist.webWallpaperIDs.count)"
+            text += model.localizedString("・") + "\(model.localizedString("Web壁紙")) \(playlist.webWallpaperIDs.count)"
         }
         return text
     }

@@ -21,7 +21,7 @@ extension SettingsView {
 
             Spacer(minLength: 8)
 
-            Text("\(model.localizedString("表示")): \(currentDisplayModeSummaryText())")
+            Text(String(format: model.localizedString("%@: %@"), model.localizedString("表示"), currentDisplayModeSummaryText()))
                 .font(.caption)
                 .foregroundColor(.secondary)
         }

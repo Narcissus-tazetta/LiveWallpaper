@@ -82,7 +82,7 @@ extension SettingsView {
         guard count > 0 else {
             return model.localizedString("未設定")
         }
-        return String(format: model.localizedString("%d件の割り当て"), count)
+        return String(format: model.localizedString("%d件の割り当て"), locale: model.appLocale, count)
     }
 
     /// フルディスクアクセス未許可(またはまだ読めていない)ときの案内。

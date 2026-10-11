@@ -152,7 +152,7 @@ extension SettingsView {
     @ViewBuilder
     func settingsSectionMatchHint(_ section: SettingsSection) -> some View {
         if isSettingsSearchActive, let keyword = settingsSectionMatch(section).matchedKeyword {
-            Text("\(model.localizedString("一致")): \(model.localizedString(keyword))")
+            Text(String(format: model.localizedString("一致: %@"), model.localizedString(keyword)))
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
