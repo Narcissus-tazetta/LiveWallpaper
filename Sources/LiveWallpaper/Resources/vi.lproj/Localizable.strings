@@ -285,8 +285,6 @@
 "ほかのアプリを使っている間は再生を停止" = "Tạm dừng phát khi đang dùng ứng dụng khác";
 "壁紙が見えているかどうかに関係なく、ほかのアプリが前面にある間は再生を停止します。" = "Bất kể hình nền có đang hiển thị hay không, phát lại sẽ tạm dừng khi ứng dụng khác ở phía trước.";
 "画面がほぼ隠れたら停止（高精度）" = "Tạm dừng khi màn hình gần như bị che (chính xác cao)";
-"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。この検出には画面収録の許可が必要です。" = "Ngay cả khi hình nền vẫn hơi hiển thị, phát lại sẽ tạm dừng khi phần lớn màn hình bị cửa sổ che phủ. Tính năng này cần quyền Ghi màn hình.";
-"高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "Phát hiện chính xác cao cần quyền Ghi màn hình. Trước khi được cấp quyền, sẽ dùng cách phát hiện thông thường.";
 "再生を止めないアプリ" = "Ứng dụng không bao giờ tạm dừng phát";
 "再生を止めないアプリはまだ登録されていません" = "Chưa có ứng dụng nào bị loại trừ";
 
@@ -657,3 +655,5 @@
 "Web壁紙の表示中は使えません。" = "Không dùng được khi đang hiển thị hình nền web.";
 "システムの「視差効果を減らす」が有効なため、オフになっています。" = "Đang tắt vì tùy chọn Giảm chuyển động của hệ thống đang bật.";
 "バッテリー駆動中で再生の負荷を下げているため、オフになっています。" = "Đang tắt vì tải phát lại được giảm khi dùng pin.";
+"壁紙がわずかに見えていても、画面の大部分がウィンドウで覆われていれば停止します。" = "Ngay cả khi hình nền còn lộ ra một chút, phát lại sẽ tạm dừng khi cửa sổ che phần lớn màn hình.";
+"このMacでは、許可なしではほかのアプリのウィンドウの位置を読み取れません。高精度な検出には画面収録の許可が必要です。許可されるまでは通常の方法で判定します。" = "Trên máy Mac này, không thể đọc vị trí cửa sổ của ứng dụng khác nếu chưa được cấp quyền, nên phát hiện chính xác cần quyền Ghi màn hình. Cho đến khi được cấp, phương pháp phát hiện thông thường sẽ được dùng.";

@@ -182,7 +182,8 @@ final class WallpaperModel: ObservableObject {
     @Published var suspendWhenOtherAppFullScreen: Bool = false
     @Published var suspendHighSensitivityEnabled: Bool = false
     @Published var suspendWhenOtherAppFrontmost: Bool = false
-    @Published var screenRecordingTrustedForCoverage: Bool = false
+    /// Whether other apps' window bounds can be read for the high-sensitivity pause.
+    @Published var windowBoundsReadableForCoverage: Bool = false
     @Published var suspendExclusionBundleIDs: [String] = []
     @Published var persistenceFailureMessage: String?
     @Published var desktopIconsFailureMessage: String?

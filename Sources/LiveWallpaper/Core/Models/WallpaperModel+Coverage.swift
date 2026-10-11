@@ -29,7 +29,7 @@ extension WallpaperModel {
         UserDefaults.standard.set(enabled, forKey: PrefsKey.suspendHighSensitivityEnabled)
         suspendHighSensitivityEnabled = enabled
         if enabled {
-            refreshScreenRecordingTrustForCoverage()
+            refreshWindowBoundsAccessForCoverage()
         }
         evaluateForegroundCoverageState()
         return true
@@ -333,26 +333,46 @@ extension WallpaperModel {
         bundleID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    private func isScreenRecordingTrusted() -> Bool {
-        CGPreflightScreenCaptureAccess()
+    /// Other apps' window positions, PIDs and layers come back without Screen
+    /// Recording permission (measured on macOS 27: identical with and without it;
+    /// only titles, and on some versions owner names, are withheld). The capability
+    /// itself is checked rather than the permission, so a macOS version that does
+    /// withhold positions falls back to asking for the permission.
+    static func otherAppWindowBoundsReadable(in windowInfo: [[String: Any]]) -> Bool {
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        return windowInfo.contains { info in
+            guard let pid = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value, pid != ownPID,
+                  let boundsDictionary = info[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: boundsDictionary)
+            else {
+                return false
+            }
+            return !bounds.isEmpty
+        }
+    }
+
+    private static func coverageWindowInfo() -> [[String: Any]]? {
+        CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]]
     }
 
     @discardableResult
-    func refreshScreenRecordingTrustForCoverage() -> Bool {
-        let trusted = isScreenRecordingTrusted()
-        guard screenRecordingTrustedForCoverage != trusted else {
-            return trusted
+    func refreshWindowBoundsAccessForCoverage() -> Bool {
+        let readable = Self.coverageWindowInfo().map(Self.otherAppWindowBoundsReadable(in:)) ?? false
+        publishWindowBoundsAccessForCoverage(readable)
+        return readable
+    }
+
+    private func publishWindowBoundsAccessForCoverage(_ readable: Bool) {
+        guard windowBoundsReadableForCoverage != readable else {
+            return
         }
         DispatchQueue.main.async { [weak self] in
-            guard let self else {
+            guard let self, self.windowBoundsReadableForCoverage != readable else {
                 return
             }
-            guard self.screenRecordingTrustedForCoverage != trusted else {
-                return
-            }
-            self.screenRecordingTrustedForCoverage = trusted
+            self.windowBoundsReadableForCoverage = readable
         }
-        return trusted
     }
 
     func requestScreenRecordingPermissionForCoverage() {
@@ -369,7 +389,7 @@ extension WallpaperModel {
                 guard let self else {
                     return
                 }
-                _ = self.refreshScreenRecordingTrustForCoverage()
+                _ = self.refreshWindowBoundsAccessForCoverage()
                 self.scheduleForegroundCoverageEvaluation()
             }
         }
@@ -377,20 +397,17 @@ extension WallpaperModel {
 
     /// Optional, opt-in second signal on top of occlusion: how much of the
     /// screen the eligible frontmost app's own windows actually cover, using
-    /// the same coverage-percentage geometry the old detector used. Requires
-    /// Screen Recording permission to read other apps' window bounds; without
-    /// it (or when the feature is off) this simply contributes nothing, so
-    /// occlusion-based detection alone still works exactly as before.
+    /// the same coverage-percentage geometry the old detector used. When other
+    /// apps' window bounds cannot be read (see otherAppWindowBoundsReadable) or
+    /// the feature is off, this contributes nothing, so occlusion-based
+    /// detection alone still works exactly as before.
     private func highSensitivityCoveredDisplayIDs(for app: NSRunningApplication) -> Set<String> {
-        guard suspendHighSensitivityEnabled, refreshScreenRecordingTrustForCoverage() else {
+        guard suspendHighSensitivityEnabled, let windowInfo = Self.coverageWindowInfo() else {
             return []
         }
-        guard
-            let windowInfo = CGWindowListCopyWindowInfo(
-                [.optionOnScreenOnly, .excludeDesktopElements],
-                kCGNullWindowID
-            ) as? [[String: Any]]
-        else {
+        let readable = Self.otherAppWindowBoundsReadable(in: windowInfo)
+        publishWindowBoundsAccessForCoverage(readable)
+        guard readable else {
             return []
         }
 

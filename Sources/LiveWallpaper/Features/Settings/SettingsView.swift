@@ -215,7 +215,7 @@ struct SettingsView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 model.refreshDesktopIconsVisibility()
-                model.refreshScreenRecordingTrustForCoverage()
+                model.refreshWindowBoundsAccessForCoverage()
             }
             .onChange(of: selectedTab) { tab in
                 resetLibrarySearchState()
@@ -266,7 +266,7 @@ struct SettingsView: View {
                 pruneMissingWallpaperThumbnails()
                 requestCurrentWallpaperThumbnailIfNeeded()
                 requestLockScreenWallpaperThumbnailIfNeeded()
-                model.refreshScreenRecordingTrustForCoverage()
+                model.refreshWindowBoundsAccessForCoverage()
                 thumbnailCache.prewarm(paths: Array(model.allRegisteredVideoPaths.prefix(10)))
                 processThumbnailQueue()
                 if selectedTab == .wallpaperFit {
