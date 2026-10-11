@@ -302,16 +302,14 @@ extension SettingsView {
                 }
             }
 
-            EqualSegmentedControl(
-                options: [
-                    (label: model.localizedString("常に"), value: ScheduleAppearanceCondition.any),
-                    (label: model.localizedString("ライト"), value: ScheduleAppearanceCondition.light),
-                    (label: model.localizedString("ダーク"), value: ScheduleAppearanceCondition.dark)
-                ],
-                selection: ruleBinding.appearance
-            )
-            .frame(height: 22)
-            .fixedSize(horizontal: true, vertical: false)
+            Picker(model.localizedString("外観"), selection: ruleBinding.appearance) {
+                Text(model.localizedString("常に")).tag(ScheduleAppearanceCondition.any)
+                Text(model.localizedString("ライト")).tag(ScheduleAppearanceCondition.light)
+                Text(model.localizedString("ダーク")).tag(ScheduleAppearanceCondition.dark)
+            }
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
 
             HStack(spacing: 8) {
                 scheduleRuleScopePicker(ruleBinding: ruleBinding)
@@ -411,7 +409,7 @@ extension SettingsView {
     }
 
     /// 連続する曜日を「月–金」のように圧縮する。区切りはWeekdaySelectorと同じ
-    /// veryShortWeekdaySymbols を使い、チップ表示と表記を揃える。
+    /// WeekdaySelector.symbols を使い、セグメントの表記と揃える。
     private func weekdaySummary(_ weekdays: Set<Int>) -> String {
         let effective = weekdays.isEmpty ? Set(1 ... 7) : weekdays
         if effective.count == 7 {

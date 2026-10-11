@@ -93,14 +93,16 @@ extension SettingsView {
                 }
                 .frame(width: fitEditorRowLabelWidth, alignment: .leading)
                 Spacer(minLength: 0)
-                EqualSegmentedControl(
-                    options: [
-                        (model.localizedString("拡大"), VideoFitMode.fill),
-                        (model.localizedString("全体"), VideoFitMode.fit)
-                    ],
+                Picker(
+                    model.localizedString("表示"),
                     selection: fitEditor.fitModeBinding(path: path, screenID: screenID)
-                )
-                .frame(width: fitEditorSegmentedPickerWidth, height: 24)
+                ) {
+                    Text(model.localizedString("拡大")).tag(VideoFitMode.fill)
+                    Text(model.localizedString("全体")).tag(VideoFitMode.fit)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
             }
 
             if expandedHelpTopics.contains(.perVideoFitMode) {
@@ -117,17 +119,19 @@ extension SettingsView {
                 .lineLimit(1)
                 .frame(width: fitEditorRowLabelWidth, alignment: .leading)
             Spacer(minLength: 0)
-            EqualSegmentedControl(
-                options: [
-                    (model.localizedString("動画"), FitPreviewMode.video),
-                    (model.localizedString("静止画"), FitPreviewMode.still)
-                ],
+            Picker(
+                model.localizedString("プレビュー"),
                 selection: Binding(
                     get: { fitEditor.previewMode },
                     set: { fitEditor.setPreviewMode($0) }
                 )
-            )
-            .frame(width: fitEditorSegmentedPickerWidth, height: 24)
+            ) {
+                Text(model.localizedString("動画")).tag(FitPreviewMode.video)
+                Text(model.localizedString("静止画")).tag(FitPreviewMode.still)
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
         }
 
         HStack(spacing: 12) {

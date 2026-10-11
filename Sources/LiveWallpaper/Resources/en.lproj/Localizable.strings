@@ -626,3 +626,4 @@
 "見つかりませんでした" = "No matching place found";
 "検索に失敗しました。ネットワーク接続を確認してください" = "The search failed. Check your network connection.";
 "タイムゾーンから推定に戻す" = "Use Time Zone Instead";
+"外観" = "Appearance";
