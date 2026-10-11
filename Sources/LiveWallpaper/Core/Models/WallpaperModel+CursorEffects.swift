@@ -373,7 +373,7 @@ extension WallpaperModel {
             }
             return OnScreenWindow(
                 ownerPID: pid,
-                isWindowServer: info[kCGWindowOwnerName as String] as? String == "Window Server",
+                isWindowServer: NSRunningApplication(processIdentifier: pid) == nil,
                 layer: (info[kCGWindowLayer as String] as? NSNumber)?.intValue ?? 0,
                 bounds: bounds,
                 alpha: (info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1

@@ -166,8 +166,9 @@ struct CursorTrailAppearance: Equatable {
 /// Recording permission; only window titles are withheld.
 struct OnScreenWindow: Equatable {
     var ownerPID: pid_t
-    /// Owned by the window server itself (menu bar, backdrop strips), which has no
-    /// running-application entry to match by PID.
+    /// Owned by the window server itself (menu bar, backdrop strips). Told apart by
+    /// having no running application for its PID, because owner names can be
+    /// withheld without Screen Recording permission.
     var isWindowServer: Bool
     var layer: Int
     /// Global coordinates with the origin at the top-left of the main display.
