@@ -35,6 +35,11 @@ struct PackageManifest: Codable {
         /// The video was baked from a scene, packaged under `scenes/<id>/`. Older
         /// versions ignore the key and get the baked video.
         var scene: Bool?
+        var scriptScene: ScriptSceneMetadata?
+
+        struct ScriptSceneMetadata: Codable {
+            var apiVersion: Int
+        }
 
         struct VideoSource: Codable {
             let fileName: String

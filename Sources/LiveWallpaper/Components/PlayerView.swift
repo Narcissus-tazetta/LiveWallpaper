@@ -126,6 +126,10 @@ final class PlayerView: NSView {
         sceneLayer?.renderer?.usesCursor ?? false
     }
 
+    func setSceneScriptIssueHandler(_ handler: @escaping ([SceneScriptIssue]) -> Void) {
+        sceneLayer?.scriptIssueHandler = handler
+    }
+
     /// `freeClock` animates on wall time instead of the player's position, for while
     /// the baked video does not match the scene yet. Either way the animation only
     /// runs while the player plays, so every pause rule for videos applies.
@@ -133,6 +137,7 @@ final class PlayerView: NSView {
         _ document: SceneDocument,
         videoPath: String,
         freeClock: Bool,
+        timeOfDay: SceneTimeOfDay,
         maximumFramesPerSecond: Float?
     ) throws {
         let layer = sceneLayer ?? {
@@ -147,6 +152,7 @@ final class PlayerView: NSView {
         }()
         sceneUsesFreeClock = freeClock
         layer.maximumFramesPerSecond = maximumFramesPerSecond
+        layer.timeOfDay = timeOfDay
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         layer.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2

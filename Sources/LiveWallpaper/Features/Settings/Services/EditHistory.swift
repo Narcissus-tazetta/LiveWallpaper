@@ -8,7 +8,9 @@ struct TrimEditSnapshot: Equatable {
     var loopStart: Double?
 }
 
-/// トリム編集の取り消し履歴。
+typealias TrimEditHistory = EditHistory<TrimEditSnapshot>
+
+/// 編集の取り消し履歴(トリム編集とシーン編集で共用)。
 ///
 /// ドラッグやキーリピートは1操作で何十回も値を書き換えるため、素直に毎回
 /// 積むと ⌘Z が1ピクセルずつしか戻らず使い物にならない。`coalescingKey` が
@@ -17,13 +19,15 @@ struct TrimEditSnapshot: Equatable {
 ///
 /// 時間ベースの合流にしていないのは、テストが実時間に依存してしまうのと、
 /// 「ドラッグが終わった」という確かな境界がUI側にあるため。
-struct TrimEditHistory {
+struct EditHistory<Snapshot> {
     /// 保持する上限。壁紙1本の編集でこれ以上遡りたいことはまず無く、
     /// 上限を設けないと長時間の編集で際限なく積み上がる。
-    static let limit = 100
+    static var limit: Int {
+        100
+    }
 
-    private var undoStack: [TrimEditSnapshot] = []
-    private var redoStack: [TrimEditSnapshot] = []
+    private var undoStack: [Snapshot] = []
+    private var redoStack: [Snapshot] = []
     private var lastKey: String?
 
     var canUndo: Bool {
@@ -32,6 +36,11 @@ struct TrimEditHistory {
 
     var canRedo: Bool {
         !redoStack.isEmpty
+    }
+
+    /// Every state undo or redo can bring back.
+    var snapshots: [Snapshot] {
+        undoStack + redoStack
     }
 
     /// 別の動画を読み込んだときなど、履歴ごと捨てる。
@@ -44,7 +53,7 @@ struct TrimEditHistory {
     /// 値を書き換える **直前** の状態を記録する。
     /// - Parameter coalescingKey: 連続操作をまとめる単位。nil なら常に独立した
     ///   1手として積む。
-    mutating func record(_ snapshot: TrimEditSnapshot, coalescingKey: String?) {
+    mutating func record(_ snapshot: Snapshot, coalescingKey: String?) {
         redoStack.removeAll()
         if let coalescingKey, coalescingKey == lastKey, !undoStack.isEmpty {
             // 同じ操作の続き: 最初に積んだ「操作前の状態」をそのまま活かす。
@@ -62,7 +71,7 @@ struct TrimEditHistory {
         lastKey = nil
     }
 
-    mutating func undo(current: TrimEditSnapshot) -> TrimEditSnapshot? {
+    mutating func undo(current: Snapshot) -> Snapshot? {
         guard let previous = undoStack.popLast() else {
             return nil
         }
@@ -71,7 +80,7 @@ struct TrimEditHistory {
         return previous
     }
 
-    mutating func redo(current: TrimEditSnapshot) -> TrimEditSnapshot? {
+    mutating func redo(current: Snapshot) -> Snapshot? {
         guard let next = redoStack.popLast() else {
             return nil
         }

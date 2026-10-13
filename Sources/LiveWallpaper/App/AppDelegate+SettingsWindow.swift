@@ -35,9 +35,24 @@ extension AppDelegate {
                     return
                 }
                 self.wallpaperModel.scheduleActiveSpaceWindowRefresh()
+                // Closing the editor is the end of an editing session.
+                self.wallpaperModel.flushAllSceneSaves()
+                self.wallpaperModel.bakeAllScenesNowIfPending()
             }
         }
         settingsWindowController = NSWindowController(window: window)
+        // A press or release marks the edges of one gesture; edits between them (a
+        // slider drag, a held arrow key) become a single scene undo step. Menu
+        // tracking swallows mouse-ups, so presses count too.
+        sceneHistoryBreakMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .leftMouseUp, .keyDown, .keyUp]
+        ) { [weak self] event in
+            if event.type != .keyDown || !event.isARepeat {
+                self?.wallpaperModel.breakSceneHistoryCoalescing()
+                self?.wallpaperModel.breakCursorEffectsHistoryCoalescing()
+            }
+            return event
+        }
         settingsKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
             [weak self] event in
             // グローバルショートカットの録音中は Cmd+W/Cmd+Q もそのまま録音対象に

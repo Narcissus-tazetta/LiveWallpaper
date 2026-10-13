@@ -163,14 +163,17 @@ extension SettingsView {
     }
   }
 
-  private func updateCursorEffects(_ target: CursorEffectsTarget, _ change: (inout CursorEffectsSettings) -> Void) {
+  /// `field` names what changed, so dragging one value is one undo step.
+  private func updateCursorEffects(
+    _ target: CursorEffectsTarget, field: String, _ change: (inout CursorEffectsSettings) -> Void
+  ) {
     var settings = cursorEffectSettings(target)
     change(&settings)
     switch target {
     case .appWide:
       model.setCursorEffects(settings)
     case let .wallpaper(path):
-      model.setCursorEffectsOverride(settings, path: path)
+      model.editCursorEffectsOverride(settings, path: path, coalescingKey: field)
     }
   }
 
@@ -179,7 +182,7 @@ extension SettingsView {
   ) -> Binding<T> {
     Binding(
       get: { cursorEffectSettings(target)[keyPath: keyPath] },
-      set: { newValue in updateCursorEffects(target) { $0[keyPath: keyPath] = newValue } }
+      set: { newValue in updateCursorEffects(target, field: "\(keyPath)") { $0[keyPath: keyPath] = newValue } }
     )
   }
 
@@ -201,7 +204,9 @@ extension SettingsView {
         model.localizedString("カスタムの色"),
         selection: Binding(
           get: { Color(nsColor: cursorEffectSettings(target)[keyPath: custom].nsColor) },
-          set: { newValue in updateCursorEffects(target) { $0[keyPath: custom] = RGBAColor(NSColor(newValue)) } }
+          set: { newValue in
+            updateCursorEffects(target, field: "\(custom)") { $0[keyPath: custom] = RGBAColor(NSColor(newValue)) }
+          }
         ),
         supportsOpacity: false
       )

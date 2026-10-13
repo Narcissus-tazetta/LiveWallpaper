@@ -169,6 +169,7 @@ if [[ "$STAMPED_SDK" != "$SDK_VERSION" ]]; then
   exit 1
 fi
 cp -f "$ICON_PATH" "$APP_DIR/Contents/Resources/AppIcon.icns"
+cp -f "$ROOT_DIR/Sources/LiveWallpaper/Resources/QuickJS-LICENSE.txt" "$APP_DIR/Contents/Resources/QuickJS-LICENSE.txt"
 if [[ -d "$ROOT_DIR/Sources/LiveWallpaper/Resources" ]]; then
   for lproj in "$ROOT_DIR"/Sources/LiveWallpaper/Resources/*.lproj; do
     if [[ -d "$lproj" ]]; then

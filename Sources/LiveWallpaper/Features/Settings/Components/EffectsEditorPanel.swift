@@ -5,16 +5,42 @@ extension SettingsView {
   var wallpaperEffectsEditorPanel: some View {
     VStack(alignment: .leading, spacing: 10) {
       if let path = wallpaperEditor.resolvedVideoPath(), !path.isEmpty {
-        Text(model.registeredVideoDisplayName(for: path))
-          .lineLimit(1)
-          .truncationMode(.middle)
-          .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: 10) {
+          Text(model.registeredVideoDisplayName(for: path))
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+          Button {
+            model.undoCursorEffects(path: path)
+          } label: {
+            Image(systemName: "arrow.uturn.backward")
+          }
+          .buttonStyle(.bordered)
+          .controlSize(.small)
+          .keyboardShortcut("z", modifiers: .command)
+          .disabled(!model.canUndoCursorEffects(path: path))
+          .iconHelp(model.localizedString("取り消す(⌘Z)"))
+
+          Button {
+            model.redoCursorEffects(path: path)
+          } label: {
+            Image(systemName: "arrow.uturn.forward")
+          }
+          .buttonStyle(.bordered)
+          .controlSize(.small)
+          .keyboardShortcut("z", modifiers: [.command, .shift])
+          .disabled(!model.canRedoCursorEffects(path: path))
+          .iconHelp(model.localizedString("やり直す(⇧⌘Z)"))
+        }
 
         Toggle(
           model.localizedString("この壁紙だけの設定を使う"),
           isOn: Binding(
             get: { model.cursorEffectsOverride(path: path) != nil },
-            set: { model.setCursorEffectsOverride($0 ? model.cursorEffects : nil, path: path) }
+            set: {
+              model.editCursorEffectsOverride($0 ? model.cursorEffects : nil, path: path, coalescingKey: nil)
+            }
           )
         )
 

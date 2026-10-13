@@ -26,6 +26,7 @@ extension WallpaperModel {
 
         for path in sceneDocumentsByPath.keys {
             cancelSceneBake(path: path)
+            discardSceneSave(path: path)
         }
 
         do {
@@ -51,6 +52,7 @@ extension WallpaperModel {
             libraryVideoPaths.removeAll()
             sceneDocumentsByPath.removeAll()
             sceneStaleVideoPaths.removeAll()
+            sceneVideosAwaitingScriptApproval.removeAll()
             registeredVideoPaths.removeAll()
             registeredWebWallpaperIDs.removeAll()
             UserDefaults.standard.removeObject(forKey: PrefsKey.libraryVideoPaths)

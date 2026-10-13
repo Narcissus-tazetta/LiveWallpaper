@@ -9,6 +9,45 @@ extension SettingsView {
         return layer.keyframes.first { $0.id == selectedSceneKeyframeID }
     }
 
+    /// The placement the preview's handles and the number fields change: the chosen
+    /// keyframe's pose, or the fixed placement. nil while locked, or while the layer
+    /// moves over time and no keyframe is chosen.
+    func sceneEditableTransform(of layer: SceneLayer) -> SceneTransform? {
+        guard !layer.isLocked else {
+            return nil
+        }
+        guard layer.isKeyframed else {
+            return layer.transform
+        }
+        guard layer.id == selectedSceneLayerID else {
+            return nil
+        }
+        return selectedSceneKeyframe(in: layer)?.transform
+    }
+
+    func applySceneTransform(_ transform: SceneTransform, path: String, layerID: UUID) {
+        updateSceneLayout(path: path, layerID: layerID) { layer in
+            if layer.isKeyframed {
+                guard let index = layer.keyframes.firstIndex(where: { $0.id == selectedSceneKeyframeID }) else {
+                    return
+                }
+                layer.keyframes[index].transform = transform
+            } else {
+                layer.transform = transform
+            }
+        }
+    }
+
+    /// `phase` is 0..<1 of the loop.
+    func setSceneKeyframeTime(_ phase: Double, keyframeID: UUID, path: String, layerID: UUID) {
+        updateSceneLayout(path: path, layerID: layerID) { layer in
+            guard !layer.isLocked, let index = layer.keyframes.firstIndex(where: { $0.id == keyframeID }) else {
+                return
+            }
+            layer.keyframes[index].time = phase
+        }
+    }
+
     /// Placement, and its keyframes when the layer moves over time.
     @ViewBuilder
     func sceneLayoutControls(path: String, layer: SceneLayer) -> some View {
@@ -43,7 +82,7 @@ extension SettingsView {
 
         if layer.isKeyframed {
             settingsFootnote(
-                model.localizedString("キーフレームの姿勢を順に通って、最後のキーフレームから最初に戻ります。キーフレームを選んでいる間は、プレビューがその時刻で止まります。")
+                model.localizedString("キーフレームの姿勢を順に通って、最後のキーフレームから最初に戻ります。キーフレームを選んでいる間は、プレビューがその時刻で止まります。一時停止中に追加すると、その時刻に追加します。")
             )
             ForEach(Array(layer.keyframes.sorted { $0.time < $1.time }.enumerated()), id: \.element.id) { index, frame in
                 let isSelected = frame.id == keyframe?.id
@@ -82,15 +121,25 @@ extension SettingsView {
             }
             Button(model.localizedString("キーフレームを追加")) {
                 updateSceneLayout(path: path, layerID: layer.id) { layer in
-                    // Halfway into the longest gap, starting from the pose shown there.
                     let times = layer.keyframes.map(\.time).sorted()
-                    var bestStart = times.last ?? 0
-                    var bestGap = (times.first ?? 0) + 1 - bestStart
-                    for (a, b) in zip(times, times.dropFirst()) where b - a > bestGap {
-                        bestStart = a
-                        bestGap = b - a
+                    let playhead = scenePreviewController.time / loopSeconds
+                    let wrappedPlayhead = playhead - floor(playhead)
+                    let time: Double
+                    if !scenePreviewController.isPlaying, keyframe == nil,
+                       !times.contains(where: { abs($0 - wrappedPlayhead) < 0.001 })
+                    {
+                        // Stopped at a time of the user's choosing: add it there.
+                        time = min(wrappedPlayhead, 0.999)
+                    } else {
+                        // Halfway into the longest gap, starting from the pose shown there.
+                        var bestStart = times.last ?? 0
+                        var bestGap = (times.first ?? 0) + 1 - bestStart
+                        for (a, b) in zip(times, times.dropFirst()) where b - a > bestGap {
+                            bestStart = a
+                            bestGap = b - a
+                        }
+                        time = (bestStart + bestGap / 2).truncatingRemainder(dividingBy: 1)
                     }
-                    let time = (bestStart + bestGap / 2).truncatingRemainder(dividingBy: 1)
                     let pose = layer.pose(at: time)
                     let frame = SceneKeyframe(time: time, transform: pose.transform, opacity: pose.opacity)
                     layer.keyframes.append(frame)
@@ -99,7 +148,9 @@ extension SettingsView {
             }
         }
 
-        if layer.isKeyframed, keyframe == nil {
+        if layer.isLocked {
+            settingsFootnote(model.localizedString("ロック中のレイヤーは変更できません。"))
+        } else if layer.isKeyframed, keyframe == nil {
             settingsFootnote(model.localizedString("姿勢を変えるには、キーフレームを選んでください。"))
         } else {
             if let keyframe {
@@ -107,37 +158,41 @@ extension SettingsView {
                     title: model.localizedString("時刻"),
                     value: sceneKeyframeBinding(path: path, layerID: layer.id, keyframe: keyframe, \.time),
                     range: 0 ... 0.999,
-                    text: String(format: "%.1f s", keyframe.time * loopSeconds),
+                    factor: loopSeconds,
+                    unit: "s",
+                    fractionDigits: 1,
                     labelWidth: labelWidth
                 )
             }
-            let transform = keyframe?.transform ?? layer.transform
             sceneLayoutSlider(
                 title: model.localizedString("横位置"),
                 value: sceneTransformBinding(path: path, layer: layer, keyframe: keyframe, \.offsetX),
                 range: -1 ... 1,
-                text: "\(Int((transform.offsetX * 100).rounded()))%",
+                factor: 100,
+                unit: "%",
                 labelWidth: labelWidth
             )
             sceneLayoutSlider(
                 title: model.localizedString("縦位置"),
                 value: sceneTransformBinding(path: path, layer: layer, keyframe: keyframe, \.offsetY),
                 range: -1 ... 1,
-                text: "\(Int((transform.offsetY * 100).rounded()))%",
+                factor: 100,
+                unit: "%",
                 labelWidth: labelWidth
             )
             sceneLayoutSlider(
                 title: model.localizedString("大きさ"),
                 value: sceneTransformBinding(path: path, layer: layer, keyframe: keyframe, \.scale),
-                range: 0.1 ... 3,
-                text: "\(Int((transform.scale * 100).rounded()))%",
+                range: SceneTransform.scaleRange,
+                factor: 100,
+                unit: "%",
                 labelWidth: labelWidth
             )
             sceneLayoutSlider(
-                title: model.localizedString("回転"),
+                title: model.localizedString("角度"),
                 value: sceneTransformBinding(path: path, layer: layer, keyframe: keyframe, \.rotation),
                 range: -180 ... 180,
-                text: "\(Int(transform.rotation.rounded()))°",
+                unit: "°",
                 labelWidth: labelWidth
             )
             if let keyframe {
@@ -145,10 +200,12 @@ extension SettingsView {
                     title: model.localizedString("不透明度"),
                     value: sceneKeyframeBinding(path: path, layerID: layer.id, keyframe: keyframe, \.opacity),
                     range: 0 ... 1,
-                    text: "\(Int((keyframe.opacity * 100).rounded()))%",
+                    factor: 100,
+                    unit: "%",
                     labelWidth: labelWidth
                 )
             }
+            let transform = keyframe?.transform ?? layer.transform
             Button(model.localizedString("配置を元に戻す")) {
                 updateSceneLayout(path: path, layerID: layer.id) { layer in
                     if let id = keyframe?.id, let index = layer.keyframes.firstIndex(where: { $0.id == id }) {
@@ -162,11 +219,14 @@ extension SettingsView {
         }
     }
 
-    private func sceneLayoutSlider(
+    /// A slider with the value next to it, which can also be typed.
+    func sceneLayoutSlider(
         title: String,
         value: Binding<Double>,
         range: ClosedRange<Double>,
-        text: String,
+        factor: Double = 1,
+        unit: String,
+        fractionDigits: Int = 0,
         labelWidth: CGFloat
     ) -> some View {
         HStack(spacing: 12) {
@@ -175,11 +235,13 @@ extension SettingsView {
                 .frame(width: labelWidth, alignment: .leading)
             Slider(value: value, in: range)
                 .accessibilityLabel(title)
-                .accessibilityValue(text)
-            Text(text)
-                .font(.caption.monospacedDigit())
-                .foregroundColor(.secondary)
-                .frame(width: 64, alignment: .trailing)
+                .accessibilityValue(String(format: "%.\(fractionDigits)f\(unit)", value.wrappedValue * factor))
+            SceneNumberField(
+                title: title, value: value.wrappedValue, factor: factor, unit: unit, range: range,
+                fractionDigits: fractionDigits
+            ) { newValue in
+                value.wrappedValue = newValue
+            }
         }
     }
 

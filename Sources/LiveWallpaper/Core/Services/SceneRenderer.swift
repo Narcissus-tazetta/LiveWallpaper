@@ -11,6 +11,9 @@ struct SceneFrameInput: Equatable {
     var cursor: SIMD2<Float>?
     /// Seconds into the scene loop.
     var time: Double = 0
+    /// The part of the canvas drawn into the target: origin and size in canvas UV.
+    /// Only the editor zooms; everything else draws the whole canvas.
+    var viewport = SIMD4<Float>(0, 0, 1, 1)
 
     static let rest = SceneFrameInput()
 }
@@ -113,6 +116,16 @@ final class SceneRenderer {
     private var lastPhase: Double = 0
     private var paintOverride: ScenePaintOverride?
     private var paintOverrideTexture: MTLTexture?
+    /// Tints where the painted mask or flow map applies, so weak motion can be seen.
+    var showsPaintTint = true
+    /// The part of the day the links see: now unless the owner says otherwise (a bake
+    /// fixes it at its start, the editor shows what it simulates).
+    var timeOfDay: SceneTimeOfDay
+    /// Evaluates scripts only off the main thread: for bakes (live drawing evaluates
+    /// them on SceneScriptWorker and passes the frame in).
+    private let frameEvaluator = SceneFrameEvaluator(budget: .offline)
+    private var lastFrame: SceneEvaluatedFrame?
+    var lastDrawnInput: SceneFrameInput? { lastFrame?.input }
 
     var device: MTLDevice {
         pipeline.device
@@ -126,6 +139,7 @@ final class SceneRenderer {
         pipeline = try Self.makePipeline()
         self.document = document
         self.videoPath = videoPath
+        timeOfDay = document.timeOfDay(at: Date())
         blackTexture = try Self.makeSolidTexture(device: pipeline.device, pixelFormat: .rgba8Unorm, bytes: [0, 0, 0, 255])
         whiteMask = try Self.makeSolidTexture(device: pipeline.device, pixelFormat: .r8Unorm, bytes: [255])
         stillFlow = try Self.makeSolidTexture(device: pipeline.device, pixelFormat: .rgba8Unorm, bytes: [128, 128, 0, 255])
@@ -169,7 +183,7 @@ final class SceneRenderer {
         guard let layer = document.layers.first(where: { $0.id == layerID }) else {
             return nil
         }
-        let placement = placement(for: layer.pose(at: lastPhase).transform)
+        let placement = placement(for: currentTransform(layerID: layerID) ?? layer.pose(at: lastPhase).transform)
         let relative = canvasUV - 0.5 - placement.offset
         let placed = placement.column0 * relative.x + placement.column1 * relative.y + 0.5
         return (placed - 0.5) * layerUVScale(for: layer) + 0.5
@@ -181,7 +195,11 @@ final class SceneRenderer {
         guard let layer = document.layers.first(where: { $0.id == layerID }) else {
             return nil
         }
-        let transform = layer.pose(at: lastPhase).transform
+        return canvasUV(layerUV: layerUV, layer: layer, transform: currentTransform(layerID: layerID) ?? layer.pose(at: lastPhase).transform)
+    }
+
+    /// Where the layer's picture would sit with `transform`, at rest.
+    func canvasUV(layerUV: SIMD2<Float>, layer: SceneLayer, transform: SceneTransform) -> SIMD2<Float> {
         let placed = (layerUV - 0.5) / layerUVScale(for: layer)
         let aspect = Float(document.aspectRatio)
         let radians = Float(transform.rotation * .pi / 180)
@@ -193,23 +211,43 @@ final class SceneRenderer {
         return column0 * placed.x + column1 * placed.y + 0.5 + SIMD2(Float(transform.offsetX), Float(transform.offsetY))
     }
 
+    /// The layer's pose at the frame last drawn.
+    func currentTransform(layerID: UUID) -> SceneTransform? {
+        lastFrame?.layers[layerID]?.transform ?? document.layers.first { $0.id == layerID }?.pose(at: lastPhase).transform
+    }
+
+    func currentLayer(layerID: UUID) -> SceneLayer? {
+        lastFrame?.layers[layerID]?.layer ?? document.layers.first { $0.id == layerID }
+    }
+
+    func currentOpacity(layerID: UUID) -> Double? {
+        if let drawn = lastFrame?.layers[layerID] { return drawn.layer.opacity * drawn.opacity }
+        return document.layers.first { $0.id == layerID }.map { $0.opacity * $0.pose(at: lastPhase).opacity }
+    }
+
     /// Encodes the scene into `target` (bgra8Unorm, renderTarget usage).
-    func encode(into target: MTLTexture, commandBuffer: MTLCommandBuffer, input: SceneFrameInput) throws {
+    func encode(into target: MTLTexture, commandBuffer: MTLCommandBuffer, input: SceneFrameInput, frame: SceneEvaluatedFrame? = nil) throws {
+        if frame == nil, document.scripts.contains(where: \.canRun), Thread.isMainThread {
+            throw SceneScriptIssue(scriptID: document.scripts.first!.id, name: "JavaScript", message: "Scripts must be evaluated off the main thread")
+        }
+        let evaluated = try frame ?? frameEvaluator.evaluate(document, input: input, timeOfDay: timeOfDay)
+        lastFrame = evaluated
         lastPhase = Double(loopPhase(input.time))
         let targetSize = SIMD2(Float(target.width), Float(target.height))
         let visible = document.layers.filter { layer in
-            layer.isVisible && (layer.kind == .particles ? layer.particles != nil : textures[layer.imageFile] != nil)
+            evaluated.layers[layer.id]!.layer.isVisible && (layer.kind == .particles ? layer.particles != nil : textures[layer.imageFile] != nil)
         }
         // Effects and particles render into their own textures first, so the
         // composite can then run as a single pass.
         var prepared: [PreparedLayer] = []
         for layer in visible {
+            let drawn = evaluated.layers[layer.id]!
             let layerTexture = try applyEffects(
-                to: layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize
+                to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize
             )
             prepared.append(PreparedLayer(
                 layerTexture: layerTexture,
-                uniforms: compositeUniforms(for: layer, input: input, targetSize: targetSize),
+                uniforms: compositeUniforms(for: drawn.layer, drawn: drawn, input: input, targetSize: targetSize),
                 depth: layer.depthFile.flatMap { maskTextures[$0] }
             ))
         }
@@ -312,6 +350,9 @@ final class SceneRenderer {
     // MARK: - Effects
 
     private struct EffectUniforms {
+        /// The effect's area for `fixedEdge`: min x, min y, max x, max y in layer UV.
+        /// First, so the 16-byte alignment matches the shader's struct.
+        var bounds: SIMD4<Float>
         var center: SIMD2<Float>
         var direction: SIMD2<Float>
         var scrollStep: SIMD2<Float>
@@ -324,6 +365,7 @@ final class SceneRenderer {
         var reversed: Int32
         var overlay: Int32
         var hasMask: Int32
+        var fixedEdge: Int32
     }
 
     /// Runs the layer's effects and returns the texture to composite.
@@ -357,7 +399,8 @@ final class SceneRenderer {
         }
         // Half the layer's size on the target (never above its own resolution): the
         // distortions are smooth, and this pass is most of the GPU time.
-        let shown = targetSize / layerUVScale(for: layer) * effectResolutionScale
+        let viewSize = SIMD2(input.viewport.z, input.viewport.w)
+        let shown = targetSize / viewSize / layerUVScale(for: layer) * effectResolutionScale
         let width = max(min(Int(shown.x.rounded()), source.width), 16)
         let height = max(min(Int(shown.y.rounded()), source.height), 16)
         let targets = try effectTextures(for: layer.id, width: width, height: height)
@@ -373,7 +416,9 @@ final class SceneRenderer {
             let radians = Float(effect.direction * .pi / 180)
             // UV y points down, the direction angle counts counter-clockwise with y up.
             let direction = SIMD2<Float>(cos(radians), -sin(radians))
+            let bounds = effect.areaBounds ?? .whole
             var uniforms = EffectUniforms(
+                bounds: SIMD4(Float(bounds.minX), Float(bounds.minY), Float(bounds.maxX), Float(bounds.maxY)),
                 center: SIMD2(Float(effect.centerX), Float(effect.centerY)),
                 direction: direction,
                 // Scrolling must land on whole wraps each cycle to loop, so it moves
@@ -386,8 +431,9 @@ final class SceneRenderer {
                 kind: Int32(SceneEffectKind.allCases.firstIndex(of: effect.kind) ?? 0),
                 cycles: Int32(min(max(effect.cycles, SceneEffect.cyclesRange.lowerBound), SceneEffect.cyclesRange.upperBound)),
                 reversed: effect.reversed ? 1 : 0,
-                overlay: override == nil ? 0 : (override?.target == .mask ? 1 : 2),
-                hasMask: mask == nil ? 0 : 1
+                overlay: override == nil || !showsPaintTint ? 0 : (override?.target == .mask ? 1 : 2),
+                hasMask: mask == nil ? 0 : 1,
+                fixedEdge: Int32(SceneFixedEdge.allCases.firstIndex(of: effect.fixedEdge) ?? 0)
             )
             let pass = MTLRenderPassDescriptor()
             pass.colorAttachments[0].texture = destination
@@ -481,8 +527,11 @@ final class SceneRenderer {
         input: SceneFrameInput,
         targetSize: SIMD2<Float>
     ) throws -> MTLTexture {
+        // The whole canvas at the zoomed-in density, within texture limits.
+        var canvasSize = targetSize / SIMD2(input.viewport.z, input.viewport.w)
+        canvasSize *= min(1, Float(Self.maxTextureEdge) / max(canvasSize.x, canvasSize.y))
         // Glows are soft, so half the resolution looks the same at a quarter of the cost.
-        let size = particles.preset.isAdditive ? targetSize * 0.5 : targetSize
+        let size = particles.preset.isAdditive ? canvasSize * 0.5 : canvasSize
         let width = max(Int(size.x.rounded()), 16)
         let height = max(Int(size.y.rounded()), 16)
         let target: MTLTexture
@@ -559,6 +608,9 @@ final class SceneRenderer {
         var placementColumn0: SIMD2<Float>
         var placementColumn1: SIMD2<Float>
         var placementOffset: SIMD2<Float>
+        /// Target UV → canvas UV, for the editor's zoom.
+        var viewOrigin: SIMD2<Float>
+        var viewSize: SIMD2<Float>
         var hasDepth: Int32
         var depthSteps: Int32
         var opacity: Float
@@ -568,6 +620,10 @@ final class SceneRenderer {
         var maskMode: Int32
         var hasCursor: Int32
         var hasLayer: Int32
+        var brightness: Float
+        var saturation: Float
+        var warmth: Float
+        var hasColor: Int32
     }
 
     private func compositePass(
@@ -597,10 +653,12 @@ final class SceneRenderer {
 
     private static let passThroughUniforms = LayerUniforms(
         uvScale: .one, uvOffset: .zero, cursor: .zero, maskScale: .one, depthShift: .zero,
-        placementColumn0: SIMD2(1, 0), placementColumn1: SIMD2(0, 1), placementOffset: .zero, hasDepth: 0,
+        placementColumn0: SIMD2(1, 0), placementColumn1: SIMD2(0, 1), placementOffset: .zero,
+        viewOrigin: .zero, viewSize: .one, hasDepth: 0,
         depthSteps: 0,
         opacity: 0, maskRadius: 0,
-        maskSoftness: 0, blendMode: 0, maskMode: -1, hasCursor: 0, hasLayer: 0
+        maskSoftness: 0, blendMode: 0, maskMode: -1, hasCursor: 0, hasLayer: 0,
+        brightness: 0, saturation: 1, warmth: 0, hasColor: 0
     )
 
     /// Canvas UV → layer UV scale: aspect-fit, zoomed in just enough that the full
@@ -663,12 +721,13 @@ final class SceneRenderer {
 
     private func compositeUniforms(
         for layer: SceneLayer,
+        drawn: SceneEvaluatedFrame.Layer,
         input: SceneFrameInput,
         targetSize: SIMD2<Float>
     ) -> LayerUniforms {
         let canvasAspect = Float(document.aspectRatio)
-        let pose = layer.pose(at: Double(loopPhase(input.time)))
-        let placement = placement(for: pose.transform)
+        let link = drawn.color
+        let placement = placement(for: drawn.transform)
         let scale = layerUVScale(for: layer)
         // The travel is a fraction of the canvas, converted into layer UV units.
         let cursorTravel = Float(min(max(layer.parallaxDepth, 0), 1)) * Self.maxParallaxTravel
@@ -694,15 +753,21 @@ final class SceneRenderer {
             placementColumn0: placement.column0,
             placementColumn1: placement.column1,
             placementOffset: placement.offset,
+            viewOrigin: SIMD2(input.viewport.x, input.viewport.y),
+            viewSize: SIMD2(input.viewport.z, input.viewport.w),
             hasDepth: layer.hasDepth && layer.depthFile.flatMap({ maskTextures[$0] }) != nil ? 1 : 0,
             depthSteps: depthSteps(shift: depthShift, scale: scale, targetSize: targetSize),
-            opacity: Float(min(max(layer.opacity * pose.opacity, 0), 1)),
+            opacity: Float(min(max(layer.opacity * drawn.opacity, 0), 1)),
             maskRadius: Float(max(mask?.radius ?? 0, 0.001)),
             maskSoftness: Float(min(max(mask?.softness ?? 0, 0), 1)),
             blendMode: Int32(SceneBlendMode.allCases.firstIndex(of: layer.blendMode) ?? 0),
             maskMode: mask.map { $0.mode == .hide ? 0 : 1 } ?? -1,
             hasCursor: input.cursor == nil ? 0 : 1,
-            hasLayer: 1
+            hasLayer: 1,
+            brightness: Float(link.brightness),
+            saturation: Float(max(link.saturation, 0)),
+            warmth: Float(link.warmth),
+            hasColor: link.changesColor ? 1 : 0
         )
     }
 
@@ -947,7 +1012,7 @@ final class SceneRenderer {
                                           texture2d<float> layer [[texture(1)]],
                                           texture2d<float> depth [[texture(2)]],
                                           constant LayerUniforms &u [[buffer(0)]]) {
-        return float4(compositeLayer(below.rgb, in.uv, layer, depth, u), 1.0);
+        return float4(compositeLayer(below.rgb, u.viewOrigin + in.uv * u.viewSize, layer, depth, u), 1.0);
     }
     """
 
@@ -979,6 +1044,8 @@ final class SceneRenderer {
         float2 placementColumn0;
         float2 placementColumn1;
         float2 placementOffset;
+        float2 viewOrigin;
+        float2 viewSize;
         int hasDepth;
         int depthSteps;
         float opacity;
@@ -988,6 +1055,10 @@ final class SceneRenderer {
         int maskMode;
         int hasCursor;
         int hasLayer;
+        float brightness;
+        float saturation;
+        float warmth;
+        int hasColor;
     };
 
     float3 blend(int mode, float3 b, float3 s) {
@@ -1037,6 +1108,13 @@ final class SceneRenderer {
         float4 src = sampleInside(layer, s, layerUV);
         float alpha = src.a * u.opacity;
         float3 color = src.a > 0.0 ? src.rgb / src.a : float3(0.0);
+        // Skipped when unchanged, so layers without links draw exactly as before.
+        if (u.hasColor != 0) {
+            float luma = dot(color, float3(0.2126, 0.7152, 0.0722));
+            color = mix(float3(luma), color, u.saturation);
+            color *= float3(1.0 + 0.2 * u.warmth, 1.0, 1.0 - 0.2 * u.warmth);
+            color = clamp(color * (1.0 + u.brightness), 0.0, 1.0);
+        }
         if (u.maskMode >= 0) {
             float near = 0.0;
             if (u.hasCursor != 0) {
@@ -1060,12 +1138,13 @@ final class SceneRenderer {
         if (u.hasLayer == 0) {
             return float4(below.rgb, 1.0);
         }
-        return float4(compositeLayer(below.rgb, in.uv, layer, depth, u), 1.0);
+        return float4(compositeLayer(below.rgb, u.viewOrigin + in.uv * u.viewSize, layer, depth, u), 1.0);
     }
 
     // MARK: effects
 
     struct EffectUniforms {
+        float4 bounds;
         float2 center;
         float2 direction;
         float2 scrollStep;
@@ -1078,6 +1157,7 @@ final class SceneRenderer {
         int reversed;
         int overlay;
         int hasMask;
+        int fixedEdge;
     };
 
     constant float TAU = 6.28318530718;
@@ -1108,6 +1188,28 @@ final class SceneRenderer {
     float2 toSpace(float2 uv, float aspect) { return float2(uv.x * aspect, uv.y); }
     float2 toUV(float2 q, float aspect) { return float2(q.x / aspect, q.y); }
 
+    // A moved pixel that would come from outside the painted area keeps its own
+    // colour: otherwise the edge of the area smears what is around it inside.
+    float4 sampleMoved(texture2d<float> src, texture2d<float> mask, sampler s, float2 suv, float4 original,
+                       constant EffectUniforms &u) {
+        float4 moved = src.sample(s, suv);
+        return u.hasMask != 0 ? mix(original, moved, mask.sample(s, suv).r) : moved;
+    }
+
+    // 0 at the fixed side of the area, rising to 1 at the opposite side.
+    float edgeWeight(float2 uv, constant EffectUniforms &u) {
+        float4 b = u.bounds;
+        float t;
+        switch (u.fixedEdge) {
+        case 1: t = (uv.y - b.y) / max(b.w - b.y, 1e-4); break;
+        case 2: t = (b.w - uv.y) / max(b.w - b.y, 1e-4); break;
+        case 3: t = (uv.x - b.x) / max(b.z - b.x, 1e-4); break;
+        case 4: t = (b.z - uv.x) / max(b.z - b.x, 1e-4); break;
+        default: return 1.0;
+        }
+        return smoothstep(0.0, 1.0, clamp(t, 0.0, 1.0));
+    }
+
     float2 rotateAround(float2 q, float2 c, float angle) {
         float s = sin(angle);
         float co = cos(angle);
@@ -1124,7 +1226,7 @@ final class SceneRenderer {
         constexpr sampler s(filter::linear, address::clamp_to_edge);
         constexpr sampler wrap(filter::linear, address::repeat);
         float2 uv = in.uv;
-        float m = u.hasMask != 0 ? mask.sample(s, uv).r : 1.0;
+        float m = (u.hasMask != 0 ? mask.sample(s, uv).r : 1.0) * edgeWeight(uv, u);
         float w = TAU * float(u.cycles) * u.phase;
         float2 q = toSpace(uv, u.aspect);
         float2 c = toSpace(u.center, u.aspect);
@@ -1136,24 +1238,24 @@ final class SceneRenderer {
         switch (u.kind) {
         case 0: { // shake
             float2 d = dir * (u.strength * 0.03) * sin(w);
-            result = src.sample(s, toUV(q - d * m, u.aspect));
+            result = sampleMoved(src, mask, s, toUV(q - d * m, u.aspect), original, u);
             break;
         }
         case 1: { // sway
             float k = mix(2.0, 24.0, u.scale);
             float2 d = dir * (u.strength * 0.02) * sin(w - k * dot(q, dir));
-            result = src.sample(s, toUV(q - d * m, u.aspect));
+            result = sampleMoved(src, mask, s, toUV(q - d * m, u.aspect), original, u);
             break;
         }
         case 2: { // swing
             float angle = u.strength * 0.35 * sin(w) * m;
-            result = src.sample(s, toUV(rotateAround(q, c, -angle), u.aspect));
+            result = sampleMoved(src, mask, s, toUV(rotateAround(q, c, -angle), u.aspect), original, u);
             break;
         }
         case 3: { // waves
             float k = mix(4.0, 60.0, u.scale);
             float2 d = perp * (u.strength * 0.01) * sin(k * dot(q, dir) - w);
-            result = src.sample(s, toUV(q - d * m, u.aspect));
+            result = sampleMoved(src, mask, s, toUV(q - d * m, u.aspect), original, u);
             break;
         }
         case 4: { // ripple
@@ -1161,15 +1263,24 @@ final class SceneRenderer {
             float r = length(v);
             float k = mix(10.0, 120.0, u.scale);
             float2 d = r > 1e-4 ? (v / r) * (u.strength * 0.01) * sin(k * r - w) : float2(0.0);
-            result = src.sample(s, toUV(q - d * m, u.aspect));
+            result = sampleMoved(src, mask, s, toUV(q - d * m, u.aspect), original, u);
             break;
         }
         case 5: { // water flow: two samples half a cycle apart hide each one's reset
             float2 f = (flow.sample(s, uv).rg * 2.0 - 1.0) * (u.strength * 0.08) * m;
             float p0 = fract(float(u.cycles) * u.phase);
             float p1 = fract(p0 + 0.5);
-            float4 a = src.sample(s, toUV(q - f * p0, u.aspect));
-            float4 b = src.sample(s, toUV(q - f * p1, u.aspect));
+            float4 a = sampleMoved(src, mask, s, toUV(q - f * p0, u.aspect), original, u);
+            float4 b = sampleMoved(src, mask, s, toUV(q - f * p1, u.aspect), original, u);
+            result = mix(a, b, abs(1.0 - 2.0 * p0));
+            break;
+        }
+        case 12: { // drift: the water flow's two offset copies, one direction everywhere
+            float2 f = dir * (u.strength * 0.08) * m;
+            float p0 = fract(float(u.cycles) * u.phase);
+            float p1 = fract(p0 + 0.5);
+            float4 a = sampleMoved(src, mask, s, toUV(q - f * p0, u.aspect), original, u);
+            float4 b = sampleMoved(src, mask, s, toUV(q - f * p1, u.aspect), original, u);
             result = mix(a, b, abs(1.0 - 2.0 * p0));
             break;
         }
@@ -1182,7 +1293,7 @@ final class SceneRenderer {
             float f = mix(1.5, 8.0, u.scale);
             float3 p = float3(q * f, 0.0) + float3(0.0, sin(w), cos(w)) * 0.8;
             float2 d = (float2(fbm(p), fbm(p + 19.3)) - 0.5) * (u.strength * 0.06);
-            result = src.sample(s, toUV(q - d * m, u.aspect));
+            result = sampleMoved(src, mask, s, toUV(q - d * m, u.aspect), original, u);
             break;
         }
         case 8: { // spin: whole turns per loop
@@ -1195,7 +1306,7 @@ final class SceneRenderer {
             float r = length(q - c);
             float falloff = r < radius ? pow(1.0 - r / radius, 2.0) : 0.0;
             float angle = (u.reversed != 0 ? -1.0 : 1.0) * u.strength * 3.14159 * falloff * sin(w) * m;
-            result = src.sample(s, toUV(rotateAround(q, c, -angle), u.aspect));
+            result = sampleMoved(src, mask, s, toUV(rotateAround(q, c, -angle), u.aspect), original, u);
             break;
         }
         case 11: { // puppet: displacement blended from nearby pins, fading to none
@@ -1210,7 +1321,7 @@ final class SceneRenderer {
                 weights += w;
             }
             float2 d = sum / weights;
-            result = src.sample(s, toUV(q - d * m, u.aspect));
+            result = sampleMoved(src, mask, s, toUV(q - d * m, u.aspect), original, u);
             break;
         }
         case 10: { // pulse

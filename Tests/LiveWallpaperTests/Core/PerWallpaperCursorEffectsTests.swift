@@ -109,4 +109,33 @@ final class PerWallpaperCursorEffectsTests: XCTestCase {
         XCTAssertEqual(color.greenComponent, 0)
         XCTAssertEqual(color.blueComponent, 1)
     }
+
+    func testEditsUndoBackToFollowingTheAppWideSettings() {
+        let model = WallpaperModel()
+        model.editCursorEffectsOverride(CursorEffectsSettings(), path: path, coalescingKey: nil)
+        model.editCursorEffectsOverride(sparkleTrail, path: path, coalescingKey: "trail")
+
+        model.undoCursorEffects(path: path)
+        XCTAssertEqual(model.cursorEffectsOverride(path: path), CursorEffectsSettings())
+        model.undoCursorEffects(path: path)
+        XCTAssertNil(model.cursorEffectsOverride(path: path))
+        XCTAssertFalse(model.canUndoCursorEffects(path: path))
+
+        model.redoCursorEffects(path: path)
+        model.redoCursorEffects(path: path)
+        XCTAssertEqual(model.cursorEffectsOverride(path: path), sparkleTrail)
+    }
+
+    func testOneDraggedValueIsOneStep() {
+        let model = WallpaperModel()
+        model.editCursorEffectsOverride(CursorEffectsSettings(), path: path, coalescingKey: nil)
+        model.breakCursorEffectsHistoryCoalescing()
+        for red in [0.2, 0.4, 0.6] {
+            var settings = CursorEffectsSettings()
+            settings.trailCustomColor = RGBAColor(red: red, green: 0, blue: 0, alpha: 1)
+            model.editCursorEffectsOverride(settings, path: path, coalescingKey: "colour")
+        }
+        model.undoCursorEffects(path: path)
+        XCTAssertEqual(model.cursorEffectsOverride(path: path), CursorEffectsSettings())
+    }
 }

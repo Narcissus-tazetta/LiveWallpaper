@@ -273,7 +273,10 @@ final class SceneEditingTests: XCTestCase {
         model.registerImportedScene(scene, path: video.path)
         scene.layers[0].opacity = 0.4
         model.updateScene(scene, path: video.path)
-        defer { model.cancelSceneBake(path: video.path) }
+        defer {
+            model.cancelSceneBake(path: video.path)
+            model.discardSceneSave(path: video.path)
+        }
         let packageURL = try await PackageExporter().exportSingleWallpaperPackage(
             model: model, videoPath: video.path, outputFolderURL: directory, baseFileName: "pending"
         )

@@ -1,14 +1,15 @@
 import AppKit
 
-/// 矢印キーの keyCode(HIToolbox の kVK_* 相当)。
-private enum FitArrowKeyCode {
+/// 使うキーの keyCode(HIToolbox の kVK_* 相当)。
+private enum FitKeyCode {
     static let left: UInt16 = 123
     static let right: UInt16 = 124
     static let down: UInt16 = 125
     static let up: UInt16 = 126
+    static let letterZ: UInt16 = 6
 }
 
-/// フィット編集タブでの矢印キー操作(プレビューのパン)。
+/// フィット編集タブでのキー操作(矢印キーでプレビューのパン、⌘Z / ⇧⌘Z)。
 extension FitEditorController {
     func installKeyMonitorIfNeeded() {
         guard keyEventMonitor == nil else {
@@ -17,8 +18,18 @@ extension FitEditorController {
 
         keyEventMonitor =
             NSEvent
-            .addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            .addLocalMonitorForEvents(
+                matching: [.keyDown, .keyUp, .leftMouseDown, .leftMouseUp]
+            ) { [weak self] event in
                 guard let self, isActive, isSubModeActive else {
+                    return event
+                }
+                // A press or release marks the edges of one gesture; edits between
+                // them (a slider drag, a held arrow key) become a single undo step.
+                if event.type != .keyDown || !event.isARepeat {
+                    breakDraftHistoryCoalescing()
+                }
+                guard event.type == .keyDown else {
                     return event
                 }
                 // A text field (name edit, search, ...) is being edited: let the
@@ -32,20 +43,33 @@ extension FitEditorController {
                     return event
                 }
 
-                let step = event.modifierFlags.contains(.shift) ? 0.01 : 0.002
+                let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                 let screenID = resolvedScreenID()
+                if event.keyCode == FitKeyCode.letterZ {
+                    guard flags == [.command] || flags == [.command, .shift] else {
+                        return event
+                    }
+                    if flags.contains(.shift) {
+                        redoDraft(path: path, screenID: screenID)
+                    } else {
+                        undoDraft(path: path, screenID: screenID)
+                    }
+                    return nil
+                }
+
+                let step = flags.contains(.shift) ? 0.01 : 0.002
 
                 switch event.keyCode {
-                case FitArrowKeyCode.left:
+                case FitKeyCode.left:
                     moveDraftOffset(dx: -step, dy: 0, path: path, screenID: screenID)
                     return nil
-                case FitArrowKeyCode.right:
+                case FitKeyCode.right:
                     moveDraftOffset(dx: step, dy: 0, path: path, screenID: screenID)
                     return nil
-                case FitArrowKeyCode.down:
+                case FitKeyCode.down:
                     moveDraftOffset(dx: 0, dy: step, path: path, screenID: screenID)
                     return nil
-                case FitArrowKeyCode.up:
+                case FitKeyCode.up:
                     moveDraftOffset(dx: 0, dy: -step, path: path, screenID: screenID)
                     return nil
                 default:

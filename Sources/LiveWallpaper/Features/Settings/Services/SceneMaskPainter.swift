@@ -2,7 +2,7 @@ import Foundation
 
 /// Paints an effect's mask (where it applies) or a water-flow map (which way it
 /// flows) on the editor preview. Strokes show on the preview immediately and are
-/// saved as a new file when each stroke ends.
+/// saved as a new file when each stroke ends, so the scene's undo history covers them.
 @MainActor
 final class SceneMaskPainter: ObservableObject {
     enum Tool: String, CaseIterable {
@@ -23,21 +23,24 @@ final class SceneMaskPainter: ObservableObject {
     /// 0 fades from the centre, 1 is a hard edge.
     @Published var hardness = 0.5
     @Published private(set) var target: Target?
-    @Published private(set) var canUndo = false
+    /// Tints the painted area and draws the flow's arrows on the preview.
+    @Published var showsOverlay = true
 
     weak var previewLayer: SceneMetalLayer?
-    /// Saves the painted file name into the scene.
-    var onCommit: ((Target, String) -> Void)?
+    /// Called after the painted pixels or the target changed, to redraw guides.
+    var onPreviewChange: (() -> Void)?
+    /// Saves the painted file name into the scene, with the painted area's box for a mask.
+    var onCommit: ((Target, String, SceneAreaBounds?) -> Void)?
     var onError: ((Error) -> Void)?
 
     private var width = 0
     private var height = 0
     private var bytes: [UInt8] = []
-    private var undoStack: [[UInt8]] = []
+    /// The file `bytes` were read from or last saved as.
+    private var currentFile: String?
     private var lastPoint: SIMD2<Float>?
     private var strokeChanged = false
 
-    private static let maxUndo = 30
     /// Masks are soft, so this is plenty and keeps strokes fast.
     private static let maxMaskEdge = 1024
     private static let maxFlowEdge = 512
@@ -54,6 +57,23 @@ final class SceneMaskPainter: ObservableObject {
         width = max(Int(Double(layerPixelSize.width) * scale), 8)
         height = max(Int(Double(layerPixelSize.height) * scale), 8)
         self.target = target
+        load(existingFile)
+    }
+
+    /// Follows the scene after undo or redo put a different file in place.
+    func reload(existingFile: String?) {
+        guard target != nil, existingFile != currentFile else {
+            return
+        }
+        lastPoint = nil
+        load(existingFile)
+    }
+
+    private func load(_ existingFile: String?) {
+        guard let target else {
+            return
+        }
+        currentFile = existingFile
         if let existingFile {
             do {
                 bytes = try SceneStore.readPaintImage(
@@ -66,8 +86,6 @@ final class SceneMaskPainter: ObservableObject {
         } else {
             bytes = blank()
         }
-        undoStack = []
-        canUndo = false
         pushPreview()
     }
 
@@ -77,9 +95,41 @@ final class SceneMaskPainter: ObservableObject {
         }
         target = nil
         bytes = []
-        undoStack = []
-        canUndo = false
+        currentFile = nil
         previewLayer?.setPaintOverride(nil)
+        onPreviewChange?()
+    }
+
+    /// The brush's radius in layer UV per axis (it is round in pixels).
+    var brushRadiusUV: SIMD2<Float> {
+        guard width > 0, height > 0 else {
+            return .zero
+        }
+        return SIMD2(brushRadiusInPixels / Float(width), brushRadiusInPixels / Float(height))
+    }
+
+    /// The painted flow on a grid of about `columns` across: each cell's centre and
+    /// its flow (layer UV per unit, up to 1), skipping still cells.
+    func flowArrows(columns: Int) -> [(position: SIMD2<Float>, flow: SIMD2<Float>)] {
+        guard target?.kind == .flow, width > 0, height > 0, bytes.count == width * height * 4 else {
+            return []
+        }
+        let step = max(width / max(columns, 1), 1)
+        var arrows: [(position: SIMD2<Float>, flow: SIMD2<Float>)] = []
+        for y in stride(from: step / 2, to: height, by: step) {
+            for x in stride(from: step / 2, to: width, by: step) {
+                let index = (y * width + x) * 4
+                let flow = SIMD2((Float(bytes[index]) - 128) / 127, (Float(bytes[index + 1]) - 128) / 127)
+                guard (flow.x * flow.x + flow.y * flow.y) > 0.01 else {
+                    continue
+                }
+                arrows.append((
+                    SIMD2((Float(x) + 0.5) / Float(width), (Float(y) + 0.5) / Float(height)),
+                    SIMD2(flow.x * Float(step) / Float(width), flow.y * Float(step) / Float(height))
+                ))
+            }
+        }
+        return arrows
     }
 
     // MARK: - Strokes (points in layer UV, origin top-left)
@@ -88,7 +138,6 @@ final class SceneMaskPainter: ObservableObject {
         guard target != nil else {
             return
         }
-        pushUndo()
         lastPoint = point
         strokeChanged = false
         stamp(at: point, direction: nil)
@@ -122,9 +171,6 @@ final class SceneMaskPainter: ObservableObject {
         lastPoint = nil
         if strokeChanged {
             commit()
-        } else {
-            undoStack.removeLast()
-            canUndo = !undoStack.isEmpty
         }
     }
 
@@ -132,7 +178,6 @@ final class SceneMaskPainter: ObservableObject {
         guard let target, target.kind == .mask else {
             return
         }
-        pushUndo()
         bytes = [UInt8](repeating: 255, count: width * height)
         pushPreview()
         commit()
@@ -142,18 +187,7 @@ final class SceneMaskPainter: ObservableObject {
         guard target != nil else {
             return
         }
-        pushUndo()
         bytes = blank()
-        pushPreview()
-        commit()
-    }
-
-    func undo() {
-        guard let previous = undoStack.popLast() else {
-            return
-        }
-        bytes = previous
-        canUndo = !undoStack.isEmpty
         pushPreview()
         commit()
     }
@@ -175,14 +209,6 @@ final class SceneMaskPainter: ObservableObject {
             still[index + 3] = 255
         }
         return still
-    }
-
-    private func pushUndo() {
-        undoStack.append(bytes)
-        if undoStack.count > Self.maxUndo {
-            undoStack.removeFirst()
-        }
-        canUndo = true
     }
 
     /// `direction` (unit, pixel space) is the stroke's heading; flow maps need one.
@@ -243,6 +269,7 @@ final class SceneMaskPainter: ObservableObject {
         previewLayer?.setPaintOverride(ScenePaintOverride(
             effectID: target.effectID, target: target.kind, width: width, height: height, bytes: bytes
         ))
+        onPreviewChange?()
     }
 
     private func commit() {
@@ -253,7 +280,9 @@ final class SceneMaskPainter: ObservableObject {
             let fileName = try SceneStore.writePaintImage(
                 bytes, width: width, height: height, target: target.kind, videoPath: target.path
             )
-            onCommit?(target, fileName)
+            currentFile = fileName
+            let bounds = target.kind == .mask ? SceneAreaBounds.of(bytes, width: width, height: height) : nil
+            onCommit?(target, fileName, bounds)
         } catch {
             onError?(error)
         }

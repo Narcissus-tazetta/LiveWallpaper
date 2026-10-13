@@ -73,12 +73,23 @@ extension SettingsView {
                     onDelta: { delta in
                         let normalizedDX = Double(delta.width / max(frameSize.width, 1)) * 2
                         let normalizedDY = Double(delta.height / max(frameSize.height, 1)) * 2
-                        fitEditor.moveDraftOffset(
+                        // Offsets are fractions of the room to pan, so the same
+                        // distance on screen is a different offset on each axis. An
+                        // axis without room never snaps (-1).
+                        let maxPan = frameGeometry.maxPan
+                        let snapX = maxPan.width >= 1 ? Self.fitSnapDistance / maxPan.width : -1
+                        let snapY = maxPan.height >= 1 ? Self.fitSnapDistance / maxPan.height : -1
+                        fitEditor.dragDraftOffset(
                             dx: normalizedDX,
                             dy: normalizedDY,
+                            snapDistance: CGSize(width: snapX, height: snapY),
+                            snaps: !NSEvent.modifierFlags.contains(.command),
                             path: path,
                             screenID: screenID
                         )
+                    },
+                    onDragEnded: {
+                        fitEditor.endDraftDrag()
                     },
                     onScrollDelta: { delta in
                         let normalizedDX = Double(delta.width / max(frameSize.width, 1)) * 2
@@ -141,7 +152,7 @@ extension SettingsView {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .clipped()
             .overlay(alignment: .center) {
-                fitEditorCenterFrameOverlay(frameSize: frameSize)
+                fitEditorCenterFrameOverlay(frameSize: frameSize, snapped: fitEditor.snappedAxes)
             }
             .contentShape(RoundedRectangle(cornerRadius: 12))
             .onAppear {
@@ -173,7 +184,10 @@ extension SettingsView {
         return CGSize(width: width, height: height)
     }
 
-    func fitEditorCenterFrameOverlay(frameSize: CGSize) -> some View {
+    /// Points from the centre within which a drag snaps the picture to it.
+    static let fitSnapDistance: CGFloat = 6
+
+    func fitEditorCenterFrameOverlay(frameSize: CGSize, snapped: FitSnappedAxes) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.white.opacity(0.92), lineWidth: 2.5)
@@ -196,6 +210,17 @@ extension SettingsView {
                     style: StrokeStyle(lineWidth: 1, dash: [4, 4])
                 )
                 .frame(width: 1, height: frameSize.height * 0.7)
+
+            if snapped.x {
+                Rectangle()
+                    .fill(Color.accentColor)
+                    .frame(width: 1.5, height: frameSize.height)
+            }
+            if snapped.y {
+                Rectangle()
+                    .fill(Color.accentColor)
+                    .frame(width: frameSize.width, height: 1.5)
+            }
         }
         .allowsHitTesting(false)
     }

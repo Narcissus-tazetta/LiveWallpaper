@@ -48,7 +48,9 @@ enum SceneStore {
             guard let sceneDate, let videoDate else {
                 return false
             }
-            return sceneDate > videoDate
+            // Setting a date (importScene) rounds it to the microsecond, which can land
+            // just after the date copied; a real edit comes far later than that.
+            return sceneDate.timeIntervalSince(videoDate) > 0.001
         } catch {
             AppLog.windowRefresh.error("scene date check failed: \(error.localizedDescription, privacy: .public)")
             return false
@@ -56,13 +58,42 @@ enum SceneStore {
     }
 
     static func save(_ document: SceneDocument, videoPath: String) throws {
-        let folder = folderURL(forVideoPath: videoPath)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try write(encode(document), videoPath: videoPath)
+    }
+
+    static func encode(_ document: SceneDocument) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(document).write(
-            to: folder.appendingPathComponent(documentFileName), options: .atomic
-        )
+        return try encoder.encode(document)
+    }
+
+    /// Writes data from encode(_:) as the scene's scene.json, atomically. The partial
+    /// file has a dot name: pruning on the main thread skips those, while it would
+    /// delete the unnamed temporary file of `Data.write(options: .atomic)` mid-write.
+    static func write(_ data: Data, videoPath: String) throws {
+        let folder = folderURL(forVideoPath: videoPath)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let partial = folder.appendingPathComponent(".\(documentFileName).\(UUID().uuidString)")
+        do {
+            try data.write(to: partial)
+            if rename(partial.path, folder.appendingPathComponent(documentFileName).path) != 0 {
+                throw CocoaError(.fileWriteUnknown, userInfo: [
+                    NSFilePathErrorKey: partial.path,
+                    NSUnderlyingErrorKey: POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                ])
+            }
+        } catch {
+            if FileManager.default.fileExists(atPath: partial.path) {
+                do {
+                    try FileManager.default.removeItem(at: partial)
+                } catch let cleanupError {
+                    AppLog.persistence.error(
+                        "scene write cleanup failed: \(cleanupError.localizedDescription, privacy: .public)"
+                    )
+                }
+            }
+            throw error
+        }
     }
 
     /// Copies the image into the scene folder and returns a layer for it plus the
@@ -278,6 +309,13 @@ enum SceneStore {
             for name in names {
                 try FileManager.default.copyItem(
                     at: source.appendingPathComponent(name), to: staging.appendingPathComponent(name)
+                )
+            }
+            // The video imported beside it already shows this scene. Dated like it,
+            // scene.json only becomes newer than the video (isNewerThanVideo) once edited.
+            if let videoDate = try FileManager.default.attributesOfItem(atPath: videoPath)[.modificationDate] {
+                try FileManager.default.setAttributes(
+                    [.modificationDate: videoDate], ofItemAtPath: staging.appendingPathComponent(documentFileName).path
                 )
             }
             if FileManager.default.fileExists(atPath: destination.path) {

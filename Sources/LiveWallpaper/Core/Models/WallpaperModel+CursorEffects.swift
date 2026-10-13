@@ -102,6 +102,51 @@ extension WallpaperModel {
         refreshCursorEffects()
     }
 
+    /// An edit in the editor, recorded for undo. Edits with the same `coalescingKey`
+    /// between two presses (a colour dragged in the colour panel) make one step.
+    func editCursorEffectsOverride(_ settings: CursorEffectsSettings?, path: String, coalescingKey: String?) {
+        let previous = cursorEffectsByPath[path]
+        guard previous != settings else {
+            return
+        }
+        cursorEffectsHistories[path, default: EditHistory()].record(previous, coalescingKey: coalescingKey)
+        setCursorEffectsOverride(settings, path: path)
+    }
+
+    func canUndoCursorEffects(path: String) -> Bool {
+        cursorEffectsHistories[path]?.canUndo ?? false
+    }
+
+    func canRedoCursorEffects(path: String) -> Bool {
+        cursorEffectsHistories[path]?.canRedo ?? false
+    }
+
+    func undoCursorEffects(path: String) {
+        guard var history = cursorEffectsHistories[path],
+              let restored = history.undo(current: cursorEffectsByPath[path])
+        else {
+            return
+        }
+        cursorEffectsHistories[path] = history
+        setCursorEffectsOverride(restored, path: path)
+    }
+
+    func redoCursorEffects(path: String) {
+        guard var history = cursorEffectsHistories[path],
+              let restored = history.redo(current: cursorEffectsByPath[path])
+        else {
+            return
+        }
+        cursorEffectsHistories[path] = history
+        setCursorEffectsOverride(restored, path: path)
+    }
+
+    func breakCursorEffectsHistoryCoalescing() {
+        for path in cursorEffectsHistories.keys {
+            cursorEffectsHistories[path]?.breakCoalescing()
+        }
+    }
+
     func persistCursorEffectsByPath() {
         do {
             try UserDefaults.standard.set(

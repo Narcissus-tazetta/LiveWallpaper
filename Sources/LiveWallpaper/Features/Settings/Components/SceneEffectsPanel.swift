@@ -27,13 +27,14 @@ extension SettingsView {
         case .twirl: model.localizedString("渦")
         case .pulse: model.localizedString("明滅")
         case .puppet: model.localizedString("パペット(ピン)")
+        case .drift: model.localizedString("一方向に流す")
         }
     }
 
     /// The preview interaction matching the current tool.
     func scenePreviewInteraction(layerID: UUID?) -> ScenePreviewInteraction {
         guard let layerID, let tool = sceneEditorTool else {
-            return .hover
+            return .arrange(selectedLayerID: layerID)
         }
         switch tool {
         case .paint:
@@ -107,11 +108,6 @@ extension SettingsView {
                 Button(model.localizedString("すべて消す")) {
                     sceneMaskPainter.clearAll()
                 }
-                Button(model.localizedString("取り消す")) {
-                    sceneMaskPainter.undo()
-                }
-                .keyboardShortcut("z", modifiers: .command)
-                .disabled(!sceneMaskPainter.canUndo)
                 Spacer(minLength: 0)
                 Button(model.localizedString("完了")) {
                     endSceneEditorTool()
@@ -157,6 +153,7 @@ extension SettingsView {
                     }
                     Section(model.localizedString("流れ・回転・明滅")) {
                         sceneAddEffectButton(.scroll, path: path, layerID: layer.id)
+                        sceneAddEffectButton(.drift, path: path, layerID: layer.id)
                         sceneAddEffectButton(.cloudMotion, path: path, layerID: layer.id)
                         sceneAddEffectButton(.spin, path: path, layerID: layer.id)
                         sceneAddEffectButton(.twirl, path: path, layerID: layer.id)
@@ -355,6 +352,28 @@ extension SettingsView {
                     settingsFootnote(model.localizedString("向きを描くまでは動きません。"))
                 }
             }
+            if effect.kind.usesFixedEdge {
+                sceneEffectRow(title: model.localizedString("固定する側")) {
+                    Picker(
+                        model.localizedString("固定する側"),
+                        selection: sceneEffectBinding(path: path, layerID: layerID, effect: effect, \.fixedEdge)
+                    ) {
+                        Text(model.localizedString("なし")).tag(SceneFixedEdge.none)
+                        Text(model.localizedString("上")).tag(SceneFixedEdge.top)
+                        Text(model.localizedString("下")).tag(SceneFixedEdge.bottom)
+                        Text(model.localizedString("左")).tag(SceneFixedEdge.left)
+                        Text(model.localizedString("右")).tag(SceneFixedEdge.right)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    Spacer(minLength: 0)
+                }
+                if effect.fixedEdge != .none {
+                    settingsFootnote(model.localizedString("選んだ側は動かさず、反対側ほど大きく動かします。髪の根元や枝の付け根を押さえるのに使います。"))
+                        .padding(.leading, sceneEffectLabelWidth + 12)
+                }
+            }
             sceneEffectRow(title: model.localizedString("範囲")) {
                 Text(model.localizedString(effect.maskFile == nil ? "レイヤー全体" : "塗った範囲だけ"))
                     .foregroundColor(.secondary)
@@ -372,6 +391,37 @@ extension SettingsView {
                 }
             }
             .padding(.leading, sceneEffectLabelWidth + 12)
+            if effect.maskFile != nil, effect.kind.canMoveOnItsOwnLayer,
+               model.sceneDocumentsByPath[path]?.layers.first(where: { $0.id == layerID })?.kind == .image
+            {
+                HStack(spacing: 8) {
+                    Button(model.localizedString("塗った範囲を別のレイヤーにする")) {
+                        moveScenePaintedArea(path: path, layerID: layerID, effectID: effect.id)
+                    }
+                    .disabled(model.sceneAIWork[layerID] != nil)
+                    if model.sceneAIWork[layerID] == .separating {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+                .padding(.leading, sceneEffectLabelWidth + 12)
+                settingsFootnote(model.localizedString("塗った範囲だけを動かすと、輪郭はその場に残ります。別のレイヤーにすると輪郭ごと動き、元のレイヤーの抜けた所は周りの色で埋めます。"))
+                    .padding(.leading, sceneEffectLabelWidth + 12)
+            }
+        }
+    }
+
+    /// Selects the new layer with the effect when the cut-out is done.
+    func moveScenePaintedArea(path: String, layerID: UUID, effectID: UUID) {
+        endSceneEditorTool()
+        Task {
+            guard let id = await model.moveScenePaintedAreaToOwnLayer(effectID: effectID, layerID: layerID, path: path),
+                  fitEditor.resolvedVideoPath() == path
+            else {
+                return
+            }
+            selectSceneLayer(id)
+            selectedSceneEffectID = effectID
         }
     }
 
@@ -526,7 +576,7 @@ extension SettingsView {
 
     // MARK: - Editing helpers
 
-    private func beginScenePainting(path: String, layerID: UUID, effect: SceneEffect, kind: ScenePaintOverride.Target) {
+    func beginScenePainting(path: String, layerID: UUID, effect: SceneEffect, kind: ScenePaintOverride.Target) {
         guard let document = model.sceneDocumentsByPath[path],
               let layer = document.layers.first(where: { $0.id == layerID })
         else {
@@ -539,9 +589,10 @@ extension SettingsView {
             model.sceneErrorMessage = error.localizedDescription
             return
         }
-        sceneMaskPainter.onCommit = { [model] target, fileName in
+        sceneMaskPainter.onCommit = { [model] target, fileName, bounds in
             model.setScenePaintFile(
-                fileName, kind: target.kind, effectID: target.effectID, layerID: target.layerID, path: target.path
+                fileName, kind: target.kind, effectID: target.effectID, layerID: target.layerID, path: target.path,
+                bounds: bounds
             )
         }
         sceneMaskPainter.onError = { [model] error in

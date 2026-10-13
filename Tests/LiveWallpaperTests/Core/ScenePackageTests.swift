@@ -52,9 +52,16 @@ final class ScenePackageTests: XCTestCase {
         try SceneStore.copyScene(videoPath: original, to: packaged)
 
         let imported = workingDirectory.appendingPathComponent("b.mp4").path
+        // Packages import the baked video before its scene.
+        FileManager.default.createFile(atPath: imported, contents: Data())
         let restored = try SceneStore.importScene(from: packaged, videoPath: imported)
 
         XCTAssertEqual(restored, document)
+        // The imported video already shows the scene until it is edited.
+        XCTAssertFalse(SceneStore.isNewerThanVideo(videoPath: imported))
+        Thread.sleep(forTimeInterval: 0.01)
+        try SceneStore.save(restored, videoPath: imported)
+        XCTAssertTrue(SceneStore.isNewerThanVideo(videoPath: imported))
         for name in SceneStore.referencedFiles(of: restored) {
             XCTAssertTrue(FileManager.default.fileExists(
                 atPath: SceneStore.folderURL(forVideoPath: imported).appendingPathComponent(name).path
@@ -71,6 +78,8 @@ final class ScenePackageTests: XCTestCase {
         try JSONEncoder().encode(document).write(to: packaged.appendingPathComponent("scene.json"))
 
         let imported = workingDirectory.appendingPathComponent("b.mp4").path
+        // Packages import the baked video before its scene.
+        FileManager.default.createFile(atPath: imported, contents: Data())
         XCTAssertThrowsError(try SceneStore.importScene(from: packaged, videoPath: imported))
         XCTAssertFalse(FileManager.default.fileExists(atPath: SceneStore.folderURL(forVideoPath: imported).path))
     }
@@ -83,6 +92,8 @@ final class ScenePackageTests: XCTestCase {
         let packaged = workingDirectory.appendingPathComponent("package/scenes/id", isDirectory: true)
         try SceneStore.copyScene(videoPath: original, to: packaged)
         let imported = workingDirectory.appendingPathComponent("b.mp4").path
+        // Packages import the baked video before its scene.
+        FileManager.default.createFile(atPath: imported, contents: Data())
         let existing = try SceneStore.importScene(from: packaged, videoPath: imported)
 
         let unreadable = packaged.appendingPathComponent(document.layers[0].imageFile)

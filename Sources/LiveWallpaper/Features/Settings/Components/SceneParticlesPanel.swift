@@ -24,9 +24,7 @@ extension SettingsView {
                 ForEach(SceneParticlePreset.allCases, id: \.self) { preset in
                     Button(sceneParticleName(preset)) {
                         if let id = model.addSceneParticleLayer(preset, name: sceneParticleName(preset), path: path) {
-                            endSceneEditorTool()
-                            selectedSceneLayerID = id
-                            selectedSceneEffectID = nil
+                            selectSceneLayer(id)
                         }
                     }
                 }
@@ -218,7 +216,7 @@ extension SettingsView {
         guard let document = model.sceneDocumentsByPath[path] else {
             return
         }
-        sceneMaskPainter.onCommit = { [model] target, fileName in
+        sceneMaskPainter.onCommit = { [model] target, fileName, _ in
             model.setScenePaintFile(
                 fileName, kind: target.kind, effectID: target.effectID, layerID: target.layerID, path: target.path
             )

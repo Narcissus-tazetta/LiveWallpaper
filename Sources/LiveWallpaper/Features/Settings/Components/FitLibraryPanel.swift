@@ -8,8 +8,13 @@ extension SettingsView {
         guard wallpaperEditor.requestSelectVideo(path: path) else {
             return
         }
+        if let previous = fitEditor.resolvedVideoPath(), previous != path {
+            model.bakeSceneNowIfPending(path: previous)
+        }
         fitEditor.selectVideo(path: path)
         endSceneEditorTool()
+        scenePreviewController.reset()
+        renamingSceneLayerID = nil
         selectedSceneLayerID = nil
         selectedSceneEffectID = nil
         syncEditorSubMode()

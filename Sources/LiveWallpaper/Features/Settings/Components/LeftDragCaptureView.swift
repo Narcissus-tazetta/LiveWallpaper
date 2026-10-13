@@ -5,6 +5,7 @@ struct LeftDragCaptureView: NSViewRepresentable {
     var isEnabled: Bool = true
     var onActivate: (() -> Void)?
     var onDelta: (CGSize) -> Void
+    var onDragEnded: (() -> Void)?
     var onScrollDelta: ((CGSize) -> Void)?
     var currentZoom: (() -> Double)?
     /// ズーム変更。anchor はビュー中心を原点とした y 下向きの座標で、
@@ -16,6 +17,7 @@ struct LeftDragCaptureView: NSViewRepresentable {
             isEnabled: isEnabled,
             onActivate: onActivate,
             onDelta: onDelta,
+            onDragEnded: onDragEnded,
             onScrollDelta: onScrollDelta,
             currentZoom: currentZoom,
             onZoomChange: onZoomChange
@@ -33,6 +35,7 @@ struct LeftDragCaptureView: NSViewRepresentable {
         context.coordinator.isEnabled = isEnabled
         context.coordinator.onActivate = onActivate
         context.coordinator.onDelta = onDelta
+        context.coordinator.onDragEnded = onDragEnded
         context.coordinator.onScrollDelta = onScrollDelta
         context.coordinator.currentZoom = currentZoom
         context.coordinator.onZoomChange = onZoomChange
@@ -42,6 +45,7 @@ struct LeftDragCaptureView: NSViewRepresentable {
         var isEnabled: Bool
         var onActivate: (() -> Void)?
         var onDelta: (CGSize) -> Void
+        var onDragEnded: (() -> Void)?
         var onScrollDelta: ((CGSize) -> Void)?
         var currentZoom: (() -> Double)?
         var onZoomChange: ((Double, CGPoint?) -> Void)?
@@ -51,6 +55,7 @@ struct LeftDragCaptureView: NSViewRepresentable {
             isEnabled: Bool = true,
             onActivate: (() -> Void)? = nil,
             onDelta: @escaping (CGSize) -> Void,
+            onDragEnded: (() -> Void)? = nil,
             onScrollDelta: ((CGSize) -> Void)? = nil,
             currentZoom: (() -> Double)? = nil,
             onZoomChange: ((Double, CGPoint?) -> Void)? = nil
@@ -58,6 +63,7 @@ struct LeftDragCaptureView: NSViewRepresentable {
             self.isEnabled = isEnabled
             self.onActivate = onActivate
             self.onDelta = onDelta
+            self.onDragEnded = onDragEnded
             self.onScrollDelta = onScrollDelta
             self.currentZoom = currentZoom
             self.onZoomChange = onZoomChange
@@ -208,6 +214,7 @@ final class LeftDragCaptureNSView: NSView {
             gesture.setTranslation(.zero, in: self)
         default:
             gesture.setTranslation(.zero, in: self)
+            coordinator?.onDragEnded?()
         }
     }
 }

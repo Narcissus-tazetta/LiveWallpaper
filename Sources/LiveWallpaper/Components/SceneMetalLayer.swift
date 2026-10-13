@@ -47,11 +47,54 @@ final class SceneMetalLayer: CAMetalLayer {
     /// GPU busy), so the redraw waits for it instead.
     private var isFrameInFlight = false
     private var needsRedrawAfterFrame = false
+    private var scriptWorker = SceneScriptWorker()
+    private var isEvaluatingScript = false
+    private var needsScriptEvaluation = false
+    private var scriptGeneration = UUID()
+    private var frozenScriptInput: SceneFrameInput?
+    private var stoppedScriptIDs: Set<UUID> = []
+    var scriptIssueHandler: (([SceneScriptIssue]) -> Void)?
+    var scriptLogHandler: (([UUID: String]) -> Void)?
 
     /// Provides the animation time. nil leaves the scene at the loop start.
     var clock: (() -> SceneClockReading)?
+    /// The part of the canvas shown (origin and size in canvas UV); the editor zooms.
+    var viewport = SIMD4<Float>(0, 0, 1, 1) {
+        didSet {
+            if viewport != oldValue {
+                current.viewport = viewport
+                target.viewport = viewport
+                redraw()
+            }
+        }
+    }
+    /// The part of the day the scene's links see.
+    var timeOfDay: SceneTimeOfDay = .day {
+        didSet {
+            if timeOfDay != oldValue {
+                renderer?.timeOfDay = timeOfDay
+                redraw()
+            }
+        }
+    }
+    /// The editor's stand-in cursor, -1...1 per axis (+y down); while set, the real
+    /// pointer is ignored. nil follows setCursor.
+    var simulatedCursor: SIMD2<Float>? {
+        didSet {
+            guard simulatedCursor != oldValue else {
+                return
+            }
+            if let simulatedCursor {
+                applyCursor(uv: (simulatedCursor + 1) / 2, parallax: simulatedCursor)
+            } else {
+                applyCursor(uv: nil, parallax: .zero)
+            }
+        }
+    }
     /// The view whose display drives the ticks.
     weak var hostView: NSView?
+    /// Called after each frame is encoded, for overlays that follow the animation.
+    var didDraw: (() -> Void)?
     var maximumFramesPerSecond: Float? {
         didSet {
             if maximumFramesPerSecond != oldValue {
@@ -92,6 +135,14 @@ final class SceneMetalLayer: CAMetalLayer {
     }
 
     func show(_ document: SceneDocument, videoPath: String) throws {
+        if self.videoPath != videoPath {
+            scriptWorker = SceneScriptWorker()
+            frozenScriptInput = nil
+        }
+        if self.videoPath != videoPath || renderer?.document != document {
+            scriptGeneration = UUID()
+            stoppedScriptIDs = []
+        }
         if let renderer, self.videoPath == videoPath {
             if renderer.document != document {
                 try renderer.update(document: document)
@@ -99,11 +150,14 @@ final class SceneMetalLayer: CAMetalLayer {
         } else {
             let renderer = try SceneRenderer(document: document, videoPath: videoPath)
             renderer.effectResolutionScale = 0.5
+            renderer.timeOfDay = timeOfDay
             self.renderer = renderer
             self.videoPath = videoPath
             device = renderer.device
             current = .rest
             target = .rest
+            current.viewport = viewport
+            target.viewport = viewport
         }
         readClock()
         // SwiftUI may still be attaching or resizing the backing layer here.
@@ -114,6 +168,10 @@ final class SceneMetalLayer: CAMetalLayer {
 
     func clear() {
         suspend()
+        scriptWorker = SceneScriptWorker()
+        frozenScriptInput = nil
+        scriptGeneration = UUID()
+        scriptIssueHandler?([])
         renderer = nil
         videoPath = nil
         target = .rest
@@ -121,6 +179,8 @@ final class SceneMetalLayer: CAMetalLayer {
     }
 
     func suspend() {
+        scriptGeneration = UUID()
+        needsScriptEvaluation = false
         stopTicking()
         stopPolling()
     }
@@ -130,6 +190,22 @@ final class SceneMetalLayer: CAMetalLayer {
         readClock()
         setNeedsDisplay()
         updateTicking()
+    }
+
+    func freezeScriptsForEditing() {
+        guard renderer?.document.scripts.contains(where: \.canRun) == true else { return }
+        frozenScriptInput = renderer?.lastDrawnInput ?? current
+        scriptGeneration = UUID()
+        updateTicking()
+    }
+
+    func unfreezeScripts() {
+        guard frozenScriptInput != nil else { return }
+        frozenScriptInput = nil
+        scriptGeneration = UUID()
+        readClock()
+        updateTicking()
+        redraw()
     }
 
     func setPaintOverride(_ override: ScenePaintOverride?) {
@@ -145,14 +221,18 @@ final class SceneMetalLayer: CAMetalLayer {
     /// cursor is not on this screen or masks may not react. `parallax` is -1...1 from
     /// the screen centre, zero when parallax may not move.
     func setCursor(_ cursor: CGPoint?, parallax: CGPoint) {
-        let uv = cursor.flatMap(canvasUV(of:))
-        let newTarget = SceneFrameInput(
-            parallax: SIMD2(Float(parallax.x), Float(-parallax.y)), cursor: uv, time: target.time
-        )
-        guard newTarget.parallax != target.parallax || newTarget.cursor != target.cursor else {
+        guard simulatedCursor == nil else {
             return
         }
-        target.parallax = newTarget.parallax
+        applyCursor(uv: cursor.flatMap(canvasUV(of:)), parallax: SIMD2(Float(parallax.x), Float(-parallax.y)))
+    }
+
+    /// `parallax` is -1...1 with +y down.
+    private func applyCursor(uv: SIMD2<Float>?, parallax: SIMD2<Float>) {
+        guard parallax != target.parallax || uv != target.cursor else {
+            return
+        }
+        target.parallax = parallax
         target.cursor = uv
         current.cursor = uv
         lastInteraction = CACurrentMediaTime()
@@ -171,7 +251,14 @@ final class SceneMetalLayer: CAMetalLayer {
         guard size.width > 0, size.height > 0 else {
             return nil
         }
-        return SIMD2(Float(point.x / size.width), Float(1 - point.y / size.height))
+        let viewUV = SIMD2(Float(point.x / size.width), Float(1 - point.y / size.height))
+        return SIMD2(viewport.x, viewport.y) + viewUV * SIMD2(viewport.z, viewport.w)
+    }
+
+    /// Canvas UV → a point in this layer's coordinates (origin bottom-left).
+    func point(ofCanvasUV uv: SIMD2<Float>) -> CGPoint {
+        let viewUV = (uv - SIMD2(viewport.x, viewport.y)) / SIMD2(viewport.z, viewport.w)
+        return CGPoint(x: CGFloat(viewUV.x) * bounds.width, y: CGFloat(1 - viewUV.y) * bounds.height)
     }
 
     override func layoutSublayers() {
@@ -184,6 +271,43 @@ final class SceneMetalLayer: CAMetalLayer {
     }
 
     func redraw() {
+        guard let renderer else { return }
+        if renderer.document.scripts.contains(where: \.canRun) {
+            needsScriptEvaluation = true
+            guard !isEvaluatingScript else { return }
+            needsScriptEvaluation = false
+            isEvaluatingScript = true
+            let generation = scriptGeneration
+            let document = renderer.document
+            let input = frozenScriptInput ?? current
+            let requestedTimeOfDay = timeOfDay
+            scriptWorker.evaluate(document, input: input, timeOfDay: requestedTimeOfDay) { [weak self] result in
+                guard let self else { return }
+                self.isEvaluatingScript = false
+                if self.scriptGeneration == generation, self.renderer?.document == document,
+                   self.timeOfDay == requestedTimeOfDay {
+                    switch result {
+                    case let .success(frame):
+                        self.scriptIssueHandler?(frame.issues)
+                        self.scriptLogHandler?(frame.logs)
+                        // A script paused for running out of time keeps the clock going, so it can resume.
+                        self.stoppedScriptIDs = Set(frame.issues.filter { !$0.isTemporary }.map(\.scriptID))
+                        self.draw(input: frame.input, frame: frame)
+                        self.updateTicking()
+                    case let .failure(error):
+                        AppLog.windowRefresh.error("script frame failed: \(error.localizedDescription, privacy: .public)")
+                        self.scriptIssueHandler?([SceneScriptIssue(scriptID: document.scripts.first!.id,
+                                                                  name: "JavaScript", message: error.localizedDescription)])
+                    }
+                }
+                if self.needsScriptEvaluation { self.redraw() }
+            }
+        } else {
+            draw(input: current, frame: nil)
+        }
+    }
+
+    private func draw(input: SceneFrameInput, frame: SceneEvaluatedFrame?) {
         guard let renderer, bounds.width > 0, bounds.height > 0 else {
             return
         }
@@ -202,7 +326,7 @@ final class SceneMetalLayer: CAMetalLayer {
             return
         }
         do {
-            try renderer.encode(into: drawable.texture, commandBuffer: commandBuffer, input: current)
+            try renderer.encode(into: drawable.texture, commandBuffer: commandBuffer, input: input, frame: frame)
         } catch {
             AppLog.windowRefresh.error("scene render failed: \(error.localizedDescription, privacy: .public)")
             return
@@ -221,6 +345,7 @@ final class SceneMetalLayer: CAMetalLayer {
         commandBuffer.commit()
         commandBuffer.waitUntilScheduled()
         drawable.present()
+        didDraw?()
     }
 
     private func frameDidFinish() {
@@ -234,14 +359,17 @@ final class SceneMetalLayer: CAMetalLayer {
     // MARK: - Ticking
 
     private var isAnimating: Bool {
-        guard let renderer, renderer.document.isAnimated, let clock else {
+        guard frozenScriptInput == nil else { return false }
+        guard let renderer, let clock else {
             return false
         }
-        return clock().isRunning
+        let animated = renderer.document.layers.contains(where: \.isAnimated)
+            || renderer.document.scripts.contains { $0.canRun && $0.usesTime && !stoppedScriptIDs.contains($0.id) }
+        return animated && clock().isRunning
     }
 
     private var isEasing: Bool {
-        current.parallax != target.parallax
+        frozenScriptInput == nil && current.parallax != target.parallax
     }
 
     private func readClock() {

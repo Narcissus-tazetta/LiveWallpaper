@@ -48,6 +48,9 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     case twirl
     case pulse
     case puppet
+    /// Moves the picture one way and fades between two offset copies, like the water
+    /// flow with one direction everywhere: clouds drifting, mist.
+    case drift
 
     /// Uses `centerX`/`centerY` (picked on the preview).
     var usesCenter: Bool {
@@ -55,7 +58,18 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     }
 
     var usesDirection: Bool {
-        [.shake, .sway, .waves, .scroll].contains(self)
+        [.shake, .sway, .waves, .scroll, .drift].contains(self)
+    }
+
+    /// Can hold one side still and move more toward the other (hair, leaves, cloth).
+    var usesFixedEdge: Bool {
+        [.shake, .sway, .waves, .cloudMotion].contains(self)
+    }
+
+    /// Moves the picture, so moving a painted area of it as its own layer lets its
+    /// outline move instead of only what is inside.
+    var canMoveOnItsOwnLayer: Bool {
+        self != .pulse
     }
 
     /// Uses `scale`: wavelength, noise size or radius depending on the effect.
@@ -65,6 +79,46 @@ enum SceneEffectKind: String, Codable, CaseIterable {
 
     var usesStrength: Bool {
         ![.scroll, .spin, .puppet].contains(self)
+    }
+}
+
+/// The side of an effect's area that stays still.
+enum SceneFixedEdge: String, Codable, CaseIterable {
+    case none
+    case top
+    case bottom
+    case left
+    case right
+}
+
+/// A rectangle in layer UV (origin top-left).
+struct SceneAreaBounds: Codable, Equatable {
+    var minX: Double
+    var minY: Double
+    var maxX: Double
+    var maxY: Double
+
+    static let whole = SceneAreaBounds(minX: 0, minY: 0, maxX: 1, maxY: 1)
+
+    /// The box around the pixels at or above `threshold` in a one-byte-per-pixel
+    /// image; nil when there are none.
+    static func of(_ bytes: [UInt8], width: Int, height: Int, threshold: UInt8 = 8) -> SceneAreaBounds? {
+        var minX = width, minY = height, maxX = -1, maxY = -1
+        for y in 0 ..< height {
+            for x in 0 ..< width where bytes[y * width + x] >= threshold {
+                minX = min(minX, x)
+                maxX = max(maxX, x)
+                minY = min(minY, y)
+                maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX, maxY >= minY else {
+            return nil
+        }
+        return SceneAreaBounds(
+            minX: Double(minX) / Double(width), minY: Double(minY) / Double(height),
+            maxX: Double(maxX + 1) / Double(width), maxY: Double(maxY + 1) / Double(height)
+        )
     }
 }
 
@@ -129,6 +183,10 @@ struct SceneEffect: Codable, Equatable, Identifiable {
     var flowFile: String?
     /// Puppet only.
     var pins: [ScenePin] = []
+    var fixedEdge: SceneFixedEdge = .none
+    /// Where the effect's area is, for `fixedEdge`: the painted area, or a cut-out's
+    /// picture. nil means the whole layer.
+    var areaBounds: SceneAreaBounds?
 
     init(kind: SceneEffectKind) {
         self.kind = kind
@@ -137,6 +195,9 @@ struct SceneEffect: Codable, Equatable, Identifiable {
         }
         if kind == .puppet {
             scale = 0.3
+        }
+        if kind == .drift {
+            cycles = 2
         }
     }
 
@@ -156,11 +217,15 @@ struct SceneEffect: Codable, Equatable, Identifiable {
         maskFile = try? container.decodeIfPresent(String.self, forKey: .maskFile)
         flowFile = try? container.decodeIfPresent(String.self, forKey: .flowFile)
         pins = (try? container.decode([ScenePin].self, forKey: .pins)) ?? []
+        fixedEdge = (try? container.decode(SceneFixedEdge.self, forKey: .fixedEdge)) ?? .none
+        areaBounds = try? container.decodeIfPresent(SceneAreaBounds.self, forKey: .areaBounds)
     }
 }
 
 /// Where a layer sits on the canvas, on top of its aspect-fit placement.
 struct SceneTransform: Codable, Equatable {
+    static let scaleRange = 0.1 ... 5.0
+
     /// Fractions of the canvas width/height; +x right, +y down.
     var offsetX: Double = 0
     var offsetY: Double = 0
@@ -328,6 +393,8 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     /// File name inside the scene folder; empty for particle layers.
     var imageFile: String
     var isVisible = true
+    /// Editor only: keeps the layer from being picked, moved or changed.
+    var isLocked = false
     var opacity: Double = 1
     var blendMode: SceneBlendMode = .normal
     /// 0 keeps the layer still; 1 moves it the most with the cursor.
@@ -378,6 +445,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         transform = (try? container.decode(SceneTransform.self, forKey: .transform)) ?? .identity
         keyframes = (try? container.decode([SceneKeyframe].self, forKey: .keyframes)) ?? []
         isVisible = (try? container.decode(Bool.self, forKey: .isVisible)) ?? true
+        isLocked = (try? container.decode(Bool.self, forKey: .isLocked)) ?? false
         opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
         blendMode = (try? container.decode(SceneBlendMode.self, forKey: .blendMode)) ?? .normal
         parallaxDepth = (try? container.decode(Double.self, forKey: .parallaxDepth)) ?? 0
@@ -392,13 +460,21 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     }
 
     func separatedForeground(name: String, imageFile: String) -> SceneLayer {
-        var foreground = self
-        foreground.id = UUID()
-        foreground.name = name
+        var foreground = duplicated(name: name)
         foreground.imageFile = imageFile
+        return foreground
+    }
+
+    /// An independent copy. Painted files are shared by name, which is safe because a
+    /// stroke always writes a new file instead of changing one.
+    func duplicated(name: String) -> SceneLayer {
+        var copy = self
+        copy.id = UUID()
+        copy.name = name
+        copy.isLocked = false
         // Painting and selection identify effects, pins and poses by UUID across
         // the editor, so the two independent layers must not share those IDs.
-        foreground.effects = effects.map { effect in
+        copy.effects = effects.map { effect in
             var copy = effect
             copy.id = UUID()
             copy.pins = effect.pins.map { pin in
@@ -408,12 +484,12 @@ struct SceneLayer: Codable, Equatable, Identifiable {
             }
             return copy
         }
-        foreground.keyframes = keyframes.map { frame in
+        copy.keyframes = keyframes.map { frame in
             var copy = frame
             copy.id = UUID()
             return copy
         }
-        return foreground
+        return copy
     }
 
     var hasDepth: Bool {
@@ -477,6 +553,11 @@ struct SceneDocument: Codable, Equatable {
     var layers: [SceneLayer]
     /// Length of one loop of the motion, and of the baked video when anything moves.
     var loopSeconds = 20
+    /// When each part of the day starts, one entry per part.
+    var timeBands = SceneTimeBand.defaults
+    /// Applied in order after placement and keyframes (SceneLink).
+    var links: [SceneLink] = []
+    var scripts: [SceneScript] = []
 
     init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer]) {
         self.canvasWidth = canvasWidth
@@ -492,10 +573,22 @@ struct SceneDocument: Codable, Equatable {
         // Packages come from anyone, and the baker writes loopSeconds × 60 frames.
         let decodedLoop = (try? container.decode(Int.self, forKey: .loopSeconds)) ?? 20
         loopSeconds = min(max(decodedLoop, 1), Self.loopSecondsChoices.max()!)
+        let bands = (try? container.decode([SceneTimeBand].self, forKey: .timeBands)) ?? []
+        // One of each part, within a day; anything else falls back as a whole.
+        if Set(bands.map(\.timeOfDay)) == Set(SceneTimeOfDay.allCases), bands.count == SceneTimeOfDay.allCases.count,
+           bands.allSatisfy({ (0 ..< 24 * 60).contains($0.startMinute) })
+        {
+            timeBands = bands
+        }
+        links = ((try? container.decode([FailableDecodable<SceneLink>].self, forKey: .links)) ?? []).compactMap(\.value)
+        scripts = try container.decodeIfPresent([SceneScript].self, forKey: .scripts) ?? []
+        guard scripts.count <= SceneScript.maximumCount, Set(scripts.map(\.id)).count == scripts.count else {
+            throw DecodingError.dataCorruptedError(forKey: .scripts, in: container, debugDescription: "Too many scripts or duplicate script IDs")
+        }
     }
 
     var isAnimated: Bool {
-        layers.contains(where: \.isAnimated)
+        layers.contains(where: \.isAnimated) || scripts.contains { $0.canRun && $0.usesTime }
     }
 
     var aspectRatio: Double {
@@ -503,8 +596,11 @@ struct SceneDocument: Codable, Equatable {
     }
 
     var usesCursor: Bool {
-        layers.contains(where: \.usesCursor)
+        layers.contains(where: \.usesCursor) || links.contains { $0.input.usesCursor && $0.hasEffect }
+            || scripts.contains { $0.canRun && $0.usesCursor }
     }
+
+    var hasUnapprovedScripts: Bool { scripts.contains { $0.isEnabled && !$0.canRun } }
 }
 
 /// Decodes to nil instead of failing the whole array.

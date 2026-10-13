@@ -3,6 +3,17 @@ import Foundation
 
 @MainActor
 final class PackageExporter {
+    enum ExportError: LocalizedError {
+        case sceneAwaitingScriptApproval(String)
+
+        var errorDescription: String? {
+            switch self {
+            case let .sceneAwaitingScriptApproval(message):
+                return message
+            }
+        }
+    }
+
     private let fileManager: FileManager
     private let manifestBuilder: PackageManifestBuilder
     private let archiveWriter: PackageArchiveWriter
@@ -79,7 +90,7 @@ final class PackageExporter {
         )
         if includeVideos {
             for videoId in videoMap.values {
-                markPackagedScene(videoId: videoId, contentDir: contentDir, manifest: &manifest)
+                try markPackagedScene(videoId: videoId, contentDir: contentDir, manifest: &manifest)
             }
         }
 
@@ -173,7 +184,7 @@ final class PackageExporter {
             mediaPath: packagedVideoURL.path,
             license: license
         )
-        markPackagedScene(videoId: videoId, contentDir: contentDir, manifest: &manifest)
+        try markPackagedScene(videoId: videoId, contentDir: contentDir, manifest: &manifest)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -194,12 +205,22 @@ final class PackageExporter {
         contentDir: URL
     ) async throws -> URL {
         let videoURL = contentDir.appendingPathComponent("videos/\(videoId).mp4")
-        if let document = try SceneStore.load(videoPath: videoPath) {
+        model.flushSceneSave(path: videoPath)
+        if let loaded = try SceneStore.load(videoPath: videoPath) {
+            let document = SceneScriptPermissions.restored(loaded, path: videoPath)
+            // Its video predates the edits, and baking would run scripts nobody allowed.
+            if document.hasUnapprovedScripts, SceneStore.isNewerThanVideo(videoPath: videoPath) {
+                throw ExportError.sceneAwaitingScriptApproval(String(
+                    format: model.localizedString("「%@」には未許可のスクリプトがあり、動画が最新の編集を反映していません。スクリプトを許可するか停止してから書き出してください。"),
+                    model.registeredVideoDisplayName(for: videoPath)
+                ))
+            }
             let snapshotFolder = SceneStore.folderURL(forVideoPath: videoURL.path)
             // Capture assets before suspending: another edit may prune the originals
             // while the snapshot is being rendered.
             try SceneStore.copyScene(videoPath: videoPath, to: snapshotFolder)
-            if model.scenesBaking.contains(videoPath) || SceneStore.isNewerThanVideo(videoPath: videoPath) {
+            let isStale = model.scenesBaking.contains(videoPath) || SceneStore.isNewerThanVideo(videoPath: videoPath)
+            if !document.hasUnapprovedScripts, isStale {
                 try await SceneVideoBaker.bake(document: document, videoPath: videoURL.path, to: videoURL) { _ in }
             } else {
                 try fileManager.copyItem(atPath: videoPath, toPath: videoURL.path)
@@ -213,11 +234,19 @@ final class PackageExporter {
         return videoURL
     }
 
-    private func markPackagedScene(videoId: String, contentDir: URL, manifest: inout PackageManifest) {
+    private func markPackagedScene(videoId: String, contentDir: URL, manifest: inout PackageManifest) throws {
         guard fileManager.fileExists(atPath: contentDir.appendingPathComponent("scenes/\(videoId)/scene.json").path),
               let index = manifest.videos.firstIndex(where: { $0.id == videoId })
         else { return }
-        manifest.videos[index].scene = true
+        let source = contentDir.appendingPathComponent("scenes/\(videoId)/scene.json")
+        let document = try JSONDecoder().decode(SceneDocument.self, from: Data(contentsOf: source))
+        if document.scripts.isEmpty {
+            manifest.videos[index].scene = true
+        } else {
+            // Older importers understand scene=true and would erase unknown script fields on edit.
+            manifest.videos[index].scriptScene = .init(apiVersion: document.scripts.map(\.version).max()!)
+            manifest.videos[index].scene = nil
+        }
     }
 
     private func copyOriginalVideo(

@@ -148,6 +148,19 @@ final class WallpaperModel: ObservableObject {
     /// Scenes whose baked video does not show the latest edit yet (pending or failed).
     var sceneStaleVideoPaths: Set<String> = []
     @Published var sceneErrorMessage: String?
+    @Published var sceneScriptIssues: [String: [SceneScriptIssue]] = [:]
+    @Published var sceneScriptLogs: [String: [UUID: String]] = [:]
+    var sceneScriptLogTimes: [String: TimeInterval] = [:]
+    /// Video path → undo history of its scene, kept per wallpaper until the app quits.
+    /// Not published: every change to it comes with a change to sceneDocumentsByPath.
+    var sceneHistories: [String: EditHistory<SceneDocument>] = [:]
+    /// Video path → undo history of its own cursor effects (nil: follows the app-wide
+    /// ones), kept until the app quits. Every change comes with one to cursorEffectsByPath.
+    var cursorEffectsHistories: [String: EditHistory<CursorEffectsSettings?>] = [:]
+    /// Full path → number of running tasks reading that scene file, which pruning keeps.
+    var sceneFilesInUse: [String: Int] = [:]
+    /// Video path → image layer additions still being read in.
+    @Published var sceneLayerImportCounts: [String: Int] = [:]
     /// Leaves the lock screen video and the screen saver in place when the app quits.
     @Published var keepLockScreenAndScreenSaverAfterQuit = false
     /// Layer id → the on-device analysis running on it.
@@ -155,6 +168,35 @@ final class WallpaperModel: ObservableObject {
     var sceneBakeWorkItems: [String: DispatchWorkItem] = [:]
     var sceneBakeTasks: [String: Task<Void, Never>] = [:]
     var sceneBakeGenerations: [String: UUID] = [:]
+    /// Scenes whose bake is writing now, as opposed to waiting for edits to settle.
+    @Published var scenesBakeRunning: Set<String> = []
+    /// Scenes edited since their video was baked, whose bake waits until their
+    /// scripts are allowed or stopped.
+    @Published var sceneVideosAwaitingScriptApproval: Set<String> = []
+    /// Video path → why its last bake failed; the previous video stays in use.
+    @Published var sceneBakeFailures: [String: String] = [:]
+    /// Scenes with edits not yet written to scene.json.
+    @Published var scenesSaving: Set<String> = []
+    /// Video path → why scene.json could not be written; the edit stays in memory.
+    @Published var sceneSaveFailures: [String: String] = [:]
+    var sceneSaveWorkItems: [String: DispatchWorkItem] = [:]
+    var sceneSaveGenerations: [String: UUID] = [:]
+    /// Video path → states kept for comparison in the editor; pruning keeps their files.
+    @Published var sceneComparisonSnapshots: [String: SceneDocument] = [:]
+    /// nil until the editor first needs them.
+    @Published var userScenePresets: [ScenePreset]?
+    /// Where the user's presets live; tests point it elsewhere.
+    var scenePresetStore = ScenePresetStore.standard
+    /// A preset shown on the preview before it is applied.
+    @Published var scenePresetTrial: ScenePresetTrial?
+    /// Video path → what is left to do after the last preset applied there.
+    @Published var scenePresetGuides: [String: ScenePresetGuide] = [:]
+    /// Video path → the part of the day its baked video shows.
+    var sceneBakedTimesOfDay: [String: SceneTimeOfDay] = [:]
+    var sceneTimeOfDayTimer: Timer?
+    /// Video path → the part of the day a running bake writes.
+    var sceneBakingTimesOfDay: [String: SceneTimeOfDay] = [:]
+    var sceneTimeOfDayObservers: [NSObjectProtocol] = []
     @Published var frameRateLimit: FrameRateLimit = .off
     @Published var decodeMode: DecodeMode = .automatic
     @Published var qualityPreset: QualityPreset = .auto

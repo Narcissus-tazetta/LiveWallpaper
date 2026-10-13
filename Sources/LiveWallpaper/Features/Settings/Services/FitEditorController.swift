@@ -1,6 +1,11 @@
 import AppKit
 import SwiftUI
 
+struct FitSnappedAxes: Equatable {
+    var x = false
+    var y = false
+}
+
 /// フィット編集タブの状態とロジックの持ち主。
 /// SettingsView に散らばっていた @State(ドラフト、静止画キャッシュ、デバウンス、
 /// キーモニタ)を1箇所へ集約し、ビュー側は表示とバインディングだけを担当する。
@@ -9,7 +14,7 @@ import SwiftUI
 /// - この本体: 表示状態・画面/動画選択・ファイル存在キャッシュ
 /// - `+Draft`: ドラフトの読み書き・編集・バインディング・正規化・保存
 /// - `+StillPreview`: 静止画プレビューの生成とキャッシュ
-/// - `+Keyboard`: 矢印キーによるパン操作
+/// - `+Keyboard`: 矢印キーによるパンと ⌘Z / ⇧⌘Z
 @MainActor
 final class FitEditorController: ObservableObject {
     let model: WallpaperModel
@@ -44,6 +49,14 @@ final class FitEditorController: ObservableObject {
     var lastNormalizeAt: Date = .distantPast
     var normalizeGeneration: Int = 0
     var keyEventMonitor: Any?
+    /// Undo history per video and screen, kept until the app quits so switching
+    /// screens to compare does not throw the edits away.
+    var draftHistories: [DraftHistoryKey: EditHistory<FitEditorDraft>] = [:]
+    /// Where the drag on the preview would put the picture without snapping; nil
+    /// between drags.
+    var dragRawOffset: CGPoint?
+    /// The axes a drag holds at the centre, which the preview marks with a guide.
+    @Published var snappedAxes = FitSnappedAxes()
 
     init(model: WallpaperModel) {
         self.model = model
@@ -191,6 +204,7 @@ final class FitEditorController: ObservableObject {
             stillImageTasks.removeValue(forKey: path)
         }
         stillImageGeneration = stillImageGeneration.filter { valid.contains($0.key) }
+        draftHistories = draftHistories.filter { valid.contains($0.key.path) }
         if let selected = selectedVideoPath, !valid.contains(selected) {
             selectedVideoPath = nil
         }

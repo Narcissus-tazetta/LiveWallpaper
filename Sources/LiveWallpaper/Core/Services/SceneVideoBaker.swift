@@ -25,18 +25,24 @@ enum SceneVideoBaker {
     /// Longest edge of the baked video; the lock screen does not need more.
     static let maxEdge = 3840
 
+    /// The links see `timeOfDay` (by default the part of the day now) and the cursor
+    /// at the centre, as on the lock screen.
     static func bake(
         document: SceneDocument,
         videoPath: String,
+        timeOfDay: SceneTimeOfDay? = nil,
         to outputURL: URL,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
+        let timeOfDay = timeOfDay ?? document.timeOfDay(at: Date())
         let task = Task.detached(priority: .utility) {
             try Task.checkCancellation()
             if document.isAnimated {
-                try await render(document: document, videoPath: videoPath, outputURL: outputURL, progress: progress)
+                try await render(
+                    document: document, videoPath: videoPath, timeOfDay: timeOfDay, outputURL: outputURL, progress: progress
+                )
             } else {
-                try await renderStill(document: document, videoPath: videoPath, outputURL: outputURL)
+                try await renderStill(document: document, videoPath: videoPath, timeOfDay: timeOfDay, outputURL: outputURL)
             }
         }
         try await withTaskCancellationHandler {
@@ -53,8 +59,12 @@ enum SceneVideoBaker {
         }
     }
 
-    private static func renderStill(document: SceneDocument, videoPath: String, outputURL: URL) async throws {
-        let image = try SceneRenderer(document: document, videoPath: videoPath).renderStill()
+    private static func renderStill(
+        document: SceneDocument, videoPath: String, timeOfDay: SceneTimeOfDay, outputURL: URL
+    ) async throws {
+        let renderer = try SceneRenderer(document: document, videoPath: videoPath)
+        renderer.timeOfDay = timeOfDay
+        let image = try renderer.renderStill()
         let temporaryBase = outputURL.deletingLastPathComponent().appendingPathComponent(".scene-\(UUID().uuidString)")
         let stillURL = temporaryBase.appendingPathExtension("png")
         let videoURL = temporaryBase.appendingPathExtension("mp4")
@@ -78,10 +88,12 @@ enum SceneVideoBaker {
     private static func render(
         document: SceneDocument,
         videoPath: String,
+        timeOfDay: SceneTimeOfDay,
         outputURL: URL,
         progress: @Sendable (Double) -> Void
     ) async throws {
         let renderer = try SceneRenderer(document: document, videoPath: videoPath)
+        renderer.timeOfDay = timeOfDay
         // Its own queue: on the shared one, every live preview frame waited behind a
         // full-resolution bake frame and stalled the main thread in nextDrawable.
         guard let commandQueue = renderer.device.makeCommandQueue() else {

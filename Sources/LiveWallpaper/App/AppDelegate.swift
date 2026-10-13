@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var cancellables = Set<AnyCancellable>()
     var hotKeyCenter: GlobalHotKeyCenter?
     var settingsKeyMonitor: Any?
+    var sceneHistoryBreakMonitor: Any?
     var screenUnlockObserver: NSObjectProtocol?
     var appearanceObserver: NSKeyValueObservation?
     #if canImport(Sparkle)
@@ -82,6 +83,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        // A pending bake is picked up at the next launch (restoreScenes), as long as
+        // scene.json holds the edit.
+        wallpaperModel.flushAllSceneSaves()
         wallpaperModel.removeScreenSaverBeforeExit()
         wallpaperModel.restoreLockScreenSyncBeforeExit()
     }
@@ -116,6 +120,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         appearanceObserver?.invalidate()
         if let monitor: Any = settingsKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let monitor: Any = sceneHistoryBreakMonitor {
             NSEvent.removeMonitor(monitor)
         }
     }

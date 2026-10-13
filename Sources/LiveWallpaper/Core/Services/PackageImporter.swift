@@ -223,7 +223,7 @@ final class PackageImporter {
         packageRoot: URL,
         into model: WallpaperModel
     ) {
-        for video in manifest.videos where video.scene == true {
+        for video in manifest.videos where video.scene == true || video.scriptScene != nil {
             guard let videoPath = importedVideoPaths[video.id] else {
                 continue
             }

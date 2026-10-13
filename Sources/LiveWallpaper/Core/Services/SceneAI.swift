@@ -1,3 +1,4 @@
+import Accelerate
 import CoreGraphics
 import CoreML
 import CryptoKit
@@ -89,6 +90,53 @@ enum SceneAI {
         return try Separation(
             foreground: makeImage(foreground, width: width, height: height, alpha: .last),
             background: makeImage(pixels, width: width, height: height, alpha: .noneSkipLast)
+        )
+    }
+
+    /// Splits off a painted area: the area with the mask as alpha, and the picture
+    /// with that place filled in from its surroundings. A picture that is already a
+    /// cut-out keeps its own outline in both.
+    static func separateArea(imageURL: URL, maskURL: URL) throws -> Separation {
+        let image = try decode(imageURL, maxEdge: maxEdge)
+        let width = image.width
+        let height = image.height
+        guard let maskSource = CGImageSourceCreateWithURL(maskURL as CFURL, nil),
+              let maskImage = CGImageSourceCreateImageAtIndex(maskSource, 0, nil)
+        else {
+            throw AIError.unreadableImage(maskURL.lastPathComponent)
+        }
+        var mask = [UInt8](repeating: 0, count: width * height)
+        mask.withUnsafeMutableBytes { buffer in
+            let context = CGContext(
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
+                space: CGColorSpace(name: CGColorSpace.linearGray)!, bitmapInfo: CGImageAlphaInfo.none.rawValue
+            )
+            context?.interpolationQuality = .high
+            context?.draw(maskImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        var pixels = straightRGBA(of: image)
+        let alpha = (0 ..< width * height).map { pixels[$0 * 4 + 3] }
+
+        var area = pixels
+        for index in 0 ..< width * height {
+            area[index * 4 + 3] = UInt8((Int(alpha[index]) * Int(mask[index]) + 127) / 255)
+        }
+
+        // Only where the area covers the picture completely: under its soft edge the
+        // original stays, so the two layers add up to the original when at rest.
+        var hole = mask.map { $0 >= 250 ? UInt8(1) : 0 }
+        // Transparent pixels hold no colour to spread.
+        for index in 0 ..< width * height where alpha[index] == 0 {
+            hole[index] = 1
+        }
+        fillHoles(&pixels, hole: hole, width: width, height: height)
+        for index in 0 ..< width * height {
+            pixels[index * 4 + 3] = alpha[index]
+        }
+
+        return try Separation(
+            foreground: makeImage(area, width: width, height: height, alpha: .last),
+            background: makeImage(pixels, width: width, height: height, alpha: .last)
         )
     }
 
@@ -246,8 +294,32 @@ enum SceneAI {
         return bytes
     }
 
+    /// Straight-alpha RGBA bytes in sRGB, keeping the picture's transparency.
+    private static func straightRGBA(of image: CGImage) -> [UInt8] {
+        let width = image.width
+        let height = image.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        bytes.withUnsafeMutableBytes { buffer in
+            let context = CGContext(
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+            context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        for index in 0 ..< width * height {
+            let a = Int(bytes[index * 4 + 3])
+            guard a > 0, a < 255 else {
+                continue
+            }
+            for channel in 0 ..< 3 {
+                bytes[index * 4 + channel] = UInt8(min((Int(bytes[index * 4 + channel]) * 255 + a / 2) / a, 255))
+            }
+        }
+        return bytes
+    }
+
     /// Reads a one-channel float32 or float16 buffer, resampling to the requested size.
-    private static func readFloatPlane(_ buffer: CVPixelBuffer, width: Int, height: Int) -> [Float] {
+    static func readFloatPlane(_ buffer: CVPixelBuffer, width: Int, height: Int) -> [Float] {
         CVPixelBufferLockBaseAddress(buffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
         let sourceWidth = CVPixelBufferGetWidth(buffer)
@@ -257,11 +329,24 @@ enum SceneAI {
             return [Float](repeating: 0, count: width * height)
         }
         let isHalf = CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_OneComponent16Half
-        func value(_ x: Int, _ y: Int) -> Float {
-            let row = base.advanced(by: y * rowBytes)
-            if isHalf {
-                return Float(row.assumingMemoryBound(to: Float16.self)[x])
+        var halfPlane: [Float] = []
+        if isHalf {
+            // Swift Float16 is unavailable on Intel; vImage handles the same IEEE-754 pixels on both architectures.
+            halfPlane = [Float](repeating: 0, count: sourceWidth * sourceHeight)
+            halfPlane.withUnsafeMutableBytes { bytes in
+                var source = vImage_Buffer(data: base, height: vImagePixelCount(sourceHeight),
+                                           width: vImagePixelCount(sourceWidth), rowBytes: rowBytes)
+                var destination = vImage_Buffer(data: bytes.baseAddress!, height: vImagePixelCount(sourceHeight),
+                                                width: vImagePixelCount(sourceWidth), rowBytes: sourceWidth * MemoryLayout<Float>.stride)
+                let status = vImageConvert_Planar16FtoPlanarF(&source, &destination, vImage_Flags(kvImageDoNotTile))
+                precondition(status == kvImageNoError, "Float16 plane conversion failed: \(status)")
             }
+        }
+        func value(_ x: Int, _ y: Int) -> Float {
+            if isHalf {
+                return halfPlane[y * sourceWidth + x]
+            }
+            let row = base.advanced(by: y * rowBytes)
             return row.assumingMemoryBound(to: Float.self)[x]
         }
         var out = [Float](repeating: 0, count: width * height)
