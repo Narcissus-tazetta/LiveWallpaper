@@ -35,7 +35,10 @@ final class LockScreenSyncServiceTests: XCTestCase {
         let systemDefault = try XCTUnwrap(store["SystemDefault"] as? [String: Any])
         try assertLinkedAerialState(systemDefault, assetID: tahoeID)
         try assertAllWallpaperStatesAreLinkedAerial(in: store, assetID: tahoeID)
-        XCTAssertTrue(fixture.storeBackupExists)
+        let backupName = try XCTUnwrap(service.activeLease?.storeBackupFileName)
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: fixture.storeURL.deletingLastPathComponent().appendingPathComponent(backupName).path
+        ))
     }
 
     func testSyncCreatesLeaseAndRestoreClearsIt() async throws {
@@ -175,6 +178,51 @@ final class LockScreenSyncServiceTests: XCTestCase {
 
         XCTAssertEqual(try String(contentsOf: fixture.videoURL(tahoeID)), "original-\(tahoeID)")
         XCTAssertEqual(try Data(contentsOf: fixture.storeURL), originalStoreData)
+    }
+
+    /// The first sync ever leaves a permanent backup; a later borrow must not undo
+    /// wallpaper changes made since then, nor restore a state it patched itself when
+    /// the video changes mid-borrow.
+    func testRestoreReturnsToTheWallpaperFromBeforeThisBorrow() async throws {
+        let fixture = try makeFixture(downloadedIDs: [tahoeID])
+        let sourceVideoURL = try writeFakeVideo(named: "source.mov", contents: "live-video")
+        let service = makeService(fixture)
+        _ = try await service.sync(videoURL: sourceVideoURL)
+        try service.restoreOriginalAerialAndWallpaperStore()
+
+        var changed = try wallpaperStore(at: fixture.storeURL)
+        changed["ChangedByUserLater"] = true
+        let changedData = try PropertyListSerialization.data(fromPropertyList: changed, format: .binary, options: 0)
+        try changedData.write(to: fixture.storeURL)
+
+        _ = try await service.sync(videoURL: sourceVideoURL)
+        let nextVideoURL = try writeFakeVideo(named: "next.mov", contents: "next-video")
+        _ = try await service.sync(videoURL: nextVideoURL)
+        try service.restoreOriginalAerialAndWallpaperStore()
+
+        XCTAssertEqual(try Data(contentsOf: fixture.storeURL), changedData)
+    }
+
+    /// Every sync used to leave a backup behind (dozens piled up); only the one the
+    /// current borrow returns to and the newest few are kept.
+    func testStoreBackupsDoNotPileUp() async throws {
+        let fixture = try makeFixture(downloadedIDs: [tahoeID])
+        let originalStoreData = try Data(contentsOf: fixture.storeURL)
+        let service = makeService(fixture)
+        for index in 0 ..< 6 {
+            let video = try writeFakeVideo(named: "video\(index).mov", contents: "video-\(index)")
+            _ = try await service.sync(videoURL: video)
+            // The timestamp in the name has one-second resolution.
+            try await Task.sleep(nanoseconds: 1_050_000_000)
+        }
+        try service.restoreOriginalAerialAndWallpaperStore()
+
+        XCTAssertEqual(try Data(contentsOf: fixture.storeURL), originalStoreData)
+        XCTAssertFalse(fixture.storeBackupExists)
+        let backups = try FileManager.default.contentsOfDirectory(
+            atPath: fixture.storeURL.deletingLastPathComponent().path
+        ).filter { $0.hasPrefix("Index.plist.livewallpaper.") }
+        XCTAssertLessThanOrEqual(backups.count, 3)
     }
 
     private struct Fixture {
