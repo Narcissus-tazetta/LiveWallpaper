@@ -220,7 +220,10 @@ final class SceneLinkTests: XCTestCase {
         scene.links = [link]
 
         let night = try frame(scene, timeOfDay: .night)
-        XCTAssertEqual(stride(from: 0, to: night.count, by: 4).map { Int(night[$0]) + Int(night[$0 + 1]) + Int(night[$0 + 2]) }.max(), 0)
+        let brightest = stride(from: 0, to: night.count, by: 4).map { index -> Int in
+            Int(night[index]) + Int(night[index + 1]) + Int(night[index + 2])
+        }.max()
+        XCTAssertEqual(brightest, 0)
         let evening = try frame(scene, timeOfDay: .evening)
         for index in stride(from: 0, to: evening.count, by: 4) {
             XCTAssertLessThanOrEqual(abs(Int(evening[index]) - Int(evening[index + 2])), 1, "grey")
