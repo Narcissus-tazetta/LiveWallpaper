@@ -73,11 +73,47 @@ enum SceneStore {
         let size = try pixelSize(of: sourceURL)
         let folder = folderURL(forVideoPath: videoPath)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let name = sourceURL.deletingPathExtension().lastPathComponent
+        // Renderers never use more than maxTextureEdge, and every renderer decodes the
+        // file again: a 16000 px PNG took ~1.8 s per renderer, 4096 px a fraction.
+        if max(size.width, size.height) > CGFloat(SceneRenderer.maxTextureEdge) {
+            let (fileName, storedSize) = try writeDownscaled(sourceURL, maxEdge: SceneRenderer.maxTextureEdge, folder: folder)
+            return (SceneLayer(name: name, imageFile: fileName), storedSize)
+        }
         let ext = sourceURL.pathExtension.isEmpty ? "png" : sourceURL.pathExtension.lowercased()
         let fileName = "layer-\(UUID().uuidString).\(ext)"
         try FileManager.default.copyItem(at: sourceURL, to: folder.appendingPathComponent(fileName))
-        let name = sourceURL.deletingPathExtension().lastPathComponent
         return (SceneLayer(name: name, imageFile: fileName), size)
+    }
+
+    /// Writes the image at most `maxEdge` on its long side, EXIF orientation applied.
+    /// Images with transparency stay PNG; opaque ones become JPEG, which decodes fastest.
+    private static func writeDownscaled(_ url: URL, maxEdge: Int, folder: URL) throws -> (String, CGSize) {
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxEdge
+        ]
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        else {
+            throw StoreError.unreadableImage(url.lastPathComponent)
+        }
+        let hasAlpha = ![.none, .noneSkipFirst, .noneSkipLast].contains(image.alphaInfo)
+        let fileName = "layer-\(UUID().uuidString).\(hasAlpha ? "png" : "jpg")"
+        let type = (hasAlpha ? UTType.png : UTType.jpeg).identifier as CFString
+        guard let destination = CGImageDestinationCreateWithURL(
+            folder.appendingPathComponent(fileName) as CFURL, type, 1, nil
+        ) else {
+            throw StoreError.unreadableImage(fileName)
+        }
+        CGImageDestinationAddImage(
+            destination, image, [kCGImageDestinationLossyCompressionQuality: 0.95] as CFDictionary
+        )
+        guard CGImageDestinationFinalize(destination) else {
+            throw StoreError.unreadableImage(fileName)
+        }
+        return (fileName, CGSize(width: image.width, height: image.height))
     }
 
     /// Saves a painted mask (1 byte per pixel) or flow map (RGBA) as a new file and

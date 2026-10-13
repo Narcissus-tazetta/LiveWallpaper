@@ -78,6 +78,20 @@ final class SceneRenderer {
     private static let pipelineLock = NSLock()
     private nonisolated(unsafe) static var sharedPipeline: Pipeline?
 
+    /// Decoded layer images shared by every renderer alive (the editor preview, each
+    /// desktop, the baker): decoding a large photo takes seconds and renderers are
+    /// recreated on the main thread. Weak, so an image is freed with its last user.
+    private final class TextureCacheEntry {
+        weak var texture: MTLTexture?
+
+        init(_ texture: MTLTexture) {
+            self.texture = texture
+        }
+    }
+
+    private static let textureCacheLock = NSLock()
+    private nonisolated(unsafe) static var textureCache: [String: TextureCacheEntry] = [:]
+
     private let pipeline: Pipeline
     private(set) var document: SceneDocument
     private let videoPath: String
@@ -719,7 +733,9 @@ final class SceneRenderer {
         let images = Set(document.layers.filter { $0.kind == .image }.map(\.imageFile))
         textures = textures.filter { images.contains($0.key) }
         for file in images where textures[file] == nil {
-            textures[file] = try Self.decodeRGBA(url: fileURL(file), device: device)
+            textures[file] = try Self.cachedTexture(url: fileURL(file), variant: "rgba") { url in
+                try Self.decodeRGBA(url: url, device: device)
+            }
         }
 
         let effects = document.layers.flatMap(\.effects)
@@ -729,13 +745,45 @@ final class SceneRenderer {
         )
         maskTextures = maskTextures.filter { masks.contains($0.key) }
         for file in masks where maskTextures[file] == nil {
-            maskTextures[file] = try Self.decodeMask(url: fileURL(file), device: device)
+            maskTextures[file] = try Self.cachedTexture(url: fileURL(file), variant: "mask") { url in
+                try Self.decodeMask(url: url, device: device)
+            }
         }
         let flows = Set(effects.compactMap(\.flowFile))
         flowTextures = flowTextures.filter { flows.contains($0.key) }
         for file in flows where flowTextures[file] == nil {
-            flowTextures[file] = try Self.decodeRGBA(url: fileURL(file), device: device, premultiplied: false)
+            flowTextures[file] = try Self.cachedTexture(url: fileURL(file), variant: "flow") { url in
+                try Self.decodeRGBA(url: url, device: device, premultiplied: false)
+            }
         }
+    }
+
+    /// Keyed by the file's identity too: an imported package can replace a scene
+    /// folder with files of the same names.
+    private static func cachedTexture(
+        url: URL,
+        variant: String,
+        decode: (URL) throws -> MTLTexture
+    ) throws -> MTLTexture {
+        let values = try url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+        let key = [
+            variant,
+            url.standardizedFileURL.path,
+            String(values.contentModificationDate?.timeIntervalSinceReferenceDate ?? 0),
+            String(values.fileSize ?? 0)
+        ].joined(separator: "|")
+        textureCacheLock.lock()
+        let cached = textureCache[key]?.texture
+        textureCacheLock.unlock()
+        if let cached {
+            return cached
+        }
+        let texture = try decode(url)
+        textureCacheLock.lock()
+        textureCache = textureCache.filter { $0.value.texture != nil }
+        textureCache[key] = TextureCacheEntry(texture)
+        textureCacheLock.unlock()
+        return texture
     }
 
     private func fileURL(_ name: String) -> URL {

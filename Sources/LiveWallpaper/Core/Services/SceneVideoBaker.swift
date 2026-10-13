@@ -82,6 +82,11 @@ enum SceneVideoBaker {
         progress: @Sendable (Double) -> Void
     ) async throws {
         let renderer = try SceneRenderer(document: document, videoPath: videoPath)
+        // Its own queue: on the shared one, every live preview frame waited behind a
+        // full-resolution bake frame and stalled the main thread in nextDrawable.
+        guard let commandQueue = renderer.device.makeCommandQueue() else {
+            throw BakeError.writerFailed("Cannot create a command queue")
+        }
         let (width, height) = SceneRenderer.outputSize(for: document, maxEdge: maxEdge)
         let fps = framesPerSecond
         let frameCount = max(document.loopSeconds, 1) * fps
@@ -144,7 +149,7 @@ enum SceneVideoBaker {
                     )
                 }
                 guard let pixelBuffer, let metalTexture, let texture = CVMetalTextureGetTexture(metalTexture),
-                      let commandBuffer = renderer.commandQueue.makeCommandBuffer()
+                      let commandBuffer = commandQueue.makeCommandBuffer()
                 else {
                     throw BakeError.writerFailed("Cannot allocate frame \(frame)")
                 }

@@ -103,6 +103,31 @@ final class ScenePackageTests: XCTestCase {
         XCTAssertEqual(leftovers, [])
     }
 
+    /// Renderers never use more than maxTextureEdge, so a larger image is stored at
+    /// that size, keeping its shape.
+    func testLargeImageIsStoredAtTheRenderedSize() throws {
+        let width = 6000
+        let height = 3600
+        let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        )!
+        context.setFillColor(CGColor(red: 0.2, green: 0.6, blue: 0.3, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let image = workingDirectory.appendingPathComponent("large.png")
+        let destination = CGImageDestinationCreateWithURL(image as CFURL, "public.png" as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, context.makeImage()!, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+
+        let videoPath = workingDirectory.appendingPathComponent("a.mp4").path
+        let (layer, size) = try SceneStore.importImage(at: image, videoPath: videoPath)
+
+        let stored = try SceneStore.pixelSize(of: SceneStore.imageURL(layer, videoPath: videoPath))
+        XCTAssertEqual(stored, size)
+        XCTAssertEqual(max(stored.width, stored.height), CGFloat(SceneRenderer.maxTextureEdge))
+        XCTAssertEqual(stored.width / stored.height, 6000.0 / 3600.0, accuracy: 0.01)
+    }
+
     /// The baker writes loopSeconds × 60 frames, so a package cannot ask for more than
     /// the editor offers.
     func testLoopLengthFromAPackageIsCapped() throws {

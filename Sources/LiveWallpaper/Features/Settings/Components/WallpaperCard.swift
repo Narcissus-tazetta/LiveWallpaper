@@ -116,20 +116,26 @@ extension SettingsView {
         .overlay(alignment: .topTrailing) {
             if isHovered {
                 // A borderless Menu drops any background drawn in its label, so the circle
-                // sits behind the menu instead.
+                // sits behind the menu instead. AppKit also shifts the label left while the
+                // pointer is over it, so the menu only provides the click area and the
+                // glyph is drawn on top.
                 Menu {
                     wallpaperCardMenuItems(path: path)
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 11, weight: .bold))
+                    Color.clear
+                        .frame(width: 24, height: 24)
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
-                .fixedSize()
-                .tint(.white)
                 .frame(width: 24, height: 24)
                 .background(.black.opacity(0.4), in: Circle())
                 .background(.ultraThinMaterial, in: Circle())
+                .overlay(
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .allowsHitTesting(false)
+                )
                 .overlay(
                     Circle()
                         .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)

@@ -42,6 +42,11 @@ final class SceneMetalLayer: CAMetalLayer {
     private var lastInteraction: CFTimeInterval = 0
     private var poller: Timer?
     private var lastStep: CFTimeInterval = 0
+    /// A frame whose GPU work has not finished yet. Asking for another drawable then
+    /// blocks the main thread in nextDrawable (up to a second while a bake keeps the
+    /// GPU busy), so the redraw waits for it instead.
+    private var isFrameInFlight = false
+    private var needsRedrawAfterFrame = false
 
     /// Provides the animation time. nil leaves the scene at the loop start.
     var clock: (() -> SceneClockReading)?
@@ -182,6 +187,10 @@ final class SceneMetalLayer: CAMetalLayer {
         guard let renderer, bounds.width > 0, bounds.height > 0 else {
             return
         }
+        guard !isFrameInFlight else {
+            needsRedrawAfterFrame = true
+            return
+        }
         let scale = contentsScale
         let size = CGSize(width: (bounds.width * scale).rounded(), height: (bounds.height * scale).rounded())
         if drawableSize != size {
@@ -198,12 +207,28 @@ final class SceneMetalLayer: CAMetalLayer {
             AppLog.windowRefresh.error("scene render failed: \(error.localizedDescription, privacy: .public)")
             return
         }
+        isFrameInFlight = true
+        commandBuffer.addCompletedHandler { [weak self] _ in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    self?.frameDidFinish()
+                }
+            }
+        }
         // Frames presented from display-link ticks outside a Core Animation
         // transaction never showed in captures of the window; redraws made while
         // handling an event did. Presenting with the transaction shows both.
         commandBuffer.commit()
         commandBuffer.waitUntilScheduled()
         drawable.present()
+    }
+
+    private func frameDidFinish() {
+        isFrameInFlight = false
+        if needsRedrawAfterFrame {
+            needsRedrawAfterFrame = false
+            setNeedsDisplay()
+        }
     }
 
     // MARK: - Ticking

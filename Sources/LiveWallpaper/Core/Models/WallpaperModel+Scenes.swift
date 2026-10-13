@@ -70,7 +70,11 @@ extension WallpaperModel {
         // Held in activeMediaImportTask so the import's cancel button stops the bake.
         let task = Task { () -> Result<URL, Error> in
             do {
-                let (layer, size) = try SceneStore.importImage(at: sourceURL, videoPath: videoURL.path)
+                // Off the main thread: downscaling a large photo takes seconds.
+                let (layer, size) = try await Task.detached(priority: .userInitiated) {
+                    try SceneStore.importImage(at: sourceURL, videoPath: videoURL.path)
+                }.value
+                try Task.checkCancellation()
                 let document = SceneDocument(
                     canvasWidth: Int(size.width), canvasHeight: Int(size.height), layers: [layer]
                 )
@@ -130,15 +134,35 @@ extension WallpaperModel {
 
     /// Adds the image as the new top layer.
     func addSceneLayer(from imageURL: URL, path: String) {
-        guard var document = sceneDocumentsByPath[path] else {
+        guard sceneDocumentsByPath[path] != nil else {
             return
         }
-        do {
-            let (layer, _) = try SceneStore.importImage(at: imageURL, videoPath: path)
-            document.layers.append(layer)
-            updateScene(document, path: path)
-        } catch {
-            sceneErrorMessage = error.localizedDescription
+        // Downscaling a large photo takes seconds, so it runs off the main thread, in
+        // a staging folder: an edit meanwhile prunes files the scene does not name yet.
+        let stagingVideoPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scene-layer-\(UUID().uuidString).mp4").path
+        let stagingFolder = SceneStore.folderURL(forVideoPath: stagingVideoPath)
+        Task { [weak self] in
+            defer {
+                self?.removeLeftovers(of: [stagingFolder])
+            }
+            do {
+                let (layer, _) = try await Task.detached(priority: .userInitiated) {
+                    try SceneStore.importImage(at: imageURL, videoPath: stagingVideoPath)
+                }.value
+                guard let self, var document = self.sceneDocumentsByPath[path] else {
+                    return
+                }
+                try FileManager.default.moveItem(
+                    at: stagingFolder.appendingPathComponent(layer.imageFile),
+                    to: SceneStore.folderURL(forVideoPath: path).appendingPathComponent(layer.imageFile)
+                )
+                document.layers.append(layer)
+                self.updateScene(document, path: path)
+            } catch {
+                self?.sceneErrorMessage = error.localizedDescription
+                AppLog.windowRefresh.error("adding scene layer failed: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
