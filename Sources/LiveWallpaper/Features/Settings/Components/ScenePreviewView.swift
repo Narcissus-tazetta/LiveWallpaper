@@ -50,6 +50,10 @@ struct ScenePreviewView: NSViewRepresentable {
         view.show(document, videoPath: videoPath)
         view.markers = markers
     }
+
+    static func dismantleNSView(_ view: ScenePreviewNSView, coordinator _: ()) {
+        view.tearDown()
+    }
 }
 
 final class ScenePreviewNSView: NSView {
@@ -175,6 +179,20 @@ final class ScenePreviewNSView: NSView {
 
     private var occlusionObserver: NSObjectProtocol?
 
+    deinit {
+        if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
+    }
+
+    func tearDown() {
+        if let occlusionObserver {
+            NotificationCenter.default.removeObserver(occlusionObserver)
+            self.occlusionObserver = nil
+        }
+        sceneLayer?.clear()
+        painter = nil
+        onPickPoint = nil
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if let occlusionObserver {
@@ -189,13 +207,22 @@ final class ScenePreviewNSView: NSView {
                 }
             }
         }
-        sceneLayer?.clockDidChange()
+        if window == nil {
+            sceneLayer?.suspend()
+        } else {
+            sceneLayer?.clockDidChange()
+        }
     }
 
     override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
         sceneLayer?.contentsScale = window?.backingScaleFactor ?? 2
         sceneLayer?.redraw()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        sceneLayer?.setNeedsDisplay()
     }
 
     override func resetCursorRects() {

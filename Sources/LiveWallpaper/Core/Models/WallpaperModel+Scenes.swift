@@ -65,20 +65,35 @@ extension WallpaperModel {
         isImportingMedia = true
         defer {
             isImportingMedia = false
+            activeMediaImportTask = nil
         }
-        do {
-            let (layer, size) = try SceneStore.importImage(at: sourceURL, videoPath: videoURL.path)
-            let document = SceneDocument(
-                canvasWidth: Int(size.width), canvasHeight: Int(size.height), layers: [layer]
-            )
-            try SceneStore.save(document, videoPath: videoURL.path)
-            try await bakeScene(document, videoPath: videoURL.path)
-            sceneDocumentsByPath[videoURL.path] = document
+        // Held in activeMediaImportTask so the import's cancel button stops the bake.
+        let task = Task { () -> Result<URL, Error> in
+            do {
+                let (layer, size) = try SceneStore.importImage(at: sourceURL, videoPath: videoURL.path)
+                let document = SceneDocument(
+                    canvasWidth: Int(size.width), canvasHeight: Int(size.height), layers: [layer]
+                )
+                try SceneStore.save(document, videoPath: videoURL.path)
+                try await bakeScene(document, videoPath: videoURL.path)
+                sceneDocumentsByPath[videoURL.path] = document
+                return .success(videoURL)
+            } catch {
+                return .failure(error)
+            }
+        }
+        activeMediaImportTask = task
+        switch await task.value {
+        case let .success(url):
             mediaImportProgress = 1
-            return videoURL
-        } catch {
-            AppLog.windowRefresh.error("still import failed: \(error.localizedDescription, privacy: .public)")
+            return url
+        case let .failure(error):
             removeLeftovers(of: [SceneStore.folderURL(forVideoPath: videoURL.path), videoURL])
+            if error is CancellationError {
+                mediaImportErrorMessage = localizedString("変換をキャンセルしました")
+                return nil
+            }
+            AppLog.windowRefresh.error("still import failed: \(error.localizedDescription, privacy: .public)")
             mediaImportErrorMessage = localizedString("画像を壁紙にできませんでした。")
                 + " " + error.localizedDescription
             return nil
@@ -106,10 +121,10 @@ extension WallpaperModel {
         }
         sceneErrorMessage = nil
         sceneDocumentsByPath[path] = document
-        pruneSceneFiles(document, path: path)
         // Marks the video stale first, so the desktop draws the edit live until the
         // new video is baked.
         scheduleSceneBake(path: path)
+        pruneSceneFiles(document, path: path)
         refreshCursorEffects()
     }
 
@@ -172,8 +187,7 @@ extension WallpaperModel {
                 }
                 document.layers[index].imageFile = backgroundFile
                 document.layers[index].name = backgroundName
-                var foreground = SceneLayer(name: foregroundName, imageFile: foregroundFile)
-                foreground.blendMode = document.layers[index].blendMode
+                let foreground = document.layers[index].separatedForeground(name: foregroundName, imageFile: foregroundFile)
                 document.layers.insert(foreground, at: index + 1)
                 self.updateScene(document, path: path)
             } catch {
@@ -295,7 +309,7 @@ extension WallpaperModel {
     }
 
     private func scheduleSceneBake(path: String) {
-        sceneBakeWorkItems[path]?.cancel()
+        cancelSceneBake(path: path)
         let workItem = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 self?.startSceneBake(path: path)
@@ -307,20 +321,29 @@ extension WallpaperModel {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.sceneBakeDelay, execute: workItem)
     }
 
+    func cancelSceneBake(path: String) {
+        sceneBakeWorkItems.removeValue(forKey: path)?.cancel()
+        sceneBakeTasks.removeValue(forKey: path)?.cancel()
+        sceneBakeProgress.removeValue(forKey: path)
+        sceneBakeGenerations.removeValue(forKey: path)
+        scenesBaking.remove(path)
+    }
+
     private func startSceneBake(path: String) {
         sceneBakeWorkItems[path] = nil
         guard let document = sceneDocumentsByPath[path] else {
             scenesBaking.remove(path)
             return
         }
-        sceneBakeTasks[path]?.cancel()
+        let generation = UUID()
+        sceneBakeGenerations[path] = generation
         sceneBakeTasks[path] = Task { [weak self] in
             guard let self else {
                 return
             }
             let succeeded: Bool
             do {
-                try await self.bakeScene(document, videoPath: path)
+                try await self.bakeScene(document, videoPath: path, generation: generation)
                 succeeded = true
             } catch is CancellationError {
                 return
@@ -350,7 +373,9 @@ extension WallpaperModel {
             // live layer does not drop out before the first new frame.
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.sceneHandOverDelay) { [weak self] in
                 MainActor.assumeIsolated {
-                    guard let self, !self.scenesBaking.contains(path) else {
+                    guard let self, self.sceneBakeGenerations[path] == generation,
+                          !self.scenesBaking.contains(path)
+                    else {
                         return
                     }
                     self.sceneStaleVideoPaths.remove(path)
@@ -362,41 +387,33 @@ extension WallpaperModel {
 
     /// Writes the scene's video at `videoPath`: one seamless loop when anything moves,
     /// otherwise a short still.
-    private func bakeScene(_ document: SceneDocument, videoPath: String) async throws {
+    private func bakeScene(_ document: SceneDocument, videoPath: String, generation: UUID? = nil) async throws {
+        try Task.checkCancellation()
         let output = URL(fileURLWithPath: videoPath)
+        let stagedOutput = output.deletingLastPathComponent().appendingPathComponent(".scene-\(UUID().uuidString).mp4")
+        defer { removeLeftovers(of: [stagedOutput]) }
         if document.isAnimated {
             sceneBakeProgress[videoPath] = 0
-            let throttle = MediaImportProgressThrottle()
-            try await SceneVideoBaker.bake(document: document, videoPath: videoPath, to: output) { value in
-                guard throttle.shouldReport(value) else {
-                    return
-                }
-                Task { @MainActor [weak self] in
-                    if self?.sceneBakeProgress[videoPath] != nil {
-                        self?.sceneBakeProgress[videoPath] = value
-                    }
+        }
+        let throttle = MediaImportProgressThrottle()
+        try await SceneVideoBaker.bake(document: document, videoPath: videoPath, to: stagedOutput) { [weak self] value in
+            guard throttle.shouldReport(value) else { return }
+            Task { @MainActor [weak self] in
+                if let self, self.sceneBakeGenerations[videoPath] == generation,
+                   self.sceneBakeProgress[videoPath] != nil
+                {
+                    self.sceneBakeProgress[videoPath] = value
                 }
             }
-            return
         }
-        let image = try SceneRenderer(document: document, videoPath: videoPath).renderStill()
-        let stillURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("scene-\(UUID().uuidString).png")
-        guard let destination = CGImageDestinationCreateWithURL(stillURL as CFURL, "public.png" as CFString, 1, nil)
-        else {
-            throw SceneStore.StoreError.unreadableImage(stillURL.lastPathComponent)
-        }
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else {
-            throw SceneStore.StoreError.unreadableImage(stillURL.lastPathComponent)
-        }
-        defer {
-            removeLeftovers(of: [stillURL])
-        }
+        // Edits and cancellation run on this actor too: no obsolete bake can
+        // replace the library file between the check and the atomic rename.
         try Task.checkCancellation()
-        try await Task.detached(priority: .userInitiated) {
-            try await AnimatedImageTranscoder.transcode(imageURL: stillURL, to: output)
-        }.value
+        if FileManager.default.fileExists(atPath: output.path) {
+            _ = try FileManager.default.replaceItemAt(output, withItemAt: stagedOutput)
+        } else {
+            try FileManager.default.moveItem(at: stagedOutput, to: output)
+        }
     }
 
     private func removeLeftovers(of urls: [URL]) {

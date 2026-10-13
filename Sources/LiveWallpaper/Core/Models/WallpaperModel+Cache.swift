@@ -24,6 +24,10 @@ extension WallpaperModel {
 
         let thumbnailDirectory = thumbnailCacheDirectoryURL()
 
+        for path in sceneDocumentsByPath.keys {
+            cancelSceneBake(path: path)
+        }
+
         do {
             if FileManager.default.fileExists(atPath: directory.path) {
                 try FileManager.default.removeItem(at: directory)
@@ -45,6 +49,8 @@ extension WallpaperModel {
             playlists.removeAll()
             selectedPlaylistID = nil
             libraryVideoPaths.removeAll()
+            sceneDocumentsByPath.removeAll()
+            sceneStaleVideoPaths.removeAll()
             registeredVideoPaths.removeAll()
             registeredWebWallpaperIDs.removeAll()
             UserDefaults.standard.removeObject(forKey: PrefsKey.libraryVideoPaths)

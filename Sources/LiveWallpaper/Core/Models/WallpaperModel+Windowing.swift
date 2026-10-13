@@ -235,6 +235,7 @@ extension WallpaperModel {
                 window.setFrame(screen.frame, display: true)
             }
             if window.contentView !== webView {
+                (window.contentView as? PlayerView)?.hideScene()
                 window.contentView = webView
             }
             if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedWindow != nil) {
@@ -300,6 +301,7 @@ extension WallpaperModel {
     private func prepareWindowForRetire(_ window: NSWindow) {
         displayIDByWindow.removeValue(forKey: ObjectIdentifier(window))
         if let playerView = window.contentView as? PlayerView {
+            playerView.hideScene()
             presentationCacheByPlayerView.removeValue(forKey: ObjectIdentifier(playerView))
             playerView.playerLayer.player = nil
         } else if let webView = window.contentView as? WebPlayerView {

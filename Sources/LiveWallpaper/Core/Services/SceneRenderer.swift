@@ -1138,8 +1138,8 @@ final class SceneRenderer {
             break;
         }
         case 8: { // spin: whole turns per loop
-            float angle = (u.reversed != 0 ? -1.0 : 1.0) * w * m;
-            result = src.sample(s, toUV(rotateAround(q, c, -angle), u.aspect));
+            float angle = (u.reversed != 0 ? -1.0 : 1.0) * w;
+            result = mix(original, src.sample(s, toUV(rotateAround(q, c, -angle), u.aspect)), m);
             break;
         }
         case 9: { // twirl

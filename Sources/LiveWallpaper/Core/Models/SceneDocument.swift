@@ -391,6 +391,31 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         isVisible ? effects.filter(\.isEnabled) : []
     }
 
+    func separatedForeground(name: String, imageFile: String) -> SceneLayer {
+        var foreground = self
+        foreground.id = UUID()
+        foreground.name = name
+        foreground.imageFile = imageFile
+        // Painting and selection identify effects, pins and poses by UUID across
+        // the editor, so the two independent layers must not share those IDs.
+        foreground.effects = effects.map { effect in
+            var copy = effect
+            copy.id = UUID()
+            copy.pins = effect.pins.map { pin in
+                var copy = pin
+                copy.id = UUID()
+                return copy
+            }
+            return copy
+        }
+        foreground.keyframes = keyframes.map { frame in
+            var copy = frame
+            copy.id = UUID()
+            return copy
+        }
+        return foreground
+    }
+
     var hasDepth: Bool {
         depthFile != nil && depthStrength > 0
     }
@@ -464,7 +489,9 @@ struct SceneDocument: Codable, Equatable {
         canvasWidth = try container.decode(Int.self, forKey: .canvasWidth)
         canvasHeight = try container.decode(Int.self, forKey: .canvasHeight)
         layers = try container.decode([SceneLayer].self, forKey: .layers)
-        loopSeconds = (try? container.decode(Int.self, forKey: .loopSeconds)) ?? 20
+        // Packages come from anyone, and the baker writes loopSeconds × 60 frames.
+        let decodedLoop = (try? container.decode(Int.self, forKey: .loopSeconds)) ?? 20
+        loopSeconds = min(max(decodedLoop, 1), Self.loopSecondsChoices.max()!)
     }
 
     var isAnimated: Bool {

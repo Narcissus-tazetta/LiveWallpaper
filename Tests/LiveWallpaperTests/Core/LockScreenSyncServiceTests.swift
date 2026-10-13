@@ -225,6 +225,36 @@ final class LockScreenSyncServiceTests: XCTestCase {
         XCTAssertLessThanOrEqual(backups.count, 3)
     }
 
+    /// When only the Aerial video cannot be put back, the lease stays for a retry; the
+    /// retry must still find the backup from before the borrow, not one it patched.
+    func testRetryAfterFailedAerialRestoreReturnsToTheOriginalStore() async throws {
+        let fixture = try makeFixture(downloadedIDs: [tahoeID])
+        let originalStoreData = try Data(contentsOf: fixture.storeURL)
+        let service = makeService(fixture)
+        for index in 0 ..< 5 {
+            let video = try writeFakeVideo(named: "video\(index).mov", contents: "video-\(index)")
+            _ = try await service.sync(videoURL: video)
+            // The timestamp in the name has one-second resolution.
+            try await Task.sleep(nanoseconds: 1_050_000_000)
+        }
+        let videosURL = fixture.rootURL.appendingPathComponent("videos", isDirectory: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: videosURL.path)
+        XCTAssertThrowsError(try service.restoreOriginalAerialAndWallpaperStore())
+        XCTAssertTrue(service.hasActiveLease)
+
+        // Something patches the store again before the retry.
+        var patched = try wallpaperStore(at: fixture.storeURL)
+        patched["PatchedAgain"] = true
+        try PropertyListSerialization.data(fromPropertyList: patched, format: .binary, options: 0)
+            .write(to: fixture.storeURL)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: videosURL.path)
+        try service.restoreOriginalAerialAndWallpaperStore()
+
+        XCTAssertFalse(service.hasActiveLease)
+        XCTAssertEqual(try Data(contentsOf: fixture.storeURL), originalStoreData)
+    }
+
     private struct Fixture {
         let rootURL: URL
         let storeURL: URL

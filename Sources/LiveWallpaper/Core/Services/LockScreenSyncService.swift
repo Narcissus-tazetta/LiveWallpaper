@@ -328,8 +328,10 @@ final class LockScreenSyncService {
             try? fileManager.removeItem(at: temporaryURL)
             throw error
         }
-        // Only once the store is back: a failed restore still needs its backup.
-        pruneWallpaperStoreBackups(keeping: nil)
+        // Only once the store is back: a failed restore still needs its backup. A lease
+        // still active here (the Aerial video could not be put back) will be retried,
+        // and the retry must return to the same backup.
+        pruneWallpaperStoreBackups(keeping: activeLease?.storeBackupFileName)
         if restartServices {
             restartWallpaperServices()
         }

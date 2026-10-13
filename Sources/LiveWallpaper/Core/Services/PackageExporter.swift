@@ -42,6 +42,7 @@ final class PackageExporter {
 
         var videoMap: [String: String] = [:]
         var videoThumbnails: [String: String] = [:]
+        var mediaPathsByVideoID: [String: String] = [:]
         var totalBytes: UInt64 = 0
 
         for path in model.allRegisteredVideoPaths {
@@ -49,17 +50,16 @@ final class PackageExporter {
             videoMap[path] = videoId
 
             if includeVideos {
-                let attrs = try fileManager.attributesOfItem(atPath: path)
+                let snapshot = try await snapshotVideo(model: model, videoPath: path, videoId: videoId, contentDir: contentDir)
+                mediaPathsByVideoID[videoId] = snapshot.path
+                let attrs = try fileManager.attributesOfItem(atPath: snapshot.path)
                 let fileSize = attrs[.size] as? UInt64 ?? 0
                 totalBytes += fileSize
-
-                let destURL = videosDir.appendingPathComponent("\(videoId).mp4")
-                try fileManager.copyItem(atPath: path, toPath: destURL.path)
             }
 
             let thumbPath = previewsDir.appendingPathComponent("\(videoId).png")
             if let thumbnail = await thumbnailGenerator.generateThumbnail(
-                for: path,
+                for: mediaPathsByVideoID[videoId] ?? path,
                 maxSize: CGSize(width: 256, height: 144)
             ),
                 let pngData = ThumbnailGenerator.pngData(from: thumbnail)
@@ -69,16 +69,17 @@ final class PackageExporter {
             }
         }
 
-        var manifest = await manifestBuilder.buildManifest(
+        var manifest = try await manifestBuilder.buildManifest(
             model: model,
             videoMap: videoMap,
             videoThumbnails: videoThumbnails,
             includeVideos: includeVideos,
-            totalBytes: totalBytes
+            totalBytes: totalBytes,
+            mediaPathsByVideoID: mediaPathsByVideoID
         )
         if includeVideos {
-            for (path, videoId) in videoMap {
-                try packageScene(videoPath: path, videoId: videoId, contentDir: contentDir, manifest: &manifest)
+            for videoId in videoMap.values {
+                markPackagedScene(videoId: videoId, contentDir: contentDir, manifest: &manifest)
             }
         }
 
@@ -148,15 +149,13 @@ final class PackageExporter {
         let videoId = UUID().uuidString
         var videoThumbnails: [String: String] = [:]
 
-        let attrs = try fileManager.attributesOfItem(atPath: videoPath)
+        let packagedVideoURL = try await snapshotVideo(model: model, videoPath: videoPath, videoId: videoId, contentDir: contentDir)
+        let attrs = try fileManager.attributesOfItem(atPath: packagedVideoURL.path)
         let fileSize = attrs[.size] as? UInt64 ?? 0
-
-        let packagedVideoURL = videosDir.appendingPathComponent("\(videoId).mp4")
-        try fileManager.copyItem(atPath: videoPath, toPath: packagedVideoURL.path)
 
         let thumbPath = previewsDir.appendingPathComponent("\(videoId).png")
         if let thumbnail = await thumbnailGenerator.generateThumbnail(
-            for: videoPath,
+            for: packagedVideoURL.path,
             maxSize: CGSize(width: 256, height: 144)
         ),
             let pngData = ThumbnailGenerator.pngData(from: thumbnail)
@@ -165,15 +164,16 @@ final class PackageExporter {
             videoThumbnails[videoId] = "previews/\(videoId).png"
         }
 
-        var manifest = await manifestBuilder.buildSingleVideoManifest(
+        var manifest = try await manifestBuilder.buildSingleVideoManifest(
             model: model,
             videoPath: videoPath,
             videoId: videoId,
             videoThumbnails: videoThumbnails,
             fileSize: fileSize,
+            mediaPath: packagedVideoURL.path,
             license: license
         )
-        try packageScene(videoPath: videoPath, videoId: videoId, contentDir: contentDir, manifest: &manifest)
+        markPackagedScene(videoId: videoId, contentDir: contentDir, manifest: &manifest)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -187,22 +187,36 @@ final class PackageExporter {
         return packageURL
     }
 
-    /// A video baked from a scene carries the scene, so the receiver can edit it and
-    /// gets the live cursor effects.
-    private func packageScene(
+    private func snapshotVideo(
+        model: WallpaperModel,
         videoPath: String,
         videoId: String,
-        contentDir: URL,
-        manifest: inout PackageManifest
-    ) throws {
-        guard SceneStore.hasScene(videoPath: videoPath),
-              let index = manifest.videos.firstIndex(where: { $0.id == videoId })
-        else {
-            return
+        contentDir: URL
+    ) async throws -> URL {
+        let videoURL = contentDir.appendingPathComponent("videos/\(videoId).mp4")
+        if let document = try SceneStore.load(videoPath: videoPath) {
+            let snapshotFolder = SceneStore.folderURL(forVideoPath: videoURL.path)
+            // Capture assets before suspending: another edit may prune the originals
+            // while the snapshot is being rendered.
+            try SceneStore.copyScene(videoPath: videoPath, to: snapshotFolder)
+            if model.scenesBaking.contains(videoPath) || SceneStore.isNewerThanVideo(videoPath: videoPath) {
+                try await SceneVideoBaker.bake(document: document, videoPath: videoURL.path, to: videoURL) { _ in }
+            } else {
+                try fileManager.copyItem(atPath: videoPath, toPath: videoURL.path)
+            }
+            let scenesDirectory = contentDir.appendingPathComponent("scenes", isDirectory: true)
+            try fileManager.createDirectory(at: scenesDirectory, withIntermediateDirectories: true)
+            try fileManager.moveItem(at: snapshotFolder, to: scenesDirectory.appendingPathComponent(videoId))
+        } else {
+            try fileManager.copyItem(atPath: videoPath, toPath: videoURL.path)
         }
-        let destination = contentDir.appendingPathComponent("scenes", isDirectory: true)
-            .appendingPathComponent(videoId, isDirectory: true)
-        try SceneStore.copyScene(videoPath: videoPath, to: destination)
+        return videoURL
+    }
+
+    private func markPackagedScene(videoId: String, contentDir: URL, manifest: inout PackageManifest) {
+        guard fileManager.fileExists(atPath: contentDir.appendingPathComponent("scenes/\(videoId)/scene.json").path),
+              let index = manifest.videos.firstIndex(where: { $0.id == videoId })
+        else { return }
         manifest.videos[index].scene = true
     }
 

@@ -139,4 +139,34 @@ final class WallpaperModelMediaImportTests: XCTestCase {
         let size = try await track.load(.naturalSize)
         XCTAssertEqual(size.width / size.height, 16.0 / 9.0, accuracy: 0.02)
     }
+
+    /// The import's cancel button also stops a still image's bake, leaving nothing behind.
+    func testCancellingStillImageImportLeavesNothingBehind() async throws {
+        let model = WallpaperModel()
+        let png = workingDirectory.appendingPathComponent("large.png")
+        let context = CGContext(
+            data: nil, width: 3840, height: 2160, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        )!
+        context.setFillColor(CGColor(red: 0.9, green: 0.4, blue: 0.1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 3840, height: 2160))
+        let destination = CGImageDestinationCreateWithURL(png as CFURL, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, context.makeImage()!, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        let cacheDirectory = try XCTUnwrap(model.cacheDirectoryURL())
+        let before = Set((try? FileManager.default.contentsOfDirectory(atPath: cacheDirectory.path)) ?? [])
+
+        let importTask = Task { await model.importVideoToAppSupport(from: png) }
+        while model.activeMediaImportTask == nil {
+            await Task.yield()
+        }
+        model.cancelMediaImport()
+        let imported = await importTask.value
+
+        XCTAssertNil(imported)
+        XCTAssertEqual(model.mediaImportErrorMessage, model.localizedString("変換をキャンセルしました"))
+        XCTAssertFalse(model.isImportingMedia)
+        let after = Set((try? FileManager.default.contentsOfDirectory(atPath: cacheDirectory.path)) ?? [])
+        XCTAssertEqual(after.subtracting(before), [])
+    }
 }

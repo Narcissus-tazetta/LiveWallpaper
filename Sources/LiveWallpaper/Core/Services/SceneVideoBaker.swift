@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import CoreVideo
 import Foundation
+import ImageIO
 import Metal
 
 /// Renders one loop of an animated scene into a video. Every effect repeats a whole
@@ -30,10 +31,48 @@ enum SceneVideoBaker {
         to outputURL: URL,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
-        // Below the editor's own work, so sliders stay smooth while a loop bakes.
-        try await Task.detached(priority: .utility) {
-            try await render(document: document, videoPath: videoPath, outputURL: outputURL, progress: progress)
-        }.value
+        let task = Task.detached(priority: .utility) {
+            try Task.checkCancellation()
+            if document.isAnimated {
+                try await render(document: document, videoPath: videoPath, outputURL: outputURL, progress: progress)
+            } else {
+                try await renderStill(document: document, videoPath: videoPath, outputURL: outputURL)
+            }
+        }
+        try await withTaskCancellationHandler {
+            do {
+                try await task.value
+                try Task.checkCancellation()
+            } catch {
+                // The still-image transcoder uses its own cancellation error.
+                try Task.checkCancellation()
+                throw error
+            }
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    private static func renderStill(document: SceneDocument, videoPath: String, outputURL: URL) async throws {
+        let image = try SceneRenderer(document: document, videoPath: videoPath).renderStill()
+        let temporaryBase = outputURL.deletingLastPathComponent().appendingPathComponent(".scene-\(UUID().uuidString)")
+        let stillURL = temporaryBase.appendingPathExtension("png")
+        let videoURL = temporaryBase.appendingPathExtension("mp4")
+        defer {
+            removeIfPresent(stillURL)
+            removeIfPresent(videoURL)
+        }
+        guard let destination = CGImageDestinationCreateWithURL(stillURL as CFURL, "public.png" as CFString, 1, nil) else {
+            throw SceneStore.StoreError.unreadableImage(stillURL.lastPathComponent)
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else {
+            throw SceneStore.StoreError.unreadableImage(stillURL.lastPathComponent)
+        }
+        try Task.checkCancellation()
+        try await AnimatedImageTranscoder.transcode(imageURL: stillURL, to: videoURL)
+        try Task.checkCancellation()
+        try installVideo(videoURL, at: outputURL)
     }
 
     private static func render(
@@ -49,6 +88,7 @@ enum SceneVideoBaker {
 
         let tmpURL = outputURL.deletingLastPathComponent()
             .appendingPathComponent(".\(outputURL.lastPathComponent).\(UUID().uuidString).tmp.mp4")
+        defer { removeIfPresent(tmpURL) }
         let writer = try AVAssetWriter(outputURL: tmpURL, fileType: .mp4)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.hevc,
@@ -133,6 +173,11 @@ enum SceneVideoBaker {
             removeIfPresent(tmpURL)
             throw BakeError.writerFailed(writer.error?.localizedDescription ?? "Writing did not complete")
         }
+        try Task.checkCancellation()
+        try installVideo(tmpURL, at: outputURL)
+    }
+
+    private static func installVideo(_ tmpURL: URL, at outputURL: URL) throws {
         if FileManager.default.fileExists(atPath: outputURL.path) {
             _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: tmpURL)
         } else {

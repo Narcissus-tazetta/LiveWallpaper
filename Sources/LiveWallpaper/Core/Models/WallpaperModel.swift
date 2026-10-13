@@ -154,6 +154,7 @@ final class WallpaperModel: ObservableObject {
     @Published var sceneAIWork: [UUID: SceneAIWork] = [:]
     var sceneBakeWorkItems: [String: DispatchWorkItem] = [:]
     var sceneBakeTasks: [String: Task<Void, Never>] = [:]
+    var sceneBakeGenerations: [String: UUID] = [:]
     @Published var frameRateLimit: FrameRateLimit = .off
     @Published var decodeMode: DecodeMode = .automatic
     @Published var qualityPreset: QualityPreset = .auto

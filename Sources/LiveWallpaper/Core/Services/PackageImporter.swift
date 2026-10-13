@@ -48,7 +48,13 @@ final class PackageImporter {
         }
     }
 
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
+    private let videosDirectory: URL?
+
+    init(fileManager: FileManager = .default, videosDirectory: URL? = nil) {
+        self.fileManager = fileManager
+        self.videosDirectory = videosDirectory
+    }
 
     func importPackage(
         from packageURL: URL,
@@ -476,6 +482,10 @@ final class PackageImporter {
     }
 
     private func appSupportVideosDir() throws -> URL {
+        if let videosDirectory {
+            try fileManager.createDirectory(at: videosDirectory, withIntermediateDirectories: true)
+            return videosDirectory
+        }
         let libraryDir = fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
         let appSupportDir =
             libraryDir

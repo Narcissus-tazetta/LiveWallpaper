@@ -12,6 +12,27 @@ struct SceneClockReading {
 /// otherwise nothing is drawn until the next cursor move or edit.
 @MainActor
 final class SceneMetalLayer: CAMetalLayer {
+    @MainActor private final class TickTarget: NSObject {
+        weak var layer: SceneMetalLayer?
+
+        init(layer: SceneMetalLayer) { self.layer = layer }
+
+        @objc func tick(_ sender: AnyObject) {
+            if let layer { layer.tick() } else { invalidate(sender) }
+        }
+
+        @objc func poll(_ sender: Timer) {
+            if let layer { layer.poll() } else { sender.invalidate() }
+        }
+
+        private func invalidate(_ sender: AnyObject) {
+            if #available(macOS 14, *), let link = sender as? CADisplayLink { link.invalidate() }
+            (sender as? Timer)?.invalidate()
+        }
+    }
+
+    // RunLoop and display links retain their targets independently of the view.
+    private lazy var tickTarget = TickTarget(layer: self)
     private(set) var renderer: SceneRenderer?
     private(set) var videoPath: String?
     private var target = SceneFrameInput.rest
@@ -80,21 +101,29 @@ final class SceneMetalLayer: CAMetalLayer {
             target = .rest
         }
         readClock()
-        redraw()
+        // SwiftUI may still be attaching or resizing the backing layer here.
+        // Draw during the ensuing CA display transaction, after its surface settles.
+        setNeedsDisplay()
         updateTicking()
     }
 
     func clear() {
-        stopTicking()
-        stopPolling()
+        suspend()
         renderer = nil
         videoPath = nil
+        target = .rest
+        current = .rest
+    }
+
+    func suspend() {
+        stopTicking()
+        stopPolling()
     }
 
     /// Call when the clock may have started or stopped.
     func clockDidChange() {
         readClock()
-        redraw()
+        setNeedsDisplay()
         updateTicking()
     }
 
@@ -219,7 +248,7 @@ final class SceneMetalLayer: CAMetalLayer {
         guard poller == nil else {
             return
         }
-        let timer = Timer(timeInterval: 0.5, target: self, selector: #selector(poll), userInfo: nil, repeats: true)
+        let timer = Timer(timeInterval: 0.5, target: tickTarget, selector: #selector(TickTarget.poll(_:)), userInfo: nil, repeats: true)
         timer.tolerance = 0.2
         RunLoop.main.add(timer, forMode: .common)
         poller = timer
@@ -242,10 +271,8 @@ final class SceneMetalLayer: CAMetalLayer {
         }
         lastStep = CACurrentMediaTime()
         tickRateApplied = tickRateCap
-        // Target/selector: the display link or timer retains the layer only until
-        // ticking stops and invalidates it.
         if #available(macOS 14, *), let hostView {
-            let link = hostView.displayLink(target: self, selector: #selector(tick))
+            let link = hostView.displayLink(target: tickTarget, selector: #selector(TickTarget.tick(_:)))
             let cap = tickRateApplied
             link.preferredFrameRateRange = CAFrameRateRange(minimum: min(30, cap), maximum: cap, preferred: cap)
             link.add(to: .main, forMode: .common)
@@ -253,7 +280,7 @@ final class SceneMetalLayer: CAMetalLayer {
         } else {
             let fps = Double(tickRateApplied)
             let timer = Timer(
-                timeInterval: 1 / max(fps, 30), target: self, selector: #selector(tick), userInfo: nil, repeats: true
+                timeInterval: 1 / max(fps, 30), target: tickTarget, selector: #selector(TickTarget.tick(_:)), userInfo: nil, repeats: true
             )
             RunLoop.main.add(timer, forMode: .common)
             ticker = timer

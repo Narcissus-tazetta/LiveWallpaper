@@ -232,15 +232,34 @@ enum SceneStore {
                 throw ImportError.unsafeFile(name)
             }
         }
+        // Staged beside the destination and swapped in whole: a copy that fails half way
+        // must not leave a scene.json whose images are missing (restoreScenes loads it).
         let destination = folderURL(forVideoPath: videoPath)
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
-        }
-        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        for name in names {
-            try FileManager.default.copyItem(
-                at: source.appendingPathComponent(name), to: destination.appendingPathComponent(name)
-            )
+        let staging = destination.deletingLastPathComponent()
+            .appendingPathComponent(".\(destination.lastPathComponent).\(UUID().uuidString).import")
+        do {
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            for name in names {
+                try FileManager.default.copyItem(
+                    at: source.appendingPathComponent(name), to: staging.appendingPathComponent(name)
+                )
+            }
+            if FileManager.default.fileExists(atPath: destination.path) {
+                _ = try FileManager.default.replaceItemAt(destination, withItemAt: staging)
+            } else {
+                try FileManager.default.moveItem(at: staging, to: destination)
+            }
+        } catch {
+            if FileManager.default.fileExists(atPath: staging.path) {
+                do {
+                    try FileManager.default.removeItem(at: staging)
+                } catch let cleanupError {
+                    AppLog.persistence.error(
+                        "scene import cleanup failed: \(cleanupError.localizedDescription, privacy: .public)"
+                    )
+                }
+            }
+            throw error
         }
         return document
     }

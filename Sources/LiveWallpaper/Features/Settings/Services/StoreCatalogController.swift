@@ -27,10 +27,19 @@ final class StoreCatalogController: ObservableObject {
     private var requestGeneration: UInt64 = 0
     private let session: URLSession
     private let fileManager: FileManager
+    private let endpointURL: URL
+    private let packageImporter: PackageImporter
 
-    init(session: URLSession = .shared, fileManager: FileManager = .default) {
+    init(
+        session: URLSession = .shared,
+        fileManager: FileManager = .default,
+        baseURL: URL? = nil,
+        packageImporter: PackageImporter? = nil
+    ) {
         self.session = session
         self.fileManager = fileManager
+        endpointURL = baseURL ?? StoreClient.baseURL
+        self.packageImporter = packageImporter ?? PackageImporter()
     }
 
     func loadIfNeeded() async {
@@ -117,7 +126,7 @@ final class StoreCatalogController: ObservableObject {
 
     private func fetchPage(cursor: String?) async throws -> StoreCatalogResponse {
         var components = URLComponents(
-            url: StoreClient.baseURL.appendingPathComponent("catalog"),
+            url: endpointURL.appendingPathComponent("catalog"),
             resolvingAgainstBaseURL: false
         )!
         var queryItems = [URLQueryItem(name: "limit", value: "20")]
@@ -174,7 +183,7 @@ final class StoreCatalogController: ObservableObject {
                 throw StoreClientError.checksumMismatch
             }
 
-            try await PackageImporter().importPackage(from: tempFile, into: model)
+            try await packageImporter.importPackage(from: tempFile, into: model)
             downloadResultMessage = model.localizedString("追加しました")
         } catch {
             downloadResultMessage = error.localizedDescription
@@ -200,7 +209,7 @@ final class StoreCatalogController: ObservableObject {
             let entryId: String
             let reason: String
         }
-        var request = URLRequest(url: StoreClient.baseURL.appendingPathComponent("report"))
+        var request = URLRequest(url: endpointURL.appendingPathComponent("report"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         do {
