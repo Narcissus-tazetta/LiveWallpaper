@@ -78,6 +78,17 @@ extension FitEditorController {
         stillImageTasks[path] = task
     }
 
+    /// The video was rewritten in place (a scene re-bake).
+    func invalidateStillImage(path: String) {
+        stillImageTasks[path]?.cancel()
+        stillImageTasks.removeValue(forKey: path)
+        stillImageInFlight.remove(path)
+        stillImageGeneration.removeValue(forKey: path)
+        stillImages.removeValue(forKey: path)
+        stillImageOrder.removeAll { $0 == path }
+        prepareStillImageIfNeeded()
+    }
+
     private func trimStillImagesIfNeeded() {
         guard stillImageOrder.count > stillImageLimit else {
             return

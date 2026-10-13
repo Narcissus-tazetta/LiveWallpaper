@@ -138,6 +138,22 @@ final class WallpaperModel: ObservableObject {
     @Published var isLowPowerModeOn: Bool = false
     @Published var isThermallyConstrained: Bool = false
     var trailIdleWorkItem: DispatchWorkItem?
+    /// Video path → the scene it was baked from (SceneStore). Paths without a scene
+    /// are plain videos.
+    @Published var sceneDocumentsByPath: [String: SceneDocument] = [:]
+    /// Scenes whose baked video is being rewritten.
+    @Published var scenesBaking: Set<String> = []
+    /// 0...1 while an animated scene's loop is being written.
+    @Published var sceneBakeProgress: [String: Double] = [:]
+    /// Scenes whose baked video does not show the latest edit yet (pending or failed).
+    var sceneStaleVideoPaths: Set<String> = []
+    @Published var sceneErrorMessage: String?
+    /// Leaves the lock screen video and the screen saver in place when the app quits.
+    @Published var keepLockScreenAndScreenSaverAfterQuit = false
+    /// Layer id → the on-device analysis running on it.
+    @Published var sceneAIWork: [UUID: SceneAIWork] = [:]
+    var sceneBakeWorkItems: [String: DispatchWorkItem] = [:]
+    var sceneBakeTasks: [String: Task<Void, Never>] = [:]
     @Published var frameRateLimit: FrameRateLimit = .off
     @Published var decodeMode: DecodeMode = .automatic
     @Published var qualityPreset: QualityPreset = .auto
@@ -380,6 +396,11 @@ final class WallpaperModel: ObservableObject {
         // Read the power source before the first playback so it can pick the proxy.
         configurePowerSourceMonitoring()
         recoverStaleLockScreenSyncOnLaunchIfNeeded()
+        // Sync stays on across launches only when kept after quitting; if the system
+        // lost the replacement meanwhile, put it back.
+        if lockScreenSyncEnabled, !lockScreenSyncService.hasActiveLease {
+            syncCurrentVideoToLockScreen()
+        }
         LocalizationManager.setLanguage(effectiveAppLanguageCode)
         refreshDisplayScreens()
         rebuildWindows()

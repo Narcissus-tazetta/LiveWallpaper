@@ -25,6 +25,13 @@ final class PlayerView: NSView {
 
     private let cursorOverlayView = CursorEffectsOverlayView()
 
+    /// Sits right above the video and under the switch-effect layer, with the video's
+    /// fit/zoom frame (syncSceneFrame). Created on first use.
+    private var sceneLayer: SceneMetalLayer?
+    /// While the baked video is out of date (an edit is still being baked), the
+    /// player's time does not match the scene's loop.
+    private var sceneUsesFreeClock = false
+
     private lazy var readabilityDimOverlayView: NSView = {
         let view = NSView()
         view.wantsLayer = true
@@ -107,6 +114,107 @@ final class PlayerView: NSView {
         addSubview(menuBarMaskView, positioned: .above, relativeTo: nil)
         addSubview(readabilityDimOverlayView, positioned: .above, relativeTo: nil)
         addSubview(cursorOverlayView, positioned: .above, relativeTo: nil)
+    }
+
+    // MARK: - Scene
+
+    var isShowingScene: Bool {
+        sceneLayer?.renderer != nil
+    }
+
+    var sceneUsesCursor: Bool {
+        sceneLayer?.renderer?.usesCursor ?? false
+    }
+
+    /// `freeClock` animates on wall time instead of the player's position, for while
+    /// the baked video does not match the scene yet. Either way the animation only
+    /// runs while the player plays, so every pause rule for videos applies.
+    func showScene(
+        _ document: SceneDocument,
+        videoPath: String,
+        freeClock: Bool,
+        maximumFramesPerSecond: Float?
+    ) throws {
+        let layer = sceneLayer ?? {
+            let layer = SceneMetalLayer()
+            layer.hostView = self
+            layer.clock = { [weak self] in
+                self?.sceneClockReading() ?? SceneClockReading(time: 0, isRunning: false)
+            }
+            contentLayer.insertSublayer(layer, above: playerLayer)
+            sceneLayer = layer
+            return layer
+        }()
+        sceneUsesFreeClock = freeClock
+        layer.maximumFramesPerSecond = maximumFramesPerSecond
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        layer.frame = sceneFrame(aspectRatio: document.aspectRatio)
+        layer.isHidden = false
+        CATransaction.commit()
+        try layer.show(document, videoPath: videoPath)
+    }
+
+    private func sceneClockReading() -> SceneClockReading {
+        guard let player = playerLayer.player else {
+            return SceneClockReading(time: 0, isRunning: false)
+        }
+        let running = player.rate != 0
+        if sceneUsesFreeClock {
+            return SceneClockReading(time: CACurrentMediaTime(), isRunning: running)
+        }
+        let seconds = player.currentTime().seconds
+        return SceneClockReading(time: seconds.isFinite ? seconds : 0, isRunning: running)
+    }
+
+    /// playerLayer's frame only has the video's shape once its aspect ratio is known,
+    /// and AVPlayerLayer hides any mismatch with its gravity; apply the same gravity
+    /// so the scene is never stretched.
+    private func sceneFrame(aspectRatio: Double) -> CGRect {
+        let frame = playerLayer.frame
+        guard frame.width > 0, frame.height > 0, aspectRatio > 0 else {
+            return frame
+        }
+        let fill = playerLayer.videoGravity == .resizeAspectFill
+        let frameAspect = frame.width / frame.height
+        let widthLimited = (CGFloat(aspectRatio) > frameAspect) != fill
+        let size = widthLimited
+            ? CGSize(width: frame.width, height: frame.width / CGFloat(aspectRatio))
+            : CGSize(width: frame.height * CGFloat(aspectRatio), height: frame.height)
+        return CGRect(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2, width: size.width, height: size.height)
+    }
+
+    /// Call after changing playerLayer.frame.
+    func syncSceneFrame() {
+        guard let sceneLayer, let document = sceneLayer.renderer?.document else {
+            return
+        }
+        let frame = sceneFrame(aspectRatio: document.aspectRatio)
+        guard sceneLayer.frame != frame else {
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        sceneLayer.frame = frame
+        CATransaction.commit()
+    }
+
+    func hideScene() {
+        guard let sceneLayer, sceneLayer.renderer != nil else {
+            return
+        }
+        sceneLayer.clear()
+        sceneLayer.isHidden = true
+    }
+
+    /// `point` is in this view's coordinates.
+    func setSceneCursor(_ point: CGPoint?, parallax: CGPoint) {
+        guard let sceneLayer, sceneLayer.renderer != nil else {
+            return
+        }
+        let local = point.map { sceneLayer.convert($0, from: layer) }
+        sceneLayer.setCursor(local, parallax: parallax)
     }
 
     // MARK: - Cursor effects

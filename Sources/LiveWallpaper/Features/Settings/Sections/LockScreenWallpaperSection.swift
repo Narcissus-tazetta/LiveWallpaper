@@ -68,6 +68,10 @@ extension SettingsView {
         .font(.caption)
         .foregroundColor(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
+
+      if model.lockScreenSyncEnabled {
+        keepAfterQuitControls
+      }
     }
   }
 
@@ -140,7 +144,9 @@ extension SettingsView {
     case .recovered:
       return model.localizedString("前回終了時に残ったロック画面設定を自動で元に戻しました。")
     default:
-      return model.localizedString("オンにすると選択中のロック画面動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。")
+      return model.keepLockScreenAndScreenSaverAfterQuit
+        ? model.localizedString("オンにすると選択中のロック画面動画をシステムのAerial壁紙として設定します。アプリを終了しても、そのまま残ります。")
+        : model.localizedString("オンにすると選択中のロック画面動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。")
     }
   }
 }

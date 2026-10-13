@@ -92,10 +92,12 @@ extension SettingsView {
 
     /// 「編集」タブ内のサブモード。フィット(表示位置)とトリム(カット/ループ)は
     /// 別々のコントローラ(FitEditorController/WallpaperEditorController)が持つが、
-    /// タブとしては1つにまとめて切り替えられるようにする。
+    /// タブとしては1つにまとめて切り替えられるようにする。静止画(シーン)の壁紙は
+    /// トリムの代わりにシーン(レイヤー)を出す。
     enum EditorSubMode: String, CaseIterable, Hashable {
         case fit
         case trim
+        case scene
         case effects
     }
 

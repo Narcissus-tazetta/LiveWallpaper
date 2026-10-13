@@ -17,6 +17,7 @@ extension WallpaperModel {
         restoreDependentSubsystemState()
         restoreSuspendPrefs()
         restoreLibraryAndPlaylistState()
+        restoreScenes()
         restoreLockScreenAndWebWallpaperState()
         restorePresentationAndEditState()
         persistPlaylistStateImmediately()
@@ -97,6 +98,8 @@ extension WallpaperModel {
     }
 
     private func restoreMiscFeatureTogglePrefs() {
+        keepLockScreenAndScreenSaverAfterQuit =
+            UserDefaults.standard.bool(forKey: PrefsKey.keepLockScreenAndScreenSaverAfterQuit)
         if let appLanguageValue = UserDefaults.standard.string(forKey: PrefsKey.appLanguage),
            let restoredAppLanguage = AppLanguage(rawValue: appLanguageValue)
         {
@@ -594,6 +597,14 @@ extension WallpaperModel {
         guard lockScreenSyncService.hasActiveLease else {
             return
         }
+        // Left in place on purpose at the last quit: carry on with it rather than
+        // undoing it (a stale lease is one left by a crash or a forced quit).
+        if keepLockScreenAndScreenSaverAfterQuit, lockScreenSyncEnabled,
+           let lease = lockScreenSyncService.activeLease
+        {
+            lockScreenSyncStatus = .borrowed(lease.assetName)
+            return
+        }
 
         lockScreenSyncStatus = .recovering
         do {
@@ -608,11 +619,16 @@ extension WallpaperModel {
         }
     }
 
+    func setKeepLockScreenAndScreenSaverAfterQuit(_ enabled: Bool) {
+        keepLockScreenAndScreenSaverAfterQuit = enabled
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.keepLockScreenAndScreenSaverAfterQuit)
+    }
+
     func restoreLockScreenSyncBeforeExit() {
         lockScreenSyncTask?.cancel()
         lockScreenUnlockResetWorkItem?.cancel()
         lockScreenUnlockResetWorkItem = nil
-        guard lockScreenSyncService.hasActiveLease else {
+        guard lockScreenSyncService.hasActiveLease, !keepLockScreenAndScreenSaverAfterQuit else {
             return
         }
 

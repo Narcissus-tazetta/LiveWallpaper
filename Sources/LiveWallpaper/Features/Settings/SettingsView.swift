@@ -28,6 +28,12 @@ struct SettingsView: View {
     @StateObject var storeMySubmissions: StoreMySubmissionsController
     @StateObject var remoteThumbnailCache: RemoteThumbnailCache
     @State var editorSubMode: EditorSubMode = .fit
+    @State var selectedSceneLayerID: UUID?
+    @State var selectedSceneEffectID: UUID?
+    @State var sceneEditorTool: SceneEditorTool?
+    @State var selectedScenePinID: UUID?
+    @State var selectedSceneKeyframeID: UUID?
+    @StateObject var sceneMaskPainter = SceneMaskPainter()
     /// 「他の壁紙へコピー」ピッカーの状態。
     @State var isTrimCopyPickerPresented: Bool = false
     @State var trimCopySelection: Set<String> = []
@@ -239,6 +245,12 @@ struct SettingsView: View {
             .onChange(of: editorSubMode) { _ in
                 syncEditorSubMode()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .sceneDidBake)) { note in
+                if let path = note.object as? String {
+                    thumbnailCache.refresh(path: path)
+                    fitEditor.invalidateStillImage(path: path)
+                }
+            }
             .onChange(of: model.lockScreenVideoPath) { _ in
                 requestLockScreenWallpaperThumbnailIfNeeded()
             }
@@ -256,8 +268,25 @@ struct SettingsView: View {
 
     /// 「編集」タブの前面がフィットかトリムかを両コントローラへ伝える。
     func syncEditorSubMode() {
-        fitEditor.setSubModeActive(editorSubMode == .fit)
-        wallpaperEditor.setSubModeActive(editorSubMode == .trim)
+        fitEditor.setSubModeActive(effectiveEditorSubMode == .fit)
+        wallpaperEditor.setSubModeActive(effectiveEditorSubMode == .trim)
+    }
+
+    var isEditingScene: Bool {
+        fitEditor.resolvedVideoPath().map(model.isScene(path:)) ?? false
+    }
+
+    /// Trim and scene editing share a slot: switching between a video and a still
+    /// keeps the user on the matching editor instead of an empty one.
+    var effectiveEditorSubMode: EditorSubMode {
+        switch (editorSubMode, isEditingScene) {
+        case (.trim, true):
+            return .scene
+        case (.scene, false):
+            return .trim
+        default:
+            return editorSubMode
+        }
     }
 
     private func applyLifecycleModifiers<V: View>(_ view: V) -> some View {
@@ -463,9 +492,19 @@ struct SettingsView: View {
             )
         case .wallpaperFit:
             tabScrollPane {
-                Picker(model.localizedString("編集"), selection: $editorSubMode) {
+                Picker(
+                    model.localizedString("編集"),
+                    selection: Binding(
+                        get: { effectiveEditorSubMode },
+                        set: { editorSubMode = $0 }
+                    )
+                ) {
                     Text(model.localizedString("フィット編集")).tag(EditorSubMode.fit)
-                    Text(model.localizedString("トリム編集")).tag(EditorSubMode.trim)
+                    if isEditingScene {
+                        Text(model.localizedString("シーン編集")).tag(EditorSubMode.scene)
+                    } else {
+                        Text(model.localizedString("トリム編集")).tag(EditorSubMode.trim)
+                    }
                     Text(model.localizedString("エフェクト")).tag(EditorSubMode.effects)
                 }
                 .pickerStyle(.segmented)
@@ -473,11 +512,13 @@ struct SettingsView: View {
                 .frame(maxWidth: 420)
                 .frame(maxWidth: .infinity)
 
-                switch editorSubMode {
+                switch effectiveEditorSubMode {
                 case .fit:
                     wallpaperFitEditorPanel
                 case .trim:
                     wallpaperTrimEditorPanel
+                case .scene:
+                    wallpaperSceneEditorPanel
                 case .effects:
                     wallpaperEffectsEditorPanel
                 }

@@ -55,6 +55,18 @@ extension DiskThumbnailCache {
     persistMetadata()
   }
 
+  /// The source file was rewritten in place (a scene re-bake). Drops the cached
+  /// picture but keeps the visibility counts, then regenerates if a card shows it.
+  func refresh(path: String) {
+    let visibleCount = visibleRefCounts[path]
+    removeEntry(path)
+    visibleRefCounts[path] = visibleCount
+    bumpRevision()
+    if isPathVisible(path) {
+      request(path: path)
+    }
+  }
+
   func trimInMemoryIfNeeded() {
     if inMemoryImages.count <= maxInMemoryCount {
       return

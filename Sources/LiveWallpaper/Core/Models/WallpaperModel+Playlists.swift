@@ -542,6 +542,7 @@ extension WallpaperModel {
         }
         clearVideoOverrides(forPath: trimmed)
         clearSpaceVideos(forPath: trimmed)
+        sceneDocumentsByPath.removeValue(forKey: trimmed)
         pruneScheduleRules(referencingVideoPath: trimmed)
         syncActivePlaylistPaths()
         registeredVideoDisplayNames.removeValue(forKey: trimmed)

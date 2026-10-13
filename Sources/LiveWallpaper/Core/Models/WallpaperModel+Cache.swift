@@ -102,7 +102,10 @@ extension WallpaperModel {
                 .appendingPathComponent("ThumbnailCache", isDirectory: true)
     }
 
-    func importVideoToAppSupport(from sourceURL: URL) async -> URL? {
+    func importVideoToAppSupport(from originalURL: URL) async -> URL? {
+        // Copying a symbolic link copies the link (often relative), which then
+        // points nowhere from the app's folder.
+        let sourceURL = originalURL.resolvingSymlinksInPath()
         let fileManager = FileManager.default
         guard let targetDirectory: URL = cacheDirectoryURL() else {
             return nil
@@ -115,6 +118,10 @@ extension WallpaperModel {
             )
         } catch {
             return nil
+        }
+
+        if SceneStore.isStillImage(sourceURL) {
+            return await importStillImageAsScene(from: sourceURL, targetDirectory: targetDirectory)
         }
 
         if AnimatedImageTranscoder.isSupportedImageExtension(sourceURL.pathExtension) {
@@ -210,7 +217,7 @@ extension WallpaperModel {
 }
 
 /// 進捗更新のMainActorホップがフレーム毎に積み上がらないよう間引く
-private final class MediaImportProgressThrottle: @unchecked Sendable {
+final class MediaImportProgressThrottle: @unchecked Sendable {
     private let lock = NSLock()
     private var lastReported: Double = -1
 

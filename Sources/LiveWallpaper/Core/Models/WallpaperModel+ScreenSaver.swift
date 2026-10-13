@@ -70,9 +70,10 @@ extension WallpaperModel {
 
     /// Quitting takes the saver out the same way uninstall does, so the previous screen
     /// saver comes back and nothing is left behind if the app is then deleted. The
-    /// preference stays on, so the next launch puts it back.
+    /// preference stays on, so the next launch puts it back. With "keep after quit"
+    /// the saver stays and keeps playing the last wallpaper on its own.
     func removeScreenSaverBeforeExit() {
-        guard isScreenSaverInstalled else {
+        guard isScreenSaverInstalled, !keepLockScreenAndScreenSaverAfterQuit else {
             return
         }
         do {

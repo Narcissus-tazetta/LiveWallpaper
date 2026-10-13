@@ -69,13 +69,18 @@ final class PackageExporter {
             }
         }
 
-        let manifest = await manifestBuilder.buildManifest(
+        var manifest = await manifestBuilder.buildManifest(
             model: model,
             videoMap: videoMap,
             videoThumbnails: videoThumbnails,
             includeVideos: includeVideos,
             totalBytes: totalBytes
         )
+        if includeVideos {
+            for (path, videoId) in videoMap {
+                try packageScene(videoPath: path, videoId: videoId, contentDir: contentDir, manifest: &manifest)
+            }
+        }
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -160,7 +165,7 @@ final class PackageExporter {
             videoThumbnails[videoId] = "previews/\(videoId).png"
         }
 
-        let manifest = await manifestBuilder.buildSingleVideoManifest(
+        var manifest = await manifestBuilder.buildSingleVideoManifest(
             model: model,
             videoPath: videoPath,
             videoId: videoId,
@@ -168,6 +173,7 @@ final class PackageExporter {
             fileSize: fileSize,
             license: license
         )
+        try packageScene(videoPath: videoPath, videoId: videoId, contentDir: contentDir, manifest: &manifest)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -179,6 +185,25 @@ final class PackageExporter {
         let packageURL = outputFolderURL.appendingPathComponent(packageFileName)
         try archiveWriter.createPackage(from: contentDir, outputURL: packageURL)
         return packageURL
+    }
+
+    /// A video baked from a scene carries the scene, so the receiver can edit it and
+    /// gets the live cursor effects.
+    private func packageScene(
+        videoPath: String,
+        videoId: String,
+        contentDir: URL,
+        manifest: inout PackageManifest
+    ) throws {
+        guard SceneStore.hasScene(videoPath: videoPath),
+              let index = manifest.videos.firstIndex(where: { $0.id == videoId })
+        else {
+            return
+        }
+        let destination = contentDir.appendingPathComponent("scenes", isDirectory: true)
+            .appendingPathComponent(videoId, isDirectory: true)
+        try SceneStore.copyScene(videoPath: videoPath, to: destination)
+        manifest.videos[index].scene = true
     }
 
     private func copyOriginalVideo(
