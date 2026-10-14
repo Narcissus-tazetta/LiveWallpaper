@@ -64,14 +64,15 @@ struct ScreenSaverInstaller {
         }
         #if DEBUG
             // `swift run` has no app bundle; scripts/build_screensaver.sh writes to
-            // .build/screensaver, three levels above .build/<triple>/debug/<exe>.
-            if let executable = Bundle.main.executableURL {
-                let url = executable.deletingLastPathComponent().deletingLastPathComponent()
-                    .deletingLastPathComponent()
-                    .appendingPathComponent("screensaver/\(bundleName)")
-                if FileManager.default.fileExists(atPath: url.path) {
-                    return url
+            // .build/screensaver. How deep the executable sits under .build depends on
+            // the build system (.build/<triple>/debug or .build/out/Products/Debug).
+            var directory = Bundle.main.executableURL?.deletingLastPathComponent()
+            while let current = directory, current.path != "/" {
+                if current.lastPathComponent == ".build" {
+                    let url = current.appendingPathComponent("screensaver/\(bundleName)")
+                    return FileManager.default.fileExists(atPath: url.path) ? url : nil
                 }
+                directory = current.deletingLastPathComponent()
             }
         #endif
         return nil
