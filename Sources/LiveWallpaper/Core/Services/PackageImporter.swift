@@ -48,7 +48,13 @@ final class PackageImporter {
         }
     }
 
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
+    private let videosDirectory: URL?
+
+    init(fileManager: FileManager = .default, videosDirectory: URL? = nil) {
+        self.fileManager = fileManager
+        self.videosDirectory = videosDirectory
+    }
 
     func importPackage(
         from packageURL: URL,
@@ -177,6 +183,8 @@ final class PackageImporter {
             }
         }
 
+        importScenes(of: manifest, importedVideoPaths: importedVideoPaths, packageRoot: packageRootDir, into: model)
+
         var importedPlaylistIDs: [UUID] = []
         for playlist in manifest.playlists {
             let videoPaths = playlist.videoIds.compactMap { importedVideoPaths[$0] }
@@ -204,6 +212,31 @@ final class PackageImporter {
            let videoPath = importedVideoPaths[firstVideoId]
         {
             model.selectRegisteredVideo(path: videoPath)
+        }
+    }
+
+    /// A broken scene leaves the baked video as a plain wallpaper rather than failing
+    /// the import. video.id was checked by validatedVideoURL.
+    private func importScenes(
+        of manifest: PackageManifest,
+        importedVideoPaths: [String: String],
+        packageRoot: URL,
+        into model: WallpaperModel
+    ) {
+        for video in manifest.videos where video.scene == true || video.scriptScene != nil {
+            guard let videoPath = importedVideoPaths[video.id] else {
+                continue
+            }
+            let source = packageRoot.appendingPathComponent("scenes", isDirectory: true)
+                .appendingPathComponent(video.id, isDirectory: true)
+            do {
+                let document = try SceneStore.importScene(from: source, videoPath: videoPath)
+                model.registerImportedScene(document, path: videoPath)
+            } catch {
+                AppLog.persistence.error(
+                    "skipped scene of imported video id=\(video.id, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+            }
         }
     }
 
@@ -449,6 +482,10 @@ final class PackageImporter {
     }
 
     private func appSupportVideosDir() throws -> URL {
+        if let videosDirectory {
+            try fileManager.createDirectory(at: videosDirectory, withIntermediateDirectories: true)
+            return videosDirectory
+        }
         let libraryDir = fileManager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
         let appSupportDir =
             libraryDir

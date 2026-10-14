@@ -11,6 +11,8 @@ export default defineWorkersConfig({
 					bindings: {
 						ADMIN_KEY: "test-admin-key",
 						RESEND_API_KEY: "test-resend-key",
+						R2_ACCESS_KEY_ID: "test-access-key",
+						R2_SECRET_ACCESS_KEY: "test-secret-key",
 					},
 				},
 			},

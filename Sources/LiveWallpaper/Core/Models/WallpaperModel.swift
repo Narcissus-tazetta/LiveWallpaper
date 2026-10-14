@@ -102,13 +102,14 @@ final class WallpaperModel: ObservableObject {
     var isActiveSpaceTransitioning: Bool = false
     var activeSpaceTransitionLockWorkItem: DispatchWorkItem?
     var statePersistWorkItem: DispatchWorkItem?
-    var lockScreenUnlockResetWorkItem: DispatchWorkItem?
     var persistenceFailureCount: Int = 0
     let playbackEnvironment: PlaybackEnvironment
     let lockScreenSyncService: LockScreenSyncService = .init()
     let desktopIconsService: DesktopIconsService = .init()
     let lightweightProxyCache: LightweightProxyCache = .init()
     var lockScreenSyncTask: Task<Void, Never>?
+    /// Identifies the running sync, so progress from a replaced one is ignored.
+    var lockScreenSyncID = UUID()
     // フィット編集のプレビューが非同期ロード完了後に再描画されるよう @Published にしている。
     // (16:9 フォールバックで描画された後、実際のアスペクト比で描き直すため)
     @Published var videoAspectRatioByPath: [String: Double] = [:]
@@ -138,6 +139,65 @@ final class WallpaperModel: ObservableObject {
     @Published var isLowPowerModeOn: Bool = false
     @Published var isThermallyConstrained: Bool = false
     var trailIdleWorkItem: DispatchWorkItem?
+    /// Video path → the scene it was baked from (SceneStore). Paths without a scene
+    /// are plain videos.
+    @Published var sceneDocumentsByPath: [String: SceneDocument] = [:]
+    /// Scenes whose baked video is being rewritten.
+    @Published var scenesBaking: Set<String> = []
+    /// 0...1 while an animated scene's loop is being written.
+    @Published var sceneBakeProgress: [String: Double] = [:]
+    /// Scenes whose baked video does not show the latest edit yet (pending or failed).
+    var sceneStaleVideoPaths: Set<String> = []
+    @Published var sceneErrorMessage: String?
+    @Published var sceneScriptIssues: [String: [SceneScriptIssue]] = [:]
+    @Published var sceneScriptLogs: [String: [UUID: String]] = [:]
+    var sceneScriptLogTimes: [String: TimeInterval] = [:]
+    /// Video path → undo history of its scene, kept per wallpaper until the app quits.
+    /// Not published: every change to it comes with a change to sceneDocumentsByPath.
+    var sceneHistories: [String: EditHistory<SceneDocument>] = [:]
+    /// Video path → undo history of its own cursor effects (nil: follows the app-wide
+    /// ones), kept until the app quits. Every change comes with one to cursorEffectsByPath.
+    var cursorEffectsHistories: [String: EditHistory<CursorEffectsSettings?>] = [:]
+    /// Full path → number of running tasks reading that scene file, which pruning keeps.
+    var sceneFilesInUse: [String: Int] = [:]
+    /// Video path → image layer additions still being read in.
+    @Published var sceneLayerImportCounts: [String: Int] = [:]
+    /// Leaves the lock screen video and the screen saver in place when the app quits.
+    @Published var keepLockScreenAndScreenSaverAfterQuit = false
+    /// Layer id → the on-device analysis running on it.
+    @Published var sceneAIWork: [UUID: SceneAIWork] = [:]
+    var sceneBakeWorkItems: [String: DispatchWorkItem] = [:]
+    var sceneBakeTasks: [String: Task<Void, Never>] = [:]
+    var sceneBakeGenerations: [String: UUID] = [:]
+    /// Scenes whose bake is writing now, as opposed to waiting for edits to settle.
+    @Published var scenesBakeRunning: Set<String> = []
+    /// Scenes edited since their video was baked, whose bake waits until their
+    /// scripts are allowed or stopped.
+    @Published var sceneVideosAwaitingScriptApproval: Set<String> = []
+    /// Video path → why its last bake failed; the previous video stays in use.
+    @Published var sceneBakeFailures: [String: String] = [:]
+    /// Scenes with edits not yet written to scene.json.
+    @Published var scenesSaving: Set<String> = []
+    /// Video path → why scene.json could not be written; the edit stays in memory.
+    @Published var sceneSaveFailures: [String: String] = [:]
+    var sceneSaveWorkItems: [String: DispatchWorkItem] = [:]
+    var sceneSaveGenerations: [String: UUID] = [:]
+    /// Video path → states kept for comparison in the editor; pruning keeps their files.
+    @Published var sceneComparisonSnapshots: [String: SceneDocument] = [:]
+    /// nil until the editor first needs them.
+    @Published var userScenePresets: [ScenePreset]?
+    /// Where the user's presets live; tests point it elsewhere.
+    var scenePresetStore = ScenePresetStore.standard
+    /// A preset shown on the preview before it is applied.
+    @Published var scenePresetTrial: ScenePresetTrial?
+    /// Video path → what is left to do after the last preset applied there.
+    @Published var scenePresetGuides: [String: ScenePresetGuide] = [:]
+    /// Video path → the part of the day its baked video shows.
+    var sceneBakedTimesOfDay: [String: SceneTimeOfDay] = [:]
+    var sceneTimeOfDayTimer: Timer?
+    /// Video path → the part of the day a running bake writes.
+    var sceneBakingTimesOfDay: [String: SceneTimeOfDay] = [:]
+    var sceneTimeOfDayObservers: [NSObjectProtocol] = []
     @Published var frameRateLimit: FrameRateLimit = .off
     @Published var decodeMode: DecodeMode = .automatic
     @Published var qualityPreset: QualityPreset = .auto
@@ -175,6 +235,8 @@ final class WallpaperModel: ObservableObject {
     /// Screen saver bundle install state and config sync (WallpaperModel+ScreenSaver.swift).
     @Published var screenSaverInstallState: ScreenSaverInstallState = .unavailable
     @Published var screenSaverErrorMessage: String?
+    /// The video the screen saver plays on every display; nil plays what the desktop shows.
+    @Published var screenSaverVideoPath: String?
     let screenSaverInstaller = ScreenSaverInstaller()
     var lastWrittenScreenSaverConfig: ScreenSaverConfig?
     var screenSaverSyncCancellable: AnyCancellable?
@@ -227,6 +289,8 @@ final class WallpaperModel: ObservableObject {
     @Published var advancedSharingEnabled: Bool = false
     @Published var lockScreenSyncEnabled: Bool = false
     @Published var lockScreenSyncStatus: LockScreenSyncStatus = .disabled
+    /// How far the lock screen video's encoding is; nil when nothing is being encoded.
+    @Published var lockScreenEncodeProgress: LockScreenEncodeProgress?
     @Published var wallpaperPresentationByPath:
         [String: [String: WallpaperPresentation]] = [:]
     /// 動画パス → トリム/ループ編集。画面ごとではなく動画ファイルごとの性質なのでパスのみでキーする。
@@ -380,6 +444,11 @@ final class WallpaperModel: ObservableObject {
         // Read the power source before the first playback so it can pick the proxy.
         configurePowerSourceMonitoring()
         recoverStaleLockScreenSyncOnLaunchIfNeeded()
+        // Sync stays on across launches only when kept after quitting; if the system
+        // lost the replacement meanwhile, put it back.
+        if lockScreenSyncEnabled, !lockScreenSyncService.hasActiveLease {
+            syncCurrentVideoToLockScreen()
+        }
         LocalizationManager.setLanguage(effectiveAppLanguageCode)
         refreshDisplayScreens()
         rebuildWindows()
@@ -420,7 +489,6 @@ final class WallpaperModel: ObservableObject {
         deepSuspendWorkItem?.cancel()
         webDeepSuspendWorkItem?.cancel()
         statePersistWorkItem?.cancel()
-        lockScreenUnlockResetWorkItem?.cancel()
         lockScreenSyncTask?.cancel()
         retiredWindows.removeAll()
         if let observer: any NSObjectProtocol = screenChangeObserver {

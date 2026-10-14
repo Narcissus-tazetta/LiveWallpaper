@@ -63,6 +63,26 @@ extension SettingsView {
                 .labelsHidden()
                 .frame(width: 220)
             }
+
+            Button {
+                fitEditor.undoDraft(path: path, screenID: screenID)
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(!fitEditor.canUndoDraft(path: path, screenID: screenID))
+            .iconHelp(model.localizedString("取り消す(⌘Z)"))
+
+            Button {
+                fitEditor.redoDraft(path: path, screenID: screenID)
+            } label: {
+                Image(systemName: "arrow.uturn.forward")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(!fitEditor.canRedoDraft(path: path, screenID: screenID))
+            .iconHelp(model.localizedString("やり直す(⇧⌘Z)"))
         }
 
         if let dimensionsText = fitEditorDimensionsText(path: path, screenID: screenID) {
@@ -143,9 +163,12 @@ extension SettingsView {
             )
             .accessibilityLabel(model.localizedString("ズーム"))
             .accessibilityValue(String(format: "%.2fx", zoomValue))
-            fitEditorValueText(String(format: "%.2fx", zoomValue)) {
-                fitEditor.setDraftZoom(1.0, path: path, screenID: screenID)
-            }
+            fitEditorNumberField(
+                title: model.localizedString("ズーム"), value: zoomValue, unit: "x",
+                range: WallpaperGeometry.zoomRange, fractionDigits: 2,
+                onCommit: { fitEditor.setDraftZoom($0, path: path, screenID: screenID) },
+                reset: { fitEditor.setDraftZoom(1.0, path: path, screenID: screenID) }
+            )
         }
 
         HStack(spacing: 12) {
@@ -155,9 +178,13 @@ extension SettingsView {
                 .disabled(!canPanX)
                 .accessibilityLabel(model.localizedString("横位置"))
                 .accessibilityValue(String(format: "%+.0f%%", offsetXValue * 100))
-            fitEditorValueText(String(format: "%+.0f%%", offsetXValue * 100)) {
-                fitEditor.setDraftOffsetX(0, path: path, screenID: screenID)
-            }
+            fitEditorNumberField(
+                title: model.localizedString("横位置"), value: offsetXValue, factor: 100, unit: "%",
+                range: -1 ... 1,
+                onCommit: { fitEditor.setDraftOffsetX($0, path: path, screenID: screenID) },
+                reset: { fitEditor.setDraftOffsetX(0, path: path, screenID: screenID) }
+            )
+            .disabled(!canPanX)
         }
         .opacity(canPanX ? 1 : 0.5)
 
@@ -168,9 +195,13 @@ extension SettingsView {
                 .disabled(!canPanY)
                 .accessibilityLabel(model.localizedString("縦位置"))
                 .accessibilityValue(String(format: "%+.0f%%", offsetYValue * 100))
-            fitEditorValueText(String(format: "%+.0f%%", offsetYValue * 100)) {
-                fitEditor.setDraftOffsetY(0, path: path, screenID: screenID)
-            }
+            fitEditorNumberField(
+                title: model.localizedString("縦位置"), value: offsetYValue, factor: 100, unit: "%",
+                range: -1 ... 1,
+                onCommit: { fitEditor.setDraftOffsetY($0, path: path, screenID: screenID) },
+                reset: { fitEditor.setDraftOffsetY(0, path: path, screenID: screenID) }
+            )
+            .disabled(!canPanY)
         }
         .opacity(canPanY ? 1 : 0.5)
 
@@ -266,17 +297,26 @@ extension SettingsView {
     }
 
     /// スライダー右側の数値表示。ダブルクリックで初期値に戻せる。
-    private func fitEditorValueText(_ text: String, resetAction: @escaping () -> Void) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .frame(width: 50, alignment: .trailing)
-            .contentShape(Rectangle())
-            .onTapGesture(count: 2, perform: resetAction)
-            .help(model.localizedString("ダブルクリックで初期値に戻します"))
-            .accessibilityLabel(model.localizedString("既定に戻す"))
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { resetAction() }
+    /// The value, typed in directly; the context menu puts it back to the default.
+    private func fitEditorNumberField(
+        title: String,
+        value: Double,
+        factor: Double = 1,
+        unit: String,
+        range: ClosedRange<Double>,
+        fractionDigits: Int = 0,
+        onCommit: @escaping (Double) -> Void,
+        reset: @escaping () -> Void
+    ) -> some View {
+        SceneNumberField(
+            title: title, value: value, factor: factor, unit: unit, range: range,
+            fractionDigits: fractionDigits, onCommit: onCommit
+        )
+        .contextMenu {
+            Button(model.localizedString("既定に戻す"), action: reset)
+        }
+        .help(model.localizedString("数値を入力して Return で反映します。右クリックで初期値に戻します"))
+        .accessibilityAction(named: model.localizedString("既定に戻す"), reset)
     }
 
     private func fitEditorDimensionsText(path: String, screenID: String) -> String? {

@@ -8,7 +8,16 @@ extension SettingsView {
         guard wallpaperEditor.requestSelectVideo(path: path) else {
             return
         }
+        if let previous = fitEditor.resolvedVideoPath(), previous != path {
+            model.bakeSceneNowIfPending(path: previous)
+        }
         fitEditor.selectVideo(path: path)
+        endSceneEditorTool()
+        scenePreviewController.reset()
+        renamingSceneLayerID = nil
+        selectedSceneLayerID = nil
+        selectedSceneEffectID = nil
+        syncEditorSubMode()
     }
 
     var wallpaperFitLibraryPanel: some View {
@@ -30,7 +39,7 @@ extension SettingsView {
                 // ハイライトは「いま前面にある編集タブ」の選択に合わせる。
                 // トリム編集は未保存の確認を挟むため、確定するまで選択が
                 // 動かないことがあり、フィット側の選択とは一致しない。
-                let selectedPath = editorSubMode == .trim
+                let selectedPath = effectiveEditorSubMode == .trim
                     ? wallpaperEditor.resolvedVideoPath()
                     : fitEditor.resolvedVideoPath()
                 GeometryReader { proxy in

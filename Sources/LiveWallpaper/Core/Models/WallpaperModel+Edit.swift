@@ -21,6 +21,12 @@ extension WallpaperModel {
         playRegisteredVideo(path: path)
     }
 
+    /// The file at `path` was rewritten in place; players still hold the old one open.
+    func reloadPlayback(forRewrittenPath path: String) {
+        reinstallCurrentPlayerItemIfNeeded(for: path)
+        refreshDedicatedSlotsIfNeeded(for: path)
+    }
+
     func setWallpaperEdit(
         trimStart: Double,
         trimEnd: Double?,

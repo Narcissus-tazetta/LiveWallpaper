@@ -67,6 +67,7 @@ extension WallpaperModel {
             height: renderedHeight
         )
         CATransaction.commit()
+        playerView.syncSceneFrame()
         presentationCacheByPlayerView[playerID] = key
     }
 

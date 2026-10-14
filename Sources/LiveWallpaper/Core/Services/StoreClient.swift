@@ -82,15 +82,18 @@ final class StoreClient {
     private let packageExporter: PackageExporter
     private let session: URLSession
     private let fileManager: FileManager
+    private let endpointURL: URL
 
     init(
         packageExporter: PackageExporter,
         session: URLSession = .shared,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        baseURL: URL? = nil
     ) {
         self.packageExporter = packageExporter
         self.session = session
         self.fileManager = fileManager
+        endpointURL = baseURL ?? Self.baseURL
     }
 
     func submit(
@@ -174,7 +177,7 @@ final class StoreClient {
             status: entry.status,
             withdrawToken: response.withdrawToken,
             downloadURL: entry.status == "published"
-                ? Self.baseURL.appendingPathComponent("download/\(entry.id)")
+                ? endpointURL.appendingPathComponent("download/\(entry.id)")
                 : nil
         )
     }
@@ -244,7 +247,7 @@ final class StoreClient {
         kind: UploadKind = .package,
         relatedId: String? = nil
     ) async throws -> UploadURLResponse {
-        var request = URLRequest(url: Self.baseURL.appendingPathComponent("upload-url"))
+        var request = URLRequest(url: endpointURL.appendingPathComponent("upload-url"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = try JSONEncoder().encode(
@@ -325,7 +328,7 @@ final class StoreClient {
         thumbnailSha256: String?,
         thumbnailSizeBytes: Int?
     ) async throws -> SubmitResponse {
-        var request = URLRequest(url: Self.baseURL.appendingPathComponent("submit"))
+        var request = URLRequest(url: endpointURL.appendingPathComponent("submit"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = try JSONEncoder().encode(

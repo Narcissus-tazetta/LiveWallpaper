@@ -169,6 +169,16 @@ async function entryStatus(id: string): Promise<string | undefined> {
 }
 
 describe("store submission review flow", () => {
+	it("binds the upload size into the presigned request", async () => {
+		const response = await callWorker(new Request("https://store.example.com/upload-url", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ contentType: "application/octet-stream", sizeBytes: 1024 }),
+		}));
+		expect(response.status).toBe(200);
+		const slot = await response.json() as { uploadURL: string };
+		expect(new URL(slot.uploadURL).searchParams.get("X-Amz-SignedHeaders")?.split(";")).toContain("content-length");
+	});
 	it("submit creates a 'requested' entry with a one-time review token", async () => {
 		const { res, id } = await submitEntry();
 		expect(res.status).toBe(200);
@@ -750,13 +760,10 @@ describe("store submission review flow", () => {
 			.bind(new Date(0).toISOString(), staleId)
 			.run();
 
-		const ctx = createExecutionContext();
 		await worker.scheduled(
 			{ cron: "0 * * * *", scheduledTime: Date.now(), noRetry: () => {} } as never,
 			env,
-			ctx,
 		);
-		await waitOnExecutionContext(ctx);
 
 		expect(await entryStatus(staleId)).toBe("rejected");
 		expect(await entryStatus(freshId)).toBe("requested");

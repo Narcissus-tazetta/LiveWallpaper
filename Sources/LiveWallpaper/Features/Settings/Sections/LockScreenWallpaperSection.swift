@@ -3,7 +3,15 @@ import SwiftUI
 extension SettingsView {
   var lockScreenSyncControls: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Toggle(model.localizedString("ロック画面用にシステム壁紙を一時設定"), isOn: lockScreenSyncBinding)
+      // Kept after quitting, the setting is no longer temporary, and the desktop
+      // shows the same system wallpaper while the app is not running.
+      Toggle(
+        model.localizedString(
+          model.keepLockScreenAndScreenSaverAfterQuit
+            ? "ロック画面とデスクトップにシステム壁紙として設定" : "ロック画面用にシステム壁紙を一時設定"
+        ),
+        isOn: lockScreenSyncBinding
+      )
         .disabled(lockScreenSyncActionInProgress)
 
       Label(lockScreenSyncStatusText(), systemImage: lockScreenSyncStatusIconName())
@@ -68,6 +76,9 @@ extension SettingsView {
         .font(.caption)
         .foregroundColor(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
+
+      Divider()
+      keepAfterQuitControls(in: .lockScreen)
     }
   }
 
@@ -87,7 +98,16 @@ extension SettingsView {
     case .idle:
       return model.localizedString("同期待機中")
     case .syncing:
-      return model.localizedString("同期中")
+      guard let progress = model.lockScreenEncodeProgress else {
+        return model.localizedString("同期中")
+      }
+      let percent = Int((progress.fraction * 100).rounded(.down))
+      guard let remaining = progress.remainingSeconds.flatMap(lockScreenRemainingText) else {
+        return String(format: model.localizedString("ロック画面用に変換中… %d%%"), locale: model.appLocale, percent)
+      }
+      return String(
+        format: model.localizedString("ロック画面用に変換中… %d%%(あと %@)"), locale: model.appLocale, percent, remaining
+      )
     case let .borrowed(name):
       return String(format: model.localizedString("%@: %@"), model.localizedString("借用中"), name)
     case .recovering:
@@ -105,6 +125,17 @@ extension SettingsView {
     case let .failed(message):
       return String(format: model.localizedString("%@: %@"), model.localizedString("同期に失敗しました"), message)
     }
+  }
+
+  /// e.g. "3分12秒" / "3m 12s" in the app's language.
+  private func lockScreenRemainingText(_ seconds: Double) -> String? {
+    let formatter = DateComponentsFormatter()
+    var calendar = Calendar.current
+    calendar.locale = model.appLocale
+    formatter.calendar = calendar
+    formatter.unitsStyle = .abbreviated
+    formatter.allowedUnits = seconds >= 3600 ? [.hour, .minute] : [.minute, .second]
+    return formatter.string(from: seconds.rounded(.up))
   }
 
   func lockScreenSyncStatusIconName() -> String {
@@ -140,7 +171,9 @@ extension SettingsView {
     case .recovered:
       return model.localizedString("前回終了時に残ったロック画面設定を自動で元に戻しました。")
     default:
-      return model.localizedString("オンにすると選択中のロック画面動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。")
+      return model.keepLockScreenAndScreenSaverAfterQuit
+        ? model.localizedString("オンにすると選択中のロック画面動画をシステムのAerial壁紙として設定します。アプリを終了しても、そのまま残ります。")
+        : model.localizedString("オンにすると選択中のロック画面動画をシステムのAerial壁紙として一時設定します。アプリ終了時に元の壁紙へ戻ります。")
     }
   }
 }

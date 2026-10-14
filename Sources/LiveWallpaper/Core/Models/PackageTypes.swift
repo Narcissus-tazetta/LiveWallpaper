@@ -3,7 +3,7 @@ import Foundation
 struct PackageManifest: Codable {
     let version: String
     let manifest: PackageInfo
-    let videos: [PackageVideo]
+    var videos: [PackageVideo]
     let playlists: [PackagePlaylist]
     let packaging: PackagingInfo
 
@@ -32,6 +32,14 @@ struct PackageManifest: Codable {
         /// This wallpaper's own cursor effects; absent means it follows the receiver's
         /// app-wide settings. Older versions ignore the key.
         var cursorEffects: CursorEffectsSettings?
+        /// The video was baked from a scene, packaged under `scenes/<id>/`. Older
+        /// versions ignore the key and get the baked video.
+        var scene: Bool?
+        var scriptScene: ScriptSceneMetadata?
+
+        struct ScriptSceneMetadata: Codable {
+            var apiVersion: Int
+        }
 
         struct VideoSource: Codable {
             let fileName: String

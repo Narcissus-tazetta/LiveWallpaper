@@ -102,6 +102,51 @@ extension WallpaperModel {
         refreshCursorEffects()
     }
 
+    /// An edit in the editor, recorded for undo. Edits with the same `coalescingKey`
+    /// between two presses (a colour dragged in the colour panel) make one step.
+    func editCursorEffectsOverride(_ settings: CursorEffectsSettings?, path: String, coalescingKey: String?) {
+        let previous = cursorEffectsByPath[path]
+        guard previous != settings else {
+            return
+        }
+        cursorEffectsHistories[path, default: EditHistory()].record(previous, coalescingKey: coalescingKey)
+        setCursorEffectsOverride(settings, path: path)
+    }
+
+    func canUndoCursorEffects(path: String) -> Bool {
+        cursorEffectsHistories[path]?.canUndo ?? false
+    }
+
+    func canRedoCursorEffects(path: String) -> Bool {
+        cursorEffectsHistories[path]?.canRedo ?? false
+    }
+
+    func undoCursorEffects(path: String) {
+        guard var history = cursorEffectsHistories[path],
+              let restored = history.undo(current: cursorEffectsByPath[path])
+        else {
+            return
+        }
+        cursorEffectsHistories[path] = history
+        setCursorEffectsOverride(restored, path: path)
+    }
+
+    func redoCursorEffects(path: String) {
+        guard var history = cursorEffectsHistories[path],
+              let restored = history.redo(current: cursorEffectsByPath[path])
+        else {
+            return
+        }
+        cursorEffectsHistories[path] = history
+        setCursorEffectsOverride(restored, path: path)
+    }
+
+    func breakCursorEffectsHistoryCoalescing() {
+        for path in cursorEffectsHistories.keys {
+            cursorEffectsHistories[path]?.breakCoalescing()
+        }
+    }
+
     func persistCursorEffectsByPath() {
         do {
             try UserDefaults.standard.set(
@@ -162,7 +207,9 @@ extension WallpaperModel {
     /// Frontmost app, Low Power Mode and thermal state, watched only while some
     /// effect is enabled.
     private func updateCursorEffectsObservers() {
-        guard cursorEffects.anyEnabled || cursorEffectsByPath.values.contains(where: \.anyEnabled) else {
+        guard cursorEffects.anyEnabled || cursorEffectsByPath.values.contains(where: \.anyEnabled)
+            || playerViews.contains(where: \.sceneUsesCursor)
+        else {
             for observer in cursorEffectsObservers {
                 NSWorkspace.shared.notificationCenter.removeObserver(observer)
                 NotificationCenter.default.removeObserver(observer)
@@ -215,6 +262,7 @@ extension WallpaperModel {
     /// Re-applies the settings to every screen and starts or stops the tracker.
     /// Cheap enough to call on every coverage, power or window change.
     func refreshCursorEffects() {
+        refreshSceneHosts()
         updateCursorEffectsObservers()
         let targets = cursorEffectTargets()
         updateClickMonitor(targets: targets)
@@ -223,7 +271,8 @@ extension WallpaperModel {
         let needsTracking = targets.contains { target in
             !coveredDisplayIDs.contains(target.displayID)
                 && ((motion && (target.settings.parallaxEnabled || target.settings.trailEnabled))
-                    || (spotlight && target.settings.spotlightEnabled))
+                    || (spotlight && target.settings.spotlightEnabled)
+                    || (spotlight && target.view.sceneUsesCursor))
         }
         for target in targets {
             resetInactiveEffects(target)
@@ -250,6 +299,9 @@ extension WallpaperModel {
 
     private func resetInactiveEffects(_ target: CursorEffectTarget) {
         let view = target.view
+        if !spotlightAllowed || coveredDisplayIDs.contains(target.displayID) {
+            view.setSceneCursor(nil, parallax: .zero)
+        }
         view.configureTrail(target.settings.trailAppearance)
         if !(cursorMotionAllowed && target.settings.parallaxEnabled) {
             view.setParallax(offset: .zero, scale: 1)
@@ -288,6 +340,14 @@ extension WallpaperModel {
                     offset: offset,
                     scale: CursorEffectGeometry.parallaxScale(amplitude: settings.parallaxAmplitude)
                 )
+            }
+            // Scene cursor masks only follow the cursor, like the spotlight; the
+            // layer parallax is motion.
+            if spotlight, view.sceneUsesCursor {
+                let parallax = (motion ? local : nil).map {
+                    CGPoint(x: $0.x / frame.width * 2 - 1, y: $0.y / frame.height * 2 - 1)
+                } ?? .zero
+                view.setSceneCursor(local, parallax: parallax)
             }
             if spotlight, settings.spotlightEnabled {
                 view.setSpotlight(

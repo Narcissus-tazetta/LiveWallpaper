@@ -129,6 +129,16 @@ extension SettingsView {
         return model.registeredVideoDisplayName(for: lockScreenPath)
     }
 
+    func currentScreenSaverSummaryText() -> String {
+        guard model.isScreenSaverInstalled else {
+            return model.localizedString("オフ")
+        }
+        guard let path = model.screenSaverVideoPath else {
+            return model.localizedString("デスクトップと同じ")
+        }
+        return model.registeredVideoDisplayName(for: path)
+    }
+
     func currentDisplayModeSummaryText() -> String {
         switch model.displayMode {
         case .mainOnly:
@@ -226,6 +236,19 @@ extension SettingsView {
             image: lockScreenWallpaperPreviewImage(),
             accessibilityLabel: model.localizedString("ロック画面壁紙プレビュー")
         )
+    }
+
+    var screenSaverWallpaperPreview: some View {
+        let path = model.screenSaverVideoPath ?? model.currentVideoPath
+        return wallpaperPreviewThumbnail(
+            image: path.flatMap { thumbnailCache.image(for: $0) },
+            accessibilityLabel: model.localizedString("スクリーンセーバーのプレビュー")
+        )
+        .onAppear {
+            if let path {
+                requestWallpaperThumbnail(path: path)
+            }
+        }
     }
 
     @ViewBuilder

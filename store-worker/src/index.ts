@@ -194,7 +194,7 @@ async function handleUploadUrl(request: Request, env: Env): Promise<Response> {
 		method: "PUT",
 		headers: { "content-length": String(sizeBytes) },
 	}), {
-		aws: { signQuery: true },
+		aws: { signQuery: true, allHeaders: true },
 	});
 
 	return jsonResponse({

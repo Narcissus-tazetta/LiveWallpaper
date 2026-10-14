@@ -58,6 +58,7 @@ extension WallpaperModel {
             clearVideoOverrides(forPath: path)
             clearSpaceVideos(forPath: path)
             clearLockScreenVideoIfMissing(path: path)
+            clearScreenSaverVideoIfMissing(path: path)
         }
         pruneWallpaperPresentationsForExistingPaths()
         pruneWallpaperEditsForExistingPaths()

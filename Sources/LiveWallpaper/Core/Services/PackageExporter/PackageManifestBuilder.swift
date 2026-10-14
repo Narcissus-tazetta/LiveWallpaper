@@ -34,8 +34,9 @@ final class PackageManifestBuilder {
         videoMap: [String: String],
         videoThumbnails: [String: String],
         includeVideos: Bool,
-        totalBytes: UInt64
-    ) async -> PackageManifest {
+        totalBytes: UInt64,
+        mediaPathsByVideoID: [String: String]
+    ) async throws -> PackageManifest {
         let isoFormatter = ISO8601DateFormatter()
         let createdAt = isoFormatter.string(from: Date())
 
@@ -55,20 +56,15 @@ final class PackageManifestBuilder {
                 }
             }
 
-            let attrs = try? fileManager.attributesOfItem(atPath: path)
+            let mediaPath = mediaPathsByVideoID[videoId] ?? path
+            let attrs = includeVideos
+                ? try fileManager.attributesOfItem(atPath: mediaPath)
+                : try? fileManager.attributesOfItem(atPath: mediaPath)
             let fileSize = attrs?[.size] as? UInt64
 
-            let sha256: String? = {
-                do {
-                    let data = try Data(contentsOf: URL(fileURLWithPath: path))
-                    let digest = SHA256.hash(data: data)
-                    return digest.map { String(format: "%02x", $0) }.joined()
-                } catch {
-                    return nil
-                }
-            }()
+            let sha256 = includeVideos ? try checksum(path: mediaPath) : try? checksum(path: mediaPath)
 
-            let (duration, hasAudio) = await loadDurationAndAudioFlag(path: path)
+            let (duration, hasAudio) = await loadDurationAndAudioFlag(path: mediaPath)
 
             packageVideos.append(
                 PackageManifest.PackageVideo(
@@ -124,8 +120,9 @@ final class PackageManifestBuilder {
         videoId: String,
         videoThumbnails: [String: String],
         fileSize: UInt64,
+        mediaPath: String,
         license: String? = nil
-    ) async -> PackageManifest {
+    ) async throws -> PackageManifest {
         let isoFormatter = ISO8601DateFormatter()
         let createdAt = isoFormatter.string(from: Date())
 
@@ -141,17 +138,9 @@ final class PackageManifestBuilder {
             }
         }
 
-        let sha256: String? = {
-            do {
-                let data = try Data(contentsOf: URL(fileURLWithPath: videoPath))
-                let digest = SHA256.hash(data: data)
-                return digest.map { String(format: "%02x", $0) }.joined()
-            } catch {
-                return nil
-            }
-        }()
+        let sha256 = try checksum(path: mediaPath)
 
-        let (duration, hasAudio) = await loadDurationAndAudioFlag(path: videoPath)
+        let (duration, hasAudio) = await loadDurationAndAudioFlag(path: mediaPath)
 
         let packageVideo = PackageManifest.PackageVideo(
             id: videoId,
@@ -187,5 +176,10 @@ final class PackageManifestBuilder {
             playlists: [],
             packaging: .init(videosIncluded: true, packageSizeBytes: fileSize)
         )
+    }
+
+    private func checksum(path: String) throws -> String {
+        let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 }

@@ -542,6 +542,15 @@ extension WallpaperModel {
         }
         clearVideoOverrides(forPath: trimmed)
         clearSpaceVideos(forPath: trimmed)
+        cancelSceneBake(path: trimmed)
+        discardSceneSave(path: trimmed)
+        sceneBakeFailures.removeValue(forKey: trimmed)
+        sceneVideosAwaitingScriptApproval.remove(trimmed)
+        sceneComparisonSnapshots.removeValue(forKey: trimmed)
+        sceneStaleVideoPaths.remove(trimmed)
+        sceneDocumentsByPath.removeValue(forKey: trimmed)
+        sceneHistories.removeValue(forKey: trimmed)
+        cursorEffectsHistories.removeValue(forKey: trimmed)
         pruneScheduleRules(referencingVideoPath: trimmed)
         syncActivePlaylistPaths()
         registeredVideoDisplayNames.removeValue(forKey: trimmed)
@@ -553,6 +562,7 @@ extension WallpaperModel {
         if wasLockScreen {
             clearLockScreenVideoIfMissing(path: trimmed)
         }
+        clearScreenSaverVideoIfMissing(path: trimmed)
 
         // Web壁紙が実際に表示中のときの currentVideoPath は「動画に戻すときの
         // フォールバック参照」でしかなく、再生には使われていない。削除しても

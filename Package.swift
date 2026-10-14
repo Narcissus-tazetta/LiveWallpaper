@@ -59,9 +59,18 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.10.0")
     ],
     targets: [
+        .target(
+            name: "QuickJS",
+            path: "Sources/QuickJS",
+            exclude: ["vendor/LICENSE", "NOTICE.md"],
+            sources: ["Bridge.c", "vendor/quickjs.c", "vendor/dtoa.c", "vendor/libregexp.c", "vendor/libunicode.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("vendor"), .define("_GNU_SOURCE")]
+        ),
         .executableTarget(
             name: "LiveWallpaper",
             dependencies: [
+                "QuickJS",
                 .product(name: "Sparkle", package: "Sparkle")
             ],
             path: "Sources/LiveWallpaper",

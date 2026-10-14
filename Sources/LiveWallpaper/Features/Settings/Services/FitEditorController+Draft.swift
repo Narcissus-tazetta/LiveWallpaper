@@ -104,10 +104,30 @@ extension FitEditorController {
         scheduleLiveApplyIfNeeded(path: path, screenID: screenID)
     }
 
-    func setDraftFitMode(_ fitMode: VideoFitMode, path: String, screenID: String) {
+    /// Applies `edit` to the draft and records the state before it as an undo step.
+    /// Edits with the same `coalescingKey` between two mouse or key presses merge
+    /// into one step; nil always makes a step of its own.
+    private func editDraft(
+        path: String,
+        screenID: String,
+        coalescingKey: String?,
+        _ edit: () -> Void
+    ) {
         ensureDraft(path: path, screenID: screenID)
-        draft.fitMode = fitMode
+        let before = draft
+        edit()
+        guard draft != before else {
+            return
+        }
+        draftHistories[Self.historyKey(path: path, screenID: screenID), default: EditHistory()]
+            .record(before, coalescingKey: coalescingKey)
         draftDidChange(path: path, screenID: screenID)
+    }
+
+    func setDraftFitMode(_ fitMode: VideoFitMode, path: String, screenID: String) {
+        editDraft(path: path, screenID: screenID, coalescingKey: "fitMode") {
+            draft.fitMode = fitMode
+        }
     }
 
     /// anchor はプレビューキャンバス中心を原点とした y 下向きの座標。
@@ -118,7 +138,12 @@ extension FitEditorController {
         path: String,
         screenID: String
     ) {
-        ensureDraft(path: path, screenID: screenID)
+        editDraft(path: path, screenID: screenID, coalescingKey: "zoom") {
+            applyZoom(zoom, anchor: anchor, path: path, screenID: screenID)
+        }
+    }
+
+    private func applyZoom(_ zoom: Double, anchor: CGPoint?, path: String, screenID: String) {
         let newZoom = WallpaperGeometry.clampZoom(zoom)
         if let anchor, newZoom != draft.zoom {
             let container = resolvedConstraintFrameSize(screenID: screenID)
@@ -158,25 +183,113 @@ extension FitEditorController {
             )
         }
         draft.zoom = newZoom
-        draftDidChange(path: path, screenID: screenID)
     }
 
     func setDraftOffsetX(_ offsetX: Double, path: String, screenID: String) {
-        ensureDraft(path: path, screenID: screenID)
-        draft.offsetX = WallpaperGeometry.clampOffset(offsetX)
-        draftDidChange(path: path, screenID: screenID)
+        editDraft(path: path, screenID: screenID, coalescingKey: "offset") {
+            draft.offsetX = WallpaperGeometry.clampOffset(offsetX)
+        }
     }
 
     func setDraftOffsetY(_ offsetY: Double, path: String, screenID: String) {
-        ensureDraft(path: path, screenID: screenID)
-        draft.offsetY = WallpaperGeometry.clampOffset(offsetY)
-        draftDidChange(path: path, screenID: screenID)
+        editDraft(path: path, screenID: screenID, coalescingKey: "offset") {
+            draft.offsetY = WallpaperGeometry.clampOffset(offsetY)
+        }
     }
 
     func moveDraftOffset(dx: Double, dy: Double, path: String, screenID: String) {
+        editDraft(path: path, screenID: screenID, coalescingKey: "offset") {
+            draft.offsetX = WallpaperGeometry.clampOffset(draft.offsetX + dx)
+            draft.offsetY = WallpaperGeometry.clampOffset(draft.offsetY + dy)
+        }
+    }
+
+    /// A drag on the preview. Near the centre the picture snaps to it; the unsnapped
+    /// position keeps following the pointer, so moving on leaves the centre again.
+    /// `snapDistance` is how near counts, in offset units per axis.
+    func dragDraftOffset(
+        dx: Double,
+        dy: Double,
+        snapDistance: CGSize,
+        snaps: Bool,
+        path: String,
+        screenID: String
+    ) {
         ensureDraft(path: path, screenID: screenID)
-        draft.offsetX = WallpaperGeometry.clampOffset(draft.offsetX + dx)
-        draft.offsetY = WallpaperGeometry.clampOffset(draft.offsetY + dy)
+        let start = dragRawOffset ?? CGPoint(x: draft.offsetX, y: draft.offsetY)
+        let raw = CGPoint(
+            x: WallpaperGeometry.clampOffset(start.x + dx),
+            y: WallpaperGeometry.clampOffset(start.y + dy)
+        )
+        dragRawOffset = raw
+        let axes = FitSnappedAxes(
+            x: snaps && abs(raw.x) <= snapDistance.width,
+            y: snaps && abs(raw.y) <= snapDistance.height
+        )
+        if snappedAxes != axes {
+            snappedAxes = axes
+        }
+        editDraft(path: path, screenID: screenID, coalescingKey: "offset") {
+            draft.offsetX = axes.x ? 0 : raw.x
+            draft.offsetY = axes.y ? 0 : raw.y
+        }
+    }
+
+    func endDraftDrag() {
+        dragRawOffset = nil
+        if snappedAxes != FitSnappedAxes() {
+            snappedAxes = FitSnappedAxes()
+        }
+    }
+
+    // MARK: - 取り消し・やり直し
+
+    struct DraftHistoryKey: Hashable {
+        var path: String
+        var screenID: String
+    }
+
+    static func historyKey(path: String, screenID: String) -> DraftHistoryKey {
+        DraftHistoryKey(path: path, screenID: screenID)
+    }
+
+    func canUndoDraft(path: String, screenID: String) -> Bool {
+        draftHistories[Self.historyKey(path: path, screenID: screenID)]?.canUndo ?? false
+    }
+
+    func canRedoDraft(path: String, screenID: String) -> Bool {
+        draftHistories[Self.historyKey(path: path, screenID: screenID)]?.canRedo ?? false
+    }
+
+    func undoDraft(path: String, screenID: String) {
+        stepDraftHistory(path: path, screenID: screenID) { $0.undo(current: $1) }
+    }
+
+    func redoDraft(path: String, screenID: String) {
+        stepDraftHistory(path: path, screenID: screenID) { $0.redo(current: $1) }
+    }
+
+    /// Ends the current drag or key repeat, so the next edit is a new undo step.
+    func breakDraftHistoryCoalescing() {
+        guard draft.isActive else {
+            return
+        }
+        draftHistories[Self.historyKey(path: draft.path, screenID: draft.screenID)]?
+            .breakCoalescing()
+    }
+
+    private func stepDraftHistory(
+        path: String,
+        screenID: String,
+        _ step: (inout EditHistory<FitEditorDraft>, FitEditorDraft) -> FitEditorDraft?
+    ) {
+        ensureDraft(path: path, screenID: screenID)
+        let key = Self.historyKey(path: path, screenID: screenID)
+        guard var history = draftHistories[key], let restored = step(&history, draft) else {
+            return
+        }
+        draftHistories[key] = history
+        draft = restored
         draftDidChange(path: path, screenID: screenID)
     }
 
@@ -322,17 +435,19 @@ extension FitEditorController {
     }
 
     func resetDraft(path: String, screenID: String) {
-        ensureDraft(path: path, screenID: screenID)
-        draft.fitMode = model.fitMode
-        draft.zoom = 1.0
-        draft.offsetX = 0.0
-        draft.offsetY = 0.0
-        draftDidChange(path: path, screenID: screenID)
+        editDraft(path: path, screenID: screenID, coalescingKey: nil) {
+            draft.fitMode = model.fitMode
+            draft.zoom = 1.0
+            draft.offsetX = 0.0
+            draft.offsetY = 0.0
+        }
     }
 
     /// 未保存の編集を破棄して、保存済みの値へ戻す。
     func discardDraftChanges(path: String, screenID: String) {
-        loadDraft(path: path, screenID: screenID)
+        editDraft(path: path, screenID: screenID, coalescingKey: nil) {
+            loadDraft(path: path, screenID: screenID)
+        }
     }
 
     /// 個別設定を削除して既定値へ戻し、ドラフトも同期する。

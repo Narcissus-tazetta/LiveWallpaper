@@ -84,11 +84,11 @@ enum WallpaperStorePatcher {
 
     private static func applyLinkedWallpaperChoice(_ choice: [String: Any], to store: inout [String: Any]) {
         if var allSpacesAndDisplays = store["AllSpacesAndDisplays"] as? [String: Any] {
-            patchStateAsLinked(&allSpacesAndDisplays, choice: choice)
+            patchState(&allSpacesAndDisplays, choice: choice)
             store["AllSpacesAndDisplays"] = allSpacesAndDisplays
         }
         if var systemDefault = store["SystemDefault"] as? [String: Any] {
-            patchStateAsLinked(&systemDefault, choice: choice)
+            patchState(&systemDefault, choice: choice)
             store["SystemDefault"] = systemDefault
         }
         if var displays = store["Displays"] as? [String: Any] {
@@ -96,7 +96,7 @@ enum WallpaperStorePatcher {
                 guard var state = displays[key] as? [String: Any] else {
                     continue
                 }
-                patchStateAsLinked(&state, choice: choice)
+                patchState(&state, choice: choice)
                 displays[key] = state
             }
             store["Displays"] = displays
@@ -113,7 +113,7 @@ enum WallpaperStorePatcher {
                 continue
             }
             if var defaultState = space["Default"] as? [String: Any] {
-                patchStateAsLinked(&defaultState, choice: choice)
+                patchState(&defaultState, choice: choice)
                 space["Default"] = defaultState
             }
             if var displays = space["Displays"] as? [String: Any] {
@@ -121,7 +121,7 @@ enum WallpaperStorePatcher {
                     guard var state = displays[displayKey] as? [String: Any] else {
                         continue
                     }
-                    patchStateAsLinked(&state, choice: choice)
+                    patchState(&state, choice: choice)
                     displays[displayKey] = state
                 }
                 space["Displays"] = displays
@@ -130,16 +130,25 @@ enum WallpaperStorePatcher {
         }
     }
 
-    private static func patchStateAsLinked(_ state: inout [String: Any], choice: [String: Any]) {
+    /// A state either shows one `Linked` surface everywhere, or (`individual`) a
+    /// `Desktop` surface, which the lock screen shows too, and an `Idle` one for the
+    /// screen saver. The screen saver is left as it is, so ScreenSaverSelection's
+    /// choice survives a sync.
+    private static func patchState(_ state: inout [String: Any], choice: [String: Any]) {
+        if state["Idle"] != nil {
+            var desktop = state["Desktop"] as? [String: Any] ?? state["Linked"] as? [String: Any] ?? [:]
+            patchSurface(&desktop, choice: choice)
+            state["Type"] = "individual"
+            state["Desktop"] = desktop
+            state.removeValue(forKey: "Linked")
+            return
+        }
         var linkedSurface = state["Linked"] as? [String: Any]
-            ?? state["Idle"] as? [String: Any]
             ?? state["Desktop"] as? [String: Any]
             ?? [:]
-
         patchSurface(&linkedSurface, choice: choice)
         state["Type"] = "linked"
         state["Linked"] = linkedSurface
-        state.removeValue(forKey: "Idle")
         state.removeValue(forKey: "Desktop")
     }
 
@@ -161,12 +170,16 @@ enum WallpaperStorePatcher {
         guard let state = value as? [String: Any] else {
             return true
         }
-        guard state["Type"] as? String == "linked",
-              state["Idle"] == nil,
-              state["Desktop"] == nil,
-              let linked = state["Linked"] as? [String: Any],
-              linkedChoiceAssetID(linked) == assetID
-        else {
+        let surface: [String: Any]?
+        switch state["Type"] as? String {
+        case "linked":
+            surface = state["Idle"] == nil && state["Desktop"] == nil ? state["Linked"] as? [String: Any] : nil
+        case "individual":
+            surface = state["Linked"] == nil ? state["Desktop"] as? [String: Any] : nil
+        default:
+            surface = nil
+        }
+        guard let surface, linkedChoiceAssetID(surface) == assetID else {
             return false
         }
         count += 1
