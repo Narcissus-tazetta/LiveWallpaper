@@ -561,7 +561,6 @@
 "システム設定で選ぶ" = "Choose in System Settings";
 "アンインストール" = "Uninstall";
 "インストール" = "Install";
-"今デスクトップに表示している動画の壁紙を、macOS のスクリーンセーバーとして再生します。画面ごとの壁紙・トリム・配置もそのまま反映されます。" = "Plays the video wallpaper currently on your desktop as the macOS screen saver, including per-display wallpapers, trimming, and placement.";
 "このビルドにはスクリーンセーバーが含まれていません。" = "This build does not include the screen saver.";
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Web wallpapers can’t play as a screen saver. Choose a video wallpaper to use it.";
 "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "While LiveWallpaper is running, it is selected as your screen saver automatically. Quitting the app or uninstalling switches back to your previous screen saver.";
@@ -580,7 +579,6 @@
 "一時停止中" = "Paused";
 "起動・動画と音声・言語・アップデート" = "Startup, video and sound, language, updates";
 "壁紙の表示方法・切り替え・省電力" = "How wallpapers are shown, switching, power saving";
-"共有・Web壁紙・ショートカット・スクリーンセーバー" = "Sharing, web wallpapers, shortcuts, screen saver";
 "エフェクトの長さ" = "Effect Length";
 "詳細…" = "Details…";
 "完了" = "Done";
@@ -701,12 +699,10 @@
 "macOS の Aerial manifest が見つかりません: %@" = "The macOS Aerial manifest wasn’t found: %@";
 "macOS の Aerial manifest を読み込めませんでした: %@" = "Couldn’t read the macOS Aerial manifest: %@";
 "ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。" = "No downloaded dynamic wallpaper was found. Download one of Apple’s dynamic wallpapers in System Settings.";
-"動画をロック画面用 mov に変換できませんでした。" = "Couldn’t convert the video to a .mov for the Lock Screen.";
 "macOS の壁紙設定ファイルを取得できませんでした。" = "Couldn’t access the macOS wallpaper settings file.";
 "復元できる LiveWallpaper のバックアップが見つかりませんでした。" = "No LiveWallpaper backup to restore was found.";
 "復元対象の Aerial バックアップが見つかりませんでした。" = "No Aerial backup to restore was found.";
 "macOS の壁紙設定に Aerial を正しく適用できませんでした。" = "Couldn’t apply the Aerial to the macOS wallpaper settings.";
-"動画の mov 変換に失敗しました。" = "Couldn’t convert the video to .mov.";
 "動画の mov 変換が完了しませんでした。" = "The video’s conversion to .mov didn’t finish.";
 "ロック画面用の動画を読み込めませんでした: %@" = "Couldn’t load the video for the Lock Screen: %@";
 "ロック画面用の動画を再生可能として読み込めませんでした。" = "The video for the Lock Screen couldn’t be loaded as playable.";
@@ -1067,3 +1063,17 @@
 "「%@」には未許可のスクリプトがあり、動画が最新の編集を反映していません。スクリプトを許可するか停止してから書き出してください。" = "“%@” has scripts you haven’t allowed, so its video doesn’t show the latest edits. Allow or stop the scripts before exporting.";
 "一時停止中(処理が重いため、自動で再開します)" = "Paused (too slow, will resume automatically)";
 "数値を入力して Return で反映します。右クリックで初期値に戻します" = "Type a number and press Return to apply. Right-click to reset to the default";
+"ロック画面とデスクトップにシステム壁紙として設定" = "Set as system wallpaper for the Lock Screen and desktop";
+"ロック画面とデスクトップは、システム壁紙に設定していないため残りません。" = "The Lock Screen and desktop won’t stay because the video isn’t set as the system wallpaper.";
+"システム壁紙に設定する" = "Set as System Wallpaper";
+"ロック画面用の動画に時間階層の情報を付けられませんでした。" = "Couldn’t add temporal layer information to the Lock Screen video.";
+"ロック画面用に変換中… %d%%" = "Converting for the Lock Screen… %d%%";
+"ロック画面用に変換中… %d%%(あと %@)" = "Converting for the Lock Screen… %d%% (%@ left)";
+"スクリーンセーバーは、インストールしていないため残りません。" = "The screen saver won’t stay because it isn’t installed.";
+"下の一覧で選んだ動画を、macOS のスクリーンセーバーとして再生します。選んでいないときは、デスクトップと同じ動画を、画面ごとの壁紙・トリム・配置も含めて再生します。" = "Plays the video you choose in the list below as the macOS screen saver. When none is chosen, it plays what the desktop shows, including each display’s wallpaper, trimming and placement.";
+"スクリーンセーバーは「壁紙」タブに移動しました" = "The screen saver has moved to the Wallpaper tab";
+"デスクトップと同じ" = "Same as Desktop";
+"スクリーンセーバーのプレビュー" = "Screen saver preview";
+"スクリーンセーバーに設定" = "Set as Screen Saver";
+"スクリーンセーバーに設定中" = "Set as screen saver";
+"共有・Web壁紙・ショートカット" = "Sharing, web wallpapers, shortcuts";

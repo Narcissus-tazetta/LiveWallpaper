@@ -45,6 +45,7 @@ enum PrefsKey {
     static let scheduleLocationData = "scheduleLocationData"
     static let scheduleRulesData = "scheduleRulesData"
     static let screenSaverEnabled = "screenSaverEnabled"
+    static let screenSaverVideoPath = "screenSaverVideoPath"
     static let keepLockScreenAndScreenSaverAfterQuit = "keepLockScreenAndScreenSaverAfterQuit"
     static let screenPlaylistByScreenID = "screenPlaylistByScreenID"
     static let selectedPlaylistID = "selectedPlaylistID"

@@ -102,13 +102,14 @@ final class WallpaperModel: ObservableObject {
     var isActiveSpaceTransitioning: Bool = false
     var activeSpaceTransitionLockWorkItem: DispatchWorkItem?
     var statePersistWorkItem: DispatchWorkItem?
-    var lockScreenUnlockResetWorkItem: DispatchWorkItem?
     var persistenceFailureCount: Int = 0
     let playbackEnvironment: PlaybackEnvironment
     let lockScreenSyncService: LockScreenSyncService = .init()
     let desktopIconsService: DesktopIconsService = .init()
     let lightweightProxyCache: LightweightProxyCache = .init()
     var lockScreenSyncTask: Task<Void, Never>?
+    /// Identifies the running sync, so progress from a replaced one is ignored.
+    var lockScreenSyncID = UUID()
     // フィット編集のプレビューが非同期ロード完了後に再描画されるよう @Published にしている。
     // (16:9 フォールバックで描画された後、実際のアスペクト比で描き直すため)
     @Published var videoAspectRatioByPath: [String: Double] = [:]
@@ -234,6 +235,8 @@ final class WallpaperModel: ObservableObject {
     /// Screen saver bundle install state and config sync (WallpaperModel+ScreenSaver.swift).
     @Published var screenSaverInstallState: ScreenSaverInstallState = .unavailable
     @Published var screenSaverErrorMessage: String?
+    /// The video the screen saver plays on every display; nil plays what the desktop shows.
+    @Published var screenSaverVideoPath: String?
     let screenSaverInstaller = ScreenSaverInstaller()
     var lastWrittenScreenSaverConfig: ScreenSaverConfig?
     var screenSaverSyncCancellable: AnyCancellable?
@@ -286,6 +289,8 @@ final class WallpaperModel: ObservableObject {
     @Published var advancedSharingEnabled: Bool = false
     @Published var lockScreenSyncEnabled: Bool = false
     @Published var lockScreenSyncStatus: LockScreenSyncStatus = .disabled
+    /// How far the lock screen video's encoding is; nil when nothing is being encoded.
+    @Published var lockScreenEncodeProgress: LockScreenEncodeProgress?
     @Published var wallpaperPresentationByPath:
         [String: [String: WallpaperPresentation]] = [:]
     /// 動画パス → トリム/ループ編集。画面ごとではなく動画ファイルごとの性質なのでパスのみでキーする。
@@ -484,7 +489,6 @@ final class WallpaperModel: ObservableObject {
         deepSuspendWorkItem?.cancel()
         webDeepSuspendWorkItem?.cancel()
         statePersistWorkItem?.cancel()
-        lockScreenUnlockResetWorkItem?.cancel()
         lockScreenSyncTask?.cancel()
         retiredWindows.removeAll()
         if let observer: any NSObjectProtocol = screenChangeObserver {

@@ -43,7 +43,7 @@ extension SettingsView {
             switch self {
             case .general: return [.video, .language, .update]
             case .display: return [.display]
-            case .integrations: return [.share, .webWallpaper, .hotKeys, .screenSaver]
+            case .integrations: return [.share, .webWallpaper, .hotKeys]
             case .other: return [.cache, .reset, .support]
             }
         }
@@ -61,7 +61,7 @@ extension SettingsView {
             switch self {
             case .general: return "起動・動画と音声・言語・アップデート"
             case .display: return "壁紙の表示方法・切り替え・省電力"
-            case .integrations: return "共有・Web壁紙・ショートカット・スクリーンセーバー"
+            case .integrations: return "共有・Web壁紙・ショートカット"
             case .other: return "キャッシュ・設定の管理・サポート"
             }
         }
@@ -120,6 +120,7 @@ extension SettingsView {
     enum WallpaperAssignmentTarget: String, CaseIterable, Hashable {
         case desktop
         case lockScreen
+        case screenSaver
     }
 
     /// 「デスクトップ」タブが今どのスコープの割り当てを見せているか。

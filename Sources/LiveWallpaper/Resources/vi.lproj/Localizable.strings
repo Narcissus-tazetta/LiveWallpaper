@@ -561,7 +561,6 @@
 "システム設定で選ぶ" = "Chọn trong Cài đặt hệ thống";
 "アンインストール" = "Gỡ cài đặt";
 "インストール" = "Cài đặt";
-"今デスクトップに表示している動画の壁紙を、macOS のスクリーンセーバーとして再生します。画面ごとの壁紙・トリム・配置もそのまま反映されます。" = "Phát hình nền video đang hiển thị trên màn hình nền làm trình bảo vệ màn hình của macOS, bao gồm cả hình nền theo từng màn hình, đoạn cắt và bố cục.";
 "このビルドにはスクリーンセーバーが含まれていません。" = "Bản dựng này không bao gồm trình bảo vệ màn hình.";
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Không thể phát hình nền web làm trình bảo vệ màn hình. Hãy chọn một hình nền video để sử dụng.";
 "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "Trong khi LiveWallpaper đang chạy, ứng dụng được tự động chọn làm trình bảo vệ màn hình. Khi bạn thoát hoặc gỡ cài đặt ứng dụng, trình bảo vệ màn hình trước đó sẽ được khôi phục.";
@@ -580,7 +579,6 @@
 "一時停止中" = "Đã tạm dừng";
 "起動・動画と音声・言語・アップデート" = "Khởi động, video và âm thanh, ngôn ngữ, cập nhật";
 "壁紙の表示方法・切り替え・省電力" = "Cách hiển thị hình nền, chuyển đổi, tiết kiệm điện";
-"共有・Web壁紙・ショートカット・スクリーンセーバー" = "Chia sẻ, hình nền web, phím tắt, trình bảo vệ màn hình";
 "エフェクトの長さ" = "Thời lượng hiệu ứng";
 "詳細…" = "Chi tiết…";
 "完了" = "Xong";
@@ -701,12 +699,10 @@
 "macOS の Aerial manifest が見つかりません: %@" = "Không tìm thấy tệp kê khai hình nền Không trung của macOS: %@";
 "macOS の Aerial manifest を読み込めませんでした: %@" = "Không thể đọc tệp kê khai hình nền Không trung của macOS: %@";
 "ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。" = "Không tìm thấy hình nền động nào đã tải về. Hãy tải về một hình nền động của Apple trong Cài đặt hệ thống.";
-"動画をロック画面用 mov に変換できませんでした。" = "Không thể chuyển đổi video sang tệp .mov cho màn hình khóa.";
 "macOS の壁紙設定ファイルを取得できませんでした。" = "Không thể truy cập tệp cài đặt hình nền của macOS.";
 "復元できる LiveWallpaper のバックアップが見つかりませんでした。" = "Không tìm thấy bản sao lưu LiveWallpaper nào để khôi phục.";
 "復元対象の Aerial バックアップが見つかりませんでした。" = "Không tìm thấy bản sao lưu hình nền Không trung nào để khôi phục.";
 "macOS の壁紙設定に Aerial を正しく適用できませんでした。" = "Không thể áp dụng đúng hình nền Không trung vào cài đặt hình nền của macOS.";
-"動画の mov 変換に失敗しました。" = "Không thể chuyển đổi video sang tệp .mov.";
 "動画の mov 変換が完了しませんでした。" = "Quá trình chuyển đổi video sang .mov chưa hoàn tất.";
 "ロック画面用の動画を読み込めませんでした: %@" = "Không thể tải video cho màn hình khóa: %@";
 "ロック画面用の動画を再生可能として読み込めませんでした。" = "Không thể tải video cho màn hình khóa ở trạng thái phát được.";
@@ -1067,3 +1063,17 @@
 "「%@」には未許可のスクリプトがあり、動画が最新の編集を反映していません。スクリプトを許可するか停止してから書き出してください。" = "“%@” có tập lệnh bạn chưa cho phép nên video không thể hiện các chỉnh sửa mới nhất. Hãy cho phép hoặc dừng tập lệnh trước khi xuất.";
 "一時停止中(処理が重いため、自動で再開します)" = "Đã tạm dừng (quá chậm, sẽ tự động tiếp tục)";
 "数値を入力して Return で反映します。右クリックで初期値に戻します" = "Nhập một số và nhấn Return để áp dụng. Bấm chuột phải để đặt lại về mặc định";
+"ロック画面とデスクトップにシステム壁紙として設定" = "Đặt làm hình nền hệ thống cho Màn hình khóa và màn hình nền";
+"ロック画面とデスクトップは、システム壁紙に設定していないため残りません。" = "Màn hình khóa và màn hình nền sẽ không được giữ lại vì video chưa được đặt làm hình nền hệ thống.";
+"システム壁紙に設定する" = "Đặt làm hình nền hệ thống";
+"ロック画面用の動画に時間階層の情報を付けられませんでした。" = "Không thể thêm thông tin lớp thời gian vào video cho Màn hình khóa.";
+"ロック画面用に変換中… %d%%" = "Đang chuyển đổi cho Màn hình khóa… %d%%";
+"ロック画面用に変換中… %d%%(あと %@)" = "Đang chuyển đổi cho Màn hình khóa… %d%% (còn %@)";
+"スクリーンセーバーは、インストールしていないため残りません。" = "Trình bảo vệ màn hình sẽ không được giữ lại vì chưa được cài đặt.";
+"下の一覧で選んだ動画を、macOS のスクリーンセーバーとして再生します。選んでいないときは、デスクトップと同じ動画を、画面ごとの壁紙・トリム・配置も含めて再生します。" = "Phát video bạn chọn trong danh sách bên dưới làm trình bảo vệ màn hình của macOS. Khi chưa chọn, sẽ phát nội dung màn hình nền đang hiển thị, bao gồm hình nền, cắt và vị trí của từng màn hình.";
+"スクリーンセーバーは「壁紙」タブに移動しました" = "Trình bảo vệ màn hình đã được chuyển sang tab Hình nền";
+"デスクトップと同じ" = "Giống màn hình nền";
+"スクリーンセーバーのプレビュー" = "Xem trước trình bảo vệ màn hình";
+"スクリーンセーバーに設定" = "Đặt làm trình bảo vệ màn hình";
+"スクリーンセーバーに設定中" = "Đã đặt làm trình bảo vệ màn hình";
+"共有・Web壁紙・ショートカット" = "Chia sẻ, hình nền web, phím tắt";

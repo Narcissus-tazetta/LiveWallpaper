@@ -6,7 +6,8 @@ import Foundation
 ///
 /// The Store keeps one state per Space/display (plus system-wide ones), so every state
 /// that has an `Idle` surface is switched; otherwise the saver would only apply to
-/// whichever Space happened to be active in System Settings.
+/// whichever Space happened to be active in System Settings. A `linked` state has no
+/// `Idle` surface, so it is made `individual` first.
 enum ScreenSaverSelection {
     struct SavedIdle {
         let path: [String]
@@ -23,13 +24,24 @@ enum ScreenSaverSelection {
         let options = try emptyOptions()
         var replaced: [SavedIdle] = []
         for path in statePaths(in: store) {
-            guard var state = value(at: path, in: store) as? [String: Any],
-                  let idle = state["Idle"] as? [String: Any]
-            else {
+            guard var state = value(at: path, in: store) as? [String: Any] else {
                 continue
             }
-            if !isSaver(idle, saverURL: saverURL) {
-                replaced.append(SavedIdle(path: path, idle: idle))
+            let idle: [String: Any]
+            if let existing = state["Idle"] as? [String: Any] {
+                idle = existing
+                if !isSaver(idle, saverURL: saverURL) {
+                    replaced.append(SavedIdle(path: path, idle: idle))
+                }
+            } else if state["Type"] as? String == "linked", let linked = state["Linked"] as? [String: Any] {
+                // One surface everywhere (as the lock screen sync leaves it): the
+                // desktop keeps it and the screen saver gets a surface of its own.
+                idle = [:]
+                state["Type"] = "individual"
+                state["Desktop"] = linked
+                state.removeValue(forKey: "Linked")
+            } else {
+                continue
             }
             state["Idle"] = surface(
                 choice: choice,
@@ -169,6 +181,11 @@ enum ScreenSaverSelection {
         content["Shuffle"] = "$null"
         surface["Content"] = content
         surface["LastSet"] = Date()
+        // WallpaperAgent cannot decode a surface without it, and then replaces the whole
+        // Store with its defaults: the screen saver and the lock screen Aerial are lost.
+        if surface["LastUse"] == nil {
+            surface["LastUse"] = Date()
+        }
         return surface
     }
 

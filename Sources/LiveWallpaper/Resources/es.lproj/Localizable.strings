@@ -561,7 +561,6 @@
 "システム設定で選ぶ" = "Elegir en Ajustes del Sistema";
 "アンインストール" = "Desinstalar";
 "インストール" = "Instalar";
-"今デスクトップに表示している動画の壁紙を、macOS のスクリーンセーバーとして再生します。画面ごとの壁紙・トリム・配置もそのまま反映されます。" = "Reproduce como salvapantallas de macOS el fondo de vídeo que tienes ahora en el escritorio, incluidos los fondos de cada pantalla, el recorte y la disposición.";
 "このビルドにはスクリーンセーバーが含まれていません。" = "Esta compilación no incluye el salvapantallas.";
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Los fondos web no se pueden reproducir como salvapantallas. Elige un fondo de vídeo para usarlo.";
 "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "Mientras LiveWallpaper está abierta, se elige automáticamente como salvapantallas. Si sales de la app o la desinstalas, se vuelve al salvapantallas anterior.";
@@ -580,7 +579,6 @@
 "一時停止中" = "En pausa";
 "起動・動画と音声・言語・アップデート" = "Inicio, vídeo y sonido, idioma, actualizaciones";
 "壁紙の表示方法・切り替え・省電力" = "Cómo se muestran los fondos, cambios, ahorro de energía";
-"共有・Web壁紙・ショートカット・スクリーンセーバー" = "Compartir, fondos web, atajos, salvapantallas";
 "エフェクトの長さ" = "Duración del efecto";
 "詳細…" = "Detalles…";
 "完了" = "Aceptar";
@@ -701,12 +699,10 @@
 "macOS の Aerial manifest が見つかりません: %@" = "No se ha encontrado el manifiesto de vistas aéreas de macOS: %@";
 "macOS の Aerial manifest を読み込めませんでした: %@" = "No se ha podido leer el manifiesto de vistas aéreas de macOS: %@";
 "ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。" = "No se ha encontrado ningún fondo de pantalla dinámico descargado. Descarga uno de los fondos dinámicos de Apple en los Ajustes del Sistema.";
-"動画をロック画面用 mov に変換できませんでした。" = "No se ha podido convertir el vídeo a .mov para la pantalla de bloqueo.";
 "macOS の壁紙設定ファイルを取得できませんでした。" = "No se ha podido acceder al archivo de ajustes de fondo de pantalla de macOS.";
 "復元できる LiveWallpaper のバックアップが見つかりませんでした。" = "No se ha encontrado ninguna copia de seguridad de LiveWallpaper que restaurar.";
 "復元対象の Aerial バックアップが見つかりませんでした。" = "No se ha encontrado ninguna copia de seguridad de vista aérea que restaurar.";
 "macOS の壁紙設定に Aerial を正しく適用できませんでした。" = "No se ha podido aplicar correctamente la vista aérea a los ajustes de fondo de pantalla de macOS.";
-"動画の mov 変換に失敗しました。" = "No se ha podido convertir el vídeo a .mov.";
 "動画の mov 変換が完了しませんでした。" = "La conversión del vídeo a .mov no ha terminado.";
 "ロック画面用の動画を読み込めませんでした: %@" = "No se ha podido cargar el vídeo para la pantalla de bloqueo: %@";
 "ロック画面用の動画を再生可能として読み込めませんでした。" = "El vídeo para la pantalla de bloqueo no se ha podido cargar como reproducible.";
@@ -1067,3 +1063,17 @@
 "「%@」には未許可のスクリプトがあり、動画が最新の編集を反映していません。スクリプトを許可するか停止してから書き出してください。" = "“%@” tiene scripts que no has permitido, por lo que su vídeo no muestra los últimos cambios. Permite o detén los scripts antes de exportar.";
 "一時停止中(処理が重いため、自動で再開します)" = "En pausa (demasiado lento, se reanudará automáticamente)";
 "数値を入力して Return で反映します。右クリックで初期値に戻します" = "Escribe un número y pulsa Retorno para aplicarlo. Haz clic con el botón derecho para restablecer el valor predeterminado";
+"ロック画面とデスクトップにシステム壁紙として設定" = "Usar como fondo del sistema para la pantalla de bloqueo y el escritorio";
+"ロック画面とデスクトップは、システム壁紙に設定していないため残りません。" = "La pantalla de bloqueo y el escritorio no se mantendrán porque el vídeo no está definido como fondo del sistema.";
+"システム壁紙に設定する" = "Usar como fondo del sistema";
+"ロック画面用の動画に時間階層の情報を付けられませんでした。" = "No se pudo añadir la información de capas temporales al vídeo de la pantalla de bloqueo.";
+"ロック画面用に変換中… %d%%" = "Convirtiendo para la pantalla de bloqueo… %d %%";
+"ロック画面用に変換中… %d%%(あと %@)" = "Convirtiendo para la pantalla de bloqueo… %d %% (quedan %@)";
+"スクリーンセーバーは、インストールしていないため残りません。" = "El salvapantallas no se mantendrá porque no está instalado.";
+"下の一覧で選んだ動画を、macOS のスクリーンセーバーとして再生します。選んでいないときは、デスクトップと同じ動画を、画面ごとの壁紙・トリム・配置も含めて再生します。" = "Reproduce como salvapantallas de macOS el vídeo que elijas en la lista de abajo. Si no eliges ninguno, reproduce lo que muestra el escritorio, incluidos el fondo, el recorte y la colocación de cada pantalla.";
+"スクリーンセーバーは「壁紙」タブに移動しました" = "El salvapantallas se ha movido a la pestaña Fondo de pantalla";
+"デスクトップと同じ" = "Igual que el escritorio";
+"スクリーンセーバーのプレビュー" = "Vista previa del salvapantallas";
+"スクリーンセーバーに設定" = "Usar como salvapantallas";
+"スクリーンセーバーに設定中" = "Usado como salvapantallas";
+"共有・Web壁紙・ショートカット" = "Compartir, fondos web, atajos";

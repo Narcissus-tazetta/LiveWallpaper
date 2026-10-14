@@ -97,7 +97,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.wallpaperModel.handleScreenUnlockedForLockScreenSync()
                 self?.wallpaperModel.evaluateSchedule(trigger: .unlock)
             }
         }

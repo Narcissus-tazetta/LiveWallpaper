@@ -17,6 +17,7 @@ extension SettingsView {
         // Web壁紙が実際に表示中のときは動画側を「デスクトップに設定中」として扱わない。
         let isDesktopAssigned = model.currentVideoPath == path && !model.isWebWallpaperActive
         let isLockScreenAssigned = model.lockScreenVideoPath == path
+        let isScreenSaverAssigned = model.screenSaverVideoPath == path
         let isDisplayOverrideAssigned = model.hasLiveDisplayOverride(forPath: path)
         let isHovered = hoveredWallpaperPath == path
         let strokeColor = wallpaperCardStrokeColor(
@@ -24,6 +25,7 @@ extension SettingsView {
             assignmentTarget: assignmentTarget,
             isDesktopAssigned: isDesktopAssigned,
             isLockScreenAssigned: isLockScreenAssigned,
+            isScreenSaverAssigned: isScreenSaverAssigned,
             isSelected: isSelected
         )
 
@@ -36,6 +38,8 @@ extension SettingsView {
                     model.selectRegisteredVideo(path: path)
                 case .lockScreen:
                     model.selectLockScreenVideo(path: path)
+                case .screenSaver:
+                    model.selectScreenSaverVideo(path: path)
                 }
                 if switchToWallpaperTabOnSelect {
                     selectedTab = .wallpaper
@@ -64,7 +68,8 @@ extension SettingsView {
                         wallpaperAssignmentBadges(
                             isDesktopAssigned: isDesktopAssigned,
                             isLockScreenAssigned: isLockScreenAssigned,
-                            isDisplayOverrideAssigned: isDisplayOverrideAssigned
+                            isDisplayOverrideAssigned: isDisplayOverrideAssigned,
+                            isScreenSaverAssigned: isScreenSaverAssigned
                         )
                         Spacer(minLength: 0)
                         if model.pinCurrentVideo, isDesktopAssigned {
@@ -104,6 +109,7 @@ extension SettingsView {
                 isDesktopAssigned: isDesktopAssigned,
                 isLockScreenAssigned: isLockScreenAssigned,
                 isDisplayOverrideAssigned: isDisplayOverrideAssigned,
+                isScreenSaverAssigned: isScreenSaverAssigned,
                 isPinned: model.pinCurrentVideo && isDesktopAssigned
             )
         )
@@ -242,6 +248,9 @@ extension SettingsView {
             model.selectLockScreenVideo(path: path)
         }
         .disabled(!model.lockScreenSyncService.isSupported)
+        Button(model.localizedString("スクリーンセーバーに設定")) {
+            model.selectScreenSaverVideo(path: path)
+        }
         // 新規割り当てには2台以上が必要だが、接続解除後も残った古い割り当て
         // (このパス宛て)を解除する手段は画面数によらず必ず出す。
         if model.availableDisplayScreens().count > 1
@@ -356,7 +365,8 @@ extension SettingsView {
     func wallpaperAssignmentBadges(
         isDesktopAssigned: Bool,
         isLockScreenAssigned: Bool,
-        isDisplayOverrideAssigned: Bool = false
+        isDisplayOverrideAssigned: Bool = false,
+        isScreenSaverAssigned: Bool = false
     ) -> some View {
         HStack(spacing: 4) {
             if isDesktopAssigned {
@@ -383,6 +393,14 @@ extension SettingsView {
                     .background(Color.purple, in: Circle())
                     .help(model.localizedString("画面別に割り当て中"))
             }
+            if isScreenSaverAssigned {
+                Image(systemName: "moon.stars.fill")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 18, height: 18)
+                    .background(Color.indigo, in: Circle())
+                    .help(model.localizedString("スクリーンセーバーに設定中"))
+            }
         }
         .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
         .accessibilityHidden(true)
@@ -393,12 +411,14 @@ extension SettingsView {
         isDesktopAssigned: Bool,
         isLockScreenAssigned: Bool,
         isDisplayOverrideAssigned: Bool,
+        isScreenSaverAssigned: Bool = false,
         isPinned: Bool = false
     ) -> String {
         var parts: [String] = []
         if isDesktopAssigned { parts.append(model.localizedString("デスクトップに設定中")) }
         if isLockScreenAssigned { parts.append(model.localizedString("ロック画面に設定中")) }
         if isDisplayOverrideAssigned { parts.append(model.localizedString("画面別に割り当て中")) }
+        if isScreenSaverAssigned { parts.append(model.localizedString("スクリーンセーバーに設定中")) }
         if isPinned { parts.append(model.localizedString("固定中")) }
         return parts.joined(separator: ", ")
     }
@@ -414,6 +434,9 @@ extension SettingsView {
             Button(model.localizedString("ロック画面に設定")) {
                 model.selectLockScreenVideo(path: path)
             }
+        }
+        Button(model.localizedString("スクリーンセーバーに設定")) {
+            model.selectScreenSaverVideo(path: path)
         }
         Button(model.localizedString("共有…")) {
             beginShareWallpaperSelection(path: path)
@@ -434,6 +457,7 @@ extension SettingsView {
         assignmentTarget: WallpaperAssignmentTarget,
         isDesktopAssigned: Bool,
         isLockScreenAssigned: Bool,
+        isScreenSaverAssigned: Bool,
         isSelected: Bool?
     ) -> Color {
         if let isSelected {
@@ -444,6 +468,8 @@ extension SettingsView {
             return isDesktopAssigned ? Color.accentColor : .clear
         case .lockScreen:
             return isLockScreenAssigned ? Color.orange : .clear
+        case .screenSaver:
+            return isScreenSaverAssigned ? Color.indigo : .clear
         }
     }
 }

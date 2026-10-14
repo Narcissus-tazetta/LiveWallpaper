@@ -38,6 +38,7 @@ extension WallpaperModel {
     /// Call once at launch. Puts the saver back (removed at the last quit) and keeps its
     /// config following whatever the desktop shows.
     func configureScreenSaverSync() {
+        screenSaverVideoPath = Self.validatedVideoPath(UserDefaults.standard.string(forKey: PrefsKey.screenSaverVideoPath))
         refreshScreenSaverInstallState()
         // Installs made before the preference existed count as enabled.
         let enabled = UserDefaults.standard.object(forKey: PrefsKey.screenSaverEnabled) as? Bool
@@ -58,6 +59,7 @@ extension WallpaperModel {
             $fitMode.map { _ in () }.eraseToAnyPublisher(),
             $displayScreens.map { _ in () }.eraseToAnyPublisher(),
             $videoAspectRatioByPath.map { _ in () }.eraseToAnyPublisher(),
+            $screenSaverVideoPath.map { _ in () }.eraseToAnyPublisher(),
         ]
         // @Published emits on willSet; the debounce also lets the value settle and
         // coalesces bursts such as a schedule switch touching several properties.
@@ -83,7 +85,7 @@ extension WallpaperModel {
         }
     }
 
-    private var isScreenSaverInstalled: Bool {
+    var isScreenSaverInstalled: Bool {
         screenSaverInstallState == .installed || screenSaverInstallState == .updateAvailable
     }
 
@@ -104,9 +106,38 @@ extension WallpaperModel {
         }
     }
 
-    /// What each display shows right now. Web wallpapers cannot be played by the
-    /// saver, so while one is active the config lists nothing and the saver says so.
+    func selectScreenSaverVideo(path: String) {
+        guard let validated = Self.validatedVideoPath(path) else {
+            return
+        }
+        screenSaverVideoPath = validated
+        UserDefaults.standard.set(validated, forKey: PrefsKey.screenSaverVideoPath)
+    }
+
+    /// Plays what the desktop shows again.
+    func useDesktopVideoForScreenSaver() {
+        screenSaverVideoPath = nil
+        UserDefaults.standard.removeObject(forKey: PrefsKey.screenSaverVideoPath)
+    }
+
+    func clearScreenSaverVideoIfMissing(path: String) {
+        if screenSaverVideoPath == path {
+            useDesktopVideoForScreenSaver()
+        }
+    }
+
+    /// The chosen video on every display, or else what each display shows right now.
+    /// Web wallpapers cannot be played by the saver, so while one is active (and no
+    /// video is chosen) the config lists nothing and the saver says so.
     func makeScreenSaverConfig() -> ScreenSaverConfig {
+        if let chosen = Self.validatedVideoPath(screenSaverVideoPath) {
+            var displays: [String: ScreenSaverConfig.Display] = [:]
+            for screen in displayScreens {
+                displays[screen.id] = screenSaverDisplay(path: chosen, screenID: screen.id)
+            }
+            let fallback = screenSaverDisplay(path: chosen, screenID: displayScreens.first?.id ?? "main")
+            return ScreenSaverConfig(displays: displays, fallback: fallback)
+        }
         guard !isWebWallpaperActive else {
             return ScreenSaverConfig(displays: [:], fallback: nil)
         }

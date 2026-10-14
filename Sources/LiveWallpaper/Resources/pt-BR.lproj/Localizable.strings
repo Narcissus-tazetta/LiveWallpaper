@@ -561,7 +561,6 @@
 "システム設定で選ぶ" = "Escolher nos Ajustes do Sistema";
 "アンインストール" = "Desinstalar";
 "インストール" = "Instalar";
-"今デスクトップに表示している動画の壁紙を、macOS のスクリーンセーバーとして再生します。画面ごとの壁紙・トリム・配置もそのまま反映されます。" = "Reproduz como protetor de tela do macOS a imagem de fundo em vídeo exibida agora na mesa, incluindo as imagens de fundo de cada tela, o corte e a disposição.";
 "このビルドにはスクリーンセーバーが含まれていません。" = "Esta compilação não inclui o protetor de tela.";
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Imagens de fundo web não podem ser reproduzidas como protetor de tela. Escolha uma imagem de fundo em vídeo para usá-lo.";
 "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "Enquanto o LiveWallpaper estiver aberto, ele é escolhido automaticamente como protetor de tela. Ao encerrar ou desinstalar o app, o protetor de tela anterior é restaurado.";
@@ -580,7 +579,6 @@
 "一時停止中" = "Pausado";
 "起動・動画と音声・言語・アップデート" = "Inicialização, vídeo e som, idioma, atualizações";
 "壁紙の表示方法・切り替え・省電力" = "Exibição das imagens de fundo, trocas, economia de energia";
-"共有・Web壁紙・ショートカット・スクリーンセーバー" = "Compartilhamento, imagens de fundo web, atalhos, protetor de tela";
 "エフェクトの長さ" = "Duração do Efeito";
 "詳細…" = "Detalhes…";
 "完了" = "OK";
@@ -701,12 +699,10 @@
 "macOS の Aerial manifest が見つかりません: %@" = "O manifesto de vistas aéreas do macOS não foi encontrado: %@";
 "macOS の Aerial manifest を読み込めませんでした: %@" = "Não foi possível ler o manifesto de vistas aéreas do macOS: %@";
 "ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。" = "Nenhuma imagem de fundo dinâmica baixada foi encontrada. Baixe uma das imagens de fundo dinâmicas da Apple nos Ajustes do Sistema.";
-"動画をロック画面用 mov に変換できませんでした。" = "Não foi possível converter o vídeo em .mov para a Tela Bloqueada.";
 "macOS の壁紙設定ファイルを取得できませんでした。" = "Não foi possível acessar o arquivo de ajustes de imagem de fundo do macOS.";
 "復元できる LiveWallpaper のバックアップが見つかりませんでした。" = "Nenhum backup do LiveWallpaper para restaurar foi encontrado.";
 "復元対象の Aerial バックアップが見つかりませんでした。" = "Nenhum backup de vista aérea para restaurar foi encontrado.";
 "macOS の壁紙設定に Aerial を正しく適用できませんでした。" = "Não foi possível aplicar corretamente a vista aérea aos ajustes de imagem de fundo do macOS.";
-"動画の mov 変換に失敗しました。" = "Não foi possível converter o vídeo em .mov.";
 "動画の mov 変換が完了しませんでした。" = "A conversão do vídeo em .mov não foi concluída.";
 "ロック画面用の動画を読み込めませんでした: %@" = "Não foi possível carregar o vídeo para a Tela Bloqueada: %@";
 "ロック画面用の動画を再生可能として読み込めませんでした。" = "O vídeo para a Tela Bloqueada não pôde ser carregado como reproduzível.";
@@ -1067,3 +1063,17 @@
 "「%@」には未許可のスクリプトがあり、動画が最新の編集を反映していません。スクリプトを許可するか停止してから書き出してください。" = "“%@” tem scripts que você não permitiu, por isso o vídeo não mostra as edições mais recentes. Permita ou interrompa os scripts antes de exportar.";
 "一時停止中(処理が重いため、自動で再開します)" = "Em pausa (lento demais, será retomado automaticamente)";
 "数値を入力して Return で反映します。右クリックで初期値に戻します" = "Digite um número e pressione Return para aplicar. Clique com o botão direito para redefinir para o padrão";
+"ロック画面とデスクトップにシステム壁紙として設定" = "Definir como Imagem de Fundo do Sistema para a Tela Bloqueada e a Mesa";
+"ロック画面とデスクトップは、システム壁紙に設定していないため残りません。" = "A Tela Bloqueada e a Mesa não serão mantidas porque o vídeo não está definido como imagem de fundo do sistema.";
+"システム壁紙に設定する" = "Definir como Imagem de Fundo do Sistema";
+"ロック画面用の動画に時間階層の情報を付けられませんでした。" = "Não foi possível adicionar as informações de camadas temporais ao vídeo da Tela Bloqueada.";
+"ロック画面用に変換中… %d%%" = "Convertendo para a Tela Bloqueada… %d%%";
+"ロック画面用に変換中… %d%%(あと %@)" = "Convertendo para a Tela Bloqueada… %d%% (faltam %@)";
+"スクリーンセーバーは、インストールしていないため残りません。" = "O protetor de tela não será mantido porque não está instalado.";
+"下の一覧で選んだ動画を、macOS のスクリーンセーバーとして再生します。選んでいないときは、デスクトップと同じ動画を、画面ごとの壁紙・トリム・配置も含めて再生します。" = "Reproduz como protetor de tela do macOS o vídeo escolhido na lista abaixo. Quando nenhum é escolhido, reproduz o que a Mesa mostra, incluindo a imagem de fundo, o corte e o posicionamento de cada tela.";
+"スクリーンセーバーは「壁紙」タブに移動しました" = "O protetor de tela foi movido para a aba Imagem de Fundo";
+"デスクトップと同じ" = "Igual à Mesa";
+"スクリーンセーバーのプレビュー" = "Pré-visualização do protetor de tela";
+"スクリーンセーバーに設定" = "Definir como Protetor de Tela";
+"スクリーンセーバーに設定中" = "Definido como protetor de tela";
+"共有・Web壁紙・ショートカット" = "Compartilhamento, imagens de fundo da web, atalhos";

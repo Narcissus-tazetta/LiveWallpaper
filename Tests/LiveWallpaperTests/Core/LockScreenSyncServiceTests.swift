@@ -30,15 +30,29 @@ final class LockScreenSyncServiceTests: XCTestCase {
 
         let store = try wallpaperStore(at: fixture.storeURL)
         let allSpacesAndDisplays = try XCTUnwrap(store["AllSpacesAndDisplays"] as? [String: Any])
-        try assertLinkedAerialState(allSpacesAndDisplays, assetID: tahoeID)
+        try assertAerialState(allSpacesAndDisplays, assetID: tahoeID)
 
         let systemDefault = try XCTUnwrap(store["SystemDefault"] as? [String: Any])
-        try assertLinkedAerialState(systemDefault, assetID: tahoeID)
-        try assertAllWallpaperStatesAreLinkedAerial(in: store, assetID: tahoeID)
+        try assertAerialState(systemDefault, assetID: tahoeID)
+        // The screen saver chosen beside the wallpaper stays chosen.
+        XCTAssertEqual(systemDefault["Type"] as? String, "individual")
+        XCTAssertNotNil(systemDefault["Idle"])
+        try assertAllWallpaperStatesShowTheAerial(in: store, assetID: tahoeID)
         let backupName = try XCTUnwrap(service.activeLease?.storeBackupFileName)
         XCTAssertTrue(FileManager.default.fileExists(
             atPath: fixture.storeURL.deletingLastPathComponent().appendingPathComponent(backupName).path
         ))
+    }
+
+    func testSyncKeepsLinkedStatesLinked() async throws {
+        let fixture = try makeFixture(downloadedIDs: [tahoeID], storeType: "linked")
+        let service = makeService(fixture)
+
+        _ = try await service.sync(videoURL: try writeFakeVideo(named: "source.mov", contents: "live-video"))
+
+        let store = try wallpaperStore(at: fixture.storeURL)
+        XCTAssertEqual((store["SystemDefault"] as? [String: Any])?["Type"] as? String, "linked")
+        try assertAllWallpaperStatesShowTheAerial(in: store, assetID: tahoeID)
     }
 
     func testSyncCreatesLeaseAndRestoreClearsIt() async throws {
@@ -75,7 +89,7 @@ final class LockScreenSyncServiceTests: XCTestCase {
 
         let store = try wallpaperStore(at: fixture.storeURL)
         let systemDefault = try XCTUnwrap(store["SystemDefault"] as? [String: Any])
-        let linked = try XCTUnwrap(systemDefault["Linked"] as? [String: Any])
+        let linked = try XCTUnwrap(systemDefault["Desktop"] as? [String: Any])
         let content = try XCTUnwrap(linked["Content"] as? [String: Any])
         let choices = try XCTUnwrap(content["Choices"] as? [[String: Any]])
         XCTAssertEqual(choices.first?["TemplateMarker"] as? String, "preserved")
@@ -126,38 +140,11 @@ final class LockScreenSyncServiceTests: XCTestCase {
         XCTAssertFalse(service.reloadProcessNames.contains("Wallpaper"))
     }
 
-    func testUnlockResetKillsOnlyAerialExtension() throws {
-        let fixture = try makeFixture(downloadedIDs: [tahoeID])
-        var killedProcesses: [String] = []
-        let service = makeService(fixture, shouldRestartWallpaperServices: true) { processName in
-            killedProcesses.append(processName)
-        }
-
-        service.resetAerialExtensionAfterUnlock()
-
-        XCTAssertEqual(service.unlockResetProcessNamesForTesting, ["WallpaperAerialsExtension"])
-        XCTAssertEqual(killedProcesses, ["WallpaperAerialsExtension"])
-        XCTAssertFalse(killedProcesses.contains("Wallpaper"))
-        XCTAssertFalse(killedProcesses.contains("WallpaperAgent"))
-    }
-
-    func testUnlockResetDoesNothingWhenRestartIsDisabled() throws {
-        let fixture = try makeFixture(downloadedIDs: [tahoeID])
-        var killedProcesses: [String] = []
-        let service = makeService(fixture, shouldRestartWallpaperServices: false) { processName in
-            killedProcesses.append(processName)
-        }
-
-        service.resetAerialExtensionAfterUnlock()
-
-        XCTAssertTrue(killedProcesses.isEmpty)
-    }
-
     func testInvalidMovIsRejectedBeforeApplyingWallpaperStore() async throws {
         let fixture = try makeFixture(downloadedIDs: [tahoeID])
         let originalStoreData = try Data(contentsOf: fixture.storeURL)
         let sourceVideoURL = try writeFakeVideo(named: "source.mov", contents: "not-a-real-movie")
-        let service = makeService(fixture, shouldValidatePreparedVideo: true)
+        let service = makeService(fixture, encodesVideo: true)
 
         do {
             _ = try await service.sync(videoURL: sourceVideoURL)
@@ -344,7 +331,7 @@ final class LockScreenSyncServiceTests: XCTestCase {
     private func makeService(
         _ fixture: Fixture,
         shouldRestartWallpaperServices: Bool = false,
-        shouldValidatePreparedVideo: Bool = false,
+        encodesVideo: Bool = false,
         processKiller: @escaping (String) -> Void = { _ in }
     ) -> LockScreenSyncService {
         LockScreenSyncService(
@@ -352,7 +339,8 @@ final class LockScreenSyncServiceTests: XCTestCase {
             wallpaperStoreURL: fixture.storeURL,
             aerialBackupDirectoryURL: fixture.backupDirectoryURL,
             shouldRestartWallpaperServices: shouldRestartWallpaperServices,
-            shouldValidatePreparedVideo: shouldValidatePreparedVideo,
+            encodesVideo: encodesVideo,
+            videoCacheDirectoryURL: nil,
             processKiller: processKiller
         )
     }
@@ -392,48 +380,36 @@ final class LockScreenSyncServiceTests: XCTestCase {
                 ]
             ]
         ]
-        let surfaceKey = type == "linked" ? "Linked" : "Idle"
+        let imageSurface: [String: Any] = [
+            "LastSet": Date(),
+            "LastUse": Date(),
+            "Content": [
+                "Choices": [
+                    [
+                        "Provider": "com.apple.wallpaper.choice.image",
+                        "Files": [],
+                        "Configuration": Data()
+                    ]
+                ]
+            ]
+        ]
+        // As the Store has them: one Linked surface, or a Desktop surface beside the
+        // screen saver's Idle one.
+        func state(_ desktop: [String: Any]) -> [String: Any] {
+            type == "linked"
+                ? ["Type": type, "Linked": desktop]
+                : ["Type": type, "Desktop": desktop, "Idle": Self.screenSaverSurface]
+        }
         let store: [String: Any] =
             includesWallpaperStates
                 ? [
-                    "AllSpacesAndDisplays": [
-                        "Type": type,
-                        surfaceKey: [
-                            "LastSet": Date(),
-                            "LastUse": Date(),
-                            "Content": [
-                                "Choices": [
-                                    [
-                                        "Provider": "com.apple.wallpaper.choice.image",
-                                        "Files": [],
-                                        "Configuration": Data()
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ],
-                    "SystemDefault": [
-                        "Type": type,
-                        surfaceKey: surface
-                    ],
-                    "Displays": [
-                        "display": [
-                            "Type": type,
-                            surfaceKey: surface
-                        ]
-                    ],
+                    "AllSpacesAndDisplays": state(imageSurface),
+                    "SystemDefault": state(surface),
+                    "Displays": ["display": state(surface)],
                     "Spaces": [
                         "space": [
-                            "Default": [
-                                "Type": type,
-                                surfaceKey: surface
-                            ],
-                            "Displays": [
-                                "display": [
-                                    "Type": type,
-                                    surfaceKey: surface
-                                ]
-                            ]
+                            "Default": state(surface),
+                            "Displays": ["display": state(surface)]
                         ]
                     ]
                 ] : [:]
@@ -469,29 +445,29 @@ final class LockScreenSyncServiceTests: XCTestCase {
         return try XCTUnwrap(plist as? [String: Any])
     }
 
-    private func assertAllWallpaperStatesAreLinkedAerial(
+    private func assertAllWallpaperStatesShowTheAerial(
         in store: [String: Any],
         assetID: String,
         file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
         if let state = store["AllSpacesAndDisplays"] as? [String: Any] {
-            try assertLinkedAerialState(state, assetID: assetID, file: file, line: line)
+            try assertAerialState(state, assetID: assetID, file: file, line: line)
         }
         if let state = store["SystemDefault"] as? [String: Any] {
-            try assertLinkedAerialState(state, assetID: assetID, file: file, line: line)
+            try assertAerialState(state, assetID: assetID, file: file, line: line)
         }
         if let displays = store["Displays"] as? [String: Any] {
             for value in displays.values {
                 let state = try XCTUnwrap(value as? [String: Any], file: file, line: line)
-                try assertLinkedAerialState(state, assetID: assetID, file: file, line: line)
+                try assertAerialState(state, assetID: assetID, file: file, line: line)
             }
         }
         if let spaces = store["Spaces"] as? [String: Any] {
             for value in spaces.values {
                 let space = try XCTUnwrap(value as? [String: Any], file: file, line: line)
                 if let defaultState = space["Default"] as? [String: Any] {
-                    try assertLinkedAerialState(
+                    try assertAerialState(
                         defaultState,
                         assetID: assetID,
                         file: file,
@@ -505,23 +481,36 @@ final class LockScreenSyncServiceTests: XCTestCase {
                             file: file,
                             line: line
                         )
-                        try assertLinkedAerialState(state, assetID: assetID, file: file, line: line)
+                        try assertAerialState(state, assetID: assetID, file: file, line: line)
                     }
                 }
             }
         }
     }
 
-    private func assertLinkedAerialState(
+    private func assertAerialState(
         _ state: [String: Any],
         assetID: String,
         file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
-        XCTAssertEqual(state["Type"] as? String, "linked", file: file, line: line)
-        XCTAssertNil(state["Idle"], file: file, line: line)
-        XCTAssertNil(state["Desktop"], file: file, line: line)
-        let surfaceState = try XCTUnwrap(state["Linked"] as? [String: Any], file: file, line: line)
+        let surfaceState: [String: Any]
+        if state["Type"] as? String == "individual" {
+            // The screen saver's surface is left as it was.
+            XCTAssertNil(state["Linked"], file: file, line: line)
+            XCTAssertEqual(
+                ((state["Idle"] as? [String: Any])?["Content"] as? [String: Any]).flatMap {
+                    ($0["Choices"] as? [[String: Any]])?.first?["Provider"] as? String
+                },
+                ScreenSaverSelection.provider, file: file, line: line
+            )
+            surfaceState = try XCTUnwrap(state["Desktop"] as? [String: Any], file: file, line: line)
+        } else {
+            XCTAssertEqual(state["Type"] as? String, "linked", file: file, line: line)
+            XCTAssertNil(state["Idle"], file: file, line: line)
+            XCTAssertNil(state["Desktop"], file: file, line: line)
+            surfaceState = try XCTUnwrap(state["Linked"] as? [String: Any], file: file, line: line)
+        }
         let content = try XCTUnwrap(
             surfaceState["Content"] as? [String: Any],
             file: file,
@@ -554,4 +543,15 @@ final class LockScreenSyncServiceTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "lockScreenBorrowedAerialName")
         UserDefaults.standard.removeObject(forKey: "lockScreenSyncEnabled")
     }
+
+    private static let screenSaverSurface: [String: Any] = [
+        "LastSet": Date(timeIntervalSince1970: 0),
+        "Content": [
+            "Choices": [[
+                "Provider": ScreenSaverSelection.provider,
+                "Files": [Any](),
+                "Configuration": Data()
+            ]]
+        ]
+    ]
 }

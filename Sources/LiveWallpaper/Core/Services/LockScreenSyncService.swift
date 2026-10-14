@@ -9,7 +9,6 @@ enum LockScreenSyncError: LocalizedError {
     case manifestMissing(URL)
     case invalidManifest(URL)
     case noDownloadedAerials
-    case exportSessionUnavailable
     case exportFailed(String)
     case invalidVideo(String)
     case wallpaperStoreUnavailable
@@ -31,8 +30,6 @@ enum LockScreenSyncError: LocalizedError {
             return String(format: NSLocalizedString("macOS の Aerial manifest を読み込めませんでした: %@", comment: ""), url.path)
         case .noDownloadedAerials:
             return NSLocalizedString("ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。", comment: "")
-        case .exportSessionUnavailable:
-            return NSLocalizedString("動画をロック画面用 mov に変換できませんでした。", comment: "")
         case let .exportFailed(message):
             return message
         case let .invalidVideo(message):
@@ -62,6 +59,12 @@ enum LockScreenSyncStatus: Equatable {
     case recovered
     case noAerialDownloaded
     case failed(String)
+}
+
+struct LockScreenEncodeProgress: Equatable {
+    var fraction: Double
+    /// nil until enough has been encoded to estimate it.
+    var remainingSeconds: Double?
 }
 
 struct BorrowedAerialAsset: Equatable {
@@ -106,9 +109,6 @@ final class LockScreenSyncService {
         "WallpaperAgent",
         "WallpaperAerialsExtension"
     ]
-    private let unlockResetProcessNames = [
-        "WallpaperAerialsExtension"
-    ]
     private let leaseDefaultsKey = "lockScreenSyncLease"
     private let legacyBorrowedAerialIDKey = "lockScreenBorrowedAerialID"
     private let legacyBorrowedAerialNameKey = "lockScreenBorrowedAerialName"
@@ -119,7 +119,8 @@ final class LockScreenSyncService {
         wallpaperStoreURL: URL? = nil,
         aerialBackupDirectoryURL: URL? = nil,
         shouldRestartWallpaperServices: Bool = true,
-        shouldValidatePreparedVideo: Bool = true,
+        encodesVideo: Bool = true,
+        videoCacheDirectoryURL: URL? = LockScreenSyncService.defaultVideoCacheDirectoryURL,
         processKiller: @escaping (String) -> Void = LockScreenSyncService.killProcess(named:)
     ) {
         self.fileManager = fileManager
@@ -134,8 +135,14 @@ final class LockScreenSyncService {
         )
         videoExporter = AerialVideoExporter(
             fileManager: fileManager,
-            shouldValidatePreparedVideo: shouldValidatePreparedVideo
+            encodesVideo: encodesVideo,
+            cacheDirectory: videoCacheDirectoryURL
         )
+    }
+
+    static var defaultVideoCacheDirectoryURL: URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("LiveWallpaper/LockScreenVideoCache", isDirectory: true)
     }
 
     var isSupported: Bool {
@@ -146,11 +153,11 @@ final class LockScreenSyncService {
         wallpaperServiceProcessNames
     }
 
-    var unlockResetProcessNamesForTesting: [String] {
-        unlockResetProcessNames
-    }
-
-    func sync(videoURL: URL) async throws -> BorrowedAerialAsset {
+    /// `progress` gets the fraction of the video encoded so far, from a background thread.
+    func sync(
+        videoURL: URL,
+        progress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> BorrowedAerialAsset {
         let operationID = beginSyncOperation()
         defer { finishSyncOperation(operationID) }
         guard isSupported || injectedAerialsBaseURL != nil else {
@@ -165,7 +172,7 @@ final class LockScreenSyncService {
         let temporaryVideoURL = paths.videosDirectory
             .appendingPathComponent(".\(borrowedAsset.id).\(UUID().uuidString)")
             .appendingPathExtension("mov")
-        try await videoExporter.prepareVideo(from: videoURL, to: temporaryVideoURL)
+        try await videoExporter.prepareVideo(from: videoURL, to: temporaryVideoURL, progress: progress)
         try Task.checkCancellation()
 
         do {
@@ -348,15 +355,6 @@ final class LockScreenSyncService {
             }
         }
         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
-    }
-
-    func resetAerialExtensionAfterUnlock() {
-        guard shouldRestartWallpaperServices else {
-            return
-        }
-        for processName in unlockResetProcessNames {
-            processKiller(processName)
-        }
     }
 
     private func saveLease(for asset: BorrowedAerialAsset, storeBackupFileName: String?) {

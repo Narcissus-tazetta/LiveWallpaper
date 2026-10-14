@@ -146,6 +146,37 @@ final class ScreenSaverInstallerTests: XCTestCase {
         XCTAssertNil((restored["AllSpacesAndDisplays"] as? [String: Any])?["Idle"])
     }
 
+    /// The lock screen sync can leave every state `linked`, with no Idle surface.
+    func testLinkedStatesGetAScreenSaverAndKeepTheirWallpaper() throws {
+        let installer = try installer(bundled: makeBundledSaver(buildID: "A"))
+        let wallpaper = Self.idle(provider: "com.apple.wallpaper.choice.aerials")
+        try writeStore([
+            "AllSpacesAndDisplays": ["Type": "linked", "Linked": wallpaper],
+            "SystemDefault": ["Type": "linked", "Linked": wallpaper]
+        ], to: installer)
+
+        try installer.install()
+        let selected = try readStore(installer)
+        for key in ["AllSpacesAndDisplays", "SystemDefault"] {
+            let state = try XCTUnwrap(selected[key] as? [String: Any])
+            XCTAssertEqual(state["Type"] as? String, "individual", key)
+            XCTAssertNil(state["Linked"], key)
+            XCTAssertEqual(
+                ((state["Desktop"] as? [String: Any])?["Content"] as? [String: Any]).flatMap {
+                    ($0["Choices"] as? [[String: Any]])?.first?["Provider"] as? String
+                },
+                "com.apple.wallpaper.choice.aerials", key
+            )
+            XCTAssertEqual(idleProvider(selected, [key]), ScreenSaverSelection.provider, key)
+            // WallpaperAgent resets the whole Store when a surface lacks one of these.
+            let idle = try XCTUnwrap(state["Idle"] as? [String: Any], key)
+            XCTAssertEqual(Set(idle.keys), ["Content", "LastSet", "LastUse"], key)
+        }
+
+        try installer.uninstall()
+        XCTAssertEqual(idleProvider(try readStore(installer), ["SystemDefault"]), "default")
+    }
+
     func testReinstallAfterAQuitThatNeverRestoredKeepsTheRealOriginals() throws {
         let installer = try installer(bundled: makeBundledSaver(buildID: "A"))
         try installer.install()

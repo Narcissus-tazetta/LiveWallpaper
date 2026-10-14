@@ -4,9 +4,9 @@ extension SettingsView {
     /// 表示可能な設定先タブ。ロック画面は対応OSのときだけ現れる。
     var availableAssignmentTargets: [WallpaperAssignmentTarget] {
         if model.lockScreenSyncService.isSupported {
-            return [.desktop, .lockScreen]
+            return [.desktop, .lockScreen, .screenSaver]
         }
-        return [.desktop]
+        return [.desktop, .screenSaver]
     }
 
     /// 「どこに設定するか」を切り替えるタブバー。各タブは現在割り当て中の
@@ -257,6 +257,8 @@ extension SettingsView {
             return model.localizedString("デスクトップ")
         case .lockScreen:
             return model.localizedString("ロック画面")
+        case .screenSaver:
+            return model.localizedString("スクリーンセーバー")
         }
     }
 
@@ -272,6 +274,8 @@ extension SettingsView {
             return "display"
         case .lockScreen:
             return "lock.fill"
+        case .screenSaver:
+            return "moon.stars.fill"
         }
     }
 
@@ -296,6 +300,8 @@ extension SettingsView {
             return .accentColor
         case .lockScreen:
             return .orange
+        case .screenSaver:
+            return .indigo
         }
     }
 
@@ -317,6 +323,8 @@ extension SettingsView {
             return currentWallpaperSummaryText()
         case .lockScreen:
             return currentLockScreenWallpaperSummaryText()
+        case .screenSaver:
+            return currentScreenSaverSummaryText()
         }
     }
 
@@ -340,6 +348,8 @@ extension SettingsView {
             }
         case .lockScreen:
             lockScreenWallpaperPreview
+        case .screenSaver:
+            screenSaverWallpaperPreview
         }
     }
 

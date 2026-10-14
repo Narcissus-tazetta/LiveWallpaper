@@ -561,7 +561,6 @@
 "システム設定で選ぶ" = "Choisir dans Réglages Système";
 "アンインストール" = "Désinstaller";
 "インストール" = "Installer";
-"今デスクトップに表示している動画の壁紙を、macOS のスクリーンセーバーとして再生します。画面ごとの壁紙・トリム・配置もそのまま反映されます。" = "Lit comme économiseur d’écran macOS le fond d’écran vidéo actuellement affiché sur le bureau, y compris les fonds d’écran de chaque écran, le découpage et la disposition.";
 "このビルドにはスクリーンセーバーが含まれていません。" = "Cette version ne contient pas l’économiseur d’écran.";
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Les fonds d’écran web ne peuvent pas être lus comme économiseur d’écran. Choisissez un fond d’écran vidéo pour l’utiliser.";
 "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "Tant que LiveWallpaper est ouvert, il est automatiquement choisi comme économiseur d’écran. Quitter ou désinstaller l’app rétablit votre économiseur d’écran précédent.";
@@ -580,7 +579,6 @@
 "一時停止中" = "En pause";
 "起動・動画と音声・言語・アップデート" = "Démarrage, vidéo et son, langue, mises à jour";
 "壁紙の表示方法・切り替え・省電力" = "Affichage des fonds d’écran, changement, économie d’énergie";
-"共有・Web壁紙・ショートカット・スクリーンセーバー" = "Partage, fonds d’écran web, raccourcis, économiseur d’écran";
 "エフェクトの長さ" = "Durée de l’effet";
 "詳細…" = "Détails…";
 "完了" = "Terminé";
@@ -701,12 +699,10 @@
 "macOS の Aerial manifest が見つかりません: %@" = "Le manifeste des vues aériennes de macOS est introuvable : %@";
 "macOS の Aerial manifest を読み込めませんでした: %@" = "Impossible de lire le manifeste des vues aériennes de macOS : %@";
 "ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。" = "Aucun fond d’écran dynamique téléchargé n’a été trouvé. Téléchargez l’un des fonds d’écran dynamiques d’Apple dans Réglages Système.";
-"動画をロック画面用 mov に変換できませんでした。" = "Impossible de convertir la vidéo en .mov pour l’écran verrouillé.";
 "macOS の壁紙設定ファイルを取得できませんでした。" = "Impossible d’accéder au fichier de réglages du fond d’écran de macOS.";
 "復元できる LiveWallpaper のバックアップが見つかりませんでした。" = "Aucune sauvegarde LiveWallpaper à restaurer n’a été trouvée.";
 "復元対象の Aerial バックアップが見つかりませんでした。" = "Aucune sauvegarde de vue aérienne à restaurer n’a été trouvée.";
 "macOS の壁紙設定に Aerial を正しく適用できませんでした。" = "Impossible d’appliquer correctement la vue aérienne aux réglages du fond d’écran de macOS.";
-"動画の mov 変換に失敗しました。" = "Impossible de convertir la vidéo en .mov.";
 "動画の mov 変換が完了しませんでした。" = "La conversion de la vidéo en .mov n’est pas allée à son terme.";
 "ロック画面用の動画を読み込めませんでした: %@" = "Impossible de charger la vidéo pour l’écran verrouillé : %@";
 "ロック画面用の動画を再生可能として読み込めませんでした。" = "La vidéo pour l’écran verrouillé n’a pas pu être chargée en tant que vidéo lisible.";
@@ -1067,3 +1063,17 @@
 "「%@」には未許可のスクリプトがあり、動画が最新の編集を反映していません。スクリプトを許可するか停止してから書き出してください。" = "« %@ » contient des scripts non autorisés : sa vidéo ne reflète donc pas les dernières modifications. Autorisez ou arrêtez les scripts avant l’exportation.";
 "一時停止中(処理が重いため、自動で再開します)" = "En pause (trop lent, reprise automatique)";
 "数値を入力して Return で反映します。右クリックで初期値に戻します" = "Saisissez un nombre et appuyez sur Retour pour l’appliquer. Clic droit pour rétablir la valeur par défaut";
+"ロック画面とデスクトップにシステム壁紙として設定" = "Définir comme fond d’écran système pour l’écran verrouillé et le bureau";
+"ロック画面とデスクトップは、システム壁紙に設定していないため残りません。" = "L’écran verrouillé et le bureau ne seront pas conservés, car la vidéo n’est pas définie comme fond d’écran système.";
+"システム壁紙に設定する" = "Définir comme fond d’écran système";
+"ロック画面用の動画に時間階層の情報を付けられませんでした。" = "Impossible d’ajouter les informations de couches temporelles à la vidéo de l’écran verrouillé.";
+"ロック画面用に変換中… %d%%" = "Conversion pour l’écran verrouillé… %d %%";
+"ロック画面用に変換中… %d%%(あと %@)" = "Conversion pour l’écran verrouillé… %d %% (%@ restantes)";
+"スクリーンセーバーは、インストールしていないため残りません。" = "L’économiseur d’écran ne sera pas conservé, car il n’est pas installé.";
+"下の一覧で選んだ動画を、macOS のスクリーンセーバーとして再生します。選んでいないときは、デスクトップと同じ動画を、画面ごとの壁紙・トリム・配置も含めて再生します。" = "Lit la vidéo choisie dans la liste ci‑dessous comme économiseur d’écran de macOS. Si aucune n’est choisie, il lit ce qu’affiche le bureau, y compris le fond, le découpage et la disposition de chaque écran.";
+"スクリーンセーバーは「壁紙」タブに移動しました" = "L’économiseur d’écran se trouve désormais dans l’onglet Fond d’écran";
+"デスクトップと同じ" = "Comme le bureau";
+"スクリーンセーバーのプレビュー" = "Aperçu de l’économiseur d’écran";
+"スクリーンセーバーに設定" = "Définir comme économiseur d’écran";
+"スクリーンセーバーに設定中" = "Défini comme économiseur d’écran";
+"共有・Web壁紙・ショートカット" = "Partage, fonds web, raccourcis";

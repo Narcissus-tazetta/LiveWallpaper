@@ -601,9 +601,9 @@ struct SettingsView: View {
                 }
             }
             Group {
-                if settingsSectionVisible(.screenSaver) {
-                    screenSaverSettingsSection
-                    settingsSectionMatchHint(.screenSaver)
+                // The screen saver lives on the wallpaper tab; search shows the way there.
+                if isSettingsSearchActive, settingsSectionMatches(.screenSaver) {
+                    screenSaverSearchRedirectSection
                 }
                 if settingsSectionVisible(.reset) {
                     resetSettingsSection

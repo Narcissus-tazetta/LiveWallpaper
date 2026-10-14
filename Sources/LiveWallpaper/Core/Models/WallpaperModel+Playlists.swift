@@ -562,6 +562,7 @@ extension WallpaperModel {
         if wasLockScreen {
             clearLockScreenVideoIfMissing(path: trimmed)
         }
+        clearScreenSaverVideoIfMissing(path: trimmed)
 
         // Web壁紙が実際に表示中のときの currentVideoPath は「動画に戻すときの
         // フォールバック参照」でしかなく、再生には使われていない。削除しても

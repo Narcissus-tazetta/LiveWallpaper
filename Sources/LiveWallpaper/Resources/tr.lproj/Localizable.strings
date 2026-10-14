@@ -561,7 +561,6 @@
 "システム設定で選ぶ" = "Sistem Ayarları’nda Seç";
 "アンインストール" = "Yüklemeyi Kaldır";
 "インストール" = "Yükle";
-"今デスクトップに表示している動画の壁紙を、macOS のスクリーンセーバーとして再生します。画面ごとの壁紙・トリム・配置もそのまま反映されます。" = "Şu anda masaüstünde gösterilen video duvar kâğıdını, ekran başına duvar kâğıtları, kırpma ve düzen dahil olmak üzere macOS ekran koruyucusu olarak oynatır.";
 "このビルドにはスクリーンセーバーが含まれていません。" = "Bu yapı ekran koruyucuyu içermiyor.";
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Web duvar kâğıtları ekran koruyucu olarak oynatılamaz. Kullanmak için bir video duvar kâğıdı seçin.";
 "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "LiveWallpaper çalışırken ekran koruyucu olarak otomatik olarak seçilir. Uygulamadan çıktığınızda veya yüklemesini kaldırdığınızda önceki ekran koruyucunuza geri dönülür.";
@@ -580,7 +579,6 @@
 "一時停止中" = "Duraklatıldı";
 "起動・動画と音声・言語・アップデート" = "Başlangıç, video ve ses, dil, güncellemeler";
 "壁紙の表示方法・切り替え・省電力" = "Duvar kâğıtlarının gösterimi, değiştirme, güç tasarrufu";
-"共有・Web壁紙・ショートカット・スクリーンセーバー" = "Paylaşım, web duvar kâğıtları, klavye kestirmeleri, ekran koruyucu";
 "エフェクトの長さ" = "Efekt süresi";
 "詳細…" = "Ayrıntılar…";
 "完了" = "Bitti";
@@ -701,12 +699,10 @@
 "macOS の Aerial manifest が見つかりません: %@" = "macOS havadan çekim bildirim dosyası bulunamadı: %@";
 "macOS の Aerial manifest を読み込めませんでした: %@" = "macOS havadan çekim bildirim dosyası okunamadı: %@";
 "ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。" = "İndirilmiş dinamik duvar kâğıdı bulunamadı. Sistem Ayarları’nda Apple’ın dinamik duvar kâğıtlarından birini indirin.";
-"動画をロック画面用 mov に変換できませんでした。" = "Video, kilitli ekran için .mov dosyasına dönüştürülemedi.";
 "macOS の壁紙設定ファイルを取得できませんでした。" = "macOS duvar kâğıdı ayar dosyasına erişilemedi.";
 "復元できる LiveWallpaper のバックアップが見つかりませんでした。" = "Geri yüklenecek LiveWallpaper yedeği bulunamadı.";
 "復元対象の Aerial バックアップが見つかりませんでした。" = "Geri yüklenecek havadan çekim yedeği bulunamadı.";
 "macOS の壁紙設定に Aerial を正しく適用できませんでした。" = "Havadan çekim, macOS duvar kâğıdı ayarlarına doğru şekilde uygulanamadı.";
-"動画の mov 変換に失敗しました。" = "Video .mov dosyasına dönüştürülemedi.";
 "動画の mov 変換が完了しませんでした。" = "Videonun .mov dosyasına dönüştürülmesi tamamlanmadı.";
 "ロック画面用の動画を読み込めませんでした: %@" = "Kilitli ekran videosu yüklenemedi: %@";
 "ロック画面用の動画を再生可能として読み込めませんでした。" = "Kilitli ekran videosu oynatılabilir olarak yüklenemedi.";
@@ -1067,3 +1063,17 @@
 "「%@」には未許可のスクリプトがあり、動画が最新の編集を反映していません。スクリプトを許可するか停止してから書き出してください。" = "“%@” izin vermediğiniz betikler içeriyor, bu nedenle videosu son düzenlemeleri göstermiyor. Dışa aktarmadan önce betiklere izin verin veya onları durdurun.";
 "一時停止中(処理が重いため、自動で再開します)" = "Duraklatıldı (çok yavaş, otomatik olarak sürdürülecek)";
 "数値を入力して Return で反映します。右クリックで初期値に戻します" = "Bir sayı yazın ve uygulamak için Return tuşuna basın. Varsayılana sıfırlamak için sağ tıklayın";
+"ロック画面とデスクトップにシステム壁紙として設定" = "Kilitli Ekran ve masaüstü için sistem duvar kâğıdı olarak ayarla";
+"ロック画面とデスクトップは、システム壁紙に設定していないため残りません。" = "Video sistem duvar kâğıdı olarak ayarlanmadığı için Kilitli Ekran ve masaüstü korunmaz.";
+"システム壁紙に設定する" = "Sistem Duvar Kâğıdı Olarak Ayarla";
+"ロック画面用の動画に時間階層の情報を付けられませんでした。" = "Kilitli Ekran videosuna zamansal katman bilgisi eklenemedi.";
+"ロック画面用に変換中… %d%%" = "Kilitli Ekran için dönüştürülüyor… %%%d";
+"ロック画面用に変換中… %d%%(あと %@)" = "Kilitli Ekran için dönüştürülüyor… %%%d (%@ kaldı)";
+"スクリーンセーバーは、インストールしていないため残りません。" = "Ekran koruyucu yüklü olmadığı için korunmaz.";
+"下の一覧で選んだ動画を、macOS のスクリーンセーバーとして再生します。選んでいないときは、デスクトップと同じ動画を、画面ごとの壁紙・トリム・配置も含めて再生します。" = "Aşağıdaki listeden seçtiğiniz videoyu macOS ekran koruyucusu olarak oynatır. Hiçbiri seçilmezse her ekranın duvar kâğıdı, kırpması ve yerleşimi dahil olmak üzere masaüstünün gösterdiğini oynatır.";
+"スクリーンセーバーは「壁紙」タブに移動しました" = "Ekran koruyucu Duvar Kâğıdı sekmesine taşındı";
+"デスクトップと同じ" = "Masaüstüyle aynı";
+"スクリーンセーバーのプレビュー" = "Ekran koruyucu önizlemesi";
+"スクリーンセーバーに設定" = "Ekran Koruyucu Olarak Ayarla";
+"スクリーンセーバーに設定中" = "Ekran koruyucu olarak ayarlandı";
+"共有・Web壁紙・ショートカット" = "Paylaşım, web duvar kâğıtları, kısayollar";

@@ -561,7 +561,6 @@
 "システム設定で選ぶ" = "In den Systemeinstellungen auswählen";
 "アンインストール" = "Deinstallieren";
 "インストール" = "Installieren";
-"今デスクトップに表示している動画の壁紙を、macOS のスクリーンセーバーとして再生します。画面ごとの壁紙・トリム・配置もそのまま反映されます。" = "Spielt das aktuell auf dem Schreibtisch angezeigte Video-Hintergrundbild als macOS-Bildschirmschoner ab – einschließlich der Hintergrundbilder pro Bildschirm, des Zuschnitts und der Anordnung.";
 "このビルドにはスクリーンセーバーが含まれていません。" = "Dieser Build enthält keinen Bildschirmschoner.";
 "Web壁紙はスクリーンセーバーでは再生できません。動画の壁紙を選ぶと反映されます。" = "Web-Hintergrundbilder können nicht als Bildschirmschoner abgespielt werden. Wähle ein Video-Hintergrundbild, um es zu verwenden.";
 "LiveWallpaper の起動中は、スクリーンセーバーに LiveWallpaper が自動で選ばれます。アプリを終了するかアンインストールすると、元のスクリーンセーバーに戻ります。" = "Solange LiveWallpaper geöffnet ist, wird es automatisch als Bildschirmschoner ausgewählt. Wenn du die App beendest oder deinstallierst, wird dein vorheriger Bildschirmschoner wiederhergestellt.";
@@ -580,7 +579,6 @@
 "一時停止中" = "Angehalten";
 "起動・動画と音声・言語・アップデート" = "Start, Video und Ton, Sprache, Updates";
 "壁紙の表示方法・切り替え・省電力" = "Anzeige der Hintergrundbilder, Wechsel, Energiesparen";
-"共有・Web壁紙・ショートカット・スクリーンセーバー" = "Teilen, Web-Hintergrundbilder, Kurzbefehle, Bildschirmschoner";
 "エフェクトの長さ" = "Effektdauer";
 "詳細…" = "Details …";
 "完了" = "Fertig";
@@ -701,12 +699,10 @@
 "macOS の Aerial manifest が見つかりません: %@" = "Das Manifest der macOS-Luftaufnahmen wurde nicht gefunden: %@";
 "macOS の Aerial manifest を読み込めませんでした: %@" = "Das Manifest der macOS-Luftaufnahmen konnte nicht gelesen werden: %@";
 "ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。" = "Es wurde kein geladenes dynamisches Hintergrundbild gefunden. Lade in den Systemeinstellungen eines der dynamischen Hintergrundbilder von Apple.";
-"動画をロック画面用 mov に変換できませんでした。" = "Das Video konnte nicht in eine .mov-Datei für den Sperrbildschirm konvertiert werden.";
 "macOS の壁紙設定ファイルを取得できませんでした。" = "Auf die Hintergrundbild-Einstellungsdatei von macOS konnte nicht zugegriffen werden.";
 "復元できる LiveWallpaper のバックアップが見つかりませんでした。" = "Es wurde kein LiveWallpaper-Backup zum Wiederherstellen gefunden.";
 "復元対象の Aerial バックアップが見つかりませんでした。" = "Es wurde kein Backup der Luftaufnahme zum Wiederherstellen gefunden.";
 "macOS の壁紙設定に Aerial を正しく適用できませんでした。" = "Die Luftaufnahme konnte nicht korrekt auf die Hintergrundbild-Einstellungen von macOS angewendet werden.";
-"動画の mov 変換に失敗しました。" = "Das Video konnte nicht in eine .mov-Datei konvertiert werden.";
 "動画の mov 変換が完了しませんでした。" = "Die Konvertierung des Videos in eine .mov-Datei wurde nicht abgeschlossen.";
 "ロック画面用の動画を読み込めませんでした: %@" = "Das Video für den Sperrbildschirm konnte nicht geladen werden: %@";
 "ロック画面用の動画を再生可能として読み込めませんでした。" = "Das Video für den Sperrbildschirm konnte nicht als abspielbar geladen werden.";
@@ -1067,3 +1063,17 @@
 "「%@」には未許可のスクリプトがあり、動画が最新の編集を反映していません。スクリプトを許可するか停止してから書き出してください。" = "„%@“ enthält nicht erlaubte Skripte, daher zeigt das Video nicht die neuesten Änderungen. Erlaube oder stoppe die Skripte vor dem Exportieren.";
 "一時停止中(処理が重いため、自動で再開します)" = "Pausiert (zu langsam, wird automatisch fortgesetzt)";
 "数値を入力して Return で反映します。右クリックで初期値に戻します" = "Gib eine Zahl ein und drücke den Zeilenschalter, um sie zu übernehmen. Rechtsklick setzt auf den Standardwert zurück";
+"ロック画面とデスクトップにシステム壁紙として設定" = "Als System-Hintergrundbild für Sperrbildschirm und Schreibtisch festlegen";
+"ロック画面とデスクトップは、システム壁紙に設定していないため残りません。" = "Sperrbildschirm und Schreibtisch bleiben nicht erhalten, weil das Video nicht als System-Hintergrundbild festgelegt ist.";
+"システム壁紙に設定する" = "Als System-Hintergrundbild festlegen";
+"ロック画面用の動画に時間階層の情報を付けられませんでした。" = "Dem Video für den Sperrbildschirm konnten keine zeitlichen Ebeneninformationen hinzugefügt werden.";
+"ロック画面用に変換中… %d%%" = "Wird für den Sperrbildschirm konvertiert … %d %%";
+"ロック画面用に変換中… %d%%(あと %@)" = "Wird für den Sperrbildschirm konvertiert … %d %% (noch %@)";
+"スクリーンセーバーは、インストールしていないため残りません。" = "Der Bildschirmschoner bleibt nicht erhalten, weil er nicht installiert ist.";
+"下の一覧で選んだ動画を、macOS のスクリーンセーバーとして再生します。選んでいないときは、デスクトップと同じ動画を、画面ごとの壁紙・トリム・配置も含めて再生します。" = "Spielt das in der Liste unten ausgewählte Video als macOS-Bildschirmschoner ab. Ist keines ausgewählt, wird das Video des Schreibtischs abgespielt – einschließlich Hintergrundbild, Kürzung und Platzierung jedes Bildschirms.";
+"スクリーンセーバーは「壁紙」タブに移動しました" = "Der Bildschirmschoner befindet sich jetzt im Tab „Hintergrundbild“";
+"デスクトップと同じ" = "Wie Schreibtisch";
+"スクリーンセーバーのプレビュー" = "Vorschau des Bildschirmschoners";
+"スクリーンセーバーに設定" = "Als Bildschirmschoner festlegen";
+"スクリーンセーバーに設定中" = "Als Bildschirmschoner festgelegt";
+"共有・Web壁紙・ショートカット" = "Teilen, Web-Hintergrundbilder, Kurzbefehle";

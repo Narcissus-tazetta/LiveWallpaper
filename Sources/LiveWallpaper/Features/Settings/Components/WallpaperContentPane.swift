@@ -49,6 +49,7 @@ extension SettingsView {
         activeDisplayOverrideScreenID != nil
             || activeSpaceScopeUUID != nil
             || selectedAssignmentTarget == .lockScreen
+            || selectedAssignmentTarget == .screenSaver
             || !model.registeredPlaybackEntries.isEmpty
     }
 
@@ -60,6 +61,8 @@ extension SettingsView {
             spaceScopeControls(forSpaceUUID: spaceUUID)
         } else if selectedAssignmentTarget == .lockScreen {
             lockScreenSyncControls
+        } else if selectedAssignmentTarget == .screenSaver {
+            screenSaverControls
         } else {
             playlistPlaybackControls
         }

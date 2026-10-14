@@ -414,9 +414,30 @@ extension WallpaperModel {
         lockScreenSyncTask?.cancel()
         lockScreenSyncService.cancelPendingSync()
         lockScreenSyncStatus = .syncing
+        lockScreenEncodeProgress = nil
+        let syncID = UUID()
+        lockScreenSyncID = syncID
+        let startedAt = Date()
+        // Encoding a long 4K video takes over an hour; App Nap would stretch it further
+        // while the app sits in the background with no window.
+        let activity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep, reason: "Encoding the lock screen video"
+        )
         lockScreenSyncTask = Task { [weak self] in
+            defer {
+                ProcessInfo.processInfo.endActivity(activity)
+                Task { @MainActor [weak self] in
+                    if self?.lockScreenSyncID == syncID {
+                        self?.lockScreenEncodeProgress = nil
+                    }
+                }
+            }
             do {
-                let borrowedAsset = try await service.sync(videoURL: videoURL)
+                let borrowedAsset = try await service.sync(videoURL: videoURL) { fraction in
+                    Task { @MainActor [weak self] in
+                        self?.updateLockScreenEncodeProgress(fraction, startedAt: startedAt, syncID: syncID)
+                    }
+                }
                 await MainActor.run {
                     guard let self, !Task.isCancelled else {
                         return
@@ -441,11 +462,19 @@ extension WallpaperModel {
         }
     }
 
+    private func updateLockScreenEncodeProgress(_ fraction: Double, startedAt: Date, syncID: UUID) {
+        guard lockScreenSyncID == syncID, lockScreenSyncStatus == .syncing else {
+            return
+        }
+        let elapsed = Date().timeIntervalSince(startedAt)
+        // The first moments include opening the file and starting the encoder.
+        let remaining = fraction >= 0.01 && elapsed >= 3 ? elapsed / fraction * (1 - fraction) : nil
+        lockScreenEncodeProgress = LockScreenEncodeProgress(fraction: fraction, remainingSeconds: remaining)
+    }
+
     func releaseLockScreenBorrowIfNeeded() {
         lockScreenSyncTask?.cancel()
         lockScreenSyncService.cancelPendingSync()
-        lockScreenUnlockResetWorkItem?.cancel()
-        lockScreenUnlockResetWorkItem = nil
 
         guard lockScreenSyncService.hasActiveLease else {
             lockScreenSyncStatus = lockScreenSyncEnabled ? .idle : .disabled
@@ -469,8 +498,6 @@ extension WallpaperModel {
 
         lockScreenSyncTask?.cancel()
         lockScreenSyncService.cancelPendingSync()
-        lockScreenUnlockResetWorkItem?.cancel()
-        lockScreenUnlockResetWorkItem = nil
         lockScreenSyncStatus = .removing
         lockScreenSyncTask = Task { [weak self] in
             do {
@@ -498,8 +525,6 @@ extension WallpaperModel {
         let service = lockScreenSyncService
         lockScreenSyncTask?.cancel()
         lockScreenSyncService.cancelPendingSync()
-        lockScreenUnlockResetWorkItem?.cancel()
-        lockScreenUnlockResetWorkItem = nil
         lockScreenSyncStatus = .restoring
         lockScreenSyncTask = Task { [weak self] in
             do {
@@ -525,72 +550,6 @@ extension WallpaperModel {
 
     func openLockScreenWallpaperSettings() {
         lockScreenSyncService.openWallpaperSettings()
-    }
-
-    func handleScreenUnlockedForLockScreenSync(delay: TimeInterval = 1.5) {
-        guard shouldResetAerialExtensionAfterUnlock else {
-            return
-        }
-
-        lockScreenUnlockResetWorkItem?.cancel()
-        let initialSignature = displayReadySignature()
-        let deadline = Date().addingTimeInterval(max(delay, 1.5) + 3.0)
-        let workItem = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated {
-                self?.waitForDisplaysThenResetAerialExtension(
-                    previousSignature: initialSignature,
-                    deadline: deadline
-                )
-            }
-        }
-        lockScreenUnlockResetWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
-    }
-
-    private func waitForDisplaysThenResetAerialExtension(
-        previousSignature: String,
-        deadline: Date
-    ) {
-        guard shouldResetAerialExtensionAfterUnlock else {
-            return
-        }
-
-        let currentSignature = displayReadySignature()
-        if currentSignature == previousSignature || Date() >= deadline {
-            lockScreenSyncService.resetAerialExtensionAfterUnlock()
-            lockScreenUnlockResetWorkItem = nil
-            return
-        }
-
-        let workItem = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self else {
-                    return
-                }
-                self.waitForDisplaysThenResetAerialExtension(
-                    previousSignature: currentSignature,
-                    deadline: deadline
-                )
-            }
-        }
-        lockScreenUnlockResetWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
-    }
-
-    private func displayReadySignature() -> String {
-        NSScreen.screens
-            .map { screen in
-                let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? ""
-                return "\(id):\(screen.frame.integral)"
-            }
-            .sorted()
-            .joined(separator: "|")
-    }
-
-    var shouldResetAerialExtensionAfterUnlock: Bool {
-        lockScreenSyncEnabled
-            && lockScreenSyncService.isSupported
-            && lockScreenSyncService.hasActiveLease
     }
 
     func recoverStaleLockScreenSyncOnLaunchIfNeeded() {
@@ -626,8 +585,6 @@ extension WallpaperModel {
 
     func restoreLockScreenSyncBeforeExit() {
         lockScreenSyncTask?.cancel()
-        lockScreenUnlockResetWorkItem?.cancel()
-        lockScreenUnlockResetWorkItem = nil
         guard lockScreenSyncService.hasActiveLease, !keepLockScreenAndScreenSaverAfterQuit else {
             return
         }
