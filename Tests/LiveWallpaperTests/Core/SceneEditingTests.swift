@@ -80,10 +80,11 @@ final class SceneEditingTests: XCTestCase {
             renderer.allowsSinglePassComposite = singlePass
             let first = try frame(renderer, time: 0)
             let last = try frame(renderer, time: Double(scene.loopSeconds) - 1.0 / 60)
-            let meanDifference = Double(zip(first, last).map { abs(Int($0) - Int($1)) }.reduce(
-                0,
-                +
-            )) / Double(first.count)
+            var totalDifference = 0
+            for (a, b) in zip(first, last) {
+                totalDifference += abs(Int(a) - Int(b))
+            }
+            let meanDifference = Double(totalDifference) / Double(first.count)
             XCTAssertLessThan(
                 meanDifference,
                 1,
