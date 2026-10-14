@@ -66,11 +66,12 @@ extension FitEditorController {
                 case FitKeyCode.right:
                     moveDraftOffset(dx: step, dy: 0, path: path, screenID: screenID)
                     return nil
+                // Offsets point up, as on the desktop.
                 case FitKeyCode.down:
-                    moveDraftOffset(dx: 0, dy: step, path: path, screenID: screenID)
+                    moveDraftOffset(dx: 0, dy: -step, path: path, screenID: screenID)
                     return nil
                 case FitKeyCode.up:
-                    moveDraftOffset(dx: 0, dy: -step, path: path, screenID: screenID)
+                    moveDraftOffset(dx: 0, dy: step, path: path, screenID: screenID)
                     return nil
                 default:
                     return event

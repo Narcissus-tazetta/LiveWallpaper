@@ -19,6 +19,11 @@ extension SettingsView {
                 offsetX: offsetX,
                 offsetY: offsetY
             )
+            // The geometry's y axis points up, as on the desktop (PlayerView is not
+            // flipped); this preview and its pointer input point down.
+            let viewTranslation = CGSize(
+                width: frameGeometry.translation.width, height: -frameGeometry.translation.height
+            )
 
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
@@ -30,7 +35,7 @@ extension SettingsView {
                             videoPath: path,
                             fitMode: fitMode,
                             renderedSize: frameGeometry.renderedSize,
-                            translation: frameGeometry.translation
+                            translation: viewTranslation
                         )
                         .id(path)
                         .frame(width: canvasSize.width, height: canvasSize.height)
@@ -43,8 +48,8 @@ extension SettingsView {
                                     height: frameGeometry.renderedSize.height
                                 )
                                 .offset(
-                                    x: frameGeometry.translation.width,
-                                    y: frameGeometry.translation.height
+                                    x: viewTranslation.width,
+                                    y: viewTranslation.height
                                 )
                                 .frame(width: canvasSize.width, height: canvasSize.height)
                                 .clipped()
@@ -72,7 +77,7 @@ extension SettingsView {
                     },
                     onDelta: { delta in
                         let normalizedDX = Double(delta.width / max(frameSize.width, 1)) * 2
-                        let normalizedDY = Double(delta.height / max(frameSize.height, 1)) * 2
+                        let normalizedDY = -Double(delta.height / max(frameSize.height, 1)) * 2
                         // Offsets are fractions of the room to pan, so the same
                         // distance on screen is a different offset on each axis. An
                         // axis without room never snaps (-1).
@@ -93,7 +98,7 @@ extension SettingsView {
                     },
                     onScrollDelta: { delta in
                         let normalizedDX = Double(delta.width / max(frameSize.width, 1)) * 2
-                        let normalizedDY = Double(delta.height / max(frameSize.height, 1)) * 2
+                        let normalizedDY = -Double(delta.height / max(frameSize.height, 1)) * 2
                         fitEditor.moveDraftOffset(
                             dx: normalizedDX,
                             dy: normalizedDY,
@@ -107,7 +112,7 @@ extension SettingsView {
                     onZoomChange: { zoom, anchor in
                         fitEditor.setDraftZoom(
                             zoom,
-                            anchor: anchor,
+                            anchor: anchor.map { CGPoint(x: $0.x, y: -$0.y) },
                             path: path,
                             screenID: screenID
                         )

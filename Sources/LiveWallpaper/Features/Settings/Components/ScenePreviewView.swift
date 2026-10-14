@@ -44,6 +44,8 @@ struct ScenePreviewView: NSViewRepresentable {
     var markers: [ScenePreviewMarker] = []
     /// Seconds into the loop to hold the preview at; nil follows the controller.
     var fixedTime: Double?
+    /// What each screen shows on the desktop, in canvas UV; the rest is dimmed.
+    var visibleRegions: [CGRect] = []
     var onScriptIssues: (([SceneScriptIssue]) -> Void)?
     var onScriptLogs: (([UUID: String]) -> Void)?
 
@@ -74,6 +76,7 @@ struct ScenePreviewView: NSViewRepresentable {
         )
         view.show(document, videoPath: videoPath)
         view.markers = markers
+        view.visibleRegions = visibleRegions
         view.layoutOverlays()
     }
 
@@ -112,6 +115,7 @@ final class ScenePreviewNSView: NSView {
     var editableTransform: ((SceneLayer) -> SceneTransform?)?
     var onTransformLayer: ((UUID, SceneTransform) -> Void)?
     var markers: [ScenePreviewMarker] = []
+    var visibleRegions: [CGRect] = []
 
     var clockState = ClockState(fixedTime: nil, isPlaying: true, pausedTime: 0) {
         didSet {
@@ -127,6 +131,8 @@ final class ScenePreviewNSView: NSView {
     private let guideLayer = CAShapeLayer()
     private let brushLayer = CAShapeLayer()
     private let flowLayer = CAShapeLayer()
+    private let offscreenLayer = CAShapeLayer()
+    private let screenOutlineLayer = CAShapeLayer()
     private let hitTester = SceneHitTester()
     private var drag: Drag?
     private var snapGuides: [SIMD2<Float>?] = []
@@ -185,6 +191,15 @@ final class ScenePreviewNSView: NSView {
         brushLayer.lineDashPattern = [4, 3]
         flowLayer.strokeColor = NSColor.systemCyan.cgColor
         flowLayer.lineWidth = 1.5
+        for shape in [screenOutlineLayer, offscreenLayer] {
+            shape.actions = ["path": NSNull(), "hidden": NSNull()]
+            sceneLayer?.insertSublayer(shape, at: 0)
+        }
+        offscreenLayer.fillColor = NSColor.black.withAlphaComponent(0.5).cgColor
+        screenOutlineLayer.fillColor = nil
+        screenOutlineLayer.strokeColor = NSColor.white.withAlphaComponent(0.8).cgColor
+        screenOutlineLayer.lineWidth = 1
+        screenOutlineLayer.lineDashPattern = [4, 3]
     }
 
     required init?(coder: NSCoder) {
@@ -222,12 +237,40 @@ final class ScenePreviewNSView: NSView {
         }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        layoutVisibleRegions()
         layoutMarkers(renderer: renderer)
         layoutSelection(renderer: renderer)
         layoutGuides()
         layoutBrush(renderer: renderer)
         layoutFlow(renderer: renderer)
         CATransaction.commit()
+    }
+
+    private func layoutVisibleRegions() {
+        let rects = visibleRegions.map { region in
+            let a = point(SIMD2(Float(region.minX), Float(region.minY)))
+            let b = point(SIMD2(Float(region.maxX), Float(region.maxY)))
+            return CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
+        }
+        func isCropped(_ region: CGRect) -> Bool {
+            region.width < 0.999 || region.height < 0.999
+        }
+        guard visibleRegions.contains(where: isCropped) else {
+            offscreenLayer.isHidden = true
+            screenOutlineLayer.isHidden = true
+            return
+        }
+        let shown = rects.dropFirst().reduce(CGPath(rect: rects[0], transform: nil)) { path, rect in
+            path.union(CGPath(rect: rect, transform: nil))
+        }
+        offscreenLayer.path = CGPath(rect: bounds, transform: nil).subtracting(shown)
+        offscreenLayer.isHidden = false
+        let outline = CGMutablePath()
+        for (region, rect) in zip(visibleRegions, rects) where isCropped(region) {
+            outline.addRect(rect)
+        }
+        screenOutlineLayer.path = outline
+        screenOutlineLayer.isHidden = false
     }
 
     private func layoutMarkers(renderer: SceneRenderer) {

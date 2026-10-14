@@ -69,4 +69,21 @@ enum WallpaperGeometry {
             maxPan: CGSize(width: maxPanX, height: maxPanY)
         )
     }
+
+    /// The part of the video a container shows, in video UV (origin top-left, clamped
+    /// to 0...1). The container's y axis points up, as in the desktop's PlayerView.
+    static func visibleVideoRect(containerSize: CGSize, geometry: WallpaperRenderGeometry) -> CGRect {
+        let width = max(Double(geometry.renderedSize.width), 1)
+        let height = max(Double(geometry.renderedSize.height), 1)
+        let originX = (Double(containerSize.width) - width) * 0.5 + Double(geometry.translation.width)
+        let originY = (Double(containerSize.height) - height) * 0.5 + Double(geometry.translation.height)
+        func clamp(_ value: Double) -> Double {
+            min(max(value, 0), 1)
+        }
+        let minX = clamp(-originX / width)
+        let maxX = clamp((Double(containerSize.width) - originX) / width)
+        let minY = clamp((originY + height - Double(containerSize.height)) / height)
+        let maxY = clamp((originY + height) / height)
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
 }

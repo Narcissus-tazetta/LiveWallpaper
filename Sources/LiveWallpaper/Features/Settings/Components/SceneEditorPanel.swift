@@ -97,6 +97,7 @@ extension SettingsView {
             .flatMap { id in document.layers.first { $0.id == id } }
             .flatMap { selectedSceneKeyframe(in: $0) }
             .map { $0.time * Double(document.loopSeconds) }
+        let visibleRegions = model.desktopVisibleRegions(path: path, videoAspectRatio: document.aspectRatio)
         ScenePreviewView(
             document: comparison ?? trial?.document ?? document,
             videoPath: path,
@@ -119,6 +120,7 @@ extension SettingsView {
             },
             markers: isEditable ? scenePreviewMarkers(document: document, layerID: selectedID) : [],
             fixedTime: fixedTime,
+            visibleRegions: visibleRegions,
             onScriptIssues: { issues in
                 if model.sceneScriptIssues[path] != issues { model.sceneScriptIssues[path] = issues }
             },
@@ -181,6 +183,10 @@ extension SettingsView {
             settingsFootnote(
                 model.localizedString("レイヤーをクリックして選び、ドラッグで移動します。四隅で拡大・縮小、上の丸で回転します(⇧で15°ずつ、⌘でスナップなし)。ポインタを動かすと、カーソルへの反応も確かめられます。")
             )
+        }
+
+        if visibleRegions.contains(where: { $0.width < 0.999 || $0.height < 0.999 }) {
+            settingsFootnote(model.localizedString("暗い部分は、デスクトップでは画面の外になり表示されません。"))
         }
 
         scenePresetGuideCard(path: path, document: document)

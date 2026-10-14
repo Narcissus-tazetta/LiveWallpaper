@@ -382,6 +382,55 @@ extension WallpaperModel {
         refreshPlayerPresentations()
     }
 
+    /// The part of `path` each screen shows on the desktop, in video UV (origin top-left),
+    /// one entry per distinct crop.
+    func desktopVisibleRegions(path: String, videoAspectRatio: Double) -> [CGRect] {
+        var regions: [CGRect] = []
+        for info in availableDisplayScreens() {
+            let region = visibleRegion(
+                of: info, presentation: presentation(for: path, screenID: info.id), videoAspectRatio: videoAspectRatio
+            )
+            let isDuplicate = regions.contains { other in
+                abs(other.minX - region.minX) < 0.001 && abs(other.minY - region.minY) < 0.001
+                    && abs(other.maxX - region.maxX) < 0.001 && abs(other.maxY - region.maxY) < 0.001
+            }
+            if !isDuplicate {
+                regions.append(region)
+            }
+        }
+        return regions
+    }
+
+    /// The part of `path` one screen shows, in video UV (origin top-left). nil picks the
+    /// screen with the menu bar. Without `appliesPresentation` it is the plain centred
+    /// fill the lock screen uses.
+    func screenVisibleRegion(
+        path: String, screenID: String?, videoAspectRatio: Double, appliesPresentation: Bool = true
+    ) -> CGRect {
+        let screens = availableDisplayScreens()
+        guard let info = screens.first(where: { $0.id == screenID }) ?? screens.first else {
+            return CGRect(x: 0, y: 0, width: 1, height: 1)
+        }
+        let current = appliesPresentation
+            ? presentation(for: path, screenID: info.id)
+            : WallpaperPresentation(fitMode: .fill, zoom: 1, offsetX: 0, offsetY: 0)
+        return visibleRegion(of: info, presentation: current, videoAspectRatio: videoAspectRatio)
+    }
+
+    private func visibleRegion(
+        of screen: DisplayScreenInfo, presentation: WallpaperPresentation, videoAspectRatio: Double
+    ) -> CGRect {
+        let geometry = WallpaperGeometry.resolve(
+            containerSize: screen.frame.size,
+            videoAspectRatio: videoAspectRatio,
+            fitMode: presentation.fitMode,
+            zoom: presentation.zoom,
+            offsetX: presentation.offsetX,
+            offsetY: presentation.offsetY
+        )
+        return WallpaperGeometry.visibleVideoRect(containerSize: screen.frame.size, geometry: geometry)
+    }
+
     func videoNaturalSize(for path: String) -> CGSize? {
         videoNaturalSizeByPath[path]
     }

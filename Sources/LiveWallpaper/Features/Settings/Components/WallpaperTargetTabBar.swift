@@ -340,7 +340,14 @@ extension SettingsView {
                 desktopWallpaperPreview
                     .overlay {
                         if let path = model.currentVideoPath, isDesktopPreviewLive {
+                            let aspect = thumbnailCache.image(for: path)
+                                .map { Double($0.size.width / max($0.size.height, 1)) }
                             LoopingVideoView(path: path)
+                                .showingVideoRegion(
+                                    aspect.map { screenRegion(path: path, screenID: nil)($0) }
+                                        ?? CGRect(x: 0, y: 0, width: 1, height: 1),
+                                    videoAspectRatio: aspect ?? 16.0 / 9.0
+                                )
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                 .allowsHitTesting(false)
                         }
@@ -362,6 +369,7 @@ extension SettingsView {
         let path = model.videoOverride(forScreenID: screenID)
         wallpaperPreviewThumbnail(
             image: path.flatMap { thumbnailCache.image(for: $0) },
+            region: path.map { screenRegion(path: $0, screenID: screenID) },
             accessibilityLabel: model.localizedString("現在の壁紙プレビュー")
         )
         .onAppear {

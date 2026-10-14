@@ -144,4 +144,36 @@ final class WallpaperGeometryTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(geometry.maxPan.width, 0)
         XCTAssertGreaterThanOrEqual(geometry.maxPan.height, 0)
     }
+
+    func testVisibleVideoRectCropsTopAndBottomInFillMode() {
+        let geometry = WallpaperGeometry.resolve(
+            containerSize: container, videoAspectRatio: 1, fitMode: .fill, zoom: 1, offsetX: 0, offsetY: 0
+        )
+        let rect = WallpaperGeometry.visibleVideoRect(containerSize: container, geometry: geometry)
+
+        XCTAssertEqual(rect.minX, 0, accuracy: 0.0001)
+        XCTAssertEqual(rect.maxX, 1, accuracy: 0.0001)
+        XCTAssertEqual(rect.minY, 0.21875, accuracy: 0.0001)
+        XCTAssertEqual(rect.maxY, 0.78125, accuracy: 0.0001)
+    }
+
+    func testVisibleVideoRectFollowsPanOnUpwardYAxis() {
+        // Panning up lifts the video, so the screen shows its bottom (UV y near 1).
+        let geometry = WallpaperGeometry.resolve(
+            containerSize: container, videoAspectRatio: 1, fitMode: .fill, zoom: 1, offsetX: 0, offsetY: 1
+        )
+        let rect = WallpaperGeometry.visibleVideoRect(containerSize: container, geometry: geometry)
+
+        XCTAssertEqual(rect.minY, 0.4375, accuracy: 0.0001)
+        XCTAssertEqual(rect.maxY, 1, accuracy: 0.0001)
+    }
+
+    func testVisibleVideoRectIsWholeVideoInFitMode() {
+        let geometry = WallpaperGeometry.resolve(
+            containerSize: container, videoAspectRatio: 1, fitMode: .fit, zoom: 1, offsetX: 0, offsetY: 0
+        )
+        let rect = WallpaperGeometry.visibleVideoRect(containerSize: container, geometry: geometry)
+
+        XCTAssertEqual(rect, CGRect(x: 0, y: 0, width: 1, height: 1))
+    }
 }
