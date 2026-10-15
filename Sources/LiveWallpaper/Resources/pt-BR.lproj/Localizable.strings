@@ -1079,3 +1079,7 @@
 "共有・Web壁紙・ショートカット" = "Compartilhamento, imagens de fundo da web, atalhos";
 "暗い部分は、デスクトップでは画面の外になり表示されません。" = "As áreas escurecidas ficam fora da tela na Mesa e não são exibidas.";
 "このMacの動画エンコーダーはロック画面の動画に必要な情報を作れないため、ロックを解除したあとにロック画面が止まることがあります。" = "O codificador de vídeo deste Mac não consegue criar as informações de que os vídeos da Tela Bloqueada precisam, então a Tela Bloqueada pode parar depois do desbloqueio.";
+"指定" = "Personalizado";
+"開始位置" = "Quadro Inicial";
+"ロック画面と、アプリを終了している間のデスクトップは、このコマから始まります。それより前の部分は最後に回ります。保存すると変換し直します(数分かかることがあります)。" = "A Tela Bloqueada, e a mesa enquanto o app não está aberto, começam neste quadro. A parte anterior é reproduzida no final. Salvar converte o vídeo novamente (pode levar alguns minutos).";
+"先頭が暗い動画は、明るくなったコマから始めます。ロック画面と、アプリを終了している間のデスクトップに使われます。" = "Um vídeo que começa escuro inicia no primeiro quadro claro. Usado na Tela Bloqueada e na mesa enquanto o app não está aberto.";

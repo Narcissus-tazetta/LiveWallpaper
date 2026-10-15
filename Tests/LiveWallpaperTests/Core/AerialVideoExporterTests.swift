@@ -134,6 +134,34 @@ final class AerialVideoExporterTests: XCTestCase {
         XCTAssertLessThan(try brightness(of: opening), 20, "the dark opening plays at the end")
     }
 
+    /// The user can pick the frame the lock screen (and the desktop after quitting)
+    /// begins at, even where the automatic choice would start elsewhere.
+    func testAPickedStartFrameComesFirst() async throws {
+        // Bright for the first second, then dim: on its own it would start at zero.
+        let source = try await writeH264Video(seconds: 2, framesPerSecond: 30) { frame in
+            frame < 30 ? 200 : 80
+        }
+        let destination = directory.appendingPathComponent("aerial.mov")
+
+        try await AerialVideoExporter(
+            fileManager: .default,
+            encodesVideo: true,
+            cacheDirectory: nil
+        )
+        .prepareVideo(from: source, to: destination, start: 1.0)
+
+        let asset = AVURLAsset(url: destination)
+        let duration = try await asset.load(.duration)
+        XCTAssertEqual(duration.seconds, 2, accuracy: 0.05)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let first = try await generator.image(at: .zero).image
+        let later = try await generator.image(at: CMTime(value: 1500, timescale: 1000)).image
+        XCTAssertEqual(try brightness(of: first), 80, accuracy: 20)
+        XCTAssertEqual(try brightness(of: later), 200, accuracy: 20, "the part before the start plays at the end")
+    }
+
     func testANonVideoIsRejected() async throws {
         let source = directory.appendingPathComponent("source.mov")
         try Data("not a movie".utf8).write(to: source)

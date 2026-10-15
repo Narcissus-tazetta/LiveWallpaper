@@ -429,6 +429,7 @@ extension WallpaperModel {
         }
 
         let videoURL = URL(fileURLWithPath: lockScreenPath)
+        let start = lockScreenStartSeconds
         let service = lockScreenSyncService
 
         lockScreenSyncTask?.cancel()
@@ -453,7 +454,7 @@ extension WallpaperModel {
                 }
             }
             do {
-                let borrowedAsset = try await service.sync(videoURL: videoURL) { fraction in
+                let borrowedAsset = try await service.sync(videoURL: videoURL, start: start) { fraction in
                     Task { @MainActor [weak self] in
                         self?.updateLockScreenEncodeProgress(fraction, startedAt: startedAt, syncID: syncID)
                     }

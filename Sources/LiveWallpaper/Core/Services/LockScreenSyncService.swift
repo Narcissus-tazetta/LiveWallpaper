@@ -153,9 +153,12 @@ final class LockScreenSyncService {
         wallpaperServiceProcessNames
     }
 
-    /// `progress` gets the fraction of the video encoded so far, from a background thread.
+    /// `start` is the source time the lock screen video begins at; nil picks it
+    /// automatically. `progress` gets the fraction of the video encoded so far, from a
+    /// background thread.
     func sync(
         videoURL: URL,
+        start: Double? = nil,
         progress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> BorrowedAerialAsset {
         let operationID = beginSyncOperation()
@@ -172,7 +175,9 @@ final class LockScreenSyncService {
         let temporaryVideoURL = paths.videosDirectory
             .appendingPathComponent(".\(borrowedAsset.id).\(UUID().uuidString)")
             .appendingPathExtension("mov")
-        try await videoExporter.prepareVideo(from: videoURL, to: temporaryVideoURL, progress: progress)
+        try await videoExporter.prepareVideo(
+            from: videoURL, to: temporaryVideoURL, start: start, progress: progress
+        )
         try Task.checkCancellation()
 
         do {

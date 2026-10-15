@@ -4,6 +4,7 @@ import Foundation
 extension WallpaperModel {
     private static let lockScreenVideoPathKey = "lockScreenVideoPath"
     private static let lockScreenVideoPathMigratedKey = "lockScreenVideoPathMigrated"
+    private static let lockScreenStartSecondsKey = "lockScreenStartSecondsByVideo"
 
     var effectiveLockScreenVideoPath: String? {
         Self.validatedVideoPath(lockScreenVideoPath)
@@ -11,6 +12,27 @@ extension WallpaperModel {
 
     func restoreLockScreenVideoPath() {
         migrateLockScreenVideoPathIfNeeded()
+        lockScreenStartSecondsByVideo = UserDefaults.standard
+            .dictionary(forKey: Self.lockScreenStartSecondsKey) as? [String: Double] ?? [:]
+    }
+
+    /// nil: the lock screen video starts automatically at its first visible frame.
+    var lockScreenStartSeconds: Double? {
+        effectiveLockScreenVideoPath.flatMap { lockScreenStartSecondsByVideo[$0] }
+    }
+
+    /// Re-encodes the lock screen video when syncing is on: the start is baked into it.
+    func setLockScreenStartSeconds(_ seconds: Double?) {
+        guard let path = effectiveLockScreenVideoPath,
+              lockScreenStartSecondsByVideo[path] != seconds
+        else {
+            return
+        }
+        lockScreenStartSecondsByVideo[path] = seconds
+        UserDefaults.standard.set(lockScreenStartSecondsByVideo, forKey: Self.lockScreenStartSecondsKey)
+        if lockScreenSyncEnabled {
+            syncCurrentVideoToLockScreen()
+        }
     }
 
     func migrateLockScreenVideoPathIfNeeded() {

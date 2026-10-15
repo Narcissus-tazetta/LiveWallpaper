@@ -1079,3 +1079,7 @@
 "共有・Web壁紙・ショートカット" = "Chia sẻ, hình nền web, phím tắt";
 "暗い部分は、デスクトップでは画面の外になり表示されません。" = "Các vùng bị làm tối nằm ngoài màn hình trên màn hình nền nên không được hiển thị.";
 "このMacの動画エンコーダーはロック画面の動画に必要な情報を作れないため、ロックを解除したあとにロック画面が止まることがあります。" = "Bộ mã hóa video của máy Mac này không tạo được thông tin mà video màn hình khóa cần, nên màn hình khóa có thể dừng lại sau khi mở khóa.";
+"指定" = "Tùy chỉnh";
+"開始位置" = "Khung hình bắt đầu";
+"ロック画面と、アプリを終了している間のデスクトップは、このコマから始まります。それより前の部分は最後に回ります。保存すると変換し直します(数分かかることがあります)。" = "Màn hình khóa và màn hình nền khi ứng dụng không chạy sẽ bắt đầu từ khung hình này. Phần trước đó được phát ở cuối. Khi lưu, video sẽ được chuyển đổi lại (có thể mất vài phút).";
+"先頭が暗い動画は、明るくなったコマから始めます。ロック画面と、アプリを終了している間のデスクトップに使われます。" = "Video bắt đầu tối sẽ bắt đầu từ khung hình sáng đầu tiên. Dùng cho Màn hình khóa và màn hình nền khi ứng dụng không chạy.";

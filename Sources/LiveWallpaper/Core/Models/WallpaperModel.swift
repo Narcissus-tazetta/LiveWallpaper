@@ -277,6 +277,9 @@ final class WallpaperModel: ObservableObject {
     @Published var selectedPlaylistID: UUID?
     @Published var currentVideoPath: String?
     @Published var lockScreenVideoPath: String?
+    /// Source seconds each lock screen video begins at; a video without an entry
+    /// starts automatically at its first visible frame.
+    @Published var lockScreenStartSecondsByVideo: [String: Double] = [:]
     @Published var registeredVideoPaths: [String] = []
     /// 選択中プレイリスト(または未選択時はライブラリ全体)に属するWeb壁紙。
     /// 次へ/前へ送りの対象になる点で registeredVideoPaths のWeb壁紙版。

@@ -77,6 +77,11 @@ extension SettingsView {
         .foregroundColor(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
 
+      if let path = model.effectiveLockScreenVideoPath {
+        Divider()
+        LockScreenStartPicker(model: model, videoPath: path, isDisabled: lockScreenSyncActionInProgress)
+      }
+
       if !AerialVideoExporter.supportsTemporalLayers {
         Label(
           model.localizedString("このMacの動画エンコーダーはロック画面の動画に必要な情報を作れないため、ロックを解除したあとにロック画面が止まることがあります。"),

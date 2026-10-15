@@ -1079,3 +1079,7 @@
 "共有・Web壁紙・ショートカット" = "Paylaşım, web duvar kâğıtları, kısayollar";
 "暗い部分は、デスクトップでは画面の外になり表示されません。" = "Karartılan alanlar masaüstünde ekranın dışında kalır ve gösterilmez.";
 "このMacの動画エンコーダーはロック画面の動画に必要な情報を作れないため、ロックを解除したあとにロック画面が止まることがあります。" = "Bu Mac’in video kodlayıcısı, Kilitli Ekran videolarının gerektirdiği bilgileri oluşturamaz; bu nedenle kilidi açtıktan sonra Kilitli Ekran durabilir.";
+"指定" = "Özel";
+"開始位置" = "Başlangıç Karesi";
+"ロック画面と、アプリを終了している間のデスクトップは、このコマから始まります。それより前の部分は最後に回ります。保存すると変換し直します(数分かかることがあります)。" = "Kilitli Ekran ve uygulama çalışmazken masaüstü bu kareden başlar. Önceki kısım sonda oynatılır. Kaydetmek videoyu yeniden dönüştürür (birkaç dakika sürebilir).";
+"先頭が暗い動画は、明るくなったコマから始めます。ロック画面と、アプリを終了している間のデスクトップに使われます。" = "Karanlık başlayan bir video ilk aydınlık kareden başlar. Kilitli Ekran’da ve uygulama çalışmazken masaüstünde kullanılır.";

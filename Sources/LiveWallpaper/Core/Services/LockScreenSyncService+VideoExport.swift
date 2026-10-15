@@ -61,10 +61,12 @@ struct AerialVideoExporter {
         self.cacheDirectory = cacheDirectory
     }
 
+    /// `start` is the source time the video begins at; nil picks it automatically.
     /// `progress` gets the encoded fraction, 0...1, from a background thread.
     func prepareVideo(
         from sourceURL: URL,
         to destinationURL: URL,
+        start: Double? = nil,
         progress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws {
         if fileManager.fileExists(atPath: destinationURL.path) {
@@ -75,7 +77,7 @@ struct AerialVideoExporter {
             return
         }
         let cachedURL = try cacheDirectory.map { directory in
-            try directory.appendingPathComponent(cacheKey(for: sourceURL))
+            try directory.appendingPathComponent(cacheKey(for: sourceURL, start: start))
                 .appendingPathExtension("mov")
         }
         if let cachedURL, fileManager.fileExists(atPath: cachedURL.path) {
@@ -103,7 +105,7 @@ struct AerialVideoExporter {
                     withIntermediateDirectories: true
                 )
             }
-            try await encode(AVURLAsset(url: sourceURL), to: encodedURL, progress: progress)
+            try await encode(AVURLAsset(url: sourceURL), to: encodedURL, start: start, progress: progress)
             try await validatePreparedVideo(at: encodedURL)
             if let cachedURL {
                 try keepOnly(encodedURL, as: cachedURL)
@@ -117,11 +119,12 @@ struct AerialVideoExporter {
         }
     }
 
-    private func cacheKey(for sourceURL: URL) throws -> String {
+    private func cacheKey(for sourceURL: URL, start: Double?) throws -> String {
         let attributes = try fileManager.attributesOfItem(atPath: sourceURL.path)
         let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
         let modified = (attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
-        let identity = "\(sourceURL.standardizedFileURL.path)|\(size)|\(modified)|\(Self.encodingVersion)"
+        let startKey = start.map { String($0) } ?? "auto"
+        let identity = "\(sourceURL.standardizedFileURL.path)|\(size)|\(modified)|\(Self.encodingVersion)|\(startKey)"
         return SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
@@ -142,6 +145,7 @@ struct AerialVideoExporter {
     private func encode(
         _ asset: AVURLAsset,
         to destinationURL: URL,
+        start requestedStart: Double?,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         let track: AVAssetTrack
@@ -191,9 +195,16 @@ struct AerialVideoExporter {
         // Without the app, the desktop shows the lock screen video's still frame where
         // it last stopped, and the first frame after a login or a WallpaperAgent restart.
         // A video that fades in from black would leave a black desktop, so the video
-        // starts at its first visible frame and the dark opening plays at the end. The
-        // loop stays seamless: the end runs straight into the opening.
-        let start = try Self.firstVisibleFrameTime(
+        // starts at its first visible frame (or the one the user picked) and the part
+        // before it plays at the end. The loop stays seamless: the end runs straight
+        // into the opening.
+        let start = try requestedStart.map {
+            // A start at the very end would leave nothing for the first part.
+            CMTimeMinimum(
+                CMTime(seconds: max($0, 0), preferredTimescale: 600),
+                duration - CMTime(value: 1, timescale: 10)
+            )
+        } ?? Self.firstVisibleFrameTime(
             in: makeSource(CMTimeRange(
                 start: .zero,
                 end: CMTimeMinimum(
@@ -205,7 +216,7 @@ struct AerialVideoExporter {
         AppLog.lockScreenSync.info(
             "lock screen video starts at \(start.seconds, format: .fixed(precision: 3), privacy: .public)s"
         )
-        let sources = try (start == .zero
+        let sources = try (start <= .zero
             ? [CMTimeRange(start: .zero, end: duration)]
             : [CMTimeRange(start: start, end: duration), CMTimeRange(start: .zero, end: start)])
             .map(makeSource)
