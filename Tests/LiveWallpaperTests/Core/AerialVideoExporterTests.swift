@@ -63,6 +63,10 @@ final class AerialVideoExporterTests: XCTestCase {
             }
         }
         XCTAssertEqual(samples, 480, "2 s at 240 fps")
+        // Without an encoder that makes them, the video is still made, without layers.
+        guard AerialVideoExporter.supportsTemporalLayers else {
+            return
+        }
         XCTAssertEqual(withLayers, samples)
         XCTAssertGreaterThan(levels.count, 1, "more than the base layer: \(levels)")
     }

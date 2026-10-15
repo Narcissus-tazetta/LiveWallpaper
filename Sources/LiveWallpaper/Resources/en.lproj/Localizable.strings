@@ -1078,3 +1078,4 @@
 "スクリーンセーバーに設定中" = "Set as screen saver";
 "共有・Web壁紙・ショートカット" = "Sharing, web wallpapers, shortcuts";
 "暗い部分は、デスクトップでは画面の外になり表示されません。" = "The darkened areas fall outside the screen on the desktop and are not shown.";
+"このMacの動画エンコーダーはロック画面の動画に必要な情報を作れないため、ロックを解除したあとにロック画面が止まることがあります。" = "This Mac’s video encoder can’t create the information Lock Screen videos need, so the Lock Screen may stop after you unlock.";

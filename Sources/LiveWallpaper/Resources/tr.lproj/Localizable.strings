@@ -1078,3 +1078,4 @@
 "スクリーンセーバーに設定中" = "Ekran koruyucu olarak ayarlandı";
 "共有・Web壁紙・ショートカット" = "Paylaşım, web duvar kâğıtları, kısayollar";
 "暗い部分は、デスクトップでは画面の外になり表示されません。" = "Karartılan alanlar masaüstünde ekranın dışında kalır ve gösterilmez.";
+"このMacの動画エンコーダーはロック画面の動画に必要な情報を作れないため、ロックを解除したあとにロック画面が止まることがあります。" = "Bu Mac’in video kodlayıcısı, Kilitli Ekran videolarının gerektirdiği bilgileri oluşturamaz; bu nedenle kilidi açtıktan sonra Kilitli Ekran durabilir.";

@@ -1078,3 +1078,4 @@
 "スクリーンセーバーに設定中" = "Definido como protetor de tela";
 "共有・Web壁紙・ショートカット" = "Compartilhamento, imagens de fundo da web, atalhos";
 "暗い部分は、デスクトップでは画面の外になり表示されません。" = "As áreas escurecidas ficam fora da tela na Mesa e não são exibidas.";
+"このMacの動画エンコーダーはロック画面の動画に必要な情報を作れないため、ロックを解除したあとにロック画面が止まることがあります。" = "O codificador de vídeo deste Mac não consegue criar as informações de que os vídeos da Tela Bloqueada precisam, então a Tela Bloqueada pode parar depois do desbloqueio.";

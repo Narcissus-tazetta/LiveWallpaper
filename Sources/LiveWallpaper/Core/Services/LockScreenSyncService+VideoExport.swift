@@ -16,6 +16,30 @@ struct AerialVideoExporter {
     /// The frame rate of the lowest temporal layer; the encoder layers the rest above it.
     static let baseLayerFrameRate = 15
 
+    /// Whether this Mac's HEVC encoder can make temporal layers. The software encoder
+    /// (Macs without HEVC hardware, and x86_64 under Rosetta) cannot; videos are then
+    /// encoded without them rather than failing, and the lock screen may stop after
+    /// an unlock.
+    static let supportsTemporalLayers: Bool = {
+        var session: VTCompressionSession?
+        let status = VTCompressionSessionCreate(
+            allocator: nil, width: 1920, height: 1080, codecType: kCMVideoCodecType_HEVC,
+            encoderSpecification: nil, imageBufferAttributes: nil, compressedDataAllocator: nil,
+            outputCallback: nil, refcon: nil, compressionSessionOut: &session
+        )
+        guard status == noErr, let session else {
+            return false
+        }
+        defer { VTCompressionSessionInvalidate(session) }
+        let result = VTSessionSetProperty(
+            session, key: kVTCompressionPropertyKey_BaseLayerFrameRate, value: baseLayerFrameRate as CFNumber
+        )
+        if result != noErr {
+            AppLog.lockScreenSync.info("HEVC encoder has no temporal layers: \(result, privacy: .public)")
+        }
+        return result == noErr
+    }()
+
     private static let encodeQueue = DispatchQueue(
         label: "com.sakana.livewallpaper.aerial-encode",
         qos: .utility
@@ -245,9 +269,9 @@ struct AerialVideoExporter {
                 comment: ""
             ))
         }
-        // The encoder silently leaves the layers out when it cannot make them, and the
+        // An encoder that supports layers can still leave them out silently, and the
         // lock screen then freezes after the first unlock: fail here instead.
-        guard try Self.hasTemporalLayers(asset: asset, track: track) else {
+        guard try !Self.supportsTemporalLayers || Self.hasTemporalLayers(asset: asset, track: track) else {
             throw LockScreenSyncError.exportFailed(
                 NSLocalizedString("ロック画面用の動画に時間階層の情報を付けられませんでした。", comment: "")
             )
@@ -401,11 +425,13 @@ private final class LayeredHEVCEncoder: @unchecked Sendable {
         var properties: [CFString: Any] = [
             kVTCompressionPropertyKey_RealTime: false,
             kVTCompressionPropertyKey_ExpectedFrameRate: AerialVideoExporter.frameRate,
-            kVTCompressionPropertyKey_BaseLayerFrameRate: AerialVideoExporter.baseLayerFrameRate,
             kVTCompressionPropertyKey_AverageBitRate: bitRate,
             kVTCompressionPropertyKey_ProfileLevel: isHDR
                 ? kVTProfileLevel_HEVC_Main10_AutoLevel : kVTProfileLevel_HEVC_Main_AutoLevel
         ]
+        if AerialVideoExporter.supportsTemporalLayers {
+            properties[kVTCompressionPropertyKey_BaseLayerFrameRate] = AerialVideoExporter.baseLayerFrameRate
+        }
         // The colour description, and for HDR its mastering data, comes from the source.
         let extensions = sourceFormat
             .flatMap { CMFormatDescriptionGetExtensions($0) as? [CFString: Any] } ?? [:]

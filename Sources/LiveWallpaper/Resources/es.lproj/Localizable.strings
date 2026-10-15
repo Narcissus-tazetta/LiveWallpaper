@@ -1078,3 +1078,4 @@
 "スクリーンセーバーに設定中" = "Usado como salvapantallas";
 "共有・Web壁紙・ショートカット" = "Compartir, fondos web, atajos";
 "暗い部分は、デスクトップでは画面の外になり表示されません。" = "Las zonas oscurecidas quedan fuera de la pantalla en el escritorio y no se muestran.";
+"このMacの動画エンコーダーはロック画面の動画に必要な情報を作れないため、ロックを解除したあとにロック画面が止まることがあります。" = "El codificador de vídeo de este Mac no puede crear la información que necesitan los vídeos de la pantalla de bloqueo, por lo que la pantalla de bloqueo puede detenerse tras desbloquear.";
