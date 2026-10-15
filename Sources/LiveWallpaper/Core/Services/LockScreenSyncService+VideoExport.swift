@@ -46,7 +46,7 @@ struct AerialVideoExporter {
     )
 
     /// Bump when the encoding changes, so videos encoded the old way are made again.
-    private static let encodingVersion = 1
+    private static let encodingVersion = 2
 
     private let fileManager: FileManager
     /// false only in tests, whose placeholder files are not videos: they are copied as is.
@@ -175,14 +175,40 @@ struct AerialVideoExporter {
             ))
         }
 
-        let reader = try AVAssetReader(asset: asset)
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
-            kCVPixelBufferPixelFormatTypeKey as String: isHDR
-                ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
-                : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
-        ])
-        output.alwaysCopiesSampleData = false
-        reader.add(output)
+        let pixelFormat = isHDR
+            ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+            : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        func makeSource(_ range: CMTimeRange) throws -> FrameSource {
+            let reader = try AVAssetReader(asset: asset)
+            reader.timeRange = range
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: pixelFormat
+            ])
+            output.alwaysCopiesSampleData = false
+            reader.add(output)
+            return FrameSource(reader: reader, output: output, range: range)
+        }
+        // Without the app, the desktop shows the lock screen video's still frame where
+        // it last stopped, and the first frame after a login or a WallpaperAgent restart.
+        // A video that fades in from black would leave a black desktop, so the video
+        // starts at its first visible frame and the dark opening plays at the end. The
+        // loop stays seamless: the end runs straight into the opening.
+        let start = try Self.firstVisibleFrameTime(
+            in: makeSource(CMTimeRange(
+                start: .zero,
+                end: CMTimeMinimum(
+                    CMTimeMultiplyByRatio(duration, multiplier: 1, divisor: 2),
+                    CMTime(value: 10, timescale: 1)
+                )
+            ))
+        )
+        AppLog.lockScreenSync.info(
+            "lock screen video starts at \(start.seconds, format: .fixed(precision: 3), privacy: .public)s"
+        )
+        let sources = try (start == .zero
+            ? [CMTimeRange(start: .zero, end: duration)]
+            : [CMTimeRange(start: start, end: duration), CMTimeRange(start: .zero, end: start)])
+            .map(makeSource)
         let encoder = try LayeredHEVCEncoder(
             width: Int32(size.width.rounded()), height: Int32(size.height.rounded()),
             isHDR: isHDR, sourceFormat: formatDescription,
@@ -193,7 +219,7 @@ struct AerialVideoExporter {
         defer { encoder.invalidate() }
         let writer = try AVAssetWriter(outputURL: destinationURL, fileType: .mov)
         let job = EncodeJob(
-            reader: reader, output: output, encoder: encoder, writer: writer, duration: duration,
+            sources: sources, encoder: encoder, writer: writer, duration: duration,
             progress: progress
         )
 
@@ -234,6 +260,63 @@ struct AerialVideoExporter {
             format: NSLocalizedString("ロック画面用の動画を読み込めませんでした: %@", comment: ""),
             error?.localizedDescription ?? ""
         ))
+    }
+
+    /// Zero when the first frame is not close to black. Otherwise the first frame at
+    /// half the brightest frame's level, which skips a fade-in rather than starting
+    /// on its dim middle; zero when every frame is close to black.
+    private static func firstVisibleFrameTime(in source: FrameSource) throws -> CMTime {
+        let visible = 0.05
+        guard source.reader.startReading() else {
+            throw unreadable(source.reader.error)
+        }
+        defer { source.reader.cancelReading() }
+        var frames: [(time: CMTime, luma: Double)] = []
+        while let frame = source.nextFrame() {
+            let luma = meanLuma(of: frame.buffer)
+            if frames.isEmpty, luma >= visible {
+                return .zero
+            }
+            frames.append((frame.time, luma))
+        }
+        if source.reader.status == .failed {
+            throw unreadable(source.reader.error)
+        }
+        let brightest = frames.map(\.luma).max() ?? 0
+        let threshold = max(visible, brightest / 2)
+        return frames.first { $0.luma >= threshold }?.time ?? .zero
+    }
+
+    /// The mean of a sparse grid of the luma plane, 0 for video black and 1 for white.
+    private static func meanLuma(of buffer: CVPixelBuffer) -> Double {
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddressOfPlane(buffer, 0) else {
+            return 0
+        }
+        let width = CVPixelBufferGetWidthOfPlane(buffer, 0)
+        let height = CVPixelBufferGetHeightOfPlane(buffer, 0)
+        let bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(buffer, 0)
+        let isTenBit = CVPixelBufferGetPixelFormatType(buffer)
+            == kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+        // Video range: black is 16 and white 235 in 8 bits; 10 bits sit in the high
+        // bits of 16-bit samples.
+        let (black, white): (Double, Double) = isTenBit ? (64 * 64, 940 * 64) : (16, 235)
+        var sum = 0.0
+        var count = 0
+        for y in stride(from: 0, to: height, by: 8) {
+            let row = base + y * bytesPerRow
+            for x in stride(from: 0, to: width, by: 8) {
+                sum += isTenBit
+                    ? Double(row.load(fromByteOffset: x * 2, as: UInt16.self))
+                    : Double(row.load(fromByteOffset: x, as: UInt8.self))
+                count += 1
+            }
+        }
+        guard count > 0 else {
+            return 0
+        }
+        return (sum / Double(count) - black) / (white - black)
     }
 
     // MARK: - Validation
@@ -305,10 +388,26 @@ struct AerialVideoExporter {
     }
 }
 
-/// Reads the source and encodes it at 240 fps on one thread; `cancel` may come from any.
+/// Decoded frames of one stretch of the source.
+private struct FrameSource {
+    let reader: AVAssetReader
+    let output: AVAssetReaderTrackOutput
+    let range: CMTimeRange
+
+    func nextFrame() -> (buffer: CVPixelBuffer, time: CMTime)? {
+        while let sample = output.copyNextSampleBuffer() {
+            if let buffer = CMSampleBufferGetImageBuffer(sample) {
+                return (buffer, CMSampleBufferGetPresentationTimeStamp(sample))
+            }
+        }
+        return nil
+    }
+}
+
+/// Reads the sources one after another and encodes them at 240 fps on one thread;
+/// `cancel` may come from any.
 private final class EncodeJob: @unchecked Sendable {
-    private let reader: AVAssetReader
-    private let output: AVAssetReaderTrackOutput
+    private let sources: [FrameSource]
     private let encoder: LayeredHEVCEncoder
     private let writer: AVAssetWriter
     private let duration: CMTime
@@ -317,15 +416,13 @@ private final class EncodeJob: @unchecked Sendable {
     private var isCancelled = false
 
     init(
-        reader: AVAssetReader,
-        output: AVAssetReaderTrackOutput,
+        sources: [FrameSource],
         encoder: LayeredHEVCEncoder,
         writer: AVAssetWriter,
         duration: CMTime,
         progress: @escaping @Sendable (Double) -> Void
     ) {
-        self.reader = reader
-        self.output = output
+        self.sources = sources
         self.encoder = encoder
         self.writer = writer
         self.duration = duration
@@ -339,41 +436,51 @@ private final class EncodeJob: @unchecked Sendable {
     }
 
     func run() throws {
-        guard reader.startReading() else {
-            throw AerialVideoExporter.unreadable(reader.error)
-        }
-        defer { reader.cancelReading() }
         let rate = AerialVideoExporter.frameRate
         let tick = CMTime(value: 1, timescale: rate)
         // Each 1/240 s tick shows the latest source frame, whatever the source's rate.
         let total = max(Double(duration.seconds) * Double(rate), 1)
         var index: Int64 = 0
-        var current: CVPixelBuffer?
-        while true {
-            try checkCancellation()
-            let next = nextFrame()
-            let until = next?.time ?? duration
-            if let current {
-                while CMTime(value: index, timescale: rate) < until {
-                    try encoder.encode(
-                        current,
-                        at: CMTime(value: index, timescale: rate),
-                        duration: tick
-                    )
-                    try encoder.drain(into: writer)
-                    index += 1
-                    if index % 24 == 0 {
-                        progress(min(Double(index) / total, 1))
+        var offset = CMTime.zero
+        for source in sources {
+            guard source.reader.startReading() else {
+                throw AerialVideoExporter.unreadable(source.reader.error)
+            }
+            defer { source.reader.cancelReading() }
+            let end = offset + source.range.duration
+            // The reader may hand over the frame that is showing at the range's start,
+            // which begins before it.
+            func outputTime(_ time: CMTime) -> CMTime {
+                CMTimeMinimum(CMTimeMaximum(time, source.range.start) - source.range.start + offset, end)
+            }
+            var current: CVPixelBuffer?
+            while true {
+                try checkCancellation()
+                let next = source.nextFrame()
+                let until = next.map { outputTime($0.time) } ?? end
+                if let current {
+                    while CMTime(value: index, timescale: rate) < until {
+                        try encoder.encode(
+                            current,
+                            at: CMTime(value: index, timescale: rate),
+                            duration: tick
+                        )
+                        try encoder.drain(into: writer)
+                        index += 1
+                        if index % 24 == 0 {
+                            progress(min(Double(index) / total, 1))
+                        }
                     }
                 }
+                guard let next else {
+                    break
+                }
+                current = next.buffer
             }
-            guard let next else {
-                break
+            if source.reader.status == .failed {
+                throw AerialVideoExporter.unreadable(source.reader.error)
             }
-            current = next.buffer
-        }
-        if reader.status == .failed {
-            throw AerialVideoExporter.unreadable(reader.error)
+            offset = end
         }
         try encoder.finish(into: writer)
     }
@@ -384,15 +491,6 @@ private final class EncodeJob: @unchecked Sendable {
         if isCancelled {
             throw CancellationError()
         }
-    }
-
-    private func nextFrame() -> (buffer: CVPixelBuffer, time: CMTime)? {
-        while let sample = output.copyNextSampleBuffer() {
-            if let buffer = CMSampleBufferGetImageBuffer(sample) {
-                return (buffer, CMSampleBufferGetPresentationTimeStamp(sample))
-            }
-        }
-        return nil
     }
 }
 

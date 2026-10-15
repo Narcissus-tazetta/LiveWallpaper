@@ -106,6 +106,34 @@ final class AerialVideoExporterTests: XCTestCase {
         )
     }
 
+    /// Without the app, the desktop shows the lock screen video's first frame: a video
+    /// that fades in from black must not leave a black desktop, nor lose its opening.
+    func testAVideoThatFadesInFromBlackStartsAtItsFirstVisibleFrame() async throws {
+        // Black for the first half second, then bright.
+        let source = try await writeH264Video(seconds: 2, framesPerSecond: 30) { frame in
+            frame < 15 ? 0 : 200
+        }
+        let destination = directory.appendingPathComponent("aerial.mov")
+
+        try await AerialVideoExporter(
+            fileManager: .default,
+            encodesVideo: true,
+            cacheDirectory: nil
+        )
+        .prepareVideo(from: source, to: destination)
+
+        let asset = AVURLAsset(url: destination)
+        let duration = try await asset.load(.duration)
+        XCTAssertEqual(duration.seconds, 2, accuracy: 0.05)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let first = try await generator.image(at: .zero).image
+        let opening = try await generator.image(at: CMTime(value: 1700, timescale: 1000)).image
+        XCTAssertGreaterThan(try brightness(of: first), 150)
+        XCTAssertLessThan(try brightness(of: opening), 20, "the dark opening plays at the end")
+    }
+
     func testANonVideoIsRejected() async throws {
         let source = directory.appendingPathComponent("source.mov")
         try Data("not a movie".utf8).write(to: source)
@@ -124,7 +152,24 @@ final class AerialVideoExporterTests: XCTestCase {
         }
     }
 
-    private func writeH264Video(seconds: Int, framesPerSecond: Int32) async throws -> URL {
+    private func brightness(of image: CGImage) throws -> Double {
+        var pixel = [UInt8](repeating: 0, count: 4)
+        let context = try XCTUnwrap(CGContext(
+            data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.interpolationQuality = .medium
+        context.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        return Double(pixel[0])
+    }
+
+    private func writeH264Video(
+        seconds: Int,
+        framesPerSecond: Int32,
+        // A brightness that changes every frame, so no two frames are identical.
+        brightness: (Int) -> Int32 = { Int32($0 * 4 % 256) }
+    ) async throws -> URL {
         let url = directory.appendingPathComponent("source.mp4")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
@@ -149,10 +194,9 @@ final class AerialVideoExporterTests: XCTestCase {
             CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
             let pixels = try XCTUnwrap(buffer)
             CVPixelBufferLockBaseAddress(pixels, [])
-            // A brightness that changes every frame, so no two frames are identical.
             memset(
                 CVPixelBufferGetBaseAddress(pixels),
-                Int32(frame * 4 % 256),
+                brightness(frame),
                 CVPixelBufferGetDataSize(pixels)
             )
             CVPixelBufferUnlockBaseAddress(pixels, [])
