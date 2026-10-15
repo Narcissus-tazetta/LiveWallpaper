@@ -133,6 +133,7 @@ extension WallpaperModel {
         } else {
             pinCurrentVideo = false
         }
+        UserDefaults.standard.set(enabled, forKey: PrefsKey.pinCurrentVideo)
         requestPlaybackReconfiguration()
         if !enabled {
             // pin解除で共有スコープのスケジュールガードが外れる。境界を跨いだまま

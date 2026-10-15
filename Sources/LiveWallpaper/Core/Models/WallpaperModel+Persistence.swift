@@ -19,8 +19,28 @@ extension WallpaperModel {
         restoreLibraryAndPlaylistState()
         restoreScenes()
         restoreLockScreenAndWebWallpaperState()
+        restorePinCurrentVideo()
         restorePresentationAndEditState()
         persistPlaylistStateImmediately()
+    }
+
+    /// Must run after the last syncActivePlaylistPaths() of the restore: the earlier
+    /// sync runs before webWallpaperFeatureEnabled is restored, so a queue that only
+    /// reaches 2 entries with web wallpapers looks unpinnable there, and
+    /// normalizePlaybackConstraints() would clear the saved pin.
+    private func restorePinCurrentVideo() {
+        guard UserDefaults.standard.bool(forKey: PrefsKey.pinCurrentVideo) else {
+            return
+        }
+        guard canPinCurrentVideo else {
+            UserDefaults.standard.set(false, forKey: PrefsKey.pinCurrentVideo)
+            return
+        }
+        pinCurrentVideo = true
+        if shufflePlaybackEnabled {
+            shufflePlaybackEnabled = false
+            UserDefaults.standard.set(false, forKey: PrefsKey.shufflePlaybackEnabled)
+        }
     }
 
     private func restoreDisplayAndWindowPrefs() {

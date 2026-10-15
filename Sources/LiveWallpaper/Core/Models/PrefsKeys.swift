@@ -47,6 +47,7 @@ enum PrefsKey {
     static let screenSaverEnabled = "screenSaverEnabled"
     static let screenSaverVideoPath = "screenSaverVideoPath"
     static let keepLockScreenAndScreenSaverAfterQuit = "keepLockScreenAndScreenSaverAfterQuit"
+    static let pinCurrentVideo = "pinCurrentVideo"
     static let screenPlaylistByScreenID = "screenPlaylistByScreenID"
     static let selectedPlaylistID = "selectedPlaylistID"
     static let shufflePlaybackEnabled = "shufflePlaybackEnabled"
