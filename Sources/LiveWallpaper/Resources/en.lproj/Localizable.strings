@@ -1083,3 +1083,8 @@
 "開始位置" = "Start Frame";
 "ロック画面と、アプリを終了している間のデスクトップは、このコマから始まります。それより前の部分は最後に回ります。保存すると変換し直します(数分かかることがあります)。" = "The Lock Screen, and the desktop while the app isn’t running, start at this frame. The part before it plays at the end. Saving converts the video again, which can take a few minutes.";
 "先頭が暗い動画は、明るくなったコマから始めます。ロック画面と、アプリを終了している間のデスクトップに使われます。" = "A video that starts dark begins at the first bright frame. Used for the Lock Screen and for the desktop while the app isn’t running.";
+"外部アプリの壁紙" = "Wallpapers from Other Apps";
+"元の壁紙に戻す" = "Restore My Wallpaper";
+"Web壁紙の表示中は使えません" = "Unavailable while a web wallpaper is showing";
+"外部アプリ" = "Other Apps";
+"追加できませんでした" = "Couldn’t add";

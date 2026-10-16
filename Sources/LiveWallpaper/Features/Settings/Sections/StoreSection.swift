@@ -7,6 +7,9 @@ extension SettingsView {
                 Picker(model.localizedString("Store"), selection: $storeTabMode) {
                     Text(model.localizedString("みんなの投稿")).tag(StoreTabMode.browse)
                     Text(model.localizedString("自分の投稿")).tag(StoreTabMode.mine)
+                    if !model.externalWallpapers.isEmpty {
+                        Text(model.localizedString("外部アプリ")).tag(StoreTabMode.external)
+                    }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -30,21 +33,30 @@ extension SettingsView {
                 .buttonStyle(.bordered)
                 .disabled(model.allRegisteredVideoPaths.isEmpty)
 
-                Button {
-                    Task {
-                        switch storeTabMode {
-                        case .browse:
-                            await storeCatalog.reload()
-                        case .mine:
-                            await storeMySubmissions.refreshAll()
+                // External wallpapers follow their provider by themselves.
+                if storeTabMode != .external {
+                    Button {
+                        Task {
+                            switch storeTabMode {
+                            case .browse:
+                                await storeCatalog.reload()
+                            case .mine:
+                                await storeMySubmissions.refreshAll()
+                            case .external:
+                                break
+                            }
                         }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
                     }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
+                    .buttonStyle(.bordered)
+                    .iconHelp(model.localizedString("再読み込み"))
+                    .disabled(
+                        storeTabMode == .browse
+                            ? storeCatalog.isLoading
+                            : storeMySubmissions.isRefreshing
+                    )
                 }
-                .buttonStyle(.bordered)
-                .iconHelp(model.localizedString("再読み込み"))
-                .disabled(storeTabMode == .browse ? storeCatalog.isLoading : storeMySubmissions.isRefreshing)
             }
 
             switch storeTabMode {
@@ -52,12 +64,19 @@ extension SettingsView {
                 storeBrowseContent
             case .mine:
                 storeMySubmissionsList
+            case .external:
+                externalStoreContent
             }
         }
         .padding(12)
         .settingsCardBackground()
         .task {
             await storeCatalog.loadIfNeeded()
+        }
+        .onChange(of: model.externalWallpapers.isEmpty) { isEmpty in
+            if isEmpty, storeTabMode == .external {
+                storeTabMode = .browse
+            }
         }
         .onChange(of: storeTabMode) { mode in
             guard mode == .mine else {
@@ -121,11 +140,14 @@ extension SettingsView {
                         .padding(.vertical, 40)
                 } else {
                     SearchEmptyState(
-                        isSearchActive: !storeCatalog.searchQuery.trimmingCharacters(in: .whitespaces).isEmpty,
+                        isSearchActive: !storeCatalog.searchQuery
+                            .trimmingCharacters(in: .whitespaces).isEmpty,
                         noContentText: model.localizedString("まだ公開されている壁紙がありません"),
                         noMatchText: model.localizedString("検索条件に一致する壁紙がありません"),
                         clearButtonTitle: model.localizedString("検索をクリア"),
-                        onClearSearch: { storeCatalog.setSearchQuery(""); isStoreSearchFocused = true }
+                        onClearSearch: {
+                            storeCatalog.setSearchQuery(""); isStoreSearchFocused = true
+                        }
                     )
                 }
             } else {

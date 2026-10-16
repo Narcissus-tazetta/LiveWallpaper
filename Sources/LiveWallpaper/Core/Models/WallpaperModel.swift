@@ -301,6 +301,16 @@ final class WallpaperModel: ObservableObject {
     @Published var wallpaperEditByPath: [String: WallpaperEditMetadata] = [:]
     /// 画面ID → その画面に固定表示する動画パス。空ならオーバーライドなし。
     @Published var videoOverrideByScreenID: [String: String] = [:]
+    /// Wallpapers offered by provider apps that are running right now. Never saved.
+    @Published var externalWallpapers: [ExternalWallpaper] = []
+    /// The external wallpaper shown on every screen in place of the user's own choice.
+    /// It changes nothing the app saves, so quitting the provider restores the desktop.
+    @Published var activeExternalWallpaperID: String?
+    /// External wallpaper ID → the library copy made from it, so adding it again is
+    /// refused while that copy is still in the library.
+    @Published var importedExternalWallpaperPaths: [String: String] = [:]
+    @Published var importingExternalWallpaperID: String?
+    @Published var failedExternalWallpaperImportID: String?
     /// 自動停止(作業中の停止など)の対象から除外する画面ID。ここに含まれる画面は
     /// 他の画面での作業やウィンドウ被覆に関わらず常に再生を続ける。
     @Published var suspendDisabledDisplayIDs: Set<String> = []
@@ -393,6 +403,7 @@ final class WallpaperModel: ObservableObject {
     /// モードidentifier → 割り当て壁紙。「変更しない」モードはエントリ自体を持たない。
     @Published var focusModeAssignments: [String: ScheduleTarget] = [:]
     var focusModeMonitor: FocusModeMonitor?
+    var externalWallpaperMonitor: ExternalWallpaperProviderMonitor?
 
     var canAddPlaylist: Bool {
         playlists.count < maxPlaylistCount

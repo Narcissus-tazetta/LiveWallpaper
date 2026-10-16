@@ -113,6 +113,8 @@ extension SettingsView {
     enum StoreTabMode: String, CaseIterable, Hashable {
         case browse
         case mine
+        /// Shown only while a provider app offers wallpapers.
+        case external
     }
 
     /// 壁紙の設定先。将来「サブディスプレイ」タブを足す場合はここに case を追加し、

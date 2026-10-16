@@ -143,7 +143,7 @@ extension WallpaperModel {
         }
         var displays: [String: ScreenSaverConfig.Display] = [:]
         for screen in displayScreens {
-            let path = resolvedOverridePath(forScreenID: screen.id) ?? currentVideoPath
+            let path = resolvedSavedOverridePath(forScreenID: screen.id) ?? currentVideoPath
             if let path, let display = screenSaverDisplay(path: path, screenID: screen.id) {
                 displays[screen.id] = display
             }

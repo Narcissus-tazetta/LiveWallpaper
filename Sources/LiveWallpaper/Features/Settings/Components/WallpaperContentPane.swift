@@ -18,6 +18,13 @@ private enum WallpaperListEntry: Identifiable {
 extension SettingsView {
     var wallpaperContentPane: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if !model.externalWallpapers.isEmpty, selectedAssignmentTarget == .desktop {
+                externalWallpapersPanel
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .settingsCardBackground()
+            }
+
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     wallpaperContentHeader

@@ -360,6 +360,9 @@ extension WallpaperModel {
     private func dedicatedWarmWindowContext(forScreenID screenID: String)
         -> (current: String, neighbors: [String])?
     {
+        if let path = activeExternalWallpaper?.path, FileManager.default.fileExists(atPath: path) {
+            return (path, [])
+        }
         if spaceWallpaperFeatureEnabled, isSpaceWallpaperAvailable,
            let spaceUUID = currentSpaceUUIDByDisplayID[screenID],
            let currentPath = videoBySpaceUUID[spaceUUID],

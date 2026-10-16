@@ -55,6 +55,7 @@ struct SettingsView: View {
     @State var isStoreSharePickerPresented: Bool = false
     @State var isStoreShareSheetPresented: Bool = false
     @State var storeTabMode: StoreTabMode = .browse
+    @State var externalStoreSearchText = ""
     /// Storeへの共有シートが対象にしている動画。共有シートはトリム編集タブの選択状態
     /// (wallpaperEditor.selectedVideoPath)には依存しない — 右クリックメニューや
     /// Storeタブのピッカーなど、編集タブを開かずに共有を始めた場合でも、選んだ動画を

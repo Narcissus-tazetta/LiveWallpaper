@@ -1083,3 +1083,8 @@
 "開始位置" = "Başlangıç Karesi";
 "ロック画面と、アプリを終了している間のデスクトップは、このコマから始まります。それより前の部分は最後に回ります。保存すると変換し直します(数分かかることがあります)。" = "Kilitli Ekran ve uygulama çalışmazken masaüstü bu kareden başlar. Önceki kısım sonda oynatılır. Kaydetmek videoyu yeniden dönüştürür (birkaç dakika sürebilir).";
 "先頭が暗い動画は、明るくなったコマから始めます。ロック画面と、アプリを終了している間のデスクトップに使われます。" = "Karanlık başlayan bir video ilk aydınlık kareden başlar. Kilitli Ekran’da ve uygulama çalışmazken masaüstünde kullanılır.";
+"外部アプリの壁紙" = "Diğer Uygulamalardan Duvar Kâğıtları";
+"元の壁紙に戻す" = "Kendi Duvar Kâğıdımı Geri Yükle";
+"Web壁紙の表示中は使えません" = "Web duvar kâğıdı gösterilirken kullanılamaz";
+"外部アプリ" = "Diğer Uygulamalar";
+"追加できませんでした" = "Eklenemedi";

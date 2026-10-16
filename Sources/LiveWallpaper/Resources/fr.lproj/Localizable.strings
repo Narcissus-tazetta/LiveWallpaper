@@ -1083,3 +1083,8 @@
 "開始位置" = "Image de départ";
 "ロック画面と、アプリを終了している間のデスクトップは、このコマから始まります。それより前の部分は最後に回ります。保存すると変換し直します(数分かかることがあります)。" = "L’écran verrouillé, et le bureau quand l’app n’est pas ouverte, commencent à cette image. La partie précédente est lue à la fin. L’enregistrement convertit à nouveau la vidéo (cela peut prendre quelques minutes).";
 "先頭が暗い動画は、明るくなったコマから始めます。ロック画面と、アプリを終了している間のデスクトップに使われます。" = "Une vidéo qui commence dans le noir démarre à la première image lumineuse. Utilisée pour l’écran verrouillé et pour le bureau quand l’app n’est pas ouverte.";
+"外部アプリの壁紙" = "Fonds d’écran d’autres apps";
+"元の壁紙に戻す" = "Rétablir mon fond d’écran";
+"Web壁紙の表示中は使えません" = "Indisponible pendant l’affichage d’un fond d’écran web";
+"外部アプリ" = "Autres apps";
+"追加できませんでした" = "Impossible d’ajouter";

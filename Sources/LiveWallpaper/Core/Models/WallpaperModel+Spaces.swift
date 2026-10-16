@@ -25,6 +25,16 @@ extension WallpaperModel {
     /// すべてが「Space層が nil → ディスプレイ別 → 共有」という同一の
     /// フォールバック経路に乗る。
     func resolvedOverridePath(forScreenID screenID: String) -> String? {
+        if let path = activeExternalWallpaper?.path, FileManager.default.fileExists(atPath: path) {
+            return path
+        }
+        return resolvedSavedOverridePath(forScreenID: screenID)
+    }
+
+    /// The override the user saved, ignoring an external wallpaper. Anything that
+    /// writes state that outlives this run (the screen saver's config, assignments made
+    /// from "the wallpaper on screen") must read this one.
+    func resolvedSavedOverridePath(forScreenID screenID: String) -> String? {
         if spaceWallpaperFeatureEnabled,
            isSpaceWallpaperAvailable,
            let spaceUUID = currentSpaceUUIDByDisplayID[screenID],
@@ -39,7 +49,7 @@ extension WallpaperModel {
     /// 専用プレイヤーで処理すべきオーバーライドが1つでも有効か。
     /// applyDedicatedSuspensionState の早期 return 判定に使う。
     var hasAnyDedicatedOverride: Bool {
-        if !videoOverrideByScreenID.isEmpty {
+        if activeExternalWallpaperID != nil || !videoOverrideByScreenID.isEmpty {
             return true
         }
         return spaceWallpaperFeatureEnabled && isSpaceWallpaperAvailable
@@ -382,8 +392,10 @@ extension WallpaperModel {
     /// 共有プレイヤーの再生中動画を返す。「現在のデスクトップに割り当て」系の
     /// メニュー操作は、共有プレイヤーの currentVideoPath だけでは専用プレイヤー
     /// 担当時に無関係の動画を参照してしまうため、必ずこちらを使うこと。
+    /// An external wallpaper is left out: assigning it would save a file that is only
+    /// lent while its provider runs.
     var currentlyVisiblePathForMainDisplay: String? {
-        resolvedOverridePath(forScreenID: displayIDString(for: NSScreen.main)) ?? currentVideoPath
+        resolvedSavedOverridePath(forScreenID: displayIDString(for: NSScreen.main)) ?? currentVideoPath
     }
 
     /// UI表示用: uuid → 「デスクトップN」の N。

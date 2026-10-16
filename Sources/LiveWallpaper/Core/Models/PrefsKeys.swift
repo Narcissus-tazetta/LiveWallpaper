@@ -38,6 +38,7 @@ enum PrefsKey {
     static let playlistsData = "playlistsData"
     static let qualityPreset = "qualityPreset"
     static let registeredVideoDisplayNames = "registeredVideoDisplayNames"
+    static let importedExternalWallpapers = "importedExternalWallpapers"
     static let registeredVideoPaths = "registeredVideoPaths"
     static let respectReduceMotionEnabled = "respectReduceMotionEnabled"
     static let cursorEffectsByPathData = "cursorEffectsByPathData"

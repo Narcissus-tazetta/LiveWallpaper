@@ -30,6 +30,7 @@ extension SettingsView {
         )
 
         let thumbnailButton = Button {
+            model.stopExternalWallpaper()
             if let onSelect {
                 onSelect()
             } else {
@@ -242,6 +243,7 @@ extension SettingsView {
     @ViewBuilder
     func wallpaperCardMenuItems(path: String) -> some View {
         Button(model.localizedString("デスクトップに設定")) {
+            model.stopExternalWallpaper()
             model.selectRegisteredVideo(path: path)
         }
         Button(model.localizedString("ロック画面に設定")) {
@@ -428,6 +430,7 @@ extension SettingsView {
     @ViewBuilder
     func wallpaperCardAccessibilityActions(path: String) -> some View {
         Button(model.localizedString("デスクトップに設定")) {
+            model.stopExternalWallpaper()
             model.selectRegisteredVideo(path: path)
         }
         if model.lockScreenSyncService.isSupported {

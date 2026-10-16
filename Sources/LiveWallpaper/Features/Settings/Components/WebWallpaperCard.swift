@@ -16,6 +16,7 @@ extension SettingsView {
         let isSelectable = assignmentTarget == .desktop
 
         let thumbnailButton = Button {
+            model.stopExternalWallpaper()
             model.selectWebWallpaper(id: source.id)
         } label: {
             ZStack {
@@ -100,6 +101,7 @@ extension SettingsView {
         )
         .contextMenu {
             Button(model.localizedString("適用")) {
+                model.stopExternalWallpaper()
                 model.selectWebWallpaper(id: source.id)
             }
             .disabled(!isSelectable)

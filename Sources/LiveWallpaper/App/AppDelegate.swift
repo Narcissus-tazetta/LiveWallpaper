@@ -59,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_: Notification) {
         NSApp.setActivationPolicy(.accessory)
         wallpaperModel.startFocusModeMonitoring()
+        wallpaperModel.startExternalWallpaperMonitoring()
         syncLaunchAtLoginState()
         autoUpdateEnabled =
             UserDefaults.standard.object(forKey: PrefsKey.autoUpdateEnabled) as? Bool ?? true
