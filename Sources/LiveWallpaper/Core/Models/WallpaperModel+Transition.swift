@@ -317,6 +317,7 @@ extension WallpaperModel {
         // Let the next installPlayerItem build a fresh player; the old one lives on
         // in `held` until the effect is over.
         sharedPlayer = nil
+        sharedPlayerAudioController = nil
         sharedLooper = nil
         return held
     }

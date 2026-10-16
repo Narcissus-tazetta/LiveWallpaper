@@ -53,6 +53,7 @@ final class WallpaperModel: ObservableObject {
     var playerViews: [PlayerView] = []
     var webPlayerViews: [WebPlayerView] = []
     var sharedPlayer: AVQueuePlayer?
+    var sharedPlayerAudioController: PlayerAudioTrackController?
     var sharedLooper: AVPlayerLooper?
     var pendingPlaybackReconfiguration: Bool = false
     var screenChangeObserver: NSObjectProtocol?
@@ -308,6 +309,7 @@ final class WallpaperModel: ObservableObject {
     struct DedicatedPlayerSlot {
         let player: AVQueuePlayer
         let looper: AVPlayerLooper
+        let audioController: PlayerAudioTrackController
     }
 
     struct ScreenPathKey: Hashable {

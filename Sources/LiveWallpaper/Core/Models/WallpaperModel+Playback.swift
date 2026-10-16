@@ -213,6 +213,7 @@ extension WallpaperModel {
         let player = createConfiguredPlayer(muted: !audioEnabled)
         player.volume = audioVolume
         sharedPlayer = player
+        sharedPlayerAudioController = PlayerAudioTrackController(player: player, isAudioEnabled: audioEnabled)
         return player
     }
 
@@ -267,6 +268,7 @@ extension WallpaperModel {
         }
         player.isMuted = !audioEnabled
         player.volume = audioVolume
+        sharedPlayerAudioController?.isAudioEnabled = audioEnabled
     }
 
     private func targetMaxPixelWidth() -> Double {

@@ -77,7 +77,10 @@ extension WallpaperModel {
         // 挙動(切替時に多少のデコード開始ラグが乗る)を妥協点として受け入れている。
 
         var slots = dedicatedSlotsByScreenID[screenID] ?? [:]
-        slots[path] = DedicatedPlayerSlot(player: player, looper: looper)
+        slots[path] = DedicatedPlayerSlot(
+            player: player, looper: looper,
+            audioController: PlayerAudioTrackController(player: player, isAudioEnabled: false)
+        )
         dedicatedSlotsByScreenID[screenID] = slots
         if isActive {
             demotePreviousActiveSlotIfNeeded(forScreenID: screenID, newActivePath: path)
