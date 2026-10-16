@@ -116,8 +116,9 @@ extension WallpaperModel {
                 continue
             }
             let expectedPlayer = suspendedDisplayIDs.contains(displayID) ? nil : player
-            let layer = playerViews[index].playerLayer
-            guard layer.player !== expectedPlayer else {
+            let view = playerViews[index]
+            let layer = view.playerLayer
+            guard view.player !== expectedPlayer else {
                 continue
             }
             if expectedPlayer != nil, layer.contents != nil, !layer.isReadyForDisplay {
@@ -127,13 +128,13 @@ extension WallpaperModel {
                 // has never composited. Clearing `contents` now would leave the
                 // layer momentarily empty, and its clear background shows through
                 // as black. Keep the still up and drop it once the layer is ready.
-                layer.player = expectedPlayer
+                view.player = expectedPlayer
                 viewsAwaitingFirstFrame.append(playerViews[index])
             } else {
                 if expectedPlayer != nil {
                     layer.contents = nil
                 }
-                layer.player = expectedPlayer
+                view.player = expectedPlayer
             }
         }
         CATransaction.commit()
@@ -155,7 +156,7 @@ extension WallpaperModel {
         // still showing a still. If a view was re-suspended in the meantime, the
         // freeze path owns its contents again — leave it untouched.
         let pending = views.filter { view in
-            view.playerLayer.player != nil && view.playerLayer.contents != nil
+            view.player != nil && view.playerLayer.contents != nil
         }
         guard !pending.isEmpty else {
             return

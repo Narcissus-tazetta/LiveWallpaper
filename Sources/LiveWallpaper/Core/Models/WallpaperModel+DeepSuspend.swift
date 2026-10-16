@@ -17,7 +17,7 @@ extension WallpaperModel {
                 continue
             }
             let view = playerViews[index]
-            view.playerLayer.player = nil
+            view.player = nil
             view.playerLayer.contents = image
         }
         CATransaction.commit()

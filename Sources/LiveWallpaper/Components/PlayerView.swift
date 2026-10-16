@@ -2,7 +2,18 @@ import AppKit
 import AVFoundation
 
 final class PlayerView: NSView {
+    /// Set `player` rather than `playerLayer.player`, which is left empty while a
+    /// live scene covers the video.
     let playerLayer: AVPlayerLayer = .init()
+    /// The player this screen shows. While a live scene covers the video, the
+    /// layer is given no player: an AVPlayerLayer keeps decoding and compositing
+    /// every frame even under an opaque layer (about as costly as showing it),
+    /// while a player with no layer still advances the clock the scene follows.
+    var player: AVPlayer? {
+        didSet {
+            updateVideoRendering()
+        }
+    }
     /// Holds the video and the switch-effect picture so the cursor parallax can move
     /// them as one without touching playerLayer's own fit/zoom frame.
     private let contentLayer: CALayer = .init()
@@ -31,6 +42,12 @@ final class PlayerView: NSView {
     /// While the baked video is out of date (an edit is still being baked), the
     /// player's time does not match the scene's loop.
     private var sceneUsesFreeClock = false
+    /// The scene has finished a frame since it was shown, so dropping the video
+    /// under it reveals nothing.
+    private var sceneCoversVideo = false
+    /// Set while a hidden scene stays up until the video layer has a frame again;
+    /// removing it sooner shows the desktop for the ~30 ms that takes.
+    private var sceneRemovalObservation: NSKeyValueObservation?
 
     private lazy var readabilityDimOverlayView: NSView = {
         let view = NSView()
@@ -146,10 +163,20 @@ final class PlayerView: NSView {
             layer.clock = { [weak self] in
                 self?.sceneClockReading() ?? SceneClockReading(time: 0, isRunning: false)
             }
+            layer.frameDidComplete = { [weak self] in
+                guard let self, self.sceneLayer?.renderer != nil, self.sceneRemovalObservation == nil,
+                      !self.sceneCoversVideo
+                else {
+                    return
+                }
+                self.sceneCoversVideo = true
+                self.updateVideoRendering()
+            }
             contentLayer.insertSublayer(layer, above: playerLayer)
             sceneLayer = layer
             return layer
         }()
+        sceneRemovalObservation = nil
         sceneUsesFreeClock = freeClock
         layer.maximumFramesPerSecond = maximumFramesPerSecond
         layer.timeOfDay = timeOfDay
@@ -163,7 +190,7 @@ final class PlayerView: NSView {
     }
 
     private func sceneClockReading() -> SceneClockReading {
-        guard let player = playerLayer.player else {
+        guard let player else {
             return SceneClockReading(time: 0, isRunning: false)
         }
         let running = player.rate != 0
@@ -207,11 +234,69 @@ final class PlayerView: NSView {
     }
 
     func hideScene() {
-        guard let sceneLayer, sceneLayer.renderer != nil else {
+        guard let sceneLayer, sceneLayer.renderer != nil, sceneRemovalObservation == nil else {
+            return
+        }
+        sceneCoversVideo = false
+        updateVideoRendering()
+        guard playerLayer.player != nil, !playerLayer.isReadyForDisplay else {
+            removeScene()
+            return
+        }
+        let observation = playerLayer.observe(\.isReadyForDisplay, options: [.new]) { [weak self] _, change in
+            guard change.newValue == true else {
+                return
+            }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    self?.finishSceneRemoval()
+                }
+            }
+        }
+        sceneRemovalObservation = observation
+        // isReadyForDisplay may never turn true (the item failed or was replaced);
+        // the desktop showing through briefly beats a scene that never leaves.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.sceneRemovalObservation === observation else {
+                    return
+                }
+                self.finishSceneRemoval()
+            }
+        }
+    }
+
+    private func finishSceneRemoval() {
+        guard sceneRemovalObservation != nil else {
+            return
+        }
+        sceneRemovalObservation = nil
+        removeScene()
+    }
+
+    private func removeScene() {
+        guard let sceneLayer else {
             return
         }
         sceneLayer.clear()
         sceneLayer.isHidden = true
+    }
+
+    private var isTransitioning: Bool {
+        !transitionLayer.isHidden || !blackoutLayer.isHidden
+    }
+
+    /// A switch effect keeps the video attached: the code finishing it waits for
+    /// playerLayer to show the new content.
+    private func updateVideoRendering() {
+        let shown = sceneCoversVideo && !isTransitioning ? nil : player
+        guard playerLayer.player !== shown else {
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        playerLayer.player = shown
+        CATransaction.commit()
     }
 
     /// `point` is in this view's coordinates.
@@ -299,6 +384,7 @@ final class PlayerView: NSView {
         blackoutLayer.opacity = 0
         blackoutLayer.isHidden = true
         CATransaction.commit()
+        updateVideoRendering()
         return transitionGeneration
     }
 
@@ -389,6 +475,7 @@ final class PlayerView: NSView {
         blackoutLayer.isHidden = true
         blackoutLayer.opacity = 0
         CATransaction.commit()
+        updateVideoRendering()
     }
 
     private func layoutMenuBarMask() {

@@ -65,7 +65,13 @@ let package = Package(
             exclude: ["vendor/LICENSE", "NOTICE.md"],
             sources: ["Bridge.c", "vendor/quickjs.c", "vendor/dtoa.c", "vendor/libregexp.c", "vendor/libunicode.c"],
             publicHeadersPath: "include",
-            cSettings: [.headerSearchPath("vendor"), .define("_GNU_SOURCE")]
+            cSettings: [
+                .headerSearchPath("vendor"),
+                .define("_GNU_SOURCE"),
+                // The vendored QuickJS sources stay unmodified; their ~300 implicit
+                // 64-to-32-bit narrowing warnings would bury ours.
+                .unsafeFlags(["-Wno-shorten-64-to-32"])
+            ]
         ),
         .executableTarget(
             name: "LiveWallpaper",

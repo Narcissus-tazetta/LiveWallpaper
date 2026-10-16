@@ -155,9 +155,9 @@ extension WallpaperModel {
                     let playerView = playerViews[index]
                     applyPlayerPresentation(to: playerView, screen: screen)
                     if isSharedPlayerDisplay(displayID),
-                       playerView.playerLayer.player !== sharedPlayer
+                       playerView.player !== sharedPlayer
                     {
-                        playerView.playerLayer.player = sharedPlayer
+                        playerView.player = sharedPlayer
                     }
                     if window.contentView !== playerView {
                         window.contentView = playerView

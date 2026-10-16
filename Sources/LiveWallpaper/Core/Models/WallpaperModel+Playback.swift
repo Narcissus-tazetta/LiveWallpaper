@@ -223,9 +223,9 @@ extension WallpaperModel {
             guard isSharedPlayerDisplay(displayIDForWindow(at: index)) else {
                 continue
             }
-            let layer = playerViews[index].playerLayer
-            if layer.player !== player {
-                layer.player = player
+            let view = playerViews[index]
+            if view.player !== player {
+                view.player = player
             }
         }
     }

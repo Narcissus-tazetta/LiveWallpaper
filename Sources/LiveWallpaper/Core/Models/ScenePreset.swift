@@ -66,11 +66,12 @@ struct ScenePreset: Codable, Equatable, Identifiable {
     var referencedFiles: Set<String> {
         var files = Set<String>()
         for item in effects {
-            item.effect.maskFile.map { files.insert($0) }
-            item.effect.flowFile.map { files.insert($0) }
+            files.formUnion([item.effect.maskFile, item.effect.flowFile].compactMap { $0 })
         }
         for layer in particleLayers {
-            layer.particles?.maskFile.map { files.insert($0) }
+            if let maskFile = layer.particles?.maskFile {
+                files.insert(maskFile)
+            }
         }
         return files
     }

@@ -141,8 +141,8 @@ extension WallpaperModel {
         let candidates = playerViews.indices
             .filter { isSharedPlayerDisplay(displayIDForWindow(at: $0)) }
             .map { playerViews[$0] }
-        transitionViews(candidates, livePlayer: { layer in
-            retired.flatMap { layer.player === $0.player ? $0.player : nil }
+        transitionViews(candidates, livePlayer: { view in
+            retired.flatMap { view.player === $0.player ? $0.player : nil }
         }, change: change, completion: { _ in
             retired?.retain()
             return { retired?.release() }
@@ -165,7 +165,7 @@ extension WallpaperModel {
         for view in playerViews {
             // Keep a dedicated player's picture until the fade ends even if
             // unassigning evicts its slot (see adoptEvictedPlayerForTransition).
-            if let player = view.playerLayer.player as? AVQueuePlayer, player !== sharedPlayer {
+            if let player = view.player as? AVQueuePlayer, player !== sharedPlayer {
                 let held = holdPlayerForTransition(player)
                 held.retain()
                 heldByView[ObjectIdentifier(view)] = held
@@ -201,7 +201,7 @@ extension WallpaperModel {
     /// running effect for a callback to invoke when that effect ends.
     private func transitionViews(
         _ views: [PlayerView],
-        livePlayer: (AVPlayerLayer) -> AVPlayer?,
+        livePlayer: (PlayerView) -> AVPlayer?,
         change: () -> Void,
         completion: (PlayerView) -> (() -> Void)?
     ) {
@@ -214,20 +214,20 @@ extension WallpaperModel {
         var pinned: [Pinned] = []
         for view in views {
             let layer = view.playerLayer
-            let player = livePlayer(layer)
+            let player = livePlayer(view)
             guard player != nil || layer.contents != nil else {
                 continue
             }
             let generation = view.beginTransition(from: player, still: layer.contents)
-            pinned.append(Pinned(view: view, generation: generation, player: layer.player, still: layer.contents))
+            pinned.append(Pinned(view: view, generation: generation, player: view.player, still: layer.contents))
         }
         change()
         // Same run loop turn as beginTransition, so nothing has been rendered yet;
         // dropping unchanged views here is invisible.
         for entry in pinned {
             let layer = entry.view.playerLayer
-            let unchanged = layer.player === entry.player
-                && (layer.player != nil || (layer.contents as AnyObject?) === (entry.still as AnyObject?))
+            let unchanged = entry.view.player === entry.player
+                && (entry.view.player != nil || (layer.contents as AnyObject?) === (entry.still as AnyObject?))
             if unchanged || !playerViews.contains(where: { $0 === entry.view }) {
                 entry.view.cancelTransition()
                 continue
@@ -457,7 +457,7 @@ extension WallpaperModel {
                     if let webView = overlay.content as? WebPlayerView {
                         webView.tearDown()
                     } else if let playerView = overlay.content as? PlayerView {
-                        playerView.playerLayer.player = nil
+                        playerView.player = nil
                     }
                     overlay.window.contentView = nil
                     overlay.window.close()

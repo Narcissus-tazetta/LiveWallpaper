@@ -241,11 +241,9 @@ enum SceneStore {
             if layer.kind == .image {
                 files.insert(layer.imageFile)
             }
-            layer.particles?.maskFile.map { files.insert($0) }
-            layer.depthFile.map { files.insert($0) }
+            files.formUnion([layer.particles?.maskFile, layer.depthFile].compactMap { $0 })
             for effect in layer.effects {
-                effect.maskFile.map { files.insert($0) }
-                effect.flowFile.map { files.insert($0) }
+                files.formUnion([effect.maskFile, effect.flowFile].compactMap { $0 })
             }
         }
         return files

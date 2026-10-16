@@ -95,6 +95,8 @@ final class SceneMetalLayer: CAMetalLayer {
     weak var hostView: NSView?
     /// Called after each frame is encoded, for overlays that follow the animation.
     var didDraw: (() -> Void)?
+    /// Called on the main thread once the GPU has finished a frame.
+    var frameDidComplete: (() -> Void)?
     var maximumFramesPerSecond: Float? {
         didSet {
             if maximumFramesPerSecond != oldValue {
@@ -332,10 +334,13 @@ final class SceneMetalLayer: CAMetalLayer {
             return
         }
         isFrameInFlight = true
-        commandBuffer.addCompletedHandler { [weak self] _ in
+        let finish: @MainActor () -> Void = { [weak self] in
+            self?.frameDidFinish()
+        }
+        commandBuffer.addCompletedHandler { _ in
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    self?.frameDidFinish()
+                    finish()
                 }
             }
         }
@@ -350,6 +355,7 @@ final class SceneMetalLayer: CAMetalLayer {
 
     private func frameDidFinish() {
         isFrameInFlight = false
+        frameDidComplete?()
         if needsRedrawAfterFrame {
             needsRedrawAfterFrame = false
             setNeedsDisplay()

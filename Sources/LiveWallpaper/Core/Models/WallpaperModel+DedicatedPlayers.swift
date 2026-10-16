@@ -460,7 +460,8 @@ extension WallpaperModel {
             guard let path = resolvedOverridePath(forScreenID: displayID) else {
                 continue
             }
-            let layer = playerViews[index].playerLayer
+            let view = playerViews[index]
+            let layer = view.playerLayer
             if suspendedDisplayIDs.contains(displayID) {
                 let player = activeDedicatedSlot(forScreenID: displayID)?.player
                 // プレイヤー未生成(停止中に起動・画面接続・割り当てされた場合)でも
@@ -469,7 +470,7 @@ extension WallpaperModel {
                 // パスが新しい割り当てと食い違う)も、古い動画の静止画のままに
                 // ならないよう再生成する。
                 let freezeIsStale = dedicatedFreezeFrameByScreenID[displayID]?.path != path
-                if layer.player != nil || layer.contents == nil || freezeIsStale {
+                if view.player != nil || layer.contents == nil || freezeIsStale {
                     // 一時停止した AVPlayerLayer は背景色に落ちることがあるため、
                     // 共有側と同じくプレイヤーを外して静止画を貼る。
                     let freeze = dedicatedFreezeFrame(
@@ -477,7 +478,7 @@ extension WallpaperModel {
                         path: path,
                         time: player?.currentTime()
                     )
-                    layer.player = nil
+                    view.player = nil
                     layer.contents = freeze
                 }
                 player?.pause()
@@ -486,14 +487,14 @@ extension WallpaperModel {
                 )
             } else {
                 let player = ensureDedicatedSlot(forScreenID: displayID, path: path, isActive: true)
-                if layer.player !== player {
+                if view.player !== player {
                     if layer.contents != nil, !layer.isReadyForDisplay {
                         // フリーズ画像を貼ったまま初回描画を待つ(黒フラッシュ防止)。
-                        layer.player = player
+                        view.player = player
                         viewsAwaitingFirstFrame.append(playerViews[index])
                     } else {
                         layer.contents = nil
-                        layer.player = player
+                        view.player = player
                     }
                 }
                 player.play()

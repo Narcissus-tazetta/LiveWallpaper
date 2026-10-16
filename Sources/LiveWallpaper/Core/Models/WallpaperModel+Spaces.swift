@@ -295,8 +295,9 @@ extension WallpaperModel {
         CATransaction.setDisableActions(true)
         for index in playerViews.indices {
             let displayID = displayIDForWindow(at: index)
-            let layer = playerViews[index].playerLayer
-            guard let attached = layer.player else {
+            let view = playerViews[index]
+            let layer = view.playerLayer
+            guard let attached = view.player else {
                 continue
             }
             let expectedPath = resolvedOverridePath(forScreenID: displayID)
@@ -328,7 +329,7 @@ extension WallpaperModel {
                     // 即座に破棄して未描画の新プレイヤーへ直結してしまう(黒フラッシュ/
                     // 一瞬の停止)。nil にしておけば isReadyForDisplay は必ず false になり、
                     // 新プレイヤーの初回描画までフリーズ画像を保持する経路に正しく乗る。
-                    layer.player = nil
+                    view.player = nil
                 }
             }
         }

@@ -167,8 +167,12 @@ enum SceneVideoBaker {
                 }
                 let time = Double(frame) / Double(fps)
                 try renderer.encode(into: texture, commandBuffer: commandBuffer, input: SceneFrameInput(time: time))
-                commandBuffer.commit()
-                commandBuffer.waitUntilCompleted()
+                await withCheckedContinuation { continuation in
+                    commandBuffer.addCompletedHandler { _ in
+                        continuation.resume()
+                    }
+                    commandBuffer.commit()
+                }
                 if let error = commandBuffer.error {
                     throw error
                 }

@@ -168,9 +168,9 @@ extension WallpaperModel {
             // オーバーライド画面への専用プレイヤーの付け替えは、この後の
             // applySuspensionStateToPlayers に任せる。
             if isSharedPlayerDisplay(displayID),
-               playerView.playerLayer.player !== player
+               playerView.player !== player
             {
-                playerView.playerLayer.player = player
+                playerView.player = player
             }
             if window.contentView !== playerView {
                 window.contentView = playerView
@@ -303,7 +303,7 @@ extension WallpaperModel {
         if let playerView = window.contentView as? PlayerView {
             playerView.hideScene()
             presentationCacheByPlayerView.removeValue(forKey: ObjectIdentifier(playerView))
-            playerView.playerLayer.player = nil
+            playerView.player = nil
         } else if let webView = window.contentView as? WebPlayerView {
             webView.tearDown()
         }

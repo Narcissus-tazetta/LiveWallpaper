@@ -444,6 +444,9 @@ extension WallpaperModel {
         let activity = ProcessInfo.processInfo.beginActivity(
             options: .userInitiatedAllowingIdleSystemSleep, reason: "Encoding the lock screen video"
         )
+        let updateProgress: @MainActor (Double) -> Void = { [weak self] fraction in
+            self?.updateLockScreenEncodeProgress(fraction, startedAt: startedAt, syncID: syncID)
+        }
         lockScreenSyncTask = Task { [weak self] in
             defer {
                 ProcessInfo.processInfo.endActivity(activity)
@@ -455,8 +458,8 @@ extension WallpaperModel {
             }
             do {
                 let borrowedAsset = try await service.sync(videoURL: videoURL, start: start) { fraction in
-                    Task { @MainActor [weak self] in
-                        self?.updateLockScreenEncodeProgress(fraction, startedAt: startedAt, syncID: syncID)
+                    Task { @MainActor in
+                        updateProgress(fraction)
                     }
                 }
                 await MainActor.run {
