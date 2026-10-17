@@ -954,6 +954,13 @@
 "一方向に流す" = "Trôi một hướng";
 "進む波" = "Sóng lan truyền";
 "流れに沿って揺らす" = "Rung theo dòng chảy";
+"流れマップで流す" = "Chảy theo bản đồ dòng";
+"法線マップのさざ波" = "Gợn sóng bản đồ pháp tuyến";
+"ノイズでずらす" = "Trôi theo nhiễu";
+"ノイズでそよがせる" = "Đung đưa theo nhiễu";
+"色の明滅" = "Nhấp nháy màu";
+"速さを決めてスクロール" = "Cuộn với tốc độ định sẵn";
+"軸でしならせる" = "Uốn theo trục";
 "先に範囲を塗ってください" = "Hãy tô vùng trước";
 "切り出している間に範囲が変わったので、中止しました。もう一度お試しください。" = "Vùng đã thay đổi trong khi cắt nên thao tác đã dừng. Hãy thử lại.";
 "別のレイヤーにする" = "Tách thành lớp riêng";

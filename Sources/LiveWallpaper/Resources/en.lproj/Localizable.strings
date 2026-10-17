@@ -954,6 +954,13 @@
 "一方向に流す" = "Drift";
 "進む波" = "Traveling waves";
 "流れに沿って揺らす" = "Shake along flow";
+"流れマップで流す" = "Flow along a map";
+"法線マップのさざ波" = "Normal-map ripples";
+"ノイズでずらす" = "Noise drift";
+"ノイズでそよがせる" = "Noise sway";
+"色の明滅" = "Color pulse";
+"速さを決めてスクロール" = "Scroll at a set speed";
+"軸でしならせる" = "Bend along an axis";
 "先に範囲を塗ってください" = "Paint the area first";
 "切り出している間に範囲が変わったので、中止しました。もう一度お試しください。" = "The area changed while it was being cut out, so it was stopped. Try again.";
 "別のレイヤーにする" = "Move to Own Layer";

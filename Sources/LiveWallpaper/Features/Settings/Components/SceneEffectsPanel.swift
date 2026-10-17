@@ -30,6 +30,13 @@ extension SettingsView {
         case .drift: model.localizedString("一方向に流す")
         case .travelingWaves: model.localizedString("進む波")
         case .flowShake: model.localizedString("流れに沿って揺らす")
+        case .flowMap: model.localizedString("流れマップで流す")
+        case .normalRipples: model.localizedString("法線マップのさざ波")
+        case .noiseDrift: model.localizedString("ノイズでずらす")
+        case .noiseSway: model.localizedString("ノイズでそよがせる")
+        case .pulseBlend: model.localizedString("色の明滅")
+        case .uvScroll: model.localizedString("速さを決めてスクロール")
+        case .axisSwing: model.localizedString("軸でしならせる")
         }
     }
 

@@ -954,6 +954,13 @@
 "一方向に流す" = "In eine Richtung treiben";
 "進む波" = "Laufende Wellen";
 "流れに沿って揺らす" = "Entlang des Flusses schütteln";
+"流れマップで流す" = "Entlang einer Flusskarte fließen";
+"法線マップのさざ波" = "Normal-Map-Wellen";
+"ノイズでずらす" = "Rauschverschiebung";
+"ノイズでそよがせる" = "Rauschwiegen";
+"色の明滅" = "Farbpuls";
+"速さを決めてスクロール" = "Mit fester Geschwindigkeit scrollen";
+"軸でしならせる" = "An einer Achse biegen";
 "先に範囲を塗ってください" = "Male zuerst den Bereich";
 "切り出している間に範囲が変わったので、中止しました。もう一度お試しください。" = "Der Bereich hat sich beim Ausschneiden geändert, daher wurde abgebrochen. Versuche es erneut.";
 "別のレイヤーにする" = "Auf eigene Ebene";

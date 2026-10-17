@@ -954,6 +954,13 @@
 "一方向に流す" = "Deriva";
 "進む波" = "Ondas en movimiento";
 "流れに沿って揺らす" = "Agitar según el flujo";
+"流れマップで流す" = "Fluir según un mapa";
+"法線マップのさざ波" = "Ondas de mapa normal";
+"ノイズでずらす" = "Deriva con ruido";
+"ノイズでそよがせる" = "Vaivén con ruido";
+"色の明滅" = "Pulso de color";
+"速さを決めてスクロール" = "Desplazar a velocidad fija";
+"軸でしならせる" = "Doblar sobre un eje";
 "先に範囲を塗ってください" = "Pinta primero la zona";
 "切り出している間に範囲が変わったので、中止しました。もう一度お試しください。" = "La zona cambió mientras se recortaba, así que se ha cancelado. Vuelve a intentarlo.";
 "別のレイヤーにする" = "Pasar a su propia capa";

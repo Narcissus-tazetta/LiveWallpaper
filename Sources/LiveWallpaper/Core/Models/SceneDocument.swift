@@ -57,11 +57,33 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     /// Each pixel swings back and forth along its own vector of a flow map, at a
     /// real speed (`SceneEffect.values`, keys in SceneEffect.FlowShakeKey).
     case flowShake
+    /// The picture streams along a flow map, two staggered pairs of copies hiding
+    /// each reset, with a pattern image deciding which pair shows where
+    /// (SceneEffect.FlowMapKey).
+    case flowMap
+    /// Two scrolling copies of a tiling normal map bend the picture like a water
+    /// surface (SceneEffect.RipplesKey).
+    case normalRipples
+    /// A tiling noise image drifting sideways pushes the picture one way and back
+    /// (SceneEffect.NoiseDriftKey).
+    case noiseDrift
+    /// Sums of slow sines, offset per pixel by a tiling noise image, sway the
+    /// picture like foliage (SceneEffect.NoiseSwayKey).
+    case noiseSway
+    /// The picture pulses between two tints, mixed by a blend mode, optionally its
+    /// opacity too (SceneEffect.PulseKey).
+    case pulseBlend
+    /// Scrolls the picture, wrapping, at a set speed per axis (SceneEffect.ScrollKey).
+    case uvScroll
+    /// Bends the part of the picture beside an axis back and forth, like a flag on
+    /// a pole (SceneEffect.AxisSwingKey).
+    case axisSwing
 
     /// Runs on seconds rather than whole repeats per loop: drawn live it keeps its
     /// own speed, and only a baked video rounds the speed to fit the loop.
     var runsOnRealTime: Bool {
-        [.travelingWaves, .flowShake].contains(self)
+        [.travelingWaves, .flowShake, .flowMap, .normalRipples, .noiseDrift, .noiseSway, .pulseBlend, .uvScroll, .axisSwing]
+            .contains(self)
     }
 
     /// Uses `centerX`/`centerY` (picked on the preview).
@@ -205,6 +227,9 @@ struct SceneEffect: Codable, Equatable, Identifiable {
     /// Grey image in the scene folder delaying each pixel's motion (white = a full
     /// period later); travelling waves and flow shake only.
     var timeOffsetFile: String?
+    /// A tiling image in the scene folder some real-time effects read: noise, a
+    /// normal map, a flow phase. Read repeating unless `values["patternClamps"]`.
+    var patternFile: String?
     var fixedEdge: SceneFixedEdge = .none
     /// Where the effect's area is, for `fixedEdge`: the painted area, or a cut-out's
     /// picture. nil means the whole layer.
@@ -241,6 +266,7 @@ struct SceneEffect: Codable, Equatable, Identifiable {
         pins = (try? container.decode([ScenePin].self, forKey: .pins)) ?? []
         values = (try? container.decode([String: Double].self, forKey: .values)) ?? [:]
         timeOffsetFile = try? container.decodeIfPresent(String.self, forKey: .timeOffsetFile)
+        patternFile = try? container.decodeIfPresent(String.self, forKey: .patternFile)
         fixedEdge = (try? container.decode(SceneFixedEdge.self, forKey: .fixedEdge)) ?? .none
         areaBounds = try? container.decodeIfPresent(SceneAreaBounds.self, forKey: .areaBounds)
     }
@@ -286,6 +312,120 @@ extension SceneEffect {
         /// 1 sums four sines of unrelated speeds for an irregular swing.
         static let irregular = "irregular"
     }
+
+    /// Flow map: cycle = fract(time × speed); the copies move by (cycle − ½) ×
+    /// strength × 0.1 along the flow, crossfaded with `feather`.
+    enum FlowMapKey {
+        /// Cycles per second.
+        static let speed = "speed"
+        static let strength = "strength"
+        static let feather = "feather"
+        /// How many times the pattern repeats across the picture.
+        static let phaseScale = "phaseScale"
+    }
+
+    /// Normal ripples: the map scrolls at animationSpeed² both ways plus the scroll,
+    /// and moves the picture by its normal × strength².
+    enum RipplesKey {
+        static let animationSpeed = "animationSpeed"
+        static let scale = "scale"
+        static let scrollSpeed = "scrollSpeed"
+        /// Radians turning (0, 1) in layer UV.
+        static let scrollAngle = "scrollAngle"
+        /// Vertical stretch of the map.
+        static let ratio = "ratio"
+        static let strength = "strength"
+        /// 1 adds a highlight where the surface faces up and toward the top centre.
+        static let specular = "specular"
+        static let specularPower = "specularPower"
+        static let specularStrength = "specularStrength"
+        static let specularRed = "specularRed"
+        static let specularGreen = "specularGreen"
+        static let specularBlue = "specularBlue"
+    }
+
+    /// Noise drift: noise(uv × scale, x stretched by scaleX, + time × speed) moves
+    /// the picture by (noise × 2 − 1) × amount across `angle`.
+    enum NoiseDriftKey {
+        /// Pattern widths per second.
+        static let speed = "speed"
+        static let scale = "scale"
+        static let scaleX = "scaleX"
+        static let amount = "amount"
+        /// Radians; the motion runs across this direction.
+        static let angle = "angle"
+    }
+
+    /// Noise sway: per-pixel phase from the pattern, four sines on each axis at
+    /// fixed multiples of the speed, each sine raised to `power`.
+    enum NoiseSwayKey {
+        /// Radians per second.
+        static let speed = "speed"
+        static let strength = "strength"
+        static let phase = "phase"
+        static let power = "power"
+        static let noiseScale = "noiseScale"
+        /// Stretch between the axes.
+        static let ratio = "ratio"
+        static let angle = "angle"
+    }
+
+    /// Pulse: pulse = smoothstep(boundsMin, boundsMax, ½ + ½ sin(time × speed + phase
+    /// − π/2)) × amount, plus noise, raised to `power`.
+    enum PulseKey {
+        static let speed = "speed"
+        static let phase = "phase"
+        static let amount = "amount"
+        static let boundsMin = "boundsMin"
+        static let boundsMax = "boundsMax"
+        static let noiseSpeed = "noiseSpeed"
+        static let noiseAmount = "noiseAmount"
+        static let power = "power"
+        /// Colour multipliers at no pulse and at full pulse.
+        static let lowRed = "lowRed", lowGreen = "lowGreen", lowBlue = "lowBlue"
+        static let highRed = "highRed", highGreen = "highGreen", highBlue = "highBlue"
+        /// 0...32, see SceneRenderer's pulse blending.
+        static let blendMode = "blendMode"
+        /// 1 pulses the colour (on by default).
+        static let pulsesColor = "pulsesColor"
+        /// 1 also multiplies the opacity by the pulse.
+        static let pulsesOpacity = "pulsesOpacity"
+    }
+
+    /// UV scroll: the picture moves by sign(speed) × speed² per second on each axis,
+    /// repeated `repeatX` × `repeatY` times.
+    enum ScrollKey {
+        static let speedX = "speedX"
+        static let speedY = "speedY"
+        static let repeatX = "repeatX"
+        static let repeatY = "repeatY"
+    }
+
+    /// Axis swing: the area within `size` of the axis from point 0 to point 1 bends
+    /// by sin(time × speed + phase × 2π) × amount.
+    enum AxisSwingKey {
+        static let speed = "speed"
+        static let phase = "phase"
+        static let amount = "amount"
+        /// Layer UV.
+        static let x0 = "x0", y0 = "y0", x1 = "x1", y1 = "y1"
+        static let size = "size"
+        /// Where along the axis it pivots, 0...1.
+        static let center = "center"
+        static let feather = "feather"
+        /// 1 bends both sides of the axis.
+        static let doubleSided = "doubleSided"
+        /// 1 adds noise from the pattern to the swing.
+        static let noise = "noise"
+        static let noiseSpeed = "noiseSpeed"
+        static let noiseAmount = "noiseAmount"
+    }
+
+    /// Width over height of the picture as stored (with any padding), which some
+    /// effects scale by. Defaults to the picture's own.
+    static let textureAspectKey = "textureAspect"
+    /// 1 reads the pattern clamped instead of repeating.
+    static let patternClampsKey = "patternClamps"
 
     func value(_ key: String, _ fallback: Double) -> Double {
         values[key] ?? fallback

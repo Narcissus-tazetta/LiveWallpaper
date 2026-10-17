@@ -954,6 +954,13 @@
 "一方向に流す" = "Tek Yönde Akış";
 "進む波" = "İlerleyen dalgalar";
 "流れに沿って揺らす" = "Akış boyunca salla";
+"流れマップで流す" = "Akış haritasıyla ak";
+"法線マップのさざ波" = "Normal harita dalgacıkları";
+"ノイズでずらす" = "Gürültüyle kaydır";
+"ノイズでそよがせる" = "Gürültüyle salla";
+"色の明滅" = "Renk nabzı";
+"速さを決めてスクロール" = "Belirli hızda kaydır";
+"軸でしならせる" = "Eksen boyunca bük";
 "先に範囲を塗ってください" = "Önce alanı boyayın";
 "切り出している間に範囲が変わったので、中止しました。もう一度お試しください。" = "Kesilirken alan değiştiği için işlem durduruldu. Yeniden deneyin.";
 "別のレイヤーにする" = "Ayrı Katmana Taşı";
