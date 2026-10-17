@@ -427,8 +427,71 @@ extension SceneEffect {
     /// 1 reads the pattern clamped instead of repeating.
     static let patternClampsKey = "patternClamps"
 
-    func value(_ key: String, _ fallback: Double) -> Double {
-        values[key] ?? fallback
+    /// The file painted for `target`, if any.
+    func paintFile(_ target: ScenePaintOverride.Target) -> String? {
+        switch target {
+        case .mask: maskFile
+        case .flow: flowFile
+        case .timeOffset: timeOffsetFile
+        }
+    }
+
+    /// The value of `key`, or the effect's default for it.
+    func value(_ key: String) -> Double {
+        values[key] ?? Self.defaultValues(for: kind)[key] ?? 0
+    }
+
+    /// What real-time effects use for a value they were not given.
+    static func defaultValues(for kind: SceneEffectKind) -> [String: Double] {
+        switch kind {
+        case .travelingWaves:
+            typealias Key = WaveKey
+            return [
+                Key.speed: 5, Key.scale: 200, Key.amplitude: 0.1, Key.exponent: 1, Key.angle: 0, Key.dual: 0,
+                Key.speed2: 3, Key.scale2: 66, Key.offset2: 0, Key.exponent2: 1, Key.angle2: 0
+            ]
+        case .flowShake:
+            typealias Key = FlowShakeKey
+            return [
+                Key.speed: 1, Key.amplitude: 0.1, Key.frictionX: 1, Key.frictionY: 1, Key.boundsMin: 0, Key.boundsMax: 1,
+                Key.side: 0, Key.irregular: 0
+            ]
+        case .flowMap:
+            typealias Key = FlowMapKey
+            return [Key.speed: 1, Key.strength: 1, Key.feather: 0.4, Key.phaseScale: 2]
+        case .normalRipples:
+            typealias Key = RipplesKey
+            return [
+                Key.animationSpeed: 0.15, Key.scale: 1, Key.scrollSpeed: 0, Key.scrollAngle: 0, Key.ratio: 1, Key.strength: 0.1,
+                Key.specular: 0, Key.specularPower: 1, Key.specularStrength: 1, Key.specularRed: 1, Key.specularGreen: 1,
+                Key.specularBlue: 1
+            ]
+        case .noiseDrift:
+            typealias Key = NoiseDriftKey
+            return [Key.speed: 0.02, Key.scale: 2, Key.scaleX: 0.5, Key.amount: 0.1, Key.angle: .pi / 2]
+        case .noiseSway:
+            typealias Key = NoiseSwayKey
+            return [Key.speed: 5, Key.strength: 0.4, Key.phase: 0.5, Key.power: 1, Key.noiseScale: 0.05, Key.ratio: 0.3, Key.angle: 0]
+        case .pulseBlend:
+            typealias Key = PulseKey
+            return [
+                Key.speed: 3, Key.phase: 0, Key.amount: 1, Key.boundsMin: 0, Key.boundsMax: 1, Key.noiseSpeed: 0.5,
+                Key.noiseAmount: 0, Key.power: 1, Key.lowRed: 1, Key.lowGreen: 1, Key.lowBlue: 1, Key.highRed: 1,
+                Key.highGreen: 1, Key.highBlue: 1, Key.blendMode: 9, Key.pulsesColor: 1, Key.pulsesOpacity: 0
+            ]
+        case .uvScroll:
+            typealias Key = ScrollKey
+            return [Key.speedX: 0.2, Key.speedY: 0.2, Key.repeatX: 1, Key.repeatY: 1]
+        case .axisSwing:
+            typealias Key = AxisSwingKey
+            return [
+                Key.speed: 2, Key.phase: 0, Key.amount: 0.2, Key.x0: 0.25, Key.y0: 0.5, Key.x1: 0.75, Key.y1: 0.5,
+                Key.size: 0.4, Key.center: 0.5, Key.feather: 0.01, Key.doubleSided: 0, Key.noise: 0, Key.noiseSpeed: 0.15,
+                Key.noiseAmount: 0.2
+            ]
+        default:
+            return [:]
+        }
     }
 }
 

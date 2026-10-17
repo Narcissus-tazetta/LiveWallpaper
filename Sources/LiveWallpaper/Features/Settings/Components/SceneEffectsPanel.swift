@@ -9,7 +9,7 @@ enum SceneEditorTool: Equatable {
 }
 
 extension SettingsView {
-    private var sceneEffectLabelWidth: CGFloat {
+    var sceneEffectLabelWidth: CGFloat {
         132
     }
 
@@ -88,13 +88,13 @@ extension SettingsView {
 
     // MARK: - Painting bar
 
-    /// Shown under the preview while painting a mask or a flow map.
+    /// Shown under the preview while painting a mask, a time offset or a flow map.
     @ViewBuilder
     func scenePaintBar(kind: ScenePaintOverride.Target) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 Picker(model.localizedString("ブラシ"), selection: $sceneMaskPainter.tool) {
-                    Text(model.localizedString(kind == .mask ? "塗る" : "向きを描く")).tag(SceneMaskPainter.Tool.paint)
+                    Text(model.localizedString(kind.isGrey ? "塗る" : "向きを描く")).tag(SceneMaskPainter.Tool.paint)
                     Text(model.localizedString("消す")).tag(SceneMaskPainter.Tool.erase)
                 }
                 .labelsHidden()
@@ -109,7 +109,7 @@ extension SettingsView {
                     .accessibilityLabel(model.localizedString("硬さ"))
             }
             HStack(spacing: 8) {
-                if kind == .mask {
+                if kind.isGrey {
                     Button(model.localizedString("全体を塗る")) {
                         sceneMaskPainter.fillAll()
                     }
@@ -123,13 +123,15 @@ extension SettingsView {
                 }
                 .keyboardShortcut(.defaultAction)
             }
-            settingsFootnote(
-                model.localizedString(
-                    kind == .mask
-                        ? "プレビューの上をドラッグして、動かす範囲を塗ります。赤い部分だけが動きます。"
-                        : "プレビューの上を、流したい向きにドラッグします。青い部分が、なぞった向きに流れます。"
-                )
-            )
+            settingsFootnote(model.localizedString(scenePaintHint(kind)))
+        }
+    }
+
+    private func scenePaintHint(_ kind: ScenePaintOverride.Target) -> String {
+        switch kind {
+        case .mask: "プレビューの上をドラッグして、動かす範囲を塗ります。赤い部分だけが動きます。"
+        case .flow: "プレビューの上を、流したい向きにドラッグします。青い部分が、なぞった向きに流れます。"
+        case .timeOffset: "プレビューの上をドラッグして、動きをずらす所を塗ります。紫が濃い所ほど、動きが遅れて始まります。"
         }
     }
 
@@ -167,6 +169,11 @@ extension SettingsView {
                         sceneAddEffectButton(.spin, path: path, layerID: layer.id)
                         sceneAddEffectButton(.twirl, path: path, layerID: layer.id)
                         sceneAddEffectButton(.pulse, path: path, layerID: layer.id)
+                    }
+                    Section(model.localizedString("細かく設定できる動き")) {
+                        ForEach(SceneEffectKind.allCases.filter(\.runsOnRealTime), id: \.self) { kind in
+                            sceneAddEffectButton(kind, path: path, layerID: layer.id)
+                        }
                     }
                 } label: {
                     Label(model.localizedString("動きを追加"), systemImage: "plus")
@@ -228,7 +235,9 @@ extension SettingsView {
 
     private func sceneAddEffectButton(_ kind: SceneEffectKind, path: String, layerID: UUID) -> some View {
         Button(sceneEffectName(kind)) {
-            let effect = SceneEffect(kind: kind)
+            guard let effect = model.makeSceneEffect(kind, path: path) else {
+                return
+            }
             updateSceneLayerEffects(path: path, layerID: layerID) { $0.append(effect) }
             selectedSceneEffectID = effect.id
         }
@@ -284,6 +293,9 @@ extension SettingsView {
     private func sceneEffectInspector(path: String, layerID: UUID, effect: SceneEffect) -> some View {
         let loopSeconds = model.sceneDocumentsByPath[path]?.loopSeconds ?? 20
         VStack(alignment: .leading, spacing: 8) {
+            if effect.kind.runsOnRealTime {
+                sceneRealTimeEffectInspector(path: path, layerID: layerID, effect: effect)
+            }
             if effect.kind.usesCycles {
             sceneEffectRow(title: model.localizedString("速さ")) {
                 Stepper(
@@ -611,8 +623,11 @@ extension SettingsView {
         }
         sceneMaskPainter.tool = .paint
         sceneMaskPainter.begin(
-            SceneMaskPainter.Target(path: path, layerID: layerID, effectID: effect.id, kind: kind),
-            existingFile: kind == .mask ? effect.maskFile : effect.flowFile,
+            SceneMaskPainter.Target(
+                path: path, layerID: layerID, effectID: effect.id, kind: kind,
+                storesFlowReversed: effect.kind == .flowMap
+            ),
+            existingFile: effect.paintFile(kind),
             layerPixelSize: size
         )
         if !effect.isEnabled {

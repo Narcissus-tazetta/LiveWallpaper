@@ -27,6 +27,13 @@ struct ScenePaintOverride {
     enum Target: Equatable {
         case mask
         case flow
+        /// When each pixel moves (grey), for real-time effects.
+        case timeOffset
+
+        /// Painted as one grey channel; a flow holds a direction.
+        var isGrey: Bool {
+            self != .flow
+        }
     }
 
     let effectID: UUID
@@ -167,7 +174,7 @@ final class SceneRenderer {
             paintOverrideTexture = nil
             return
         }
-        let format: MTLPixelFormat = override.target == .mask ? .r8Unorm : .rgba8Unorm
+        let format: MTLPixelFormat = override.target.isGrey ? .r8Unorm : .rgba8Unorm
         if let texture = paintOverrideTexture, texture.width == override.width, texture.height == override.height,
            texture.pixelFormat == format
         {
@@ -375,6 +382,19 @@ final class SceneRenderer {
         var patternClamps: Int32
     }
 
+    /// How the effect pass tints what is being painted: 1 the mask, 2 the flow, 3 the
+    /// time offset.
+    private func paintTint(_ override: ScenePaintOverride?) -> Int32 {
+        guard let override, showsPaintTint else {
+            return 0
+        }
+        switch override.target {
+        case .mask: return 1
+        case .flow: return 2
+        case .timeOffset: return 3
+        }
+    }
+
     /// The settings of a real-time effect, in the order its shader reads them.
     private struct RealTimeEffectValues {
         var values: (
@@ -405,94 +425,95 @@ final class SceneRenderer {
     }
 
     private func realTimeValues(_ effect: SceneEffect, input: SceneFrameInput) -> RealTimeEffectValues {
-        func value(_ key: String, _ fallback: Double) -> Float {
-            Float(effect.value(key, fallback))
+        func value(_ key: String) -> Float {
+            Float(effect.value(key))
         }
         switch effect.kind {
         case .travelingWaves:
             typealias Key = SceneEffect.WaveKey
             return RealTimeEffectValues([
-                loopSpeed(effect.value(Key.speed, 5), input: input), value(Key.scale, 200), value(Key.amplitude, 0.1),
-                value(Key.exponent, 1), value(Key.angle, 0), value(Key.dual, 0),
-                loopSpeed(effect.value(Key.speed2, 3), input: input), value(Key.scale2, 66), value(Key.offset2, 0),
-                value(Key.exponent2, 1), value(Key.angle2, 0)
+                loopSpeed(effect.value(Key.speed), input: input), value(Key.scale), value(Key.amplitude),
+                value(Key.exponent), value(Key.angle), value(Key.dual),
+                loopSpeed(effect.value(Key.speed2), input: input), value(Key.scale2), value(Key.offset2),
+                value(Key.exponent2), value(Key.angle2)
             ])
         case .flowShake:
             typealias Key = SceneEffect.FlowShakeKey
-            let speed = effect.value(Key.speed, 1)
+            let speed = effect.value(Key.speed)
             // The irregular swing sums sines at these multiples of the speed; each is
             // rounded on its own so a baked loop still closes.
             let multiples = [1, -0.16161616, 0.0083333, -0.00019841]
             return RealTimeEffectValues([
-                loopSpeed(speed, input: input), value(Key.amplitude, 0.1), value(Key.frictionX, 1),
-                value(Key.frictionY, 1), value(Key.boundsMin, 0), value(Key.boundsMax, 1), value(Key.side, 0),
-                value(Key.irregular, 0)
+                loopSpeed(speed, input: input), value(Key.amplitude), value(Key.frictionX),
+                value(Key.frictionY), value(Key.boundsMin), value(Key.boundsMax), value(Key.side),
+                value(Key.irregular)
             ] + multiples.map { input.isRealTime ? Float(speed * $0) : loopSpeedAllowingStill(speed * $0) })
         case .flowMap:
             typealias Key = SceneEffect.FlowMapKey
             return RealTimeEffectValues([
-                loopRate(effect.value(Key.speed, 1), input: input), value(Key.strength, 1), value(Key.feather, 0.4),
-                value(Key.phaseScale, 2)
+                loopRate(effect.value(Key.speed), input: input), value(Key.strength), value(Key.feather),
+                value(Key.phaseScale)
             ])
         case .normalRipples:
             typealias Key = SceneEffect.RipplesKey
             // Its pattern drifts along two axes at once; a baked loop does not close
             // exactly (only the desktop draws it live).
             return RealTimeEffectValues([
-                value(Key.animationSpeed, 0.15), value(Key.scale, 1), value(Key.scrollSpeed, 0), value(Key.scrollAngle, 0),
-                value(Key.ratio, 1), value(Key.strength, 0.1), textureAspect(effect), value(Key.specular, 0),
-                value(Key.specularPower, 1), value(Key.specularStrength, 1), value(Key.specularRed, 1),
-                value(Key.specularGreen, 1), value(Key.specularBlue, 1)
+                value(Key.animationSpeed), value(Key.scale), value(Key.scrollSpeed), value(Key.scrollAngle),
+                value(Key.ratio), value(Key.strength), textureAspect(effect), value(Key.specular),
+                value(Key.specularPower), value(Key.specularStrength), value(Key.specularRed),
+                value(Key.specularGreen), value(Key.specularBlue)
             ])
         case .noiseDrift:
             typealias Key = SceneEffect.NoiseDriftKey
             return RealTimeEffectValues([
-                loopRate(effect.value(Key.speed, 0.02), input: input), value(Key.scale, 2), value(Key.scaleX, 0.5),
-                value(Key.amount, 0.1), value(Key.angle, .pi / 2), textureAspect(effect)
+                loopRate(effect.value(Key.speed), input: input), value(Key.scale), value(Key.scaleX),
+                value(Key.amount), value(Key.angle), textureAspect(effect)
             ])
         case .noiseSway:
             typealias Key = SceneEffect.NoiseSwayKey
-            let speed = effect.value(Key.speed, 5)
+            let speed = effect.value(Key.speed)
             let multiples = [1, -0.16161616, 0.0083333, -0.00019841, -0.5, 0.041666666, -0.0013888889, 0.000024801587]
             return RealTimeEffectValues(
                 multiples.map { input.isRealTime ? Float(speed * $0) : loopSpeedAllowingStill(speed * $0) } + [
-                    value(Key.strength, 0.4), value(Key.phase, 0.5), value(Key.power, 1), value(Key.noiseScale, 0.05),
-                    value(Key.ratio, 0.3), value(Key.angle, 0)
+                    value(Key.strength), value(Key.phase), value(Key.power), value(Key.noiseScale),
+                    value(Key.ratio), value(Key.angle)
                 ]
             )
         case .pulseBlend:
             typealias Key = SceneEffect.PulseKey
             // The noise term wanders on its own; a baked loop does not close exactly.
             return RealTimeEffectValues([
-                loopSpeed(effect.value(Key.speed, 3), input: input), value(Key.phase, 0), value(Key.amount, 1),
-                value(Key.boundsMin, 0), value(Key.boundsMax, 1), value(Key.noiseSpeed, 0.5), value(Key.noiseAmount, 0),
-                value(Key.power, 1), value(Key.lowRed, 1), value(Key.lowGreen, 1), value(Key.lowBlue, 1),
-                value(Key.highRed, 1), value(Key.highGreen, 1), value(Key.highBlue, 1), value(Key.blendMode, 9),
-                value(Key.pulsesColor, 1), value(Key.pulsesOpacity, 0)
+                loopSpeed(effect.value(Key.speed), input: input), value(Key.phase), value(Key.amount),
+                value(Key.boundsMin), value(Key.boundsMax), value(Key.noiseSpeed), value(Key.noiseAmount),
+                value(Key.power), value(Key.lowRed), value(Key.lowGreen), value(Key.lowBlue),
+                value(Key.highRed), value(Key.highGreen), value(Key.highBlue), value(Key.blendMode),
+                value(Key.pulsesColor), value(Key.pulsesOpacity)
             ])
         case .uvScroll:
             typealias Key = SceneEffect.ScrollKey
             func speed(_ raw: Double, repeats: Double) -> Float {
                 let perSecond = raw * abs(raw)
-                guard !input.isRealTime, repeats != 0 else {
+                guard !input.isRealTime, repeats != 0, perSecond != 0 else {
                     return Float(perSecond)
                 }
-                // Whole wraps of the repeated picture per loop.
+                // Whole wraps of the repeated picture per loop, at least one.
                 let loop = Double(max(document.loopSeconds, 1))
-                return Float((perSecond * repeats * loop).rounded() / (repeats * loop))
+                let wraps = max((abs(perSecond * repeats) * loop).rounded(), 1)
+                return Float((perSecond < 0 ? -1 : 1) * wraps / (abs(repeats) * loop))
             }
-            let repeatX = effect.value(Key.repeatX, 1), repeatY = effect.value(Key.repeatY, 1)
+            let repeatX = effect.value(Key.repeatX), repeatY = effect.value(Key.repeatY)
             return RealTimeEffectValues([
-                speed(effect.value(Key.speedX, 0.2), repeats: repeatX), speed(effect.value(Key.speedY, 0.2), repeats: repeatY),
+                speed(effect.value(Key.speedX), repeats: repeatX), speed(effect.value(Key.speedY), repeats: repeatY),
                 Float(repeatX), Float(repeatY)
             ])
         case .axisSwing:
             typealias Key = SceneEffect.AxisSwingKey
             return RealTimeEffectValues([
-                loopSpeed(effect.value(Key.speed, 2), input: input), value(Key.phase, 0), value(Key.amount, 0.2),
-                value(Key.x0, 0.25), value(Key.y0, 0.5), value(Key.x1, 0.75), value(Key.y1, 0.5), value(Key.size, 0.4),
-                value(Key.center, 0.5), value(Key.feather, 0.01), value(Key.doubleSided, 0), value(Key.noise, 0),
-                value(Key.noiseSpeed, 0.15), value(Key.noiseAmount, 0.2), textureAspect(effect)
+                loopSpeed(effect.value(Key.speed), input: input), value(Key.phase), value(Key.amount),
+                value(Key.x0), value(Key.y0), value(Key.x1), value(Key.y1), value(Key.size),
+                value(Key.center), value(Key.feather), value(Key.doubleSided), value(Key.noise),
+                value(Key.noiseSpeed), value(Key.noiseAmount), textureAspect(effect)
             ])
         default:
             return RealTimeEffectValues([])
@@ -500,13 +521,15 @@ final class SceneRenderer {
     }
 
     /// A rate in cycles per second, rounded to whole cycles per loop unless drawn on
-    /// real time (it may round to none).
+    /// real time; a motion that would round to none keeps one cycle, or a slow drift
+    /// would stop altogether in a baked loop.
     private func loopRate(_ rate: Double, input: SceneFrameInput) -> Float {
-        guard !input.isRealTime else {
+        guard !input.isRealTime, rate != 0 else {
             return Float(rate)
         }
         let loop = Double(max(document.loopSeconds, 1))
-        return Float((rate * loop).rounded() / loop)
+        let cycles = max((abs(rate) * loop).rounded(), 1)
+        return Float((rate < 0 ? -1 : 1) * cycles / loop)
     }
 
     /// The stored picture's width over height when the effect names it, else the
@@ -567,7 +590,8 @@ final class SceneRenderer {
             let override = paintOverride?.effectID == effect.id ? paintOverride : nil
             let mask = override?.target == .mask ? paintOverrideTexture : effect.maskFile.flatMap { maskTextures[$0] }
             let flow = override?.target == .flow ? paintOverrideTexture : effect.flowFile.flatMap { flowTextures[$0] }
-            let timeOffset = effect.timeOffsetFile.flatMap { maskTextures[$0] }
+            let timeOffset = override?.target == .timeOffset
+                ? paintOverrideTexture : effect.timeOffsetFile.flatMap { maskTextures[$0] }
             let pattern = effect.patternFile.flatMap { flowTextures[$0] }
             let radians = Float(effect.direction * .pi / 180)
             // UV y points down, the direction angle counts counter-clockwise with y up.
@@ -587,14 +611,14 @@ final class SceneRenderer {
                 kind: Int32(SceneEffectKind.allCases.firstIndex(of: effect.kind) ?? 0),
                 cycles: Int32(min(max(effect.cycles, SceneEffect.cyclesRange.lowerBound), SceneEffect.cyclesRange.upperBound)),
                 reversed: effect.reversed ? 1 : 0,
-                overlay: override == nil || !showsPaintTint ? 0 : (override?.target == .mask ? 1 : 2),
+                overlay: paintTint(override),
                 hasMask: mask == nil ? 0 : 1,
                 fixedEdge: Int32(SceneFixedEdge.allCases.firstIndex(of: effect.fixedEdge) ?? 0),
                 // A baked loop reads its own time within the loop, so the rounded
                 // speeds land exactly where the loop starts again.
                 time: Float(input.isRealTime ? input.time : Double(phase) * Double(max(document.loopSeconds, 1))),
                 hasTimeOffset: timeOffset == nil ? 0 : 1,
-                patternClamps: effect.value(SceneEffect.patternClampsKey, 0) != 0 ? 1 : 0
+                patternClamps: effect.value(SceneEffect.patternClampsKey) != 0 ? 1 : 0
             )
             var realTime = realTimeValues(effect, input: input)
             let pass = MTLRenderPassDescriptor()
@@ -1825,6 +1849,8 @@ final class SceneRenderer {
         } else if (u.overlay == 2) {
             float strength = length(flow.sample(s, uv).rg * 2.0 - 1.0);
             result = mix(result, float4(0.2, 0.55, 1.0, 1.0), clamp(strength, 0.0, 1.0) * 0.5);
+        } else if (u.overlay == 3) {
+            result = mix(result, float4(0.75, 0.35, 1.0, 1.0), timeOffset.sample(s, uv).r * 0.5);
         }
         return result;
     }
