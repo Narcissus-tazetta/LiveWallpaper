@@ -13,7 +13,7 @@ extension SceneDocument {
         guard let effect = layer.effects.first(where: { $0.id == effectID }) else {
             return nil
         }
-        return .some(kind == .mask ? effect.maskFile : effect.flowFile)
+        return .some(effect.paintFile(kind))
     }
 
     /// Scripts can read target names and locks, so these affect baking while a script can run.

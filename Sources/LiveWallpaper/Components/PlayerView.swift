@@ -42,6 +42,8 @@ final class PlayerView: NSView {
     /// While the baked video is out of date (an edit is still being baked), the
     /// player's time does not match the scene's loop.
     private var sceneUsesFreeClock = false
+    private var sceneRunsInRealTime = false
+    private var sceneClockOrigin: CFTimeInterval?
     /// The scene has finished a frame since it was shown, so dropping the video
     /// under it reveals nothing.
     private var sceneCoversVideo = false
@@ -178,6 +180,7 @@ final class PlayerView: NSView {
         }()
         sceneRemovalObservation = nil
         sceneUsesFreeClock = freeClock
+        sceneRunsInRealTime = freeClock && document.requiresRealTimePlayback
         layer.maximumFramesPerSecond = maximumFramesPerSecond
         layer.timeOfDay = timeOfDay
         CATransaction.begin()
@@ -195,7 +198,13 @@ final class PlayerView: NSView {
         }
         let running = player.rate != 0
         if sceneUsesFreeClock {
-            return SceneClockReading(time: CACurrentMediaTime(), isRunning: running)
+            // Seconds since the scene was first shown: the time since boot is too
+            // large for the Float the shaders read it as.
+            let origin = sceneClockOrigin ?? CACurrentMediaTime()
+            sceneClockOrigin = origin
+            return SceneClockReading(
+                time: CACurrentMediaTime() - origin, isRunning: running, isRealTime: sceneRunsInRealTime
+            )
         }
         let seconds = player.currentTime().seconds
         return SceneClockReading(time: seconds.isFinite ? seconds : 0, isRunning: running)

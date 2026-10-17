@@ -51,6 +51,40 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     /// Moves the picture one way and fades between two offset copies, like the water
     /// flow with one direction everywhere: clouds drifting, mist.
     case drift
+    /// Waves travelling across the picture at a real speed, set in physical units
+    /// (`SceneEffect.values`, keys in SceneEffect.WaveKey).
+    case travelingWaves
+    /// Each pixel swings back and forth along its own vector of a flow map, at a
+    /// real speed (`SceneEffect.values`, keys in SceneEffect.FlowShakeKey).
+    case flowShake
+    /// The picture streams along a flow map, two staggered pairs of copies hiding
+    /// each reset, with a pattern image deciding which pair shows where
+    /// (SceneEffect.FlowMapKey).
+    case flowMap
+    /// Two scrolling copies of a tiling normal map bend the picture like a water
+    /// surface (SceneEffect.RipplesKey).
+    case normalRipples
+    /// A tiling noise image drifting sideways pushes the picture one way and back
+    /// (SceneEffect.NoiseDriftKey).
+    case noiseDrift
+    /// Sums of slow sines, offset per pixel by a tiling noise image, sway the
+    /// picture like foliage (SceneEffect.NoiseSwayKey).
+    case noiseSway
+    /// The picture pulses between two tints, mixed by a blend mode, optionally its
+    /// opacity too (SceneEffect.PulseKey).
+    case pulseBlend
+    /// Scrolls the picture, wrapping, at a set speed per axis (SceneEffect.ScrollKey).
+    case uvScroll
+    /// Bends the part of the picture beside an axis back and forth, like a flag on
+    /// a pole (SceneEffect.AxisSwingKey).
+    case axisSwing
+
+    /// Runs on seconds rather than whole repeats per loop: drawn live it keeps its
+    /// own speed, and only a baked video rounds the speed to fit the loop.
+    var runsOnRealTime: Bool {
+        [.travelingWaves, .flowShake, .flowMap, .normalRipples, .noiseDrift, .noiseSway, .pulseBlend, .uvScroll, .axisSwing]
+            .contains(self)
+    }
 
     /// Uses `centerX`/`centerY` (picked on the preview).
     var usesCenter: Bool {
@@ -59,6 +93,11 @@ enum SceneEffectKind: String, Codable, CaseIterable {
 
     var usesDirection: Bool {
         [.shake, .sway, .waves, .scroll, .drift].contains(self)
+    }
+
+    /// Its speed is a whole number of repeats per loop (`cycles`).
+    var usesCycles: Bool {
+        !runsOnRealTime
     }
 
     /// Can hold one side still and move more toward the other (hair, leaves, cloth).
@@ -78,7 +117,7 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     }
 
     var usesStrength: Bool {
-        ![.scroll, .spin, .puppet].contains(self)
+        ![.scroll, .spin, .puppet].contains(self) && !runsOnRealTime
     }
 }
 
@@ -183,6 +222,14 @@ struct SceneEffect: Codable, Equatable, Identifiable {
     var flowFile: String?
     /// Puppet only.
     var pins: [ScenePin] = []
+    /// The settings of effects that run on real time, in their own units.
+    var values: [String: Double] = [:]
+    /// Grey image in the scene folder delaying each pixel's motion (white = a full
+    /// period later); travelling waves and flow shake only.
+    var timeOffsetFile: String?
+    /// A tiling image in the scene folder some real-time effects read: noise, a
+    /// normal map, a flow phase. Read repeating unless `values["patternClamps"]`.
+    var patternFile: String?
     var fixedEdge: SceneFixedEdge = .none
     /// Where the effect's area is, for `fixedEdge`: the painted area, or a cut-out's
     /// picture. nil means the whole layer.
@@ -217,8 +264,234 @@ struct SceneEffect: Codable, Equatable, Identifiable {
         maskFile = try? container.decodeIfPresent(String.self, forKey: .maskFile)
         flowFile = try? container.decodeIfPresent(String.self, forKey: .flowFile)
         pins = (try? container.decode([ScenePin].self, forKey: .pins)) ?? []
+        values = (try? container.decode([String: Double].self, forKey: .values)) ?? [:]
+        timeOffsetFile = try? container.decodeIfPresent(String.self, forKey: .timeOffsetFile)
+        patternFile = try? container.decodeIfPresent(String.self, forKey: .patternFile)
         fixedEdge = (try? container.decode(SceneFixedEdge.self, forKey: .fixedEdge)) ?? .none
         areaBounds = try? container.decodeIfPresent(SceneAreaBounds.self, forKey: .areaBounds)
+    }
+}
+
+extension SceneEffect {
+    /// Travelling waves: phase = time × speed + (uv · direction) × scale, and the
+    /// picture moves sideways by sin(phase)^exponent × amplitude².
+    enum WaveKey {
+        /// Radians per second.
+        static let speed = "speed"
+        /// Radians per unit of layer UV along the direction.
+        static let scale = "scale"
+        static let amplitude = "amplitude"
+        static let exponent = "exponent"
+        /// Radians turning (0, 1) in layer UV (x right, y down) by the usual 2D
+        /// rotation: 0 runs down the picture.
+        static let angle = "angle"
+        /// 1 multiplies in a second wave with the keys below.
+        static let dual = "dual"
+        static let speed2 = "speed2"
+        static let scale2 = "scale2"
+        /// Seconds the second wave runs ahead.
+        static let offset2 = "offset2"
+        static let exponent2 = "exponent2"
+        static let angle2 = "angle2"
+    }
+
+    /// Flow shake: offset = sin(time × speed), shaped by friction and bounds, moves
+    /// each pixel by offset × amplitude² along its flow vector.
+    enum FlowShakeKey {
+        /// Radians per second.
+        static let speed = "speed"
+        static let amplitude = "amplitude"
+        /// Exponents easing the swing on its way out (x) and back (y); 1 is a sine.
+        static let frictionX = "frictionX"
+        static let frictionY = "frictionY"
+        /// The part of the swing (0...1) that is used, stretched to the whole range.
+        static let boundsMin = "boundsMin"
+        static let boundsMax = "boundsMax"
+        /// 0 swings both ways, 1 only forward, 2 only back.
+        static let side = "side"
+        /// 1 sums four sines of unrelated speeds for an irregular swing.
+        static let irregular = "irregular"
+    }
+
+    /// Flow map: cycle = fract(time × speed); the copies move by (cycle − ½) ×
+    /// strength × 0.1 along the flow, crossfaded with `feather`.
+    enum FlowMapKey {
+        /// Cycles per second.
+        static let speed = "speed"
+        static let strength = "strength"
+        static let feather = "feather"
+        /// How many times the pattern repeats across the picture.
+        static let phaseScale = "phaseScale"
+    }
+
+    /// Normal ripples: the map scrolls at animationSpeed² both ways plus the scroll,
+    /// and moves the picture by its normal × strength².
+    enum RipplesKey {
+        static let animationSpeed = "animationSpeed"
+        static let scale = "scale"
+        static let scrollSpeed = "scrollSpeed"
+        /// Radians turning (0, 1) in layer UV.
+        static let scrollAngle = "scrollAngle"
+        /// Vertical stretch of the map.
+        static let ratio = "ratio"
+        static let strength = "strength"
+        /// 1 adds a highlight where the surface faces up and toward the top centre.
+        static let specular = "specular"
+        static let specularPower = "specularPower"
+        static let specularStrength = "specularStrength"
+        static let specularRed = "specularRed"
+        static let specularGreen = "specularGreen"
+        static let specularBlue = "specularBlue"
+    }
+
+    /// Noise drift: noise(uv × scale, x stretched by scaleX, + time × speed) moves
+    /// the picture by (noise × 2 − 1) × amount across `angle`.
+    enum NoiseDriftKey {
+        /// Pattern widths per second.
+        static let speed = "speed"
+        static let scale = "scale"
+        static let scaleX = "scaleX"
+        static let amount = "amount"
+        /// Radians; the motion runs across this direction.
+        static let angle = "angle"
+    }
+
+    /// Noise sway: per-pixel phase from the pattern, four sines on each axis at
+    /// fixed multiples of the speed, each sine raised to `power`.
+    enum NoiseSwayKey {
+        /// Radians per second.
+        static let speed = "speed"
+        static let strength = "strength"
+        static let phase = "phase"
+        static let power = "power"
+        static let noiseScale = "noiseScale"
+        /// Stretch between the axes.
+        static let ratio = "ratio"
+        static let angle = "angle"
+    }
+
+    /// Pulse: pulse = smoothstep(boundsMin, boundsMax, ½ + ½ sin(time × speed + phase
+    /// − π/2)) × amount, plus noise, raised to `power`.
+    enum PulseKey {
+        static let speed = "speed"
+        static let phase = "phase"
+        static let amount = "amount"
+        static let boundsMin = "boundsMin"
+        static let boundsMax = "boundsMax"
+        static let noiseSpeed = "noiseSpeed"
+        static let noiseAmount = "noiseAmount"
+        static let power = "power"
+        /// Colour multipliers at no pulse and at full pulse.
+        static let lowRed = "lowRed", lowGreen = "lowGreen", lowBlue = "lowBlue"
+        static let highRed = "highRed", highGreen = "highGreen", highBlue = "highBlue"
+        /// 0...32, see SceneRenderer's pulse blending.
+        static let blendMode = "blendMode"
+        /// 1 pulses the colour (on by default).
+        static let pulsesColor = "pulsesColor"
+        /// 1 also multiplies the opacity by the pulse.
+        static let pulsesOpacity = "pulsesOpacity"
+    }
+
+    /// UV scroll: the picture moves by sign(speed) × speed² per second on each axis,
+    /// repeated `repeatX` × `repeatY` times.
+    enum ScrollKey {
+        static let speedX = "speedX"
+        static let speedY = "speedY"
+        static let repeatX = "repeatX"
+        static let repeatY = "repeatY"
+    }
+
+    /// Axis swing: the area within `size` of the axis from point 0 to point 1 bends
+    /// by sin(time × speed + phase × 2π) × amount.
+    enum AxisSwingKey {
+        static let speed = "speed"
+        static let phase = "phase"
+        static let amount = "amount"
+        /// Layer UV.
+        static let x0 = "x0", y0 = "y0", x1 = "x1", y1 = "y1"
+        static let size = "size"
+        /// Where along the axis it pivots, 0...1.
+        static let center = "center"
+        static let feather = "feather"
+        /// 1 bends both sides of the axis.
+        static let doubleSided = "doubleSided"
+        /// 1 adds noise from the pattern to the swing.
+        static let noise = "noise"
+        static let noiseSpeed = "noiseSpeed"
+        static let noiseAmount = "noiseAmount"
+    }
+
+    /// Width over height of the picture as stored (with any padding), which some
+    /// effects scale by. Defaults to the picture's own.
+    static let textureAspectKey = "textureAspect"
+    /// 1 reads the pattern clamped instead of repeating.
+    static let patternClampsKey = "patternClamps"
+
+    /// The file painted for `target`, if any.
+    func paintFile(_ target: ScenePaintOverride.Target) -> String? {
+        switch target {
+        case .mask: maskFile
+        case .flow: flowFile
+        case .timeOffset: timeOffsetFile
+        }
+    }
+
+    /// The value of `key`, or the effect's default for it.
+    func value(_ key: String) -> Double {
+        values[key] ?? Self.defaultValues(for: kind)[key] ?? 0
+    }
+
+    /// What real-time effects use for a value they were not given.
+    static func defaultValues(for kind: SceneEffectKind) -> [String: Double] {
+        switch kind {
+        case .travelingWaves:
+            typealias Key = WaveKey
+            return [
+                Key.speed: 5, Key.scale: 200, Key.amplitude: 0.1, Key.exponent: 1, Key.angle: 0, Key.dual: 0,
+                Key.speed2: 3, Key.scale2: 66, Key.offset2: 0, Key.exponent2: 1, Key.angle2: 0
+            ]
+        case .flowShake:
+            typealias Key = FlowShakeKey
+            return [
+                Key.speed: 1, Key.amplitude: 0.1, Key.frictionX: 1, Key.frictionY: 1, Key.boundsMin: 0, Key.boundsMax: 1,
+                Key.side: 0, Key.irregular: 0
+            ]
+        case .flowMap:
+            typealias Key = FlowMapKey
+            return [Key.speed: 1, Key.strength: 1, Key.feather: 0.4, Key.phaseScale: 2]
+        case .normalRipples:
+            typealias Key = RipplesKey
+            return [
+                Key.animationSpeed: 0.15, Key.scale: 1, Key.scrollSpeed: 0, Key.scrollAngle: 0, Key.ratio: 1, Key.strength: 0.1,
+                Key.specular: 0, Key.specularPower: 1, Key.specularStrength: 1, Key.specularRed: 1, Key.specularGreen: 1,
+                Key.specularBlue: 1
+            ]
+        case .noiseDrift:
+            typealias Key = NoiseDriftKey
+            return [Key.speed: 0.02, Key.scale: 2, Key.scaleX: 0.5, Key.amount: 0.1, Key.angle: .pi / 2]
+        case .noiseSway:
+            typealias Key = NoiseSwayKey
+            return [Key.speed: 5, Key.strength: 0.4, Key.phase: 0.5, Key.power: 1, Key.noiseScale: 0.05, Key.ratio: 0.3, Key.angle: 0]
+        case .pulseBlend:
+            typealias Key = PulseKey
+            return [
+                Key.speed: 3, Key.phase: 0, Key.amount: 1, Key.boundsMin: 0, Key.boundsMax: 1, Key.noiseSpeed: 0.5,
+                Key.noiseAmount: 0, Key.power: 1, Key.lowRed: 1, Key.lowGreen: 1, Key.lowBlue: 1, Key.highRed: 1,
+                Key.highGreen: 1, Key.highBlue: 1, Key.blendMode: 9, Key.pulsesColor: 1, Key.pulsesOpacity: 0
+            ]
+        case .uvScroll:
+            typealias Key = ScrollKey
+            return [Key.speedX: 0.2, Key.speedY: 0.2, Key.repeatX: 1, Key.repeatY: 1]
+        case .axisSwing:
+            typealias Key = AxisSwingKey
+            return [
+                Key.speed: 2, Key.phase: 0, Key.amount: 0.2, Key.x0: 0.25, Key.y0: 0.5, Key.x1: 0.75, Key.y1: 0.5,
+                Key.size: 0.4, Key.center: 0.5, Key.feather: 0.01, Key.doubleSided: 0, Key.noise: 0, Key.noiseSpeed: 0.15,
+                Key.noiseAmount: 0.2
+            ]
+        default:
+            return [:]
+        }
     }
 }
 
@@ -558,6 +831,9 @@ struct SceneDocument: Codable, Equatable {
     /// Applied in order after placement and keyframes (SceneLink).
     var links: [SceneLink] = []
     var scripts: [SceneScript] = []
+    /// Drawn live on real time on the desktop rather than as the baked loop, so its
+    /// real-time effects keep their exact speed. Set by scenes that use them.
+    var runsInRealTime = false
 
     init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer]) {
         self.canvasWidth = canvasWidth
@@ -581,6 +857,7 @@ struct SceneDocument: Codable, Equatable {
             timeBands = bands
         }
         links = ((try? container.decode([FailableDecodable<SceneLink>].self, forKey: .links)) ?? []).compactMap(\.value)
+        runsInRealTime = (try? container.decode(Bool.self, forKey: .runsInRealTime)) ?? false
         scripts = try container.decodeIfPresent([SceneScript].self, forKey: .scripts) ?? []
         guard scripts.count <= SceneScript.maximumCount, Set(scripts.map(\.id)).count == scripts.count else {
             throw DecodingError.dataCorruptedError(forKey: .scripts, in: container, debugDescription: "Too many scripts or duplicate script IDs")
@@ -598,6 +875,12 @@ struct SceneDocument: Codable, Equatable {
     var usesCursor: Bool {
         layers.contains(where: \.usesCursor) || links.contains { $0.input.usesCursor && $0.hasEffect }
             || scripts.contains { $0.canRun && $0.usesCursor }
+    }
+
+    var requiresRealTimePlayback: Bool {
+        runsInRealTime || layers.contains { layer in
+            layer.activeEffects.contains { $0.kind.runsOnRealTime }
+        }
     }
 
     var hasUnapprovedScripts: Bool { scripts.contains { $0.isEnabled && !$0.canRun } }

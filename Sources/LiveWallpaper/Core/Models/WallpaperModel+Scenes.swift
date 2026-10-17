@@ -113,6 +113,25 @@ extension WallpaperModel {
     }
 
     /// A scene that arrived in a package, next to its already imported baked video.
+    /// A new effect for the editor. An effect that reads a tiling pattern gets one
+    /// written into the scene folder; nil (with the reason shown) when that fails.
+    func makeSceneEffect(_ kind: SceneEffectKind, path: String) -> SceneEffect? {
+        var effect = SceneEffect(kind: kind)
+        guard let pattern = ScenePatternGenerator.pattern(for: kind) else {
+            return effect
+        }
+        do {
+            effect.patternFile = try SceneStore.writeImage(
+                ScenePatternGenerator.image(pattern), prefix: "pattern", videoPath: path
+            )
+        } catch {
+            AppLog.windowRefresh.error("scene pattern not written: \(error.localizedDescription, privacy: .public)")
+            sceneErrorMessage = error.localizedDescription
+            return nil
+        }
+        return effect
+    }
+
     func registerImportedScene(_ document: SceneDocument, path: String) {
         SceneScriptPermissions.revoke(document, path: path)
         var document = document
@@ -628,6 +647,8 @@ extension WallpaperModel {
         case .mask:
             document.layers[layerIndex].effects[effectIndex].maskFile = fileName
             document.layers[layerIndex].effects[effectIndex].areaBounds = fileName == nil ? nil : bounds
+        case .timeOffset:
+            document.layers[layerIndex].effects[effectIndex].timeOffsetFile = fileName
         case .flow:
             document.layers[layerIndex].effects[effectIndex].flowFile = fileName
         }
@@ -886,9 +907,13 @@ extension WallpaperModel {
                 view.hideScene()
                 continue
             }
-            guard document.usesCursor || isStale else {
+            // A real-time scene is drawn live so its effects keep their own speed;
+            // the baked video only has them rounded to the loop.
+            guard document.usesCursor || isStale || document.requiresRealTimePlayback else {
                 if view.isShowingScene {
-                    AppLog.windowRefresh.info("scene video display=\(displayID, privacy: .public)")
+                    AppLog.windowRefresh.info(
+                        "scene video display=\(displayID, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
+                    )
                 }
                 view.hideScene()
                 continue
@@ -896,11 +921,12 @@ extension WallpaperModel {
             do {
                 if !view.isShowingScene {
                     AppLog.windowRefresh.info(
-                        "scene live display=\(displayID, privacy: .public) stale=\(isStale, privacy: .public)"
+                        "scene live display=\(displayID, privacy: .public) stale=\(isStale, privacy: .public) realTime=\(document.requiresRealTimePlayback, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
                     )
                 }
                 try view.showScene(
-                    document, videoPath: path, freeClock: isStale, timeOfDay: document.timeOfDay(at: Date()),
+                    document, videoPath: path, freeClock: isStale || document.requiresRealTimePlayback,
+                    timeOfDay: document.timeOfDay(at: Date()),
                     maximumFramesPerSecond: maximumFramesPerSecond
                 )
                 view.setSceneScriptIssueHandler { [weak self] issues in

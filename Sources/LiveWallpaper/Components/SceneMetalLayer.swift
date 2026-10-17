@@ -5,6 +5,8 @@ import QuartzCore
 struct SceneClockReading {
     var time: Double
     var isRunning: Bool
+    /// `time` counts real seconds since the scene was shown, for real-time effects.
+    var isRealTime = false
 }
 
 /// Shows a scene live. Draws only when something changes: a tick runs while the
@@ -384,6 +386,7 @@ final class SceneMetalLayer: CAMetalLayer {
             return
         }
         current.time = reading.time
+        current.isRealTime = reading.isRealTime
     }
 
     private func updateTicking() {

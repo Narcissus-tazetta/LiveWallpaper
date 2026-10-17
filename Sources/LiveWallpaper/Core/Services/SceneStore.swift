@@ -157,7 +157,7 @@ enum SceneStore {
         target: ScenePaintOverride.Target,
         videoPath: String
     ) throws -> String {
-        let isMask = target == .mask
+        let isMask = target.isGrey
         let fileName = "\(isMask ? "mask" : "flow")-\(UUID().uuidString).png"
         let url = folderURL(forVideoPath: videoPath).appendingPathComponent(fileName)
         let bytesPerPixel = isMask ? 1 : 4
@@ -194,7 +194,7 @@ enum SceneStore {
         else {
             throw StoreError.unreadableImage(fileName)
         }
-        let isMask = target == .mask
+        let isMask = target.isGrey
         let bytesPerPixel = isMask ? 1 : 4
         var bytes = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
         let drew: Bool = bytes.withUnsafeMutableBytes { buffer in
@@ -243,7 +243,7 @@ enum SceneStore {
             }
             files.formUnion([layer.particles?.maskFile, layer.depthFile].compactMap { $0 })
             for effect in layer.effects {
-                files.formUnion([effect.maskFile, effect.flowFile].compactMap { $0 })
+                files.formUnion([effect.maskFile, effect.flowFile, effect.timeOffsetFile, effect.patternFile].compactMap { $0 })
             }
         }
         return files
