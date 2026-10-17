@@ -311,6 +311,13 @@ final class WallpaperModel: ObservableObject {
     @Published var importedExternalWallpaperPaths: [String: String] = [:]
     @Published var importingExternalWallpaperID: String?
     @Published var failedExternalWallpaperImportID: String?
+    /// External scene ID → the revision baked and ready to show.
+    @Published var readyExternalScenes: [String: Date] = [:]
+    /// External scene ID → the revision that failed to bake; tried again when the
+    /// provider writes a new one.
+    @Published var failedExternalScenes: [String: Date] = [:]
+    /// External scene ID → the revision being copied and baked.
+    var externalScenePreparations: [String: (revision: Date, task: Task<Void, Never>)] = [:]
     /// 自動停止(作業中の停止など)の対象から除外する画面ID。ここに含まれる画面は
     /// 他の画面での作業やウィンドウ被覆に関わらず常に再生を続ける。
     @Published var suspendDisabledDisplayIDs: Set<String> = []

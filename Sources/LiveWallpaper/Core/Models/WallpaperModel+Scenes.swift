@@ -799,6 +799,13 @@ extension WallpaperModel {
         }
     }
 
+    /// Bakes a scene that is not in the library (one an external app offers), with
+    /// its progress in sceneBakeProgress like any bake.
+    func bakeSceneOutsideLibrary(_ document: SceneDocument, videoPath: String) async throws {
+        defer { sceneBakeProgress.removeValue(forKey: videoPath) }
+        try await bakeScene(document, videoPath: videoPath)
+    }
+
     /// Writes the scene's video at `videoPath`: one seamless loop when anything moves,
     /// otherwise a short still.
     private func bakeScene(

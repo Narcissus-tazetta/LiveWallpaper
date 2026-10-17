@@ -1,4 +1,7 @@
+import CoreGraphics
+import ImageIO
 @testable import LiveWallpaper
+import UniformTypeIdentifiers
 import XCTest
 
 @MainActor
@@ -150,5 +153,110 @@ final class ExternalWallpaperTests: XCTestCase {
         try FileManager.default.removeItem(at: videoURL)
         XCTAssertTrue(model.libraryVideoPaths.contains(path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: path))
+    }
+
+    /// A provider's scene folder with one still image layer.
+    private func writeSceneFolder() throws -> URL {
+        let folder = directory.appendingPathComponent("offered.scene", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let context = try XCTUnwrap(CGContext(
+            data: nil, width: 16, height: 9, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.setFillColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: 16, height: 9))
+        let image = try XCTUnwrap(context.makeImage())
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithURL(
+            folder.appendingPathComponent("layer.png") as CFURL, UTType.png.identifier as CFString, 1, nil
+        ))
+        CGImageDestinationAddImage(destination, image, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        let document = SceneDocument(canvasWidth: 16, canvasHeight: 9, layers: [SceneLayer(name: "Sky", imageFile: "layer.png")])
+        try SceneStore.encode(document).write(to: folder.appendingPathComponent("scene.json"))
+        return folder
+    }
+
+    func testReadsSceneItemsAndRefusesItemsWithBothOrNeither() throws {
+        let sleeper = try launchSleeper()
+        defer { sleeper.terminate() }
+        let scene = try writeSceneFolder()
+        let json: [String: Any] = [
+            "processIdentifier": sleeper.processIdentifier,
+            "name": "P",
+            "wallpapers": [
+                ["id": "scene", "name": "Sky", "scene": scene.path],
+                ["id": "both", "name": "Both", "scene": scene.path, "path": videoURL.path],
+                ["id": "neither", "name": "Neither"],
+                ["id": "missing", "name": "Missing", "scene": directory.appendingPathComponent("none").path]
+            ]
+        ]
+        let providers = directory.appendingPathComponent("Providers", isDirectory: true)
+        try FileManager.default.createDirectory(at: providers, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: json).write(to: providers.appendingPathComponent("p.json"))
+
+        var report: [ExternalWallpaper] = []
+        let monitor = ExternalWallpaperProviderMonitor(directoryURL: providers) { report = $0 }
+        monitor.start()
+
+        XCTAssertEqual(report.map(\.id), ["p.json/scene"])
+        XCTAssertEqual(report.first?.sceneFolderPath, scene.path)
+        XCTAssertEqual(report.first?.path, ExternalWallpaperProviderMonitor.bakedScenePath(forID: "p.json/scene"))
+        XCTAssertNotNil(report.first?.sceneRevision)
+    }
+
+    func testOfferedSceneIsBakedShownAddedWithItsSceneAndCleanedUp() async throws {
+        let keys = [
+            PrefsKey.libraryVideoPaths, PrefsKey.registeredVideoPaths, PrefsKey.videoPath,
+            PrefsKey.registeredVideoDisplayNames, PrefsKey.importedExternalWallpapers
+        ]
+        let saved = keys.map { UserDefaults.standard.object(forKey: $0) }
+        var copiedPath: String?
+        defer {
+            for (key, value) in zip(keys, saved) {
+                UserDefaults.standard.set(value, forKey: key)
+            }
+            if let copiedPath {
+                try? FileManager.default.removeItem(atPath: copiedPath)
+                try? FileManager.default.removeItem(at: SceneStore.folderURL(forVideoPath: copiedPath))
+            }
+        }
+        let folder = try writeSceneFolder()
+        let id = "test-\(UUID().uuidString).json/a"
+        let bakedPath = ExternalWallpaperProviderMonitor.bakedScenePath(forID: id)
+        let wallpaper = ExternalWallpaper(
+            id: id, providerName: "P", name: "Sky", path: bakedPath, sceneFolderPath: folder.path,
+            sceneRevision: try XCTUnwrap(
+                FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent("scene.json").path)[.modificationDate] as? Date
+            )
+        )
+
+        let model = WallpaperModel()
+        model.updateExternalWallpapers([wallpaper])
+        XCTAssertFalse(model.isExternalWallpaperReady(wallpaper))
+        model.showExternalWallpaper(id: id)
+        XCTAssertNil(model.activeExternalWallpaperID, "a scene is not shown before it is baked")
+
+        let deadline = Date().addingTimeInterval(60)
+        while !model.isExternalWallpaperReady(wallpaper), !model.didFailToPrepareExternalScene(wallpaper), Date() < deadline {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        XCTAssertTrue(model.isExternalWallpaperReady(wallpaper))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: bakedPath))
+        XCTAssertTrue(model.isScene(path: bakedPath))
+
+        model.showExternalWallpaper(id: id)
+        XCTAssertEqual(model.resolvedOverridePath(forScreenID: "1"), bakedPath)
+
+        let added = await model.importExternalWallpaper(id: id)
+        copiedPath = model.libraryPath(forExternalWallpaperID: id)
+        XCTAssertTrue(added)
+        let path = try XCTUnwrap(copiedPath)
+        XCTAssertTrue(SceneStore.hasScene(videoPath: path))
+        XCTAssertTrue(model.isScene(path: path))
+
+        model.updateExternalWallpapers([])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: URL(fileURLWithPath: bakedPath).deletingLastPathComponent().path))
+        XCTAssertFalse(model.isScene(path: bakedPath))
+        XCTAssertTrue(model.isScene(path: path))
     }
 }

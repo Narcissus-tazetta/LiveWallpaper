@@ -68,7 +68,9 @@ extension SettingsView {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
 
-            if model.libraryPath(forExternalWallpaperID: wallpaper.id) != nil {
+            if !model.isExternalWallpaperReady(wallpaper) {
+                externalScenePreparationStatus(wallpaper)
+            } else if model.libraryPath(forExternalWallpaperID: wallpaper.id) != nil {
                 Text(model.localizedString("追加しました"))
                     .font(.caption)
                     .foregroundColor(.secondary)

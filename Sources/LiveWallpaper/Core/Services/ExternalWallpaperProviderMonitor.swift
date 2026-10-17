@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// A wallpaper another running app offers. It exists only while that app runs and is
@@ -7,9 +8,19 @@ struct ExternalWallpaper: Identifiable, Equatable {
     let id: String
     let providerName: String
     let name: String
+    /// The video the desktop plays. For a scene it is where LiveWallpaper bakes it,
+    /// and exists only once the scene is ready (WallpaperModel+ExternalWallpapers).
     let path: String
     /// An image to show in lists; nil when the provider gave none or it is missing.
     var thumbnailPath: String?
+    /// The provider's scene folder (scene.json and its images), for scene items.
+    var sceneFolderPath: String?
+    /// When the provider last wrote scene.json, so a rewritten scene is baked again.
+    var sceneRevision: Date?
+
+    var isScene: Bool {
+        sceneFolderPath != nil
+    }
 }
 
 /// The JSON a provider app writes to `Providers/<anything>.json` in the app's
@@ -18,14 +29,17 @@ struct ExternalWallpaper: Identifiable, Equatable {
 ///
 ///     { "processIdentifier": 123, "name": "My Provider",
 ///       "wallpapers": [{ "id": "a", "name": "Rain", "path": "/abs/path/video.mp4",
-///                        "thumbnail": "/abs/path/preview.jpg" }] }
+///                        "thumbnail": "/abs/path/preview.jpg" },
+///                      { "id": "b", "name": "Snow", "scene": "/abs/path/snow.scene" }] }
 ///
-/// `thumbnail` is optional.
+/// Each item has either `path` (a video) or `scene` (a folder in LiveWallpaper's scene
+/// format: scene.json and the images it names). `thumbnail` is optional.
 struct ExternalWallpaperManifest: Decodable {
     struct Item: Decodable {
         let id: String
         let name: String
-        let path: String
+        let path: String?
+        let scene: String?
         let thumbnail: String?
     }
 
@@ -121,19 +135,25 @@ final class ExternalWallpaperProviderMonitor {
             livePIDs.insert(pid)
             watchExit(of: pid)
             for item in manifest.wallpapers {
-                guard Self.isRegularFile(item.path) else {
+                let id = "\(file.lastPathComponent)/\(item.id)"
+                let thumbnail = item.thumbnail.flatMap { Self.isRegularFile($0) ? $0 : nil }
+                if let path = item.path, item.scene == nil, Self.isRegularFile(path) {
+                    wallpapers.append(ExternalWallpaper(
+                        id: id, providerName: manifest.name, name: item.name, path: path, thumbnailPath: thumbnail
+                    ))
+                } else if let scene = item.scene, item.path == nil,
+                          let revision = Self.sceneRevision(folder: scene)
+                {
+                    wallpapers.append(ExternalWallpaper(
+                        id: id, providerName: manifest.name, name: item.name,
+                        path: Self.bakedScenePath(forID: id), thumbnailPath: thumbnail,
+                        sceneFolderPath: scene, sceneRevision: revision
+                    ))
+                } else {
                     AppLog.externalWallpapers.error(
-                        "skipped item \(item.id, privacy: .public) of \(file.lastPathComponent, privacy: .public): not a file"
+                        "skipped item \(item.id, privacy: .public) of \(file.lastPathComponent, privacy: .public): needs one existing path or scene"
                     )
-                    continue
                 }
-                wallpapers.append(ExternalWallpaper(
-                    id: "\(file.lastPathComponent)/\(item.id)",
-                    providerName: manifest.name,
-                    name: item.name,
-                    path: item.path,
-                    thumbnailPath: item.thumbnail.flatMap { Self.isRegularFile($0) ? $0 : nil }
-                ))
             }
         }
         for (pid, source) in exitSources where !livePIDs.contains(pid) {
@@ -157,6 +177,29 @@ final class ExternalWallpaperProviderMonitor {
         }
         source.resume()
         exitSources[pid] = source
+    }
+
+    /// LiveWallpaper's own copies of the scenes providers offer, baked into videos.
+    /// Kept apart from the library folder, so clearing the cache or restoring the
+    /// library never meets them; emptied on launch and as providers go away.
+    nonisolated static var bakedScenesDirectoryURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("LiveWallpaper/ExternalScenes", isDirectory: true)
+    }
+
+    /// One folder per item, named by a hash: item IDs are the provider's strings.
+    nonisolated static func bakedScenePath(forID id: String) -> String {
+        let digest = SHA256.hash(data: Data(id.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
+        return bakedScenesDirectoryURL.appendingPathComponent(digest, isDirectory: true)
+            .appendingPathComponent("wallpaper.mp4").path
+    }
+
+    private static func sceneRevision(folder: String) -> Date? {
+        guard folder.hasPrefix("/") else {
+            return nil
+        }
+        let document = URL(fileURLWithPath: folder, isDirectory: true).appendingPathComponent("scene.json")
+        return try? FileManager.default.attributesOfItem(atPath: document.path)[.modificationDate] as? Date
     }
 
     private static func isAlive(_ pid: pid_t) -> Bool {

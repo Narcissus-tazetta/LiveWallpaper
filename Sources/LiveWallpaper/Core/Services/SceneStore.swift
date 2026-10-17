@@ -311,7 +311,10 @@ enum SceneStore {
             }
             // The video imported beside it already shows this scene. Dated like it,
             // scene.json only becomes newer than the video (isNewerThanVideo) once edited.
-            if let videoDate = try FileManager.default.attributesOfItem(atPath: videoPath)[.modificationDate] {
+            // A scene installed before its first bake has no video yet.
+            if FileManager.default.fileExists(atPath: videoPath),
+               let videoDate = try FileManager.default.attributesOfItem(atPath: videoPath)[.modificationDate]
+            {
                 try FileManager.default.setAttributes(
                     [.modificationDate: videoDate], ofItemAtPath: staging.appendingPathComponent(documentFileName).path
                 )

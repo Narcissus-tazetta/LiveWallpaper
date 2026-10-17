@@ -60,14 +60,36 @@ extension SettingsView {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .frame(width: width, alignment: .leading)
+                externalScenePreparationStatus(wallpaper)
+                    .frame(width: width, alignment: .leading)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(!model.canShowExternalWallpaper)
-        .opacity(model.canShowExternalWallpaper ? 1 : 0.5)
+        .disabled(!model.canShowExternalWallpaper || !model.isExternalWallpaperReady(wallpaper))
+        .opacity(model.canShowExternalWallpaper && model.isExternalWallpaperReady(wallpaper) ? 1 : 0.5)
         .help(wallpaper.name)
         .accessibilityLabel(wallpaper.name)
         .accessibilityAddTraits(isActive ? .isSelected : [])
+    }
+
+    /// A scene is baked into a video before it can be shown; nothing for videos.
+    @ViewBuilder
+    func externalScenePreparationStatus(_ wallpaper: ExternalWallpaper) -> some View {
+        if model.isPreparingExternalScene(wallpaper) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.localizedString("変換中…"))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                if let progress = model.sceneBakeProgress[wallpaper.path] {
+                    ProgressView(value: progress)
+                        .controlSize(.small)
+                }
+            }
+        } else if model.didFailToPrepareExternalScene(wallpaper) {
+            Text(model.localizedString("変換できませんでした"))
+                .font(.caption2)
+                .foregroundColor(.red)
+        }
     }
 }
