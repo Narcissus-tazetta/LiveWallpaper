@@ -94,6 +94,64 @@ final class SceneRealTimeEffectTests: XCTestCase {
         return worst
     }
 
+    func testEditorEffectsSelectRealTimePlaybackWithoutAnImportedFlag() throws {
+        for kind in SceneEffectKind.allCases.filter(\.runsOnRealTime) {
+            var layer = SceneLayer(name: "picture", imageFile: "layer.png")
+            layer.effects = [SceneEffect(kind: kind)]
+            let scene = SceneDocument(canvasWidth: size, canvasHeight: size, layers: [layer])
+            XCTAssertTrue(scene.requiresRealTimePlayback, "\(kind) must retain its speed after baking")
+            let restored = try JSONDecoder().decode(SceneDocument.self, from: JSONEncoder().encode(scene))
+            XCTAssertTrue(restored.requiresRealTimePlayback)
+        }
+    }
+
+    func testRealTimePlaybackFollowsEnabledVisibleEffectsAndExplicitRequest() {
+        var layer = SceneLayer(name: "picture", imageFile: "layer.png")
+        layer.effects = [SceneEffect(kind: .travelingWaves)]
+        var scene = SceneDocument(canvasWidth: size, canvasHeight: size, layers: [layer])
+        XCTAssertTrue(scene.requiresRealTimePlayback)
+        scene.layers[0].effects[0].isEnabled = false
+        XCTAssertFalse(scene.requiresRealTimePlayback)
+        scene.layers[0].effects[0].isEnabled = true
+        scene.layers[0].isVisible = false
+        XCTAssertFalse(scene.requiresRealTimePlayback)
+        scene.layers = []
+        XCTAssertFalse(scene.requiresRealTimePlayback)
+        scene.runsInRealTime = true
+        XCTAssertTrue(scene.requiresRealTimePlayback)
+    }
+
+    func testFlowAndScrollRespectThePaintedArea() throws {
+        let file = try writeGradient()
+        let mask = try writeImage(prefix: "mask") { x, _ in
+            let value: UInt8 = x < self.size / 2 ? 0 : 255
+            return (value, value, value)
+        }
+        var still = SceneEffect(kind: .uvScroll)
+        still.values = ["speedX": 0, "speedY": 0]
+        let original = try frame(still, file: file, time: 1.3, realTime: true)
+        for kind in [SceneEffectKind.flowMap, .uvScroll] {
+            var effect = SceneEffect(kind: kind)
+            effect.flowFile = try solid("flow", 255, 128, 0)
+            effect.patternFile = try solid("pattern", 0, 0, 0)
+            let unmasked = try frame(effect, file: file, time: 1.3, realTime: true)
+            XCTAssertNotEqual(unmasked, original)
+            effect.maskFile = mask
+            let masked = try frame(effect, file: file, time: 1.3, realTime: true)
+            var mismatchedPixels = 0
+            for y in 2 ..< size - 2 {
+                for x in 2 ..< size - 2 where abs(x - size / 2) > 1 {
+                    let offset = (y * size + x) * 4
+                    let expected = x < size / 2 ? original : unmasked
+                    if masked[offset ..< offset + 4] != expected[offset ..< offset + 4] {
+                        mismatchedPixels += 1
+                    }
+                }
+            }
+            XCTAssertEqual(mismatchedPixels, 0, "\(kind) must preserve unpainted pixels")
+        }
+    }
+
     func testTravelingWavesMoveEachPixelAsTheFormulaSays() throws {
         let file = try writeGradient()
         var effect = SceneEffect(kind: .travelingWaves)

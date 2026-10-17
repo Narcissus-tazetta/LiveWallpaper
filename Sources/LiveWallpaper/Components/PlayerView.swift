@@ -180,7 +180,7 @@ final class PlayerView: NSView {
         }()
         sceneRemovalObservation = nil
         sceneUsesFreeClock = freeClock
-        sceneRunsInRealTime = freeClock && document.runsInRealTime
+        sceneRunsInRealTime = freeClock && document.requiresRealTimePlayback
         layer.maximumFramesPerSecond = maximumFramesPerSecond
         layer.timeOfDay = timeOfDay
         CATransaction.begin()

@@ -877,6 +877,12 @@ struct SceneDocument: Codable, Equatable {
             || scripts.contains { $0.canRun && $0.usesCursor }
     }
 
+    var requiresRealTimePlayback: Bool {
+        runsInRealTime || layers.contains { layer in
+            layer.activeEffects.contains { $0.kind.runsOnRealTime }
+        }
+    }
+
     var hasUnapprovedScripts: Bool { scripts.contains { $0.isEnabled && !$0.canRun } }
 }
 

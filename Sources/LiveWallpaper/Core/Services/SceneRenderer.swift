@@ -1820,7 +1820,7 @@ final class SceneRenderer {
             result = flowShake(src, mask, flow, timeOffset, s, uv, u, realTime);
             break;
         case 15: // flow map
-            result = flowMap(src, flow, pattern, s, uv, u, realTime);
+            result = mix(original, flowMap(src, flow, pattern, s, uv, u, realTime), m);
             break;
         case 16: // normal ripples
             result = normalRipples(src, mask, pattern, s, uv, u, realTime);
@@ -1835,7 +1835,7 @@ final class SceneRenderer {
             result = pulseBlend(src, mask, pattern, s, uv, u, realTime);
             break;
         case 20: // uv scroll
-            result = uvScroll(src, s, uv, u, realTime);
+            result = mix(original, uvScroll(src, s, uv, u, realTime), m);
             break;
         case 21: // axis swing
             result = axisSwing(src, mask, pattern, s, uv, u, realTime);

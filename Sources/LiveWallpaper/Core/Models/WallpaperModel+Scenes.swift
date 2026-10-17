@@ -909,7 +909,7 @@ extension WallpaperModel {
             }
             // A real-time scene is drawn live so its effects keep their own speed;
             // the baked video only has them rounded to the loop.
-            guard document.usesCursor || isStale || document.runsInRealTime else {
+            guard document.usesCursor || isStale || document.requiresRealTimePlayback else {
                 if view.isShowingScene {
                     AppLog.windowRefresh.info(
                         "scene video display=\(displayID, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
@@ -921,11 +921,11 @@ extension WallpaperModel {
             do {
                 if !view.isShowingScene {
                     AppLog.windowRefresh.info(
-                        "scene live display=\(displayID, privacy: .public) stale=\(isStale, privacy: .public) realTime=\(document.runsInRealTime, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
+                        "scene live display=\(displayID, privacy: .public) stale=\(isStale, privacy: .public) realTime=\(document.requiresRealTimePlayback, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
                     )
                 }
                 try view.showScene(
-                    document, videoPath: path, freeClock: isStale || document.runsInRealTime,
+                    document, videoPath: path, freeClock: isStale || document.requiresRealTimePlayback,
                     timeOfDay: document.timeOfDay(at: Date()),
                     maximumFramesPerSecond: maximumFramesPerSecond
                 )
