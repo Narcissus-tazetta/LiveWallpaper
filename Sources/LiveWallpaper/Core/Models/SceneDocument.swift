@@ -51,6 +51,18 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     /// Moves the picture one way and fades between two offset copies, like the water
     /// flow with one direction everywhere: clouds drifting, mist.
     case drift
+    /// Waves travelling across the picture at a real speed, set in physical units
+    /// (`SceneEffect.values`, keys in SceneEffect.WaveKey).
+    case travelingWaves
+    /// Each pixel swings back and forth along its own vector of a flow map, at a
+    /// real speed (`SceneEffect.values`, keys in SceneEffect.FlowShakeKey).
+    case flowShake
+
+    /// Runs on seconds rather than whole repeats per loop: drawn live it keeps its
+    /// own speed, and only a baked video rounds the speed to fit the loop.
+    var runsOnRealTime: Bool {
+        [.travelingWaves, .flowShake].contains(self)
+    }
 
     /// Uses `centerX`/`centerY` (picked on the preview).
     var usesCenter: Bool {
@@ -59,6 +71,11 @@ enum SceneEffectKind: String, Codable, CaseIterable {
 
     var usesDirection: Bool {
         [.shake, .sway, .waves, .scroll, .drift].contains(self)
+    }
+
+    /// Its speed is a whole number of repeats per loop (`cycles`).
+    var usesCycles: Bool {
+        !runsOnRealTime
     }
 
     /// Can hold one side still and move more toward the other (hair, leaves, cloth).
@@ -78,7 +95,7 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     }
 
     var usesStrength: Bool {
-        ![.scroll, .spin, .puppet].contains(self)
+        ![.scroll, .spin, .puppet].contains(self) && !runsOnRealTime
     }
 }
 
@@ -183,6 +200,11 @@ struct SceneEffect: Codable, Equatable, Identifiable {
     var flowFile: String?
     /// Puppet only.
     var pins: [ScenePin] = []
+    /// The settings of effects that run on real time, in their own units.
+    var values: [String: Double] = [:]
+    /// Grey image in the scene folder delaying each pixel's motion (white = a full
+    /// period later); travelling waves and flow shake only.
+    var timeOffsetFile: String?
     var fixedEdge: SceneFixedEdge = .none
     /// Where the effect's area is, for `fixedEdge`: the painted area, or a cut-out's
     /// picture. nil means the whole layer.
@@ -217,8 +239,56 @@ struct SceneEffect: Codable, Equatable, Identifiable {
         maskFile = try? container.decodeIfPresent(String.self, forKey: .maskFile)
         flowFile = try? container.decodeIfPresent(String.self, forKey: .flowFile)
         pins = (try? container.decode([ScenePin].self, forKey: .pins)) ?? []
+        values = (try? container.decode([String: Double].self, forKey: .values)) ?? [:]
+        timeOffsetFile = try? container.decodeIfPresent(String.self, forKey: .timeOffsetFile)
         fixedEdge = (try? container.decode(SceneFixedEdge.self, forKey: .fixedEdge)) ?? .none
         areaBounds = try? container.decodeIfPresent(SceneAreaBounds.self, forKey: .areaBounds)
+    }
+}
+
+extension SceneEffect {
+    /// Travelling waves: phase = time × speed + (uv · direction) × scale, and the
+    /// picture moves sideways by sin(phase)^exponent × amplitude².
+    enum WaveKey {
+        /// Radians per second.
+        static let speed = "speed"
+        /// Radians per unit of layer UV along the direction.
+        static let scale = "scale"
+        static let amplitude = "amplitude"
+        static let exponent = "exponent"
+        /// Radians turning (0, 1) in layer UV (x right, y down) by the usual 2D
+        /// rotation: 0 runs down the picture.
+        static let angle = "angle"
+        /// 1 multiplies in a second wave with the keys below.
+        static let dual = "dual"
+        static let speed2 = "speed2"
+        static let scale2 = "scale2"
+        /// Seconds the second wave runs ahead.
+        static let offset2 = "offset2"
+        static let exponent2 = "exponent2"
+        static let angle2 = "angle2"
+    }
+
+    /// Flow shake: offset = sin(time × speed), shaped by friction and bounds, moves
+    /// each pixel by offset × amplitude² along its flow vector.
+    enum FlowShakeKey {
+        /// Radians per second.
+        static let speed = "speed"
+        static let amplitude = "amplitude"
+        /// Exponents easing the swing on its way out (x) and back (y); 1 is a sine.
+        static let frictionX = "frictionX"
+        static let frictionY = "frictionY"
+        /// The part of the swing (0...1) that is used, stretched to the whole range.
+        static let boundsMin = "boundsMin"
+        static let boundsMax = "boundsMax"
+        /// 0 swings both ways, 1 only forward, 2 only back.
+        static let side = "side"
+        /// 1 sums four sines of unrelated speeds for an irregular swing.
+        static let irregular = "irregular"
+    }
+
+    func value(_ key: String, _ fallback: Double) -> Double {
+        values[key] ?? fallback
     }
 }
 
@@ -558,6 +628,9 @@ struct SceneDocument: Codable, Equatable {
     /// Applied in order after placement and keyframes (SceneLink).
     var links: [SceneLink] = []
     var scripts: [SceneScript] = []
+    /// Drawn live on real time on the desktop rather than as the baked loop, so its
+    /// real-time effects keep their exact speed. Set by scenes that use them.
+    var runsInRealTime = false
 
     init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer]) {
         self.canvasWidth = canvasWidth
@@ -581,6 +654,7 @@ struct SceneDocument: Codable, Equatable {
             timeBands = bands
         }
         links = ((try? container.decode([FailableDecodable<SceneLink>].self, forKey: .links)) ?? []).compactMap(\.value)
+        runsInRealTime = (try? container.decode(Bool.self, forKey: .runsInRealTime)) ?? false
         scripts = try container.decodeIfPresent([SceneScript].self, forKey: .scripts) ?? []
         guard scripts.count <= SceneScript.maximumCount, Set(scripts.map(\.id)).count == scripts.count else {
             throw DecodingError.dataCorruptedError(forKey: .scripts, in: container, debugDescription: "Too many scripts or duplicate script IDs")

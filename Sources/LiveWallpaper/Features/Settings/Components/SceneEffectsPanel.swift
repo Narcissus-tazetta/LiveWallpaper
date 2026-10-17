@@ -28,6 +28,8 @@ extension SettingsView {
         case .pulse: model.localizedString("明滅")
         case .puppet: model.localizedString("パペット(ピン)")
         case .drift: model.localizedString("一方向に流す")
+        case .travelingWaves: model.localizedString("進む波")
+        case .flowShake: model.localizedString("流れに沿って揺らす")
         }
     }
 
@@ -275,6 +277,7 @@ extension SettingsView {
     private func sceneEffectInspector(path: String, layerID: UUID, effect: SceneEffect) -> some View {
         let loopSeconds = model.sceneDocumentsByPath[path]?.loopSeconds ?? 20
         VStack(alignment: .leading, spacing: 8) {
+            if effect.kind.usesCycles {
             sceneEffectRow(title: model.localizedString("速さ")) {
                 Stepper(
                     value: sceneEffectBinding(path: path, layerID: layerID, effect: effect, \.cycles),
@@ -287,6 +290,7 @@ extension SettingsView {
                     .font(.caption.monospacedDigit())
                 }
                 .accessibilityLabel(model.localizedString("速さ"))
+            }
             }
 
             if effect.kind.usesStrength {

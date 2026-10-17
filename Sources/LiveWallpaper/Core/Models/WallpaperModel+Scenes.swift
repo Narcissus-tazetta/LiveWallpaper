@@ -886,9 +886,13 @@ extension WallpaperModel {
                 view.hideScene()
                 continue
             }
-            guard document.usesCursor || isStale else {
+            // A real-time scene is drawn live so its effects keep their own speed;
+            // the baked video only has them rounded to the loop.
+            guard document.usesCursor || isStale || document.runsInRealTime else {
                 if view.isShowingScene {
-                    AppLog.windowRefresh.info("scene video display=\(displayID, privacy: .public)")
+                    AppLog.windowRefresh.info(
+                        "scene video display=\(displayID, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
+                    )
                 }
                 view.hideScene()
                 continue
@@ -896,11 +900,12 @@ extension WallpaperModel {
             do {
                 if !view.isShowingScene {
                     AppLog.windowRefresh.info(
-                        "scene live display=\(displayID, privacy: .public) stale=\(isStale, privacy: .public)"
+                        "scene live display=\(displayID, privacy: .public) stale=\(isStale, privacy: .public) realTime=\(document.runsInRealTime, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
                     )
                 }
                 try view.showScene(
-                    document, videoPath: path, freeClock: isStale, timeOfDay: document.timeOfDay(at: Date()),
+                    document, videoPath: path, freeClock: isStale || document.runsInRealTime,
+                    timeOfDay: document.timeOfDay(at: Date()),
                     maximumFramesPerSecond: maximumFramesPerSecond
                 )
                 view.setSceneScriptIssueHandler { [weak self] issues in

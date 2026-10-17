@@ -9,8 +9,12 @@ struct SceneFrameInput: Equatable {
     var parallax: SIMD2<Float> = .zero
     /// nil when no cursor masks should react (cursor elsewhere, or not allowed).
     var cursor: SIMD2<Float>?
-    /// Seconds into the scene loop.
+    /// Seconds into the scene loop; with `isRealTime`, seconds since the scene was
+    /// first shown.
     var time: Double = 0
+    /// Real-time effects take `time` at their own speed. Otherwise (a baked loop, a
+    /// preview of it) their speeds are rounded to whole repeats per loop.
+    var isRealTime = false
     /// The part of the canvas drawn into the target: origin and size in canvas UV.
     /// Only the editor zooms; everything else draws the whole canvas.
     var viewport = SIMD4<Float>(0, 0, 1, 1)
@@ -366,6 +370,72 @@ final class SceneRenderer {
         var overlay: Int32
         var hasMask: Int32
         var fixedEdge: Int32
+        var time: Float
+        var hasTimeOffset: Int32
+    }
+
+    /// The settings of a real-time effect, in the order its shader reads them.
+    private struct RealTimeEffectValues {
+        var values: (
+            Float, Float, Float, Float, Float, Float, Float, Float,
+            Float, Float, Float, Float, Float, Float, Float, Float
+        ) = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+        init(_ list: [Float]) {
+            withUnsafeMutableBytes(of: &values) { raw in
+                let slots = raw.bindMemory(to: Float.self)
+                for (index, value) in list.prefix(slots.count).enumerated() {
+                    slots[index] = value
+                }
+            }
+        }
+    }
+
+    /// A speed in radians per second, rounded to whole turns per loop unless drawn
+    /// on real time; a motion that would round to none keeps one turn.
+    private func loopSpeed(_ speed: Double, input: SceneFrameInput) -> Float {
+        guard !input.isRealTime, speed != 0 else {
+            return Float(speed)
+        }
+        let loop = Double(max(document.loopSeconds, 1))
+        let turns = max((abs(speed) * loop / (2 * .pi)).rounded(), 1)
+        return Float((speed < 0 ? -1 : 1) * turns * 2 * .pi / loop)
+    }
+
+    private func realTimeValues(_ effect: SceneEffect, input: SceneFrameInput) -> RealTimeEffectValues {
+        func value(_ key: String, _ fallback: Double) -> Float {
+            Float(effect.value(key, fallback))
+        }
+        switch effect.kind {
+        case .travelingWaves:
+            typealias Key = SceneEffect.WaveKey
+            return RealTimeEffectValues([
+                loopSpeed(effect.value(Key.speed, 5), input: input), value(Key.scale, 200), value(Key.amplitude, 0.1),
+                value(Key.exponent, 1), value(Key.angle, 0), value(Key.dual, 0),
+                loopSpeed(effect.value(Key.speed2, 3), input: input), value(Key.scale2, 66), value(Key.offset2, 0),
+                value(Key.exponent2, 1), value(Key.angle2, 0)
+            ])
+        case .flowShake:
+            typealias Key = SceneEffect.FlowShakeKey
+            let speed = effect.value(Key.speed, 1)
+            // The irregular swing sums sines at these multiples of the speed; each is
+            // rounded on its own so a baked loop still closes.
+            let multiples = [1, -0.16161616, 0.0083333, -0.00019841]
+            return RealTimeEffectValues([
+                loopSpeed(speed, input: input), value(Key.amplitude, 0.1), value(Key.frictionX, 1),
+                value(Key.frictionY, 1), value(Key.boundsMin, 0), value(Key.boundsMax, 1), value(Key.side, 0),
+                value(Key.irregular, 0)
+            ] + multiples.map { input.isRealTime ? Float(speed * $0) : loopSpeedAllowingStill(speed * $0) })
+        default:
+            return RealTimeEffectValues([])
+        }
+    }
+
+    /// Like loopSpeed, but a speed too slow for one turn per loop stands still.
+    private func loopSpeedAllowingStill(_ speed: Double) -> Float {
+        let loop = Double(max(document.loopSeconds, 1))
+        let turns = (speed * loop / (2 * .pi)).rounded()
+        return Float(turns * 2 * .pi / loop)
     }
 
     /// Runs the layer's effects and returns the texture to composite.
@@ -413,6 +483,7 @@ final class SceneRenderer {
             let override = paintOverride?.effectID == effect.id ? paintOverride : nil
             let mask = override?.target == .mask ? paintOverrideTexture : effect.maskFile.flatMap { maskTextures[$0] }
             let flow = override?.target == .flow ? paintOverrideTexture : effect.flowFile.flatMap { flowTextures[$0] }
+            let timeOffset = effect.timeOffsetFile.flatMap { maskTextures[$0] }
             let radians = Float(effect.direction * .pi / 180)
             // UV y points down, the direction angle counts counter-clockwise with y up.
             let direction = SIMD2<Float>(cos(radians), -sin(radians))
@@ -433,8 +504,13 @@ final class SceneRenderer {
                 reversed: effect.reversed ? 1 : 0,
                 overlay: override == nil || !showsPaintTint ? 0 : (override?.target == .mask ? 1 : 2),
                 hasMask: mask == nil ? 0 : 1,
-                fixedEdge: Int32(SceneFixedEdge.allCases.firstIndex(of: effect.fixedEdge) ?? 0)
+                fixedEdge: Int32(SceneFixedEdge.allCases.firstIndex(of: effect.fixedEdge) ?? 0),
+                // A baked loop reads its own time within the loop, so the rounded
+                // speeds land exactly where the loop starts again.
+                time: Float(input.isRealTime ? input.time : Double(phase) * Double(max(document.loopSeconds, 1))),
+                hasTimeOffset: timeOffset == nil ? 0 : 1
             )
+            var realTime = realTimeValues(effect, input: input)
             let pass = MTLRenderPassDescriptor()
             pass.colorAttachments[0].texture = destination
             pass.colorAttachments[0].loadAction = .dontCare
@@ -446,9 +522,11 @@ final class SceneRenderer {
             encoder.setFragmentTexture(current, index: 0)
             encoder.setFragmentTexture(mask ?? whiteMask, index: 1)
             encoder.setFragmentTexture(flow ?? stillFlow, index: 2)
+            encoder.setFragmentTexture(timeOffset ?? blackTexture, index: 3)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<EffectUniforms>.stride, index: 0)
             var pins = puppetPins(effect, phase: phase, aspect: aspect)
             encoder.setFragmentBytes(&pins, length: MemoryLayout<SIMD4<Float>>.stride * pins.count, index: 1)
+            encoder.setFragmentBytes(&realTime, length: MemoryLayout<RealTimeEffectValues>.stride, index: 2)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
             encoder.endEncoding()
             current = destination
@@ -805,7 +883,8 @@ final class SceneRenderer {
 
         let effects = document.layers.flatMap(\.effects)
         let masks = Set(
-            effects.compactMap(\.maskFile) + document.layers.compactMap { $0.particles?.maskFile }
+            effects.compactMap(\.maskFile) + effects.compactMap(\.timeOffsetFile)
+                + document.layers.compactMap { $0.particles?.maskFile }
                 + document.layers.compactMap(\.depthFile)
         )
         maskTextures = maskTextures.filter { masks.contains($0.key) }
@@ -1158,9 +1237,68 @@ final class SceneRenderer {
         int overlay;
         int hasMask;
         int fixedEdge;
+        float time;
+        int hasTimeOffset;
     };
 
     constant float TAU = 6.28318530718;
+
+    // Travelling waves (values: speed, scale, amplitude, exponent, angle, dual,
+    // speed2, scale2, offset2, exponent2, angle2). The direction turns (0, 1) by the
+    // angle; the picture moves across it by sin(phase)^exponent × amplitude², scaled
+    // by the mask where the pixel is.
+    float4 travelingWaves(texture2d<float> src, texture2d<float> mask, texture2d<float> timeOffset, sampler s,
+                          float2 uv, constant EffectUniforms &u, constant float *v) {
+        float m = u.hasMask != 0 ? mask.sample(s, uv).r : 1.0;
+        float delay = u.hasTimeOffset != 0 ? timeOffset.sample(s, uv).r * TAU : 0.0;
+        float2 direction = float2(-sin(v[4]), cos(v[4]));
+        float phase = u.time * v[0] + dot(uv, direction) * v[1] + delay;
+        float wave = sin(phase);
+        float shaped = pow(abs(wave), v[3]) * sign(wave);
+        if (v[5] != 0.0) {
+            float2 direction2 = float2(-sin(v[10]), cos(v[10]));
+            float phase2 = (u.time + v[8]) * v[6] + dot(uv, direction2) * v[7] + delay;
+            float wave2 = sin(phase2);
+            shaped *= pow(abs(wave2), v[9]) * sign(wave2);
+        }
+        float2 across = float2(direction.y, -direction.x);
+        return src.sample(s, uv + shaped * across * v[2] * v[2] * m);
+    }
+
+    // Flow shake (values: speed, amplitude, frictionX, frictionY, boundsMin,
+    // boundsMax, side, irregular, then the four speeds of the irregular swing). The
+    // flow map holds each pixel's vector around 0.498; the mask is read where the
+    // moved pixel comes from.
+    float4 flowShake(texture2d<float> src, texture2d<float> mask, texture2d<float> flow, texture2d<float> timeOffset,
+                     sampler s, float2 uv, constant EffectUniforms &u, constant float *v) {
+        float delay = u.hasTimeOffset != 0 ? timeOffset.sample(s, uv).r * TAU : 0.0;
+        float2 flowVector = (flow.sample(s, uv).rg - float2(0.498)) * 2.0;
+        float2 friction = float2(v[2], v[3]);
+        float offset;
+        if (v[7] != 0.0) {
+            float4 angles = delay + fract(float4(v[8], v[9], v[10], v[11]) * u.time / TAU) * TAU;
+            float4 rising = step(0.0, cos(angles));
+            float4 sines = sin(angles) * 0.498 + 0.5;
+            sines = mix(1.0 - pow(1.0 - sines, float4(friction.x)), pow(sines, float4(friction.y)), rising);
+            offset = dot(float4(0.5), sines);
+        } else {
+            float angle = v[0] * u.time + delay;
+            offset = sin(fract(angle / TAU) * TAU) * 0.498 + 0.5;
+            offset = mix(1.0 - pow(1.0 - offset, friction.x), pow(offset, friction.y), step(0.0, cos(angle)));
+        }
+        offset = saturate((offset - v[4]) / (v[5] - v[4]));
+        if (v[6] == 0.0) {
+            offset = offset * 2.0 - 1.0;
+        } else if (v[6] == 2.0) {
+            offset -= 1.0;
+        }
+        float2 moved = offset * v[1] * v[1] * flowVector;
+        float4 result = src.sample(s, uv + moved);
+        if (u.hasMask != 0) {
+            result = mix(src.sample(s, uv), result, mask.sample(s, uv + moved).r);
+        }
+        return result;
+    }
 
     float hash3(float3 p) {
         p = fract(p * 0.3183099 + 0.1);
@@ -1221,8 +1359,10 @@ final class SceneRenderer {
                                  texture2d<float> src [[texture(0)]],
                                  texture2d<float> mask [[texture(1)]],
                                  texture2d<float> flow [[texture(2)]],
+                                 texture2d<float> timeOffset [[texture(3)]],
                                  constant EffectUniforms &u [[buffer(0)]],
-                                 constant float4 *pins [[buffer(1)]]) {
+                                 constant float4 *pins [[buffer(1)]],
+                                 constant float *realTime [[buffer(2)]]) {
         constexpr sampler s(filter::linear, address::clamp_to_edge);
         constexpr sampler wrap(filter::linear, address::repeat);
         float2 uv = in.uv;
@@ -1329,6 +1469,12 @@ final class SceneRenderer {
             result = float4(original.rgb * (1.0 - dim * m), original.a);
             break;
         }
+        case 13: // travelling waves
+            result = travelingWaves(src, mask, timeOffset, s, uv, u, realTime);
+            break;
+        case 14: // flow shake
+            result = flowShake(src, mask, flow, timeOffset, s, uv, u, realTime);
+            break;
         default:
             break;
         }

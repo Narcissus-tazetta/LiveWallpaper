@@ -243,7 +243,7 @@ enum SceneStore {
             }
             files.formUnion([layer.particles?.maskFile, layer.depthFile].compactMap { $0 })
             for effect in layer.effects {
-                files.formUnion([effect.maskFile, effect.flowFile].compactMap { $0 })
+                files.formUnion([effect.maskFile, effect.flowFile, effect.timeOffsetFile].compactMap { $0 })
             }
         }
         return files
