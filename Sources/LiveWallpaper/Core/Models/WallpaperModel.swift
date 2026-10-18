@@ -134,6 +134,9 @@ final class WallpaperModel: ObservableObject {
     var cursorTracker: CursorTracker?
     var cursorEffectsObservers: [NSObjectProtocol] = []
     var clickMonitor: Any?
+    var scenePressMonitor: Any?
+    /// The last press went to a scene, so its release goes there too.
+    var scenePressIsDown = false
     var cursorEffectsCancellable: AnyCancellable?
     /// Finder (the desktop) or this app is frontmost; see onlyWhileDesktopActive.
     @Published var isDesktopAppFrontmost: Bool = true
@@ -266,6 +269,8 @@ final class WallpaperModel: ObservableObject {
     @Published var currentWebWallpaperID: UUID?
     @Published var webWallpaperLoadState: WebWallpaperLoadState = .idle
     @Published var webWallpaperErrorMessage: String?
+    let localWebWallpaperServer = LocalWebWallpaperServer(persistPorts: true)
+    var localWebLoadTask: Task<Void, Never>?
     /// アニメ画像(GIF等)→動画変換の進行状態。UIの進捗表示・追加ボタン無効化に使う。
     @Published var isImportingMedia: Bool = false
     @Published var mediaImportProgress: Double = 0
@@ -455,6 +460,7 @@ final class WallpaperModel: ObservableObject {
         // 画面名(「画面1 (メイン)」)は localizedString で組み立てるため、
         // 言語切替後に作り直す。LocalizationManager 更新後である必要がある。
         refreshDisplayScreens()
+        refreshLocalWebEnvironment()
         AppLog.localization.info(
             "setAppLanguage -> \(String(describing: language), privacy: .public) effective=\(language.effectiveLanguageCode, privacy: .public)"
         )
@@ -502,6 +508,7 @@ final class WallpaperModel: ObservableObject {
     }
 
     deinit {
+        localWebLoadTask?.cancel()
         screenChangeWorkItem?.cancel()
         windowRebuildWorkItem?.cancel()
         windowOptionsWorkItem?.cancel()

@@ -145,6 +145,18 @@ final class PlayerView: NSView {
         sceneLayer?.renderer?.usesCursor ?? false
     }
 
+    var sceneScriptsUsePointer: Bool {
+        sceneLayer?.renderer?.document.scripts.contains { $0.canRun && $0.usesCursor } ?? false
+    }
+
+    /// `point` is in this view's coordinates.
+    func addScenePointerPress(_ point: CGPoint, isDown: Bool) {
+        guard let sceneLayer, sceneLayer.renderer != nil else {
+            return
+        }
+        sceneLayer.addPointerPress(at: sceneLayer.convert(point, from: layer), isDown: isDown)
+    }
+
     func setSceneScriptIssueHandler(_ handler: @escaping ([SceneScriptIssue]) -> Void) {
         sceneLayer?.scriptIssueHandler = handler
     }

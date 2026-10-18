@@ -94,6 +94,25 @@ final class SceneRealTimeEffectTests: XCTestCase {
         return worst
     }
 
+    func testOpacityMaskMultipliesPremultipliedColorAndDefaultsToWhite() throws {
+        let file = try writeImage(prefix: "layer") { _, _ in (200, 100, 50) }
+        var effect = SceneEffect(kind: .opacityMask)
+        effect.values = ["alpha": 0.5]
+        let unmasked = try frame(effect, file: file, time: 0, realTime: true)
+        effect.maskFile = try writeImage(prefix: "mask") { x, _ in (x < 32 ? 0 : 128, 255, 255) }
+        let masked = try frame(effect, file: file, time: 0, realTime: true)
+        for (x, expected) in [(16, [0, 0, 0]), (48, [13, 25, 50])] {
+            let offset = (32 * size + x) * 4
+            for channel in 0 ..< 3 {
+                XCTAssertEqual(Double(masked[offset + channel]), Double(expected[channel]), accuracy: 1)
+            }
+        }
+        let offset = (32 * size + 48) * 4
+        XCTAssertEqual(Double(unmasked[offset + 2]), 100, accuracy: 1)
+        XCTAssertFalse(effect.kind.usesCycles)
+        XCTAssertFalse(effect.kind.canMoveOnItsOwnLayer)
+    }
+
     func testEditorEffectsSelectRealTimePlaybackWithoutAnImportedFlag() throws {
         for kind in SceneEffectKind.allCases.filter(\.runsOnRealTime) {
             var layer = SceneLayer(name: "picture", imageFile: "layer.png")

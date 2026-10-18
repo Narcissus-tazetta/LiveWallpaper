@@ -812,6 +812,7 @@
 "「ひとりでに動く量」を上げると、カーソルが無くても視点がゆっくり回ります。ロック画面とスクリーンセーバーにも、この動きが入ります。" = "Tăng Độ trôi để góc nhìn chuyển động chậm ngay cả khi không có con trỏ. Màn hình khóa và trình bảo vệ màn hình cũng có chuyển động này.";
 "ひとりでに動く量" = "Độ trôi";
 "カーソル" = "Con trỏ";
+"曲情報" = "Thông tin bài hát";
 "カーソルに合わせて動かす" = "Theo con trỏ";
 "カーソルに寄ってくる" = "Tụ về con trỏ";
 "カーソルを避ける" = "Tránh con trỏ";
@@ -1041,6 +1042,7 @@
 "適用済み" = "Đã áp dụng";
 "適用済みの設定が変更されています。下書きを破棄すると最新の設定を読み込めます。" = "Cài đặt đã áp dụng đã thay đổi. Bỏ bản nháp để tải cài đặt mới nhất.";
 "エラーで停止" = "Dừng do lỗi";
+"一部がエラーで停止(他は実行中)" = "Dừng một phần do lỗi (phần còn lại vẫn chạy)";
 
 "空白のスクリプト" = "Tập lệnh trống";
 "円・楕円の軌道" = "Quỹ đạo tròn và elip";
@@ -1157,3 +1159,29 @@
 "軸の終わり (横)" = "Cuối trục (ngang)";
 "軸の終わり (縦)" = "Cuối trục (dọc)";
 "時間差を塗る" = "Tô chênh lệch thời gian";
+
+"作品の設定" = "Cài đặt hình nền";
+
+"システム音に反応" = "Phản ứng với âm thanh hệ thống";
+
+"Music／Spotifyの曲情報" = "Thông tin bài hát Music / Spotify";
+
+"システム音の取得には、画面収録の許可が必要です。音声は保存しません。" = "Âm thanh hệ thống cần quyền ghi màn hình. Âm thanh không được lưu.";
+
+"起動中のアプリから曲名・ジャケット・再生状態を取得します。初回はオートメーションの許可が必要です。" = "Đọc tên bài hát, ảnh bìa và trạng thái phát từ ứng dụng đang chạy. Cần quyền Tự động hóa khi dùng lần đầu.";
+
+"既定値に戻す" = "Khôi phục mặc định";
+
+"ファイルを選択" = "Chọn tệp";
+
+"連携を利用できません" = "Không thể liên kết";
+
+"システム設定を開く" = "Mở Cài đặt hệ thống";
+
+"この項目の表示条件には未対応です。常に表示します。" = "Điều kiện hiển thị này chưa được hỗ trợ. Cài đặt luôn được hiển thị.";
+
+"不透明度マスク" = "Opacity mask";
+
+"シェーダー効果" = "Shader effect";
+
+"この効果は作品に含まれるシェーダーで描画します。範囲の描き直しには未対応です。" = "This effect uses a shader included in the scene. Repainting its area is not supported yet.";

@@ -812,6 +812,7 @@
 "「ひとりでに動く量」を上げると、カーソルが無くても視点がゆっくり回ります。ロック画面とスクリーンセーバーにも、この動きが入ります。" = "Augmentez Dérive pour que le point de vue bouge lentement même sans pointeur. L’écran verrouillé et l’économiseur d’écran ont aussi ce mouvement.";
 "ひとりでに動く量" = "Dérive";
 "カーソル" = "Pointeur";
+"曲情報" = "Infos du titre";
 "カーソルに合わせて動かす" = "Suivre le pointeur";
 "カーソルに寄ってくる" = "Se rassembler vers le pointeur";
 "カーソルを避ける" = "Éviter le pointeur";
@@ -1041,6 +1042,7 @@
 "適用済み" = "Appliqué";
 "適用済みの設定が変更されています。下書きを破棄すると最新の設定を読み込めます。" = "Les réglages appliqués ont changé. Abandonnez le brouillon pour charger les derniers réglages.";
 "エラーで停止" = "Arrêté sur erreur";
+"一部がエラーで停止(他は実行中)" = "Arrêté en partie sur erreur (le reste continue)";
 
 "空白のスクリプト" = "Script vide";
 "円・楕円の軌道" = "Orbite circulaire et elliptique";
@@ -1157,3 +1159,29 @@
 "軸の終わり (横)" = "Fin de l’axe (x)";
 "軸の終わり (縦)" = "Fin de l’axe (y)";
 "時間差を塗る" = "Peindre le décalage temporel";
+
+"作品の設定" = "Réglages du fond d’écran";
+
+"システム音に反応" = "Réagir à l’audio du système";
+
+"Music／Spotifyの曲情報" = "Informations Music / Spotify";
+
+"システム音の取得には、画面収録の許可が必要です。音声は保存しません。" = "L’audio du système nécessite l’autorisation d’enregistrement de l’écran. L’audio n’est pas enregistré.";
+
+"起動中のアプリから曲名・ジャケット・再生状態を取得します。初回はオートメーションの許可が必要です。" = "Lit le titre, la pochette et l’état de lecture des apps ouvertes. Une autorisation d’automatisation est nécessaire à la première utilisation.";
+
+"既定値に戻す" = "Rétablir les valeurs par défaut";
+
+"ファイルを選択" = "Choisir un fichier";
+
+"連携を利用できません" = "Intégration indisponible";
+
+"システム設定を開く" = "Ouvrir Réglages Système";
+
+"この項目の表示条件には未対応です。常に表示します。" = "Cette condition n’est pas prise en charge. Le réglage reste affiché.";
+
+"不透明度マスク" = "Opacity mask";
+
+"シェーダー効果" = "Shader effect";
+
+"この効果は作品に含まれるシェーダーで描画します。範囲の描き直しには未対応です。" = "This effect uses a shader included in the scene. Repainting its area is not supported yet.";

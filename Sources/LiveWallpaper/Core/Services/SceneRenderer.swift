@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import Metal
+import simd
 
 /// What changes from frame to frame. Positions are in canvas UV space (origin top-left).
 struct SceneFrameInput: Equatable {
@@ -18,8 +19,37 @@ struct SceneFrameInput: Equatable {
     /// The part of the canvas drawn into the target: origin and size in canvas UV.
     /// Only the editor zooms; everything else draws the whole canvas.
     var viewport = SIMD4<Float>(0, 0, 1, 1)
+    /// Presses and releases of the primary button on the desktop since the scripts last
+    /// ran, oldest first. Only scripts see them.
+    var pointerPresses: [ScenePointerPress] = []
+    /// What is playing, for scripts that read it; nil where nothing provides it (a bake).
+    var media: SceneMediaState?
 
     static let rest = SceneFrameInput()
+}
+
+struct ScenePointerPress: Equatable {
+    var isDown: Bool
+    /// Canvas UV, origin top-left.
+    var position: SIMD2<Float>
+}
+
+struct SceneMediaState: Equatable {
+    enum Playback: String {
+        case stopped, playing, paused
+    }
+
+    /// False while the track information cannot be read (no automation permission).
+    var isAvailable: Bool
+    var playback: Playback = .stopped
+    var title = ""
+    var artist = ""
+    var album = ""
+    var position: Double = 0
+    var duration: Double = 0
+    /// Changes whenever the artwork does; empty without artwork.
+    var artworkID = ""
+    var palette: SceneMediaPalette?
 }
 
 /// A mask or flow map being painted, shown before it is saved to a file.
@@ -82,6 +112,7 @@ final class SceneRenderer {
         let device: MTLDevice
         let queue: MTLCommandQueue
         let composite: MTLRenderPipelineState
+        let capture: MTLRenderPipelineState
         let effect: MTLRenderPipelineState
         let particlesOver: MTLRenderPipelineState
         let particlesAdd: MTLRenderPipelineState
@@ -107,9 +138,23 @@ final class SceneRenderer {
     private nonisolated(unsafe) static var textureCache: [String: TextureCacheEntry] = [:]
 
     private let pipeline: Pipeline
+    private var graphRenderers: [UUID: SceneRenderGraphRenderer] = [:]
+    private var graphTextures: [String: MTLTexture] = [:]
+    private var graphResources: [UUID: [String: MTLTexture]] = [:]
+    private var rigs: SceneSkeletonRegistry?
+    private var placementEvaluator: ScenePlacementEvaluator?
+    private var lastPlacements: [UUID: simd_float3x3] = [:]
     private(set) var document: SceneDocument
     private let videoPath: String
     private var textures: [String: MTLTexture] = [:]
+    private struct TextTexture {
+        let text: SceneText
+        let texture: MTLTexture?
+        let canvasSize: SIMD2<Double>
+        let centerOffset: SIMD2<Double>
+    }
+    /// Drawn again only when the text or its style changes (a script can change it).
+    private var textTextures: [UUID: TextTexture] = [:]
     private var maskTextures: [String: MTLTexture] = [:]
     private var flowTextures: [String: MTLTexture] = [:]
     private var effectTargets: [UUID: [MTLTexture]] = [:]
@@ -194,7 +239,12 @@ final class SceneRenderer {
         guard let layer = document.layers.first(where: { $0.id == layerID }) else {
             return nil
         }
-        let placement = placement(for: currentTransform(layerID: layerID) ?? layer.pose(at: lastPhase).transform)
+        if let matrix = lastPlacements[layerID] {
+            guard simd_determinant(matrix) != 0 else { return nil }
+            let point = simd_inverse(matrix) * SIMD3(canvasUV.x, canvasUV.y, 1)
+            return SIMD2(point.x, point.y)
+        }
+        let placement = placement(for: placedTransform(layer, currentTransform(layerID: layerID) ?? layer.pose(at: lastPhase).transform))
         let relative = canvasUV - 0.5 - placement.offset
         let placed = placement.column0 * relative.x + placement.column1 * relative.y + 0.5
         return (placed - 0.5) * layerUVScale(for: layer) + 0.5
@@ -206,19 +256,31 @@ final class SceneRenderer {
         guard let layer = document.layers.first(where: { $0.id == layerID }) else {
             return nil
         }
+        if let matrix = lastPlacements[layerID] {
+            let point = matrix * SIMD3(layerUV.x, layerUV.y, 1)
+            return SIMD2(point.x, point.y)
+        }
         return canvasUV(layerUV: layerUV, layer: layer, transform: currentTransform(layerID: layerID) ?? layer.pose(at: lastPhase).transform)
     }
 
     /// Where the layer's picture would sit with `transform`, at rest.
     func canvasUV(layerUV: SIMD2<Float>, layer: SceneLayer, transform: SceneTransform) -> SIMD2<Float> {
+        if let current = lastPlacements[layer.id] {
+            let previous = currentTransform(layerID: layer.id) ?? layer.pose(at: lastPhase).transform
+            let matrix = placementMatrix(transform) * simd_inverse(placementMatrix(previous)) * current
+            let point = matrix * SIMD3(layerUV.x, layerUV.y, 1)
+            return SIMD2(point.x, point.y)
+        }
+        let transform = placedTransform(layer, transform)
         let placed = (layerUV - 0.5) / layerUVScale(for: layer)
         let aspect = Float(document.aspectRatio)
         let radians = Float(transform.rotation * .pi / 180)
         let c = cos(radians)
         let s = sin(radians)
-        let scale = Float(transform.scale)
-        let column0 = SIMD2(c, s * aspect) * scale
-        let column1 = SIMD2(-s / aspect, c) * scale
+        let scaleX = Float(transform.scale)
+        let scaleY = Float(transform.scaleY ?? transform.scale)
+        let column0 = SIMD2(c, s * aspect) * scaleX
+        let column1 = SIMD2(-s / aspect, c) * scaleY
         return column0 * placed.x + column1 * placed.y + 0.5 + SIMD2(Float(transform.offsetX), Float(transform.offsetY))
     }
 
@@ -242,28 +304,44 @@ final class SceneRenderer {
             throw SceneScriptIssue(scriptID: document.scripts.first!.id, name: "JavaScript", message: "Scripts must be evaluated off the main thread")
         }
         let evaluated = try frame ?? frameEvaluator.evaluate(document, input: input, timeOfDay: timeOfDay)
+        rigs!.setPlaybackOverrides(evaluated.rigPlayback)
         lastFrame = evaluated
+        lastPlacements = placementEvaluator!.evaluate(time: input.time)
+        for (id, matrix) in lastPlacements {
+            let layer = evaluated.layers[id]!
+            let reference = layer.layer.placement!.referenceTransform
+            lastPlacements[id] = placementMatrix(layer.transform) * simd_inverse(placementMatrix(reference)) * matrix
+        }
         lastPhase = Double(loopPhase(input.time))
         let targetSize = SIMD2(Float(target.width), Float(target.height))
-        let visible = document.layers.filter { layer in
-            evaluated.layers[layer.id]!.layer.isVisible && (layer.kind == .particles ? layer.particles != nil : textures[layer.imageFile] != nil)
+        let ordered = document.layers.enumerated().sorted { a, b in
+            let left = evaluated.order[a.element.id] ?? a.offset
+            let right = evaluated.order[b.element.id] ?? b.offset
+            return left == right ? a.offset < b.offset : left < right
+        }.map(\.element)
+        for layer in ordered where layer.kind == .text {
+            try prepareText(evaluated.layers[layer.id]!.layer)
         }
-        // Effects and particles render into their own textures first, so the
-        // composite can then run as a single pass.
-        var prepared: [PreparedLayer] = []
-        for layer in visible {
-            let drawn = evaluated.layers[layer.id]!
-            let layerTexture = try applyEffects(
-                to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize
-            )
-            prepared.append(PreparedLayer(
-                layerTexture: layerTexture,
-                uniforms: compositeUniforms(for: drawn.layer, drawn: drawn, input: input, targetSize: targetSize),
-                depth: layer.depthFile.flatMap { maskTextures[$0] }
-            ))
+        let visible = ordered.filter { layer in
+            evaluated.layers[layer.id]!.layer.isVisible &&
+                (lastPlacements[layer.id].map { simd_determinant($0) != 0 } ?? true) &&
+                (layer.capturesCanvas || (layer.kind == .particles ? layer.particles != nil : picture(for: layer) != nil))
         }
-
-        if allowsSinglePassComposite, let fetch = pipeline.compositeFetch {
+        if !visible.contains(where: \.capturesCanvas), allowsSinglePassComposite, let fetch = pipeline.compositeFetch {
+            // Effects and particles render into their own textures first, so the
+            // composite can then run as a single pass.
+            var prepared: [PreparedLayer] = []
+            for layer in visible {
+                let drawn = evaluated.layers[layer.id]!
+                let layerTexture = try applyEffects(
+                    to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize
+                )
+                prepared.append(PreparedLayer(
+                    layerTexture: layerTexture,
+                    uniforms: compositeUniforms(for: drawn.layer, drawn: drawn, input: input, targetSize: targetSize),
+                    depth: layer.depthFile.flatMap { maskTextures[$0] }
+                ))
+            }
             let pass = MTLRenderPassDescriptor()
             pass.colorAttachments[0].texture = target
             pass.colorAttachments[0].loadAction = .clear
@@ -287,11 +365,17 @@ final class SceneRenderer {
         try ensureAccumulation(width: target.width, height: target.height)
         var source = blackTexture
         var nextIndex = 0
-        for item in prepared {
+        for layer in visible {
+            let drawn = evaluated.layers[layer.id]!
+            let uniforms = compositeUniforms(for: drawn.layer, drawn: drawn, input: input, targetSize: targetSize)
+            let layerTexture = try applyEffects(
+                to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize,
+                canvasSource: source, compositeUniforms: uniforms
+            )
             let destination = accumulation[nextIndex]
             try compositePass(
                 commandBuffer: commandBuffer, destination: destination, base: source,
-                layerTexture: item.layerTexture, uniforms: item.uniforms, depth: item.depth
+                layerTexture: layerTexture, uniforms: uniforms, depth: layer.depthFile.flatMap { maskTextures[$0] }
             )
             source = destination
             nextIndex = 1 - nextIndex
@@ -507,6 +591,8 @@ final class SceneRenderer {
                 speed(effect.value(Key.speedX), repeats: repeatX), speed(effect.value(Key.speedY), repeats: repeatY),
                 Float(repeatX), Float(repeatY)
             ])
+        case .opacityMask:
+            return RealTimeEffectValues([value("alpha")])
         case .axisSwing:
             typealias Key = SceneEffect.AxisSwingKey
             return RealTimeEffectValues([
@@ -550,17 +636,34 @@ final class SceneRenderer {
         to layer: SceneLayer,
         commandBuffer: MTLCommandBuffer,
         input: SceneFrameInput,
-        targetSize: SIMD2<Float>
+        targetSize: SIMD2<Float>,
+        canvasSource: MTLTexture? = nil,
+        compositeUniforms: LayerUniforms? = nil
     ) throws -> MTLTexture {
-        let source: MTLTexture
-        if layer.kind == .particles, let particles = layer.particles {
+        let viewSize = SIMD2(input.viewport.z, input.viewport.w)
+        let shown = targetSize / viewSize / layerUVScale(for: layer) * effectResolutionScale
+        var source: MTLTexture
+        if layer.capturesCanvas {
+            let width = max(Int((targetSize.x * effectResolutionScale).rounded()), 16)
+            let height = max(Int((targetSize.y * effectResolutionScale).rounded()), 16)
+            let targets = try effectTextures(for: layer.id, width: width, height: height)
+            try capturePass(
+                commandBuffer: commandBuffer, destination: targets[1], base: canvasSource ?? blackTexture,
+                uniforms: compositeUniforms ?? Self.passThroughUniforms
+            )
+            source = targets[1]
+        } else if layer.kind == .particles, let particles = layer.particles {
             source = try renderParticles(
                 particles, layerID: layer.id, commandBuffer: commandBuffer, input: input, targetSize: targetSize
             )
-        } else if let image = textures[layer.imageFile] {
+        } else if let image = picture(for: layer) {
             source = image
         } else {
             return blackTexture
+        }
+        if let graph = graphRenderers[layer.id] {
+            source = try graph.encode(input: source, images: graphResources[layer.id]!, time: input.time,
+                                      cursor: input.cursor, commandBuffer: commandBuffer)
         }
         var effects = layer.activeEffects
         // While a particle area is painted, an effect pass that changes nothing
@@ -576,19 +679,24 @@ final class SceneRenderer {
         }
         // Half the layer's size on the target (never above its own resolution): the
         // distortions are smooth, and this pass is most of the GPU time.
-        let viewSize = SIMD2(input.viewport.z, input.viewport.w)
-        let shown = targetSize / viewSize / layerUVScale(for: layer) * effectResolutionScale
-        let width = max(min(Int(shown.x.rounded()), source.width), 16)
-        let height = max(min(Int(shown.y.rounded()), source.height), 16)
+        let width = layer.capturesCanvas ? source.width : max(min(Int(shown.x.rounded()), source.width), 16)
+        let height = layer.capturesCanvas ? source.height : max(min(Int(shown.y.rounded()), source.height), 16)
         let targets = try effectTextures(for: layer.id, width: width, height: height)
 
         let phase = loopPhase(input.time)
         let aspect = Float(source.width) / Float(max(source.height, 1))
         var current = source
         for (index, effect) in effects.enumerated() {
+            if let graph = graphRenderers[effect.id] {
+                current = try graph.encode(input: current, images: graphResources[effect.id]!, time: input.time,
+                                           cursor: input.cursor, values: effect.values, commandBuffer: commandBuffer)
+                continue
+            }
             let destination = targets[index % 2]
             let override = paintOverride?.effectID == effect.id ? paintOverride : nil
-            let mask = override?.target == .mask ? paintOverrideTexture : effect.maskFile.flatMap { maskTextures[$0] }
+            let mask = override?.target == .mask ? paintOverrideTexture : effect.maskFile.flatMap {
+                effect.kind == .opacityMask ? flowTextures[$0] : maskTextures[$0]
+            }
             let flow = override?.target == .flow ? paintOverrideTexture : effect.flowFile.flatMap { flowTextures[$0] }
             let timeOffset = override?.target == .timeOffset
                 ? paintOverrideTexture : effect.timeOffsetFile.flatMap { maskTextures[$0] }
@@ -813,6 +921,9 @@ final class SceneRenderer {
         var saturation: Float
         var warmth: Float
         var hasColor: Int32
+        var tintRed: Float
+        var tintGreen: Float
+        var tintBlue: Float
     }
 
     private func compositePass(
@@ -840,6 +951,27 @@ final class SceneRenderer {
         encoder.endEncoding()
     }
 
+    private func capturePass(
+        commandBuffer: MTLCommandBuffer,
+        destination: MTLTexture,
+        base: MTLTexture,
+        uniforms: LayerUniforms
+    ) throws {
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = destination
+        pass.colorAttachments[0].loadAction = .dontCare
+        pass.colorAttachments[0].storeAction = .store
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
+            throw RendererError.textureAllocationFailed
+        }
+        var uniforms = uniforms
+        encoder.setRenderPipelineState(pipeline.capture)
+        encoder.setFragmentTexture(base, index: 0)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<LayerUniforms>.stride, index: 0)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        encoder.endEncoding()
+    }
+
     private static let passThroughUniforms = LayerUniforms(
         uvScale: .one, uvOffset: .zero, cursor: .zero, maskScale: .one, depthShift: .zero,
         placementColumn0: SIMD2(1, 0), placementColumn1: SIMD2(0, 1), placementOffset: .zero,
@@ -847,7 +979,8 @@ final class SceneRenderer {
         depthSteps: 0,
         opacity: 0, maskRadius: 0,
         maskSoftness: 0, blendMode: 0, maskMode: -1, hasCursor: 0, hasLayer: 0,
-        brightness: 0, saturation: 1, warmth: 0, hasColor: 0
+        brightness: 0, saturation: 1, warmth: 0, hasColor: 0,
+        tintRed: 1, tintGreen: 1, tintBlue: 1
     )
 
     /// Canvas UV → layer UV scale: aspect-fit, zoomed in just enough that the full
@@ -856,7 +989,12 @@ final class SceneRenderer {
     private func layerUVScale(for layer: SceneLayer) -> SIMD2<Float> {
         let canvasAspect = Float(document.aspectRatio)
         let layerAspect: Float
-        if layer.kind == .particles {
+        if layer.kind == .text {
+            // Text keeps its pixel size instead of filling the canvas, and does not
+            // move with the parallax zoom.
+            let size = textTextures[layer.id]?.canvasSize ?? SIMD2(1, 1)
+            return SIMD2(Float(Double(document.canvasWidth) / size.x), Float(Double(document.canvasHeight) / size.y))
+        } else if layer.kind == .particles || layer.capturesCanvas {
             layerAspect = canvasAspect
         } else {
             let texture = textures[layer.imageFile]
@@ -885,6 +1023,17 @@ final class SceneRenderer {
         let offset: SIMD2<Float>
     }
 
+    private func placementMatrix(_ transform: SceneTransform) -> simd_float3x3 {
+        let angle = Float(transform.rotation * .pi / 180)
+        let scaleX = Float(transform.scale), scaleY = Float(transform.scaleY ?? transform.scale), aspect = Float(document.aspectRatio)
+        let column0 = SIMD3(cos(angle), sin(angle) * aspect, 0) * scaleX
+        let column1 = SIMD3(-sin(angle) / aspect, cos(angle), 0) * scaleY
+        return simd_float3x3(columns: (column0, column1, SIMD3(
+            0.5 + Float(transform.offsetX) - (column0.x + column1.x) * 0.5,
+            0.5 + Float(transform.offsetY) - (column0.y + column1.y) * 0.5, 1
+        )))
+    }
+
     /// The inverse of the layer's placement in canvas UV. Rotation happens in a space
     /// with the canvas's proportions, so a turned layer is not skewed.
     private func placement(for transform: SceneTransform) -> Placement {
@@ -892,10 +1041,12 @@ final class SceneRenderer {
         let radians = Float(transform.rotation * .pi / 180)
         let c = cos(radians)
         let s = sin(radians)
-        let inverseScale = 1 / Float(max(transform.scale, 0.01))
+        let inverseScaleX = 1 / Float(max(abs(transform.scale), 0.0001)) * (transform.scale < 0 ? -1 : 1)
+        let sy = transform.scaleY ?? transform.scale
+        let inverseScaleY = 1 / Float(max(abs(sy), 0.0001)) * (sy < 0 ? -1 : 1)
         return Placement(
-            column0: SIMD2(c, -s * aspect) * inverseScale,
-            column1: SIMD2(s / aspect, c) * inverseScale,
+            column0: SIMD2(c * inverseScaleX, -s * aspect * inverseScaleY),
+            column1: SIMD2(s / aspect * inverseScaleX, c * inverseScaleY),
             offset: SIMD2(Float(transform.offsetX), Float(transform.offsetY))
         )
     }
@@ -916,23 +1067,39 @@ final class SceneRenderer {
     ) -> LayerUniforms {
         let canvasAspect = Float(document.aspectRatio)
         let link = drawn.color
-        let placement = placement(for: drawn.transform)
-        let scale = layerUVScale(for: layer)
+        let custom = lastPlacements[layer.id]
+        let placement: Placement
+        if let custom {
+            let inverse = simd_inverse(custom)
+            let center = custom * SIMD3(0.5, 0.5, 1)
+            placement = Placement(column0: SIMD2(inverse.columns.0.x, inverse.columns.0.y),
+                                  column1: SIMD2(inverse.columns.1.x, inverse.columns.1.y),
+                                  offset: SIMD2(center.x, center.y) - 0.5)
+        } else {
+            placement = self.placement(for: placedTransform(layer, drawn.transform))
+        }
+        let scale: SIMD2<Float> = custom == nil ? layerUVScale(for: layer) : .one
+        func layerDirection(_ value: SIMD2<Float>) -> SIMD2<Float> {
+            guard let custom else { return value * scale }
+            let direction = simd_inverse(custom) * SIMD3(value.x, value.y, 0)
+            return SIMD2(direction.x, direction.y)
+        }
         // The travel is a fraction of the canvas, converted into layer UV units.
         let cursorTravel = Float(min(max(layer.parallaxDepth, 0), 1)) * Self.maxParallaxTravel
-        let offset = cursorTravel > 0 ? input.parallax * cursorTravel * scale : .zero
+        let offset = cursorTravel > 0 ? layerDirection(input.parallax * cursorTravel) : .zero
         var depthView = layer.depthFollowsCursor ? input.parallax : .zero
         if layer.depthAutoMotion > 0 {
             // A circle repeats every turn, so the drift loops.
             let angle = 2 * Float.pi * Float(max(layer.depthAutoCycles, 1)) * loopPhase(input.time)
             depthView += SIMD2(cos(angle), sin(angle) * 0.6) * Float(min(layer.depthAutoMotion, 1))
         }
-        let depthShift = depthView.clamped(lowerBound: SIMD2(repeating: -1), upperBound: SIMD2(repeating: 1))
-            * depthTravel(for: layer) * scale
+        let depthShift = layerDirection(depthView.clamped(lowerBound: SIMD2(repeating: -1), upperBound: SIMD2(repeating: 1))
+            * depthTravel(for: layer))
 
         // Mask distances are measured in units of the canvas's shorter side.
         let maskScale = canvasAspect >= 1 ? SIMD2<Float>(canvasAspect, 1) : SIMD2<Float>(1, 1 / canvasAspect)
         let mask = layer.cursorMask
+        let hasTint = layer.tint.red != 1 || layer.tint.green != 1 || layer.tint.blue != 1
         return LayerUniforms(
             uvScale: scale,
             uvOffset: offset,
@@ -946,7 +1113,7 @@ final class SceneRenderer {
             viewSize: SIMD2(input.viewport.z, input.viewport.w),
             hasDepth: layer.hasDepth && layer.depthFile.flatMap({ maskTextures[$0] }) != nil ? 1 : 0,
             depthSteps: depthSteps(shift: depthShift, scale: scale, targetSize: targetSize),
-            opacity: Float(min(max(layer.opacity * drawn.opacity, 0), 1)),
+            opacity: Float(min(max(layer.opacity * layer.tint.alpha * drawn.opacity, 0), 1)),
             maskRadius: Float(max(mask?.radius ?? 0, 0.001)),
             maskSoftness: Float(min(max(mask?.softness ?? 0, 0), 1)),
             blendMode: Int32(SceneBlendMode.allCases.firstIndex(of: layer.blendMode) ?? 0),
@@ -956,7 +1123,48 @@ final class SceneRenderer {
             brightness: Float(link.brightness),
             saturation: Float(max(link.saturation, 0)),
             warmth: Float(link.warmth),
-            hasColor: link.changesColor ? 1 : 0
+            hasColor: (link.changesColor || hasTint) ? 1 : 0,
+            tintRed: Float(layer.tint.red),
+            tintGreen: Float(layer.tint.green),
+            tintBlue: Float(layer.tint.blue)
+        )
+    }
+
+    /// The picture a layer composites before its effects; particles draw their own.
+    private func picture(for layer: SceneLayer) -> MTLTexture? {
+        layer.kind == .text ? textTextures[layer.id]?.texture : textures[layer.imageFile]
+    }
+
+    /// A text layer's position is where its aligned edge sits, so its picture is
+    /// centred away from it, turned and scaled with the layer.
+    private func placedTransform(_ layer: SceneLayer, _ transform: SceneTransform) -> SceneTransform {
+        guard layer.kind == .text, let offset = textTextures[layer.id]?.centerOffset else { return transform }
+        // The rotation turns clockwise on the canvas, whose y points down; the offset
+        // has y up.
+        let radians = -transform.rotation * .pi / 180
+        let scaled = SIMD2(offset.x * transform.scale, offset.y * (transform.scaleY ?? transform.scale))
+        let turned = SIMD2(scaled.x * cos(radians) - scaled.y * sin(radians), scaled.x * sin(radians) + scaled.y * cos(radians))
+        var placed = transform
+        placed.offsetX += turned.x / Double(document.canvasWidth)
+        placed.offsetY -= turned.y / Double(document.canvasHeight)
+        return placed
+    }
+
+    private func prepareText(_ layer: SceneLayer) throws {
+        guard let text = layer.text else {
+            textTextures[layer.id] = nil
+            return
+        }
+        if textTextures[layer.id]?.text == text { return }
+        guard let raster = try SceneTextRasterizer.render(text, fontURL: text.fontFile.map(fileURL)) else {
+            textTextures[layer.id] = TextTexture(text: text, texture: nil, canvasSize: SIMD2(1, 1), centerOffset: .zero)
+            return
+        }
+        let texture = try Self.makeTexture(
+            device: device, pixelFormat: .rgba8Unorm, width: raster.width, height: raster.height, bytes: raster.bytes
+        )
+        textTextures[layer.id] = TextTexture(
+            text: text, texture: texture, canvasSize: raster.canvasSize, centerOffset: raster.centerOffset
         )
     }
 
@@ -980,11 +1188,49 @@ final class SceneRenderer {
     }
 
     private func loadTextures() throws {
+        if rigs?.skeletons != document.rigs {
+            rigs = try SceneSkeletonRegistry(document.rigs)
+            graphRenderers.removeAll()
+        }
+        placementEvaluator = try ScenePlacementEvaluator(layers: document.layers, rigs: rigs!)
+        lastPlacements.removeAll()
         let layerIDs = Set(document.layers.map(\.id))
         effectTargets = effectTargets.filter { layerIDs.contains($0.key) }
         particleTargets = particleTargets.filter { layerIDs.contains($0.key) }
+        var graphs: [UUID: SceneRenderGraph] = [:]
+        for layer in document.layers {
+            if let graph = layer.renderGraph { graphs[layer.id] = graph }
+            for effect in layer.effects {
+                if let graph = effect.renderGraph { graphs[effect.id] = graph }
+            }
+        }
+        graphRenderers = graphRenderers.filter { graphs[$0.key] != nil }
+        for (id, graph) in graphs where graphRenderers[id]?.graph != graph {
+            graphRenderers[id] = try SceneRenderGraphRenderer(graph: graph, device: device, rigs: rigs)
+        }
+        var retainedGraphTextures: [String: MTLTexture] = [:]
+        graphResources = [:]
+        for (id, graph) in graphs {
+            var resources: [String: MTLTexture] = [:]
+            for file in Set(graph.images.values) {
+                let straight = graph.straightAlphaImages == true
+                let key = "\(straight ? "straight" : "premultiplied"):\(file)"
+                let texture = try graphTextures[key] ?? Self.cachedTexture(url: fileURL(file), variant: "graph-\(straight)") { url in
+                    try Self.decodeRGBA(url: url, device: device, premultiplied: !straight)
+                }
+                retainedGraphTextures[key] = texture
+                resources[file] = texture
+            }
+            graphResources[id] = resources
+        }
+        graphTextures = retainedGraphTextures
 
-        let images = Set(document.layers.filter { $0.kind == .image }.map(\.imageFile))
+        textTextures = textTextures.filter { layerIDs.contains($0.key) }
+        for layer in document.layers where layer.kind == .text {
+            try prepareText(layer)
+        }
+
+        let images = Set(document.layers.filter { $0.kind == .image && !$0.imageFile.isEmpty }.map(\.imageFile))
         textures = textures.filter { images.contains($0.key) }
         for file in images where textures[file] == nil {
             textures[file] = try Self.cachedTexture(url: fileURL(file), variant: "rgba") { url in
@@ -994,7 +1240,7 @@ final class SceneRenderer {
 
         let effects = document.layers.flatMap(\.effects)
         let masks = Set(
-            effects.compactMap(\.maskFile) + effects.compactMap(\.timeOffsetFile)
+            effects.filter { $0.kind != .opacityMask }.compactMap(\.maskFile) + effects.compactMap(\.timeOffsetFile)
                 + document.layers.compactMap { $0.particles?.maskFile }
                 + document.layers.compactMap(\.depthFile)
         )
@@ -1004,7 +1250,10 @@ final class SceneRenderer {
                 try Self.decodeMask(url: url, device: device)
             }
         }
-        let flows = Set(effects.compactMap(\.flowFile) + effects.compactMap(\.patternFile))
+        let flows = Set(
+            effects.compactMap(\.flowFile) + effects.compactMap(\.patternFile)
+                + effects.filter { $0.kind == .opacityMask }.compactMap(\.maskFile)
+        )
         flowTextures = flowTextures.filter { flows.contains($0.key) }
         for file in flows where flowTextures[file] == nil {
             flowTextures[file] = try Self.cachedTexture(url: fileURL(file), variant: "flow") { url in
@@ -1183,6 +1432,7 @@ final class SceneRenderer {
         let pipeline = try Pipeline(
             device: device, queue: queue,
             composite: state(fragment: "scene_composite", format: .bgra8Unorm),
+            capture: state(fragment: "scene_capture", format: .rgba8Unorm),
             effect: state(fragment: "scene_effect", format: .rgba8Unorm),
             particlesOver: state(vertex: "particle_vertex", fragment: "particle_fragment", format: .rgba8Unorm, additive: false),
             particlesAdd: state(vertex: "particle_vertex", fragment: "particle_fragment", format: .rgba8Unorm, additive: true),
@@ -1249,6 +1499,9 @@ final class SceneRenderer {
         float saturation;
         float warmth;
         int hasColor;
+        float tintRed;
+        float tintGreen;
+        float tintBlue;
     };
 
     float3 blend(int mode, float3 b, float3 s) {
@@ -1300,6 +1553,7 @@ final class SceneRenderer {
         float3 color = src.a > 0.0 ? src.rgb / src.a : float3(0.0);
         // Skipped when unchanged, so layers without links draw exactly as before.
         if (u.hasColor != 0) {
+            color *= float3(u.tintRed, u.tintGreen, u.tintBlue);
             float luma = dot(color, float3(0.2126, 0.7152, 0.0722));
             color = mix(float3(luma), color, u.saturation);
             color *= float3(1.0 + 0.2 * u.warmth, 1.0, 1.0 - 0.2 * u.warmth);
@@ -1316,6 +1570,20 @@ final class SceneRenderer {
         }
         float3 mixed = blend(u.blendMode, below, color);
         return mix(below, mixed, alpha);
+    }
+
+    fragment float4 scene_capture(VertexOut in [[stage_in]],
+                                  texture2d<float> base [[texture(0)]],
+                                  constant LayerUniforms &u [[buffer(0)]]) {
+        constexpr sampler s(filter::linear, address::clamp_to_edge);
+        float2 placed = (in.uv - 0.5 - u.uvOffset) / u.uvScale;
+        float det = u.placementColumn0.x * u.placementColumn1.y - u.placementColumn1.x * u.placementColumn0.y;
+        if (abs(det) < 1e-8) { return float4(0.0); }
+        float2 relative = float2(u.placementColumn1.y * placed.x - u.placementColumn1.x * placed.y,
+                                 -u.placementColumn0.y * placed.x + u.placementColumn0.x * placed.y) / det;
+        float2 canvasUV = relative + 0.5 + u.placementOffset;
+        float2 targetUV = (canvasUV - u.viewOrigin) / u.viewSize;
+        return float4(base.sample(s, targetUV).rgb, 1.0);
     }
 
     fragment float4 scene_composite(VertexOut in [[stage_in]],
@@ -1836,6 +2104,9 @@ final class SceneRenderer {
             break;
         case 20: // uv scroll
             result = mix(original, uvScroll(src, s, uv, u, realTime), m);
+            break;
+        case 22:
+            result = original * clamp(realTime[0], 0.0, 1.0) * mask.sample(s, uv).r;
             break;
         case 21: // axis swing
             result = axisSwing(src, mask, pattern, s, uv, u, realTime);

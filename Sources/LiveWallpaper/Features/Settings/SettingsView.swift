@@ -76,6 +76,7 @@ struct SettingsView: View {
     @State var webURLInput: String = ""
     @State var isWebWallpaperURLPopoverPresented: Bool = false
     @State var isEmptyStateWebPopoverPresented: Bool = false
+    @State var localWebSettingsSource: WebWallpaperSource?
     @State var webWallpaperNameEdit: InlineNameEdit<UUID>?
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
@@ -326,6 +327,9 @@ struct SettingsView: View {
 
     private func applyDialogAndSheetModifiers<V: View>(_ view: V) -> some View {
         view
+            .sheet(item: $localWebSettingsSource) { source in
+                LocalWebSettingsSheet(model: model, source: source)
+            }
             .sheet(isPresented: $isWallpaperShareSheetPresented) {
                 shareWallpaperPickerSheet
             }

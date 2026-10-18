@@ -1,17 +1,20 @@
 import Foundation
 
 struct SceneScript: Codable, Equatable, Identifiable {
-    static let apiVersion = 3
+    static let apiVersion = 4
     static func supports(version: Int) -> Bool { (1 ... apiVersion).contains(version) }
     static let maximumCount = 32
     var id = UUID()
     var name = "JavaScript"
     var source: String
+    var modules: [String: String]?
     var version = Self.apiVersion
     var isEnabled = true
     var usesTime = true
     var usesTimeOfDay = false
     var usesCursor = false
+    /// The track playing in Music or Spotify, which needs their automation permission.
+    var usesMedia = false
     var layerIDs: [UUID]
     var targetsAllLayers = false
     var params: [String: Double] = ["amount": 0.05, "cycles": 1]
@@ -20,7 +23,7 @@ struct SceneScript: Codable, Equatable, Identifiable {
     var executionRevision = 0
 
     enum CodingKeys: String, CodingKey {
-        case id, name, source, version, isEnabled, usesTime, usesTimeOfDay, usesCursor, layerIDs, targetsAllLayers, params
+        case id, name, source, modules, version, isEnabled, usesTime, usesTimeOfDay, usesCursor, usesMedia, layerIDs, targetsAllLayers, params
     }
 
     init(source: String, layerIDs: [UUID]) {
@@ -33,15 +36,20 @@ struct SceneScript: Codable, Equatable, Identifiable {
         id = try c.decode(UUID.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
         source = try c.decode(String.self, forKey: .source)
+        modules = try c.decodeIfPresent([String: String].self, forKey: .modules)
         version = try c.decode(Int.self, forKey: .version)
         isEnabled = try c.decode(Bool.self, forKey: .isEnabled)
         usesTime = try c.decode(Bool.self, forKey: .usesTime)
         usesTimeOfDay = try c.decode(Bool.self, forKey: .usesTimeOfDay)
         usesCursor = try c.decode(Bool.self, forKey: .usesCursor)
+        usesMedia = try c.decodeIfPresent(Bool.self, forKey: .usesMedia) ?? false
         layerIDs = try c.decode([UUID].self, forKey: .layerIDs)
         targetsAllLayers = try c.decodeIfPresent(Bool.self, forKey: .targetsAllLayers) ?? false
         params = try c.decode([String: Double].self, forKey: .params)
-        guard source.utf8.count <= 65536, layerIDs.count <= 128, params.count <= 64,
+        guard (modules?.count ?? 0) <= 256,
+              (modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 1048576,
+              modules?.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }) != false,
+              source.utf8.count <= 65536, layerIDs.count <= 512, params.count <= 64,
               params.allSatisfy({ $0.key.utf8.count <= 128 && $0.value.isFinite })
         else {
             throw DecodingError.dataCorruptedError(forKey: .source, in: c, debugDescription: "Script input exceeds supported limits")
@@ -62,14 +70,25 @@ struct SceneScriptIssue: Error, LocalizedError, Equatable {
     /// Ran out of time, which depends on the machine's load as much as on the script:
     /// live drawing tries it again after a pause.
     var isTemporary = false
+    /// Only a part of the script failed; the rest keeps running.
+    var isPartial = false
     var errorDescription: String? { "\(name): \(message)" }
 }
 
+struct SceneScriptOutput {
+    var adjustments: [UUID: SceneScriptAdjustment]
+    /// Parts of the script that failed while the rest kept running.
+    var warnings: [String]
+}
+
 struct SceneScriptAdjustment {
+    var rigPlayback: [UUID: [Int: SceneScriptPlaybackValues]] = [:]
+    var order: Int?
     var values = SceneLinkValues.identity
     var appearance: SceneScriptAppearanceValues?
     var effects: [UUID: SceneScriptEffectValues] = [:]
     var particles: SceneScriptParticleValues?
+    var text: SceneScriptTextValues?
 }
 
 struct SceneScriptEffectValues: Decodable {
@@ -83,6 +102,7 @@ struct SceneScriptEffectValues: Decodable {
     var centerX: Double?
     var centerY: Double?
     var reversed: Bool?
+    var values: [String: Double]?
 
     func apply(to effect: inout SceneEffect) {
         if let kind { effect.kind = kind }
@@ -95,6 +115,9 @@ struct SceneScriptEffectValues: Decodable {
         if let centerX { effect.centerX = centerX }
         if let centerY { effect.centerY = centerY }
         if let reversed { effect.reversed = reversed }
+        if let values {
+            for (key, value) in values { effect.values[key] = value }
+        }
     }
 }
 
@@ -126,6 +149,7 @@ struct SceneScriptParticleValues: Decodable {
 
 struct SceneScriptAppearanceValues: Decodable {
     var isVisible: Bool?
+    var tint: RGBAColor?
     var blendMode: SceneBlendMode?
     var parallaxDepth: Double?
     var depthStrength: Double?
@@ -137,6 +161,7 @@ struct SceneScriptAppearanceValues: Decodable {
 
     func apply(to layer: inout SceneLayer) {
         if let isVisible { layer.isVisible = isVisible }
+        if let tint { layer.tint = tint }
         if let blendMode { layer.blendMode = blendMode }
         if let parallaxDepth { layer.parallaxDepth = parallaxDepth }
         if let depthStrength { layer.depthStrength = depthStrength }
@@ -154,8 +179,44 @@ struct SceneScriptAppearanceValues: Decodable {
     }
 }
 
+struct SceneScriptTextValues: Decodable {
+    struct Color: Decodable {
+        var red: Double
+        var green: Double
+        var blue: Double
+    }
+
+    var string: String?
+    var color: Color?
+
+    func apply(to text: inout SceneText) {
+        if let string { text.string = string }
+        if let color { text.color = RGBAColor(red: color.red, green: color.green, blue: color.blue, alpha: text.color.alpha) }
+    }
+}
+
 struct SceneScriptCursorMaskValues: Decodable {
     var mode: SceneCursorMaskMode?
     var radius: Double?
     var softness: Double?
+}
+
+struct SceneScriptPlaybackValues: Decodable {
+    var frame: Double?
+    var rate: Double?
+    var weight: Float?
+
+    func apply(to playback: inout SceneSkeleton.Playback) {
+        if let frame {
+            playback.startFrame = frame
+            playback.rate = 0
+        } else if let rate { playback.rate = rate }
+        if let weight { playback.weight = weight }
+    }
+}
+
+extension SceneLayer {
+    var scriptRigIDs: Set<UUID> {
+        Set((placement?.steps.compactMap(\.skeletonID) ?? []) + (renderGraph?.passes.compactMap { $0.draw?.skeletonID } ?? []))
+    }
 }

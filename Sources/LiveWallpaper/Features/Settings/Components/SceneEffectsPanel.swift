@@ -37,6 +37,8 @@ extension SettingsView {
         case .pulseBlend: model.localizedString("色の明滅")
         case .uvScroll: model.localizedString("速さを決めてスクロール")
         case .axisSwing: model.localizedString("軸でしならせる")
+        case .opacityMask: model.localizedString("不透明度マスク")
+        case .shader: model.localizedString("シェーダー効果")
         }
     }
 
@@ -293,6 +295,16 @@ extension SettingsView {
     private func sceneEffectInspector(path: String, layerID: UUID, effect: SceneEffect) -> some View {
         let loopSeconds = model.sceneDocumentsByPath[path]?.loopSeconds ?? 20
         VStack(alignment: .leading, spacing: 8) {
+            if effect.kind == .shader {
+                settingsFootnote(model.localizedString("この効果は作品に含まれるシェーダーで描画します。範囲の描き直しには未対応です。"))
+            } else {
+            if effect.kind == .opacityMask {
+                sceneEffectSlider(
+                    title: model.localizedString("不透明度"),
+                    value: sceneEffectValueBinding(path: path, layerID: layerID, effect: effect, key: "alpha"),
+                    range: 0 ... 1
+                )
+            }
             if effect.kind.runsOnRealTime {
                 sceneRealTimeEffectInspector(path: path, layerID: layerID, effect: effect)
             }
@@ -430,6 +442,7 @@ extension SettingsView {
                 .padding(.leading, sceneEffectLabelWidth + 12)
                 settingsFootnote(model.localizedString("塗った範囲だけを動かすと、輪郭はその場に残ります。別のレイヤーにすると輪郭ごと動き、元のレイヤーの抜けた所は周りの色で埋めます。"))
                     .padding(.leading, sceneEffectLabelWidth + 12)
+            }
             }
         }
     }
@@ -607,7 +620,14 @@ extension SettingsView {
         }
         let size: CGSize
         do {
-            size = try SceneStore.pixelSize(of: SceneStore.imageURL(layer, videoPath: path))
+            if let text = layer.text {
+                // Painted in the text's picture as it is drawn now.
+                let fontURL = text.fontFile.map { SceneStore.folderURL(forVideoPath: path).appendingPathComponent($0) }
+                guard let raster = try SceneTextRasterizer.render(text, fontURL: fontURL) else { return }
+                size = CGSize(width: raster.width, height: raster.height)
+            } else {
+                size = try SceneStore.pixelSize(of: SceneStore.imageURL(layer, videoPath: path))
+            }
         } catch {
             model.sceneErrorMessage = error.localizedDescription
             return

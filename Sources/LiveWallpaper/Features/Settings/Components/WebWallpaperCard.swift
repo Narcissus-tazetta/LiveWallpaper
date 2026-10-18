@@ -50,6 +50,12 @@ extension SettingsView {
         return VStack(alignment: .leading, spacing: 8) {
             thumbnailButton
 
+            if let warnings = source.warnings, !warnings.isEmpty {
+                Image(systemName: "exclamationmark.circle")
+                    .foregroundColor(.secondary)
+                    .help(warnings.joined(separator: "\n"))
+                    .accessibilityLabel(warnings.joined(separator: "\n"))
+            }
             if webWallpaperNameEdit?.id == source.id {
                 inlineNameEditField(
                     placeholder: model.localizedString("名前"),
@@ -115,6 +121,9 @@ extension SettingsView {
                 addToNewPlaylist: { addWebWallpaperToNewPlaylist(sourceID: source.id) }
             )
             Divider()
+            if source.localFolderPath != nil {
+                Button(model.localizedString("作品の設定")) { localWebSettingsSource = source }
+            }
             Button(model.localizedString("名前を編集")) {
                 startWebWallpaperNameEdit(sourceID: source.id)
             }

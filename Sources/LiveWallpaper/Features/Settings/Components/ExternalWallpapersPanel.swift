@@ -60,6 +60,12 @@ extension SettingsView {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .frame(width: width, alignment: .leading)
+                if let warnings = wallpaper.webSource?.warnings, !warnings.isEmpty {
+                    Image(systemName: "exclamationmark.circle")
+                        .foregroundColor(.secondary)
+                        .help(warnings.joined(separator: "\n"))
+                        .accessibilityLabel(warnings.joined(separator: "\n"))
+                }
                 externalScenePreparationStatus(wallpaper)
                     .frame(width: width, alignment: .leading)
             }
@@ -68,6 +74,11 @@ extension SettingsView {
         .buttonStyle(.plain)
         .disabled(!model.canShowExternalWallpaper || !model.isExternalWallpaperReady(wallpaper))
         .opacity(model.canShowExternalWallpaper && model.isExternalWallpaperReady(wallpaper) ? 1 : 0.5)
+        .contextMenu {
+            if let source = wallpaper.webSource {
+                Button(model.localizedString("作品の設定")) { localWebSettingsSource = source }
+            }
+        }
         .help(wallpaper.name)
         .accessibilityLabel(wallpaper.name)
         .accessibilityAddTraits(isActive ? .isSelected : [])

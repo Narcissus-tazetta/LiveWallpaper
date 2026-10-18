@@ -259,4 +259,43 @@ final class ExternalWallpaperTests: XCTestCase {
         XCTAssertFalse(model.isScene(path: bakedPath))
         XCTAssertTrue(model.isScene(path: path))
     }
+
+    func testCachedBakedSceneIsReusedWhenNeitherSceneNorAppHasChanged() async throws {
+        let folder = try writeSceneFolder()
+        let id = "test-cached-\(UUID().uuidString).json/a"
+        let bakedPath = ExternalWallpaperProviderMonitor.bakedScenePath(forID: id)
+        let revision = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent("scene.json").path)[.modificationDate] as? Date
+        )
+        let wallpaper = ExternalWallpaper(
+            id: id, providerName: "P", name: "Sky", path: bakedPath, sceneFolderPath: folder.path,
+            sceneRevision: revision
+        )
+        defer {
+            try? FileManager.default.removeItem(at: URL(fileURLWithPath: bakedPath).deletingLastPathComponent())
+        }
+
+        let firstModel = WallpaperModel()
+        firstModel.updateExternalWallpapers([wallpaper])
+        let deadline = Date().addingTimeInterval(60)
+        while !firstModel.isExternalWallpaperReady(wallpaper), Date() < deadline {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertTrue(firstModel.isExternalWallpaperReady(wallpaper))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: bakedPath))
+
+        // On a simulated app restart with unchanged scene and app, the baked scene is ready immediately.
+        let secondModel = WallpaperModel()
+        secondModel.updateExternalWallpapers([wallpaper])
+        XCTAssertTrue(secondModel.isExternalWallpaperReady(wallpaper))
+
+        // If the app signature changes, the cache is invalidated and must be rebaked.
+        let metaURL = ExternalWallpaperProviderMonitor.bakedSceneMetaURL(forID: id)
+        let oldMeta = ExternalWallpaperProviderMonitor.BakedSceneMeta(sceneRevision: revision, appSignature: "outdated-app-version")
+        try JSONEncoder().encode(oldMeta).write(to: metaURL)
+
+        let thirdModel = WallpaperModel()
+        thirdModel.updateExternalWallpapers([wallpaper])
+        XCTAssertFalse(thirdModel.isExternalWallpaperReady(wallpaper), "rebake required when app signature changes")
+    }
 }

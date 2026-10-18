@@ -15,6 +15,11 @@ struct LWJSProgram {
     double deadline;
     int timed_out;
     char logs[4096];
+    JSContext *module_context;
+    JSValue module_sources;
+    JSValue module_entry;
+    JSValue module_namespace;
+    int module_started;
     size_t log_length;
     int log_count;
 };
@@ -122,7 +127,7 @@ static JSContext *new_context(LWJSProgram *program) {
     if (JS_AddIntrinsicBaseObjects(context) < 0 ||
         JS_AddIntrinsicEval(context) < 0 || JS_AddIntrinsicJSON(context) < 0 ||
         JS_AddIntrinsicMapSet(context) < 0 || JS_AddIntrinsicTypedArrays(context) < 0 ||
-        JS_AddIntrinsicPromise(context) < 0) {
+        JS_AddIntrinsicPromise(context) < 0 || JS_AddIntrinsicProxy(context) < 0) {
         JS_FreeContext(context);
         return NULL;
     }
@@ -206,6 +211,55 @@ LWJSProgram *lwjs_compile(const char *source, char **error) {
     return program;
 }
 
+static JSModuleDef *load_module(JSContext *context, const char *name, void *opaque) {
+    LWJSProgram *program = opaque;
+    JSValue value = JS_GetPropertyStr(context, program->module_sources, name);
+    if (!JS_IsString(value)) {
+        JS_FreeValue(context, value);
+        JS_ThrowReferenceError(context, "Module is not in this script bundle: %s", name);
+        return NULL;
+    }
+    size_t length;
+    const char *source = JS_ToCStringLen(context, &length, value);
+    JSValue compiled = source ? JS_Eval(context, source, length, name,
+        JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY) : JS_EXCEPTION;
+    if (source) JS_FreeCString(context, source);
+    JS_FreeValue(context, value);
+    if (JS_IsException(compiled)) return NULL;
+    return JS_VALUE_GET_PTR(compiled);
+}
+
+LWJSProgram *lwjs_compile_modules(const char *source, const char *modules, char **error) {
+    if (strlen(source) > 65536 || strlen(modules) > 8 * 1024 * 1024) {
+        *error = strdup("Script bundle exceeds supported limits");
+        return NULL;
+    }
+    LWJSProgram *program = lwjs_compile("", error);
+    if (!program) return NULL;
+    program->module_sources = JS_UNDEFINED;
+    program->module_entry = JS_UNDEFINED;
+    program->module_namespace = JS_UNDEFINED;
+    JSContext *context = new_context(program);
+    if (!context) {
+        *error = strdup("Could not initialize module context");
+        lwjs_destroy(program);
+        return NULL;
+    }
+    program->module_context = context;
+    program->module_sources = JS_ParseJSON(context, modules, strlen(modules), "modules.json");
+    JS_SetModuleLoaderFunc(program->runtime, NULL, load_module, program);
+    if (JS_IsException(program->module_sources)) {
+        describe_error(program, context, error);
+    } else {
+        program->module_entry = JS_Eval(context, source, strlen(source), "entry.js",
+            JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+        if (JS_IsException(program->module_entry) || JS_ResolveModule(context, program->module_entry) < 0)
+            describe_error(program, context, error);
+    }
+    if (*error) { lwjs_destroy(program); return NULL; }
+    return program;
+}
+
 char *lwjs_evaluate(LWJSProgram *program, const char *input, double budget_seconds, char **error) {
     *error = NULL;
     program->deadline = now() + budget_seconds;
@@ -214,22 +268,50 @@ char *lwjs_evaluate(LWJSProgram *program, const char *input, double budget_secon
     program->log_length = 0;
     program->log_count = 0;
     update_stack_limit(program->runtime);
-    JSContext *context = new_context(program);
+    JSContext *context = program->module_context ? program->module_context : new_context(program);
     if (!context) {
         *error = strdup(program->timed_out ? "Execution time limit exceeded" : "Could not initialize JavaScript runtime");
         return NULL;
     }
     // Only bytecode produced by lwjs_compile is ever read; packages contain source.
-    JSValue compiled = JS_ReadObject(context, program->bytecode, program->length, JS_READ_OBJ_BYTECODE);
-    JSValue result = JS_IsException(compiled) ? compiled : JS_EvalFunction(context, compiled);
+    JSValue result = JS_UNDEFINED;
+    if (program->module_context) {
+        if (!program->module_started) {
+            JSValue entry = program->module_entry;
+            program->module_started = 1;
+            result = JS_EvalFunction(context, JS_DupValue(context, entry));
+            if (!JS_IsException(result) && JS_IsPromise(result)) {
+                if (JS_PromiseState(context, result) == JS_PROMISE_REJECTED) {
+                    JSValue exception = JS_PromiseResult(context, result);
+                    JS_FreeValue(context, result);
+                    result = JS_Throw(context, exception);
+                } else if (JS_PromiseState(context, result) == JS_PROMISE_PENDING) {
+                    JS_FreeValue(context, result);
+                    result = JS_ThrowTypeError(context, "Asynchronous module initialization is not supported");
+                }
+            }
+            if (!JS_IsException(result)) {
+                program->module_namespace = JS_GetModuleNamespace(context, JS_VALUE_GET_PTR(entry));
+                if (JS_IsException(program->module_namespace)) {
+                    JS_FreeValue(context, result);
+                    result = JS_EXCEPTION;
+                }
+            }
+            JS_FreeValue(context, entry);
+            program->module_entry = JS_UNDEFINED;
+        }
+    } else {
+        JSValue compiled = JS_ReadObject(context, program->bytecode, program->length, JS_READ_OBJ_BYTECODE);
+        result = JS_IsException(compiled) ? compiled : JS_EvalFunction(context, compiled);
+    }
     if (JS_IsException(result)) {
         describe_error(program, context, error);
         JS_FreeValue(context, result);
-        JS_FreeContext(context);
+        if (!program->module_context) JS_FreeContext(context);
         return NULL;
     }
     JS_FreeValue(context, result);
-    JSValue global = JS_GetGlobalObject(context);
+    JSValue global = program->module_context ? JS_DupValue(context, program->module_namespace) : JS_GetGlobalObject(context);
     JSValue function = JS_GetPropertyStr(context, global, "update");
     JSValue argument = JS_ParseJSON(context, input, strlen(input), "input.json");
     if (!JS_IsException(argument)) {
@@ -279,12 +361,18 @@ char *lwjs_evaluate(LWJSProgram *program, const char *input, double budget_secon
     JS_FreeValue(context, argument);
     JS_FreeValue(context, function);
     JS_FreeValue(context, global);
-    JS_FreeContext(context);
+    if (!program->module_context) JS_FreeContext(context);
     return output;
 }
 
 void lwjs_destroy(LWJSProgram *program) {
     if (!program) return;
+    if (program->module_context) {
+        JS_FreeValue(program->module_context, program->module_entry);
+        JS_FreeValue(program->module_context, program->module_namespace);
+        JS_FreeValue(program->module_context, program->module_sources);
+        JS_FreeContext(program->module_context);
+    }
     js_free_rt(program->runtime, program->bytecode);
     js_free_rt(program->runtime, program->helpers);
     JS_FreeRuntime(program->runtime);

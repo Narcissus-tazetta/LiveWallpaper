@@ -50,6 +50,7 @@ final class WebPlayerView: NSView {
         imageView.isHidden = true
         return imageView
     }()
+
     private lazy var menuBarMaskView: NSVisualEffectView = {
         let view = NSVisualEffectView()
         view.material = .titlebar
@@ -87,6 +88,135 @@ final class WebPlayerView: NSView {
         }
     }
 
+    private let integrationID = UUID()
+    private var wantsSpectrum = false
+    private var wantsMedia = false
+    private var localSettings = LocalWebSettings()
+    private var localProperties: [String: WebPropertyValue] = [:]
+    private var lastMediaArtwork: String?
+    private var spectrumInFlight = false
+    private var assetProperties: [String] = []
+
+    func setLocalConfiguration(
+        values: [String: WebPropertyValue],
+        settings: LocalWebSettings,
+        assets: [String] = []
+    ) {
+        let changed = localProperties != values || assetProperties != assets
+        localProperties = values
+        assetProperties = assets
+        localSettings = settings
+        guard currentRequest?.isLocalPackage == true else { return }
+        let json = LocalWebHostScript.json(values)
+        let assetsJSON = LocalWebHostScript.json(assets)
+        if changed {
+            webView
+                .evaluateJavaScript(
+                    "window.__liveWallpaperSetProperties && window.__liveWallpaperSetProperties(\(json), \(assetsJSON));"
+                ) { _, error in
+                    if let error {
+                        AppLog.externalWallpapers
+                            .error(
+                                "web properties failed: \(error.localizedDescription, privacy: .public)"
+                            )
+                    }
+                }
+        }
+        refreshIntegration()
+    }
+
+    private func refreshIntegration() {
+        let active = currentRequest?.isLocalPackage == true && !isSuspended && !isDeepUnloaded
+        let spectrum = active && wantsSpectrum && localSettings.audioReactiveEnabled
+        let media = active && wantsMedia && localSettings.mediaEnabled
+        LocalWebIntegration.shared.update(
+            id: integrationID,
+            subscription: spectrum || media ? .init(
+                spectrum: spectrum, media: media,
+                receiveSpectrum: { [weak self] values in self?.sendSpectrum(values) },
+                receiveMedia: { [weak self] value, enabled in self?.sendMedia(
+                    value,
+                    enabled: enabled
+                ) }
+            ) : nil
+        )
+        if !spectrum { sendSpectrum([Float](repeating: 0, count: 128)) }
+        if !media { sendMedia(WebNowPlaying(), enabled: false) }
+    }
+
+    private func sendSpectrum(_ values: [Float]) {
+        guard currentRequest?.isLocalPackage == true, !spectrumInFlight else { return }
+        spectrumInFlight = true
+        let json = LocalWebHostScript.json(values)
+        webView
+            .evaluateJavaScript(
+                "window.__liveWallpaperSpectrum && window.__liveWallpaperSpectrum(\(json));"
+            ) { [weak self] _, error in
+                self?.spectrumInFlight = false
+                if let error {
+                    AppLog.externalWallpapers
+                        .error(
+                            "web spectrum failed: \(error.localizedDescription, privacy: .public)"
+                        )
+                }
+            }
+    }
+
+    private func sendMedia(_ value: WebNowPlaying, enabled: Bool) {
+        guard currentRequest?.isLocalPackage == true else { return }
+        let artworkUnchanged = lastMediaArtwork == value.artwork
+        lastMediaArtwork = value.artwork
+        var packet = value
+        if artworkUnchanged { packet.artwork = "" }
+        let json = LocalWebHostScript.json(packet)
+        webView
+            .evaluateJavaScript(
+                "window.__liveWallpaperMedia && window.__liveWallpaperMedia(\(json), \(enabled), \(artworkUnchanged));"
+            ) { _, error in
+                if let error {
+                    AppLog.externalWallpapers
+                        .error("web media failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+    }
+
+    private var hostVolume: Float = 1
+    private var hostFPS: Double = 30
+    private var hostLanguage = Locale.current.identifier
+
+    private var hostState: LocalWebHostScript.State {
+        .init(
+            paused: isSuspended,
+            audioEnabled: audioEnabled,
+            volume: hostVolume,
+            fps: hostFPS,
+            language: hostLanguage
+        )
+    }
+
+    func setHostEnvironment(volume: Float, fps: Double, language: String) {
+        hostVolume = volume
+        hostFPS = fps
+        hostLanguage = language
+        applyHostState()
+    }
+
+    private func applyHostState() {
+        guard currentRequest?.isLocalPackage == true else { return }
+        refreshIntegration()
+        webView
+            .evaluateJavaScript(
+                "window.__liveWallpaperUpdate && window.__liveWallpaperUpdate(\(hostState.json));"
+            ) { _, error in
+                if let error {
+                    AppLog.externalWallpapers
+                        .error(
+                            "web host state failed: \(error.localizedDescription, privacy: .public)"
+                        )
+                }
+            }
+    }
+
     var currentURL: URL?
     var onLoadStateChanged: ((WebWallpaperLoadState) -> Void)?
 
@@ -113,12 +243,14 @@ final class WebPlayerView: NSView {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
     deinit {
         playerReadyTimeoutWorkItem?.cancel()
+        let id = integrationID
+        Task { @MainActor in LocalWebIntegration.shared.update(id: id, subscription: nil) }
     }
 
     func load(request: WebWallpaperPlaybackRequest, audioEnabled: Bool) {
@@ -133,10 +265,13 @@ final class WebPlayerView: NSView {
         // (if any) stays owned by the suspension state, so it survives until
         // setSuspended(false) — this load must not reveal the webview by itself.
         webView.stopLoading()
+        LocalWebIntegration.shared.update(id: integrationID, subscription: nil)
+        wantsSpectrum = false
+        wantsMedia = false
         currentRequest = request
         currentLayoutMode = request.layoutMode
         awaitsEmbedPlayerReady = request.awaitsEmbedPlayerReady
-        if case .url(let url) = request.loadContent {
+        if case let .url(url) = request.loadContent {
             currentURL = url
         } else {
             currentURL = nil
@@ -163,6 +298,7 @@ final class WebPlayerView: NSView {
             return
         }
         isDeepUnloaded = true
+        refreshIntegration()
         playerReadyTimeoutWorkItem?.cancel()
         playerReadyTimeoutWorkItem = nil
         loadGeneration &+= 1
@@ -234,15 +370,30 @@ final class WebPlayerView: NSView {
     }
 
     private func performLoad(request: WebWallpaperPlaybackRequest) {
+        lastMediaArtwork = nil
+        let controller = webView.configuration.userContentController
+        controller.removeAllUserScripts()
+        Self.installUserScripts(on: controller)
+        if request.isLocalPackage {
+            controller.addUserScript(WKUserScript(
+                source: LocalWebHostScript.bootstrap(
+                    state: hostState,
+                    properties: localProperties,
+                    assets: assetProperties
+                ),
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            ))
+        }
         switch request.loadContent {
-        case .url(let url):
+        case let .url(url):
             let urlRequest = URLRequest(
                 url: url,
                 cachePolicy: .reloadIgnoringLocalCacheData,
                 timeoutInterval: 30
             )
             webView.load(urlRequest)
-        case .html(let html, let baseURL):
+        case let .html(html, baseURL):
             webView.loadHTMLString(html, baseURL: baseURL)
         }
     }
@@ -254,6 +405,7 @@ final class WebPlayerView: NSView {
 
     func setSuspended(_ suspended: Bool) {
         isSuspended = suspended
+        applyHostState()
         suspensionGeneration &+= 1
         let generation = suspensionGeneration
 
@@ -267,12 +419,12 @@ final class WebPlayerView: NSView {
             // expose the window's opaque black backing layer whenever the coverage heuristic
             // suspends without the screen actually being covered (see WallpaperModel+Coverage).
             webView.takeSnapshot(with: nil) { [weak self] image, _ in
-                guard let self, self.suspensionGeneration == generation, let image else {
+                guard let self, suspensionGeneration == generation, let image else {
                     return
                 }
-                self.freezeImageView.image = image
-                self.freezeImageView.isHidden = false
-                self.webView.isHidden = true
+                freezeImageView.image = image
+                freezeImageView.isHidden = false
+                webView.isHidden = true
             }
         } else if isDeepUnloaded {
             // The page was torn down while covered; rebuild it behind the freeze
@@ -289,14 +441,15 @@ final class WebPlayerView: NSView {
             ? "typeof pauseWallpaperPlayback==='function'&&pauseWallpaperPlayback();"
             : "typeof resumeWallpaperPlayback==='function'&&resumeWallpaperPlayback();"
         webView.evaluateJavaScript(embedScript) { [weak self] _, _ in
-            guard let self, self.currentLayoutMode == .generic else {
+            guard let self, currentLayoutMode == .generic else {
                 return
             }
-            self.applyGenericPlaybackScript(paused: suspended)
+            applyGenericPlaybackScript(paused: suspended)
         }
     }
 
     func stopLoading() {
+        LocalWebIntegration.shared.update(id: integrationID, subscription: nil)
         invalidatePendingWork()
         webView.stopLoading()
         currentURL = nil
@@ -305,6 +458,7 @@ final class WebPlayerView: NSView {
     }
 
     func tearDown() {
+        LocalWebIntegration.shared.update(id: integrationID, subscription: nil)
         invalidatePendingWork()
         onLoadStateChanged = nil
         webView.stopLoading()
@@ -354,13 +508,13 @@ final class WebPlayerView: NSView {
         let generation = loadGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(retryCount)) { [weak self] in
             guard let self,
-                  self.loadGeneration == generation,
-                  self.currentRequest == request
+                  loadGeneration == generation,
+                  currentRequest == request
             else {
                 return
             }
-            self.reportLoadState(.loading)
-            self.performLoad(request: request)
+            reportLoadState(.loading)
+            performLoad(request: request)
         }
     }
 
@@ -376,17 +530,17 @@ final class WebPlayerView: NSView {
         playerReadyTimeoutWorkItem?.cancel()
         let generation = loadGeneration
         let workItem = DispatchWorkItem { [weak self] in
-            guard let self, self.loadGeneration == generation else {
+            guard let self, loadGeneration == generation else {
                 return
             }
-            self.reportLoadState(.failed)
+            reportLoadState(.failed)
         }
         playerReadyTimeoutWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.embedReadyTimeout, execute: workItem)
     }
 
     private func applyWallpaperLayoutScript() {
-        let css: String = switch currentLayoutMode {
+        let css = switch currentLayoutMode {
         case .generic:
             "html, body { margin: 0 !important; padding: 0 !important; overflow: hidden !important; width: 100% !important; height: 100% !important; background: #000 !important; }"
         case .videoEmbed:
@@ -426,6 +580,7 @@ final class WebPlayerView: NSView {
     }
 
     private func applyAudioPolicy() {
+        applyHostState()
         let script = audioEnabled
             ? "document.querySelectorAll('video,audio').forEach(function(e){e.muted=false;});"
             : "document.querySelectorAll('video,audio').forEach(function(e){e.muted=true;});"
@@ -491,21 +646,21 @@ final class WebPlayerView: NSView {
     private final class NavigationDelegate: NSObject, WKNavigationDelegate {
         weak var owner: WebPlayerView?
 
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        func webView(_: WKWebView, didFinish _: WKNavigation!) {
             owner?.handleNavigationFinished()
         }
 
         func webView(
-            _ webView: WKWebView,
-            didFail navigation: WKNavigation!,
-            withError error: Error
+            _: WKWebView,
+            didFail _: WKNavigation!,
+            withError _: Error
         ) {
             owner?.handleNavigationFailed()
         }
 
         func webView(
-            _ webView: WKWebView,
-            didFailProvisionalNavigation navigation: WKNavigation!,
+            _: WKWebView,
+            didFailProvisionalNavigation _: WKNavigation!,
             withError error: Error
         ) {
             let nsError = error as NSError
@@ -520,7 +675,7 @@ final class WebPlayerView: NSView {
         weak var owner: WebPlayerView?
 
         func userContentController(
-            _ userContentController: WKUserContentController,
+            _: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
             guard message.name == WebPlayerView.scriptMessageName,
@@ -529,6 +684,16 @@ final class WebPlayerView: NSView {
                 return
             }
             switch body {
+            case "spectrum":
+                guard message.frameInfo.isMainFrame,
+                      owner?.currentRequest?.isLocalPackage == true else { return }
+                owner?.wantsSpectrum = true
+                owner?.refreshIntegration()
+            case "media":
+                guard message.frameInfo.isMainFrame,
+                      owner?.currentRequest?.isLocalPackage == true else { return }
+                owner?.wantsMedia = true
+                owner?.refreshIntegration()
             case "ready":
                 owner?.handleEmbedPlayerReady()
             case "error":

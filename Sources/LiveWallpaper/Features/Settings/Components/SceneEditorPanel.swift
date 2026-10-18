@@ -426,6 +426,9 @@ extension SettingsView {
                     if layer.kind == .particles {
                         Image(systemName: "sparkles")
                             .foregroundColor(.secondary)
+                    } else if layer.kind == .text {
+                        Image(systemName: "textformat")
+                            .foregroundColor(.secondary)
                     }
                     Text(layer.name)
                         .lineLimit(1)

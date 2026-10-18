@@ -221,6 +221,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <string>13.0</string>
   <key>LSUIElement</key>
   <true/>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Display track information and artwork from Music and Spotify in your wallpaper.</string>
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>CFBundleURLTypes</key>

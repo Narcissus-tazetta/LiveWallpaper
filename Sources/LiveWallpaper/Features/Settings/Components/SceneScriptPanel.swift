@@ -71,6 +71,7 @@ struct SceneScriptPanel: View {
         let failed = issue != nil
         Text(model.localizedString(
             issue?.isTemporary == true ? "一時停止中(処理が重いため、自動で再開します)"
+                : issue?.isPartial == true ? "一部がエラーで停止(他は実行中)"
                 : failed ? "エラーで停止" : script.canRun ? "実行中" : script.isEnabled ? "未許可" : "停止中"
         ))
             .font(.caption).foregroundColor(failed ? .orange : script.canRun ? .green : .secondary)
@@ -78,6 +79,8 @@ struct SceneScriptPanel: View {
             Toggle(model.localizedString("ループ時刻"), isOn: boolBinding(script, \.usesTime))
             Toggle(model.localizedString("時間帯"), isOn: boolBinding(script, \.usesTimeOfDay))
             Toggle(model.localizedString("カーソル"), isOn: boolBinding(script, \.usesCursor))
+            Toggle(model.localizedString("曲情報"), isOn: boolBinding(script, \.usesMedia))
+                .help(model.localizedString("起動中のアプリから曲名・ジャケット・再生状態を取得します。初回はオートメーションの許可が必要です。"))
         }.toggleStyle(.checkbox)
         Toggle(model.localizedString("全レイヤーを管理（追加したレイヤーも含む）"), isOn: boolBinding(script, \.targetsAllLayers))
             .toggleStyle(.checkbox)

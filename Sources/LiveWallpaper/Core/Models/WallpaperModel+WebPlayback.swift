@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 extension WallpaperModel {
     var activeWebWallpaperSource: WebWallpaperSource? {
+        if let external = activeExternalWallpaper { return external.webSource }
         guard let id = currentWebWallpaperID else {
             return nil
         }
@@ -10,7 +11,8 @@ extension WallpaperModel {
     }
 
     var isWebWallpaperActive: Bool {
-        wallpaperKind == .web && activeWebWallpaperSource != nil
+        if let external = activeExternalWallpaper { return external.webSource != nil }
+        return wallpaperKind == .web && activeWebWallpaperSource != nil
     }
 
     @discardableResult
@@ -51,6 +53,7 @@ extension WallpaperModel {
     }
 
     private func applyWebWallpaperSelection(id: UUID) {
+        stopExternalWallpaper()
         wallpaperKind = .web
         currentWebWallpaperID = id
         webWallpaperLoadState = .loading
@@ -67,6 +70,16 @@ extension WallpaperModel {
     func removeWebWallpaper(id: UUID) {
         guard let index = webWallpaperSources.firstIndex(where: { $0.id == id }) else {
             return
+        }
+        if let folder = webWallpaperSources[index].localFolderPath,
+           LocalWebWallpaperPackage.owns(URL(fileURLWithPath: folder)),
+           FileManager.default.fileExists(atPath: folder) {
+            localWebWallpaperServer.remove(folder: URL(fileURLWithPath: folder))
+            do { try FileManager.default.removeItem(atPath: folder) }
+            catch {
+                webWallpaperErrorMessage = error.localizedDescription
+                return
+            }
         }
         let wasActive = currentWebWallpaperID == id
         webWallpaperSources.remove(at: index)
@@ -111,6 +124,8 @@ extension WallpaperModel {
     }
 
     func stopWebWallpaper() {
+        localWebLoadTask?.cancel()
+        localWebLoadTask = nil
         cancelWebDeepSuspend()
         for view in webPlayerViews {
             view.stopLoading()
@@ -124,17 +139,56 @@ extension WallpaperModel {
             return
         }
 
-        let request = WebWallpaperURLResolver.resolve(
-            originalURL: source.url,
-            audioEnabled: audioEnabled
-        )
+        localWebLoadTask?.cancel()
+        if let folder = source.localFolderPath {
+            localWebLoadTask = Task { [weak self] in
+                guard let self else { return }
+                do {
+                    let url = try await localWebWallpaperServer.url(folder: URL(fileURLWithPath: folder))
+                    try Task.checkCancellation()
+                    guard isWebWallpaperActive, activeWebWallpaperSource?.id == source.id else { return }
+                    applyWebRequest(WebWallpaperPlaybackRequest(
+                        loadContent: .url(url), layoutMode: .generic,
+                        canonicalKey: "local:\(source.id)", isLocalPackage: true
+                    ))
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard !Task.isCancelled, activeWebWallpaperSource?.id == source.id else { return }
+                    webWallpaperLoadState = .failed
+                    webWallpaperErrorMessage = error.localizedDescription
+                    AppLog.externalWallpapers.error("local web load failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        } else {
+            applyWebRequest(WebWallpaperURLResolver.resolve(originalURL: source.url, audioEnabled: audioEnabled))
+        }
+    }
+
+    private func applyWebRequest(_ request: WebWallpaperPlaybackRequest) {
         let reportLoadState: (WebWallpaperLoadState) -> Void = { [weak self] state in
             self?.webWallpaperLoadState = state
         }
         for (index, view) in webPlayerViews.enumerated() {
             view.onLoadStateChanged = index == 0 ? reportLoadState : nil
+            configureLocalWebEnvironment(view)
             view.load(request: request, audioEnabled: audioEnabled)
         }
+    }
+
+    private func configureLocalWebEnvironment(_ view: WebPlayerView) {
+        let fps: Double
+        switch frameRateLimit {
+        case .fps30: fps = 30
+        case .fps60: fps = 60
+        case .off: fps = Double(view.window?.screen?.maximumFramesPerSecond ?? 60)
+        }
+        view.setHostEnvironment(volume: audioVolume, fps: fps, language: appLocale.identifier)
+        configureLocalWebProperties(view)
+    }
+
+    func refreshLocalWebEnvironment() {
+        for view in webPlayerViews { configureLocalWebEnvironment(view) }
     }
 
     func refreshWebWallpaperState() {
@@ -191,7 +245,11 @@ extension WallpaperModel {
             [WebWallpaperSource].self, forKey: PrefsKey.webWallpaperSourcesData
         ) {
             webWallpaperSources = decoded.filter { source in
-                (try? WebWallpaperURLResolver.validateURL(source.url)) != nil
+                if let folder = source.localFolderPath {
+                    return LocalWebWallpaperPackage.owns(URL(fileURLWithPath: folder))
+                        && (try? LocalWebWallpaperPackage.load(folder: URL(fileURLWithPath: folder))) != nil
+                }
+                return (try? WebWallpaperURLResolver.validateURL(source.url)) != nil
             }
         }
 
@@ -238,6 +296,10 @@ extension WallpaperModel {
 
     func clearWebWallpaperState() {
         stopWebWallpaper()
+        let folders = webWallpaperSources.compactMap(\.localFolderPath).map { URL(fileURLWithPath: $0) }
+            .filter { LocalWebWallpaperPackage.owns($0) }
+        for folder in folders { localWebWallpaperServer.remove(folder: folder) }
+        removeLeftovers(of: folders)
         webWallpaperSources.removeAll()
         pruneWebWallpaperIDsFromPlaylists()
         currentWebWallpaperID = nil

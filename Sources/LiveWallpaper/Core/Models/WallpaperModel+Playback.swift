@@ -31,6 +31,7 @@ extension WallpaperModel {
         }
         audioVolume = clampedVolume
         applyAudioSettings()
+        refreshLocalWebEnvironment()
         UserDefaults.standard.set(clampedVolume, forKey: PrefsKey.audioVolume)
     }
 
@@ -40,6 +41,7 @@ extension WallpaperModel {
         }
         frameRateLimit = limit
         UserDefaults.standard.set(limit.rawValue, forKey: PrefsKey.frameRateLimit)
+        refreshLocalWebEnvironment()
         applyDynamicPlaybackProfile()
     }
 

@@ -10,6 +10,7 @@ struct ExternalWallpaper: Identifiable, Equatable {
     let name: String
     /// The video the desktop plays. For a scene it is where LiveWallpaper bakes it,
     /// and exists only once the scene is ready (WallpaperModel+ExternalWallpapers).
+    /// Web items leave this empty because they have no video player.
     let path: String
     /// An image to show in lists; nil when the provider gave none or it is missing.
     var thumbnailPath: String?
@@ -17,6 +18,7 @@ struct ExternalWallpaper: Identifiable, Equatable {
     var sceneFolderPath: String?
     /// When the provider last wrote scene.json, so a rewritten scene is baked again.
     var sceneRevision: Date?
+    var webSource: WebWallpaperSource?
 
     var isScene: Bool {
         sceneFolderPath != nil
@@ -30,16 +32,19 @@ struct ExternalWallpaper: Identifiable, Equatable {
 ///     { "processIdentifier": 123, "name": "My Provider",
 ///       "wallpapers": [{ "id": "a", "name": "Rain", "path": "/abs/path/video.mp4",
 ///                        "thumbnail": "/abs/path/preview.jpg" },
-///                      { "id": "b", "name": "Snow", "scene": "/abs/path/snow.scene" }] }
+///                      { "id": "b", "name": "Snow", "scene": "/abs/path/snow.scene" },
+///                      { "id": "c", "name": "Clock", "web": "/abs/path/clock.web" }] }
 ///
-/// Each item has either `path` (a video) or `scene` (a folder in LiveWallpaper's scene
-/// format: scene.json and the images it names). `thumbnail` is optional.
+/// Exactly one payload is required. Web packages contain web-wallpaper.json with
+/// entryPoint, warnings and an optional preview. Modules and fetch need an HTTP
+/// origin, so LiveWallpaper serves these folders through its loopback server.
 struct ExternalWallpaperManifest: Decodable {
     struct Item: Decodable {
         let id: String
         let name: String
         let path: String?
         let scene: String?
+        let web: String?
         let thumbnail: String?
     }
 
@@ -137,11 +142,11 @@ final class ExternalWallpaperProviderMonitor {
             for item in manifest.wallpapers {
                 let id = "\(file.lastPathComponent)/\(item.id)"
                 let thumbnail = item.thumbnail.flatMap { Self.isRegularFile($0) ? $0 : nil }
-                if let path = item.path, item.scene == nil, Self.isRegularFile(path) {
+                if let path = item.path, item.scene == nil, item.web == nil, Self.isRegularFile(path) {
                     wallpapers.append(ExternalWallpaper(
                         id: id, providerName: manifest.name, name: item.name, path: path, thumbnailPath: thumbnail
                     ))
-                } else if let scene = item.scene, item.path == nil,
+                } else if let scene = item.scene, item.path == nil, item.web == nil,
                           let revision = Self.sceneRevision(folder: scene)
                 {
                     wallpapers.append(ExternalWallpaper(
@@ -149,9 +154,28 @@ final class ExternalWallpaperProviderMonitor {
                         path: Self.bakedScenePath(forID: id), thumbnailPath: thumbnail,
                         sceneFolderPath: scene, sceneRevision: revision
                     ))
+                } else if let web = item.web, item.path == nil, item.scene == nil {
+                    do {
+                        let folder = URL(fileURLWithPath: web, isDirectory: true)
+                        let package = try LocalWebWallpaperPackage.load(folder: folder)
+                        let hash = SHA256.hash(data: Data(id.utf8)).map { String(format: "%02x", $0) }.joined()
+                        let text = "\(hash.prefix(8))-\(hash.dropFirst(8).prefix(4))-\(hash.dropFirst(12).prefix(4))-\(hash.dropFirst(16).prefix(4))-\(hash.dropFirst(20).prefix(12))"
+                        var source = WebWallpaperSource(
+                            id: UUID(uuidString: text)!, url: folder.appendingPathComponent(package.entryPoint),
+                            displayName: item.name, localFolderPath: folder.path, warnings: package.warnings,
+                            thumbnailPath: package.preview.map { folder.appendingPathComponent($0).path }
+                        )
+                        source.addedAt = Date(timeIntervalSince1970: 0)
+                        wallpapers.append(ExternalWallpaper(
+                            id: id, providerName: manifest.name, name: item.name, path: "",
+                            thumbnailPath: thumbnail ?? source.thumbnailPath, webSource: source
+                        ))
+                    } catch {
+                        AppLog.externalWallpapers.error("invalid web package of \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                    }
                 } else {
                     AppLog.externalWallpapers.error(
-                        "skipped item \(item.id, privacy: .public) of \(file.lastPathComponent, privacy: .public): needs one existing path or scene"
+                        "skipped item \(item.id, privacy: .public) of \(file.lastPathComponent, privacy: .public): needs one existing path, scene or web package"
                     )
                 }
             }
@@ -187,11 +211,33 @@ final class ExternalWallpaperProviderMonitor {
             .appendingPathComponent("LiveWallpaper/ExternalScenes", isDirectory: true)
     }
 
+    struct BakedSceneMeta: Codable, Equatable {
+        var sceneRevision: Date
+        var appSignature: String
+    }
+
+    nonisolated static var currentAppSignature: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+        let execDate: String
+        if let execURL = Bundle.main.executableURL,
+           let mtime = (try? FileManager.default.attributesOfItem(atPath: execURL.path)[.modificationDate] as? Date) {
+            execDate = String(mtime.timeIntervalSince1970)
+        } else {
+            execDate = ""
+        }
+        return "\(version)-\(build)-\(execDate)"
+    }
+
     /// One folder per item, named by a hash: item IDs are the provider's strings.
     nonisolated static func bakedScenePath(forID id: String) -> String {
         let digest = SHA256.hash(data: Data(id.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
         return bakedScenesDirectoryURL.appendingPathComponent(digest, isDirectory: true)
             .appendingPathComponent("wallpaper.mp4").path
+    }
+
+    nonisolated static func bakedSceneMetaURL(forID id: String) -> URL {
+        URL(fileURLWithPath: bakedScenePath(forID: id)).deletingLastPathComponent().appendingPathComponent("bake_meta.json")
     }
 
     private static func sceneRevision(folder: String) -> Date? {

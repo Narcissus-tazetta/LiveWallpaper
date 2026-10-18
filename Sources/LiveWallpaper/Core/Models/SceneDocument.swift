@@ -78,11 +78,13 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     /// Bends the part of the picture beside an axis back and forth, like a flag on
     /// a pole (SceneEffect.AxisSwingKey).
     case axisSwing
+    case opacityMask
+    case shader
 
     /// Runs on seconds rather than whole repeats per loop: drawn live it keeps its
     /// own speed, and only a baked video rounds the speed to fit the loop.
     var runsOnRealTime: Bool {
-        [.travelingWaves, .flowShake, .flowMap, .normalRipples, .noiseDrift, .noiseSway, .pulseBlend, .uvScroll, .axisSwing]
+        [.travelingWaves, .flowShake, .flowMap, .normalRipples, .noiseDrift, .noiseSway, .pulseBlend, .uvScroll, .axisSwing, .shader]
             .contains(self)
     }
 
@@ -97,7 +99,7 @@ enum SceneEffectKind: String, Codable, CaseIterable {
 
     /// Its speed is a whole number of repeats per loop (`cycles`).
     var usesCycles: Bool {
-        !runsOnRealTime
+        !runsOnRealTime && self != .opacityMask
     }
 
     /// Can hold one side still and move more toward the other (hair, leaves, cloth).
@@ -108,7 +110,7 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     /// Moves the picture, so moving a painted area of it as its own layer lets its
     /// outline move instead of only what is inside.
     var canMoveOnItsOwnLayer: Bool {
-        self != .pulse
+        ![.pulse, .opacityMask, .shader].contains(self)
     }
 
     /// Uses `scale`: wavelength, noise size or radius depending on the effect.
@@ -117,7 +119,7 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     }
 
     var usesStrength: Bool {
-        ![.scroll, .spin, .puppet].contains(self) && !runsOnRealTime
+        ![.scroll, .spin, .puppet, .opacityMask].contains(self) && !runsOnRealTime
     }
 }
 
@@ -203,6 +205,7 @@ struct SceneEffect: Codable, Equatable, Identifiable {
 
     var id = UUID()
     var kind: SceneEffectKind
+    var renderGraph: SceneRenderGraph?
     var isEnabled = true
     var cycles = 1
     /// 0...1
@@ -252,6 +255,7 @@ struct SceneEffect: Codable, Equatable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         kind = try container.decode(SceneEffectKind.self, forKey: .kind)
+        renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
         let defaults = SceneEffect(kind: kind)
         isEnabled = (try? container.decode(Bool.self, forKey: .isEnabled)) ?? defaults.isEnabled
         cycles = (try? container.decode(Int.self, forKey: .cycles)) ?? defaults.cycles
@@ -482,6 +486,8 @@ extension SceneEffect {
         case .uvScroll:
             typealias Key = ScrollKey
             return [Key.speedX: 0.2, Key.speedY: 0.2, Key.repeatX: 1, Key.repeatY: 1]
+        case .opacityMask:
+            return ["alpha": 1]
         case .axisSwing:
             typealias Key = AxisSwingKey
             return [
@@ -503,6 +509,7 @@ struct SceneTransform: Codable, Equatable {
     var offsetX: Double = 0
     var offsetY: Double = 0
     var scale: Double = 1
+    var scaleY: Double?
     /// Degrees, clockwise.
     var rotation: Double = 0
 
@@ -515,6 +522,7 @@ struct SceneTransform: Codable, Equatable {
         offsetX = (try? container.decode(Double.self, forKey: .offsetX)) ?? 0
         offsetY = (try? container.decode(Double.self, forKey: .offsetY)) ?? 0
         scale = (try? container.decode(Double.self, forKey: .scale)) ?? 1
+        scaleY = try? container.decodeIfPresent(Double.self, forKey: .scaleY)
         rotation = (try? container.decode(Double.self, forKey: .rotation)) ?? 0
     }
 
@@ -524,6 +532,10 @@ struct SceneTransform: Codable, Equatable {
         result.offsetY = offsetY + (other.offsetY - offsetY) * t
         // Scale is interpolated in log space so a zoom feels even.
         result.scale = exp(log(max(scale, 0.01)) + (log(max(other.scale, 0.01)) - log(max(scale, 0.01))) * t)
+        if scaleY != nil || other.scaleY != nil {
+            let sy0 = scaleY ?? scale, sy1 = other.scaleY ?? other.scale
+            result.scaleY = exp(log(max(sy0, 0.01)) + (log(max(sy1, 0.01)) - log(max(sy0, 0.01))) * t)
+        }
         result.rotation = rotation + (other.rotation - rotation) * t
         return result
     }
@@ -557,6 +569,7 @@ struct SceneKeyframe: Codable, Equatable, Identifiable {
 enum SceneLayerKind: String, Codable {
     case image
     case particles
+    case text
 }
 
 enum SceneParticlePreset: String, Codable, CaseIterable {
@@ -663,19 +676,25 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var id = UUID()
     var name: String
     var kind: SceneLayerKind = .image
-    /// File name inside the scene folder; empty for particle layers.
+    /// File name inside the scene folder; empty for particle and text layers.
     var imageFile: String
+    /// Reads the canvas below as its input instead of an image file.
+    var capturesCanvas = false
     var isVisible = true
     /// Editor only: keeps the layer from being picked, moved or changed.
     var isLocked = false
     var opacity: Double = 1
+    var tint = RGBAColor(red: 1, green: 1, blue: 1, alpha: 1)
     var blendMode: SceneBlendMode = .normal
     /// 0 keeps the layer still; 1 moves it the most with the cursor.
     var parallaxDepth: Double = 0
     var cursorMask: SceneCursorMask?
     /// Applied in order, before the layer is composited.
     var effects: [SceneEffect] = []
+    var renderGraph: SceneRenderGraph?
+    var placement: SceneLayerPlacement?
     var particles: SceneParticles?
+    var text: SceneText?
     /// Grayscale depth map (white = near) in the scene folder; shifts each pixel by
     /// its depth for a 3D look.
     var depthFile: String?
@@ -703,13 +722,24 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         blendMode = particles.preset.isAdditive ? .add : .normal
     }
 
+    init(name: String, text: SceneText) {
+        self.name = name
+        kind = .text
+        imageFile = ""
+        self.text = text
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         kind = (try? container.decode(SceneLayerKind.self, forKey: .kind)) ?? .image
         imageFile = (try? container.decode(String.self, forKey: .imageFile)) ?? ""
+        capturesCanvas = (try? container.decode(Bool.self, forKey: .capturesCanvas)) ?? false
         particles = try? container.decodeIfPresent(SceneParticles.self, forKey: .particles)
+        text = try container.decodeIfPresent(SceneText.self, forKey: .text)
+        renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
+        placement = try container.decodeIfPresent(SceneLayerPlacement.self, forKey: .placement)
         depthFile = try? container.decodeIfPresent(String.self, forKey: .depthFile)
         depthStrength = (try? container.decode(Double.self, forKey: .depthStrength)) ?? 0.5
         depthFollowsCursor = (try? container.decode(Bool.self, forKey: .depthFollowsCursor)) ?? true
@@ -720,6 +750,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         isVisible = (try? container.decode(Bool.self, forKey: .isVisible)) ?? true
         isLocked = (try? container.decode(Bool.self, forKey: .isLocked)) ?? false
         opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
+        tint = (try? container.decode(RGBAColor.self, forKey: .tint)) ?? RGBAColor(red: 1, green: 1, blue: 1, alpha: 1)
         blendMode = (try? container.decode(SceneBlendMode.self, forKey: .blendMode)) ?? .normal
         parallaxDepth = (try? container.decode(Double.self, forKey: .parallaxDepth)) ?? 0
         cursorMask = try? container.decodeIfPresent(SceneCursorMask.self, forKey: .cursorMask)
@@ -803,7 +834,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
 
     var usesCursor: Bool {
         isVisible && (parallaxDepth > 0 || cursorMask != nil || (particles.map { $0.cursorMode != .none } ?? false)
-            || (hasDepth && depthFollowsCursor))
+            || (hasDepth && depthFollowsCursor) || renderGraph?.uses(.cursor) == true)
     }
 
     /// Particles move on their own; an image layer through its effects or the
@@ -811,6 +842,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var isAnimated: Bool {
         !activeEffects.isEmpty || (isVisible && kind == .particles && particles != nil)
             || (isVisible && hasDepth && depthAutoMotion > 0) || (isVisible && isKeyframed)
+            || (isVisible && (renderGraph != nil || placement != nil))
     }
 }
 
@@ -831,6 +863,7 @@ struct SceneDocument: Codable, Equatable {
     /// Applied in order after placement and keyframes (SceneLink).
     var links: [SceneLink] = []
     var scripts: [SceneScript] = []
+    var rigs: [UUID: SceneSkeleton] = [:]
     /// Drawn live on real time on the desktop rather than as the baked loop, so its
     /// real-time effects keep their exact speed. Set by scenes that use them.
     var runsInRealTime = false
@@ -846,6 +879,7 @@ struct SceneDocument: Codable, Equatable {
         canvasWidth = try container.decode(Int.self, forKey: .canvasWidth)
         canvasHeight = try container.decode(Int.self, forKey: .canvasHeight)
         layers = try container.decode([SceneLayer].self, forKey: .layers)
+        rigs = try container.decodeIfPresent([UUID: SceneSkeleton].self, forKey: .rigs) ?? [:]
         // Packages come from anyone, and the baker writes loopSeconds × 60 frames.
         let decodedLoop = (try? container.decode(Int.self, forKey: .loopSeconds)) ?? 20
         loopSeconds = min(max(decodedLoop, 1), Self.loopSecondsChoices.max()!)
@@ -879,7 +913,7 @@ struct SceneDocument: Codable, Equatable {
 
     var requiresRealTimePlayback: Bool {
         runsInRealTime || layers.contains { layer in
-            layer.activeEffects.contains { $0.kind.runsOnRealTime }
+            layer.activeEffects.contains { $0.kind.runsOnRealTime } || (layer.isVisible && (layer.renderGraph != nil || layer.placement != nil))
         }
     }
 

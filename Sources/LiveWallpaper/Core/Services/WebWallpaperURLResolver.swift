@@ -32,17 +32,20 @@ struct WebWallpaperPlaybackRequest: Equatable {
     let layoutMode: WebWallpaperLayoutMode
     let canonicalKey: String
     let awaitsEmbedPlayerReady: Bool
+    var isLocalPackage: Bool = false
 
     init(
         loadContent: WebWallpaperLoadContent,
         layoutMode: WebWallpaperLayoutMode,
         canonicalKey: String,
-        awaitsEmbedPlayerReady: Bool = false
+        awaitsEmbedPlayerReady: Bool = false,
+        isLocalPackage: Bool = false
     ) {
         self.loadContent = loadContent
         self.layoutMode = layoutMode
         self.canonicalKey = canonicalKey
         self.awaitsEmbedPlayerReady = awaitsEmbedPlayerReady
+        self.isLocalPackage = isLocalPackage
     }
 }
 

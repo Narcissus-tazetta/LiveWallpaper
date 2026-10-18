@@ -5,7 +5,13 @@ enum SceneScriptPermissions {
     private static let key = "sceneScriptPermissions.v1"
 
     static func fingerprint(_ script: SceneScript, path: String) -> String {
-        let source = "\(URL(fileURLWithPath: path).standardizedFileURL.path)\n\(script.version)\n\(script.source)"
+        var source = "\(URL(fileURLWithPath: path).standardizedFileURL.path)\n\(script.version)\n\(script.source)"
+        if let modules = script.modules {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let bundle = try! encoder.encode(modules)
+            source = "module-script-v1\n\(source.utf8.count):\(source)" + String(decoding: bundle, as: UTF8.self)
+        }
         return SHA256.hash(data: Data(source.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 

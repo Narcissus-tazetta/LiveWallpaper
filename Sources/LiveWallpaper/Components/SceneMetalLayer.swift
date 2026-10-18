@@ -55,6 +55,25 @@ final class SceneMetalLayer: CAMetalLayer {
     private var scriptGeneration = UUID()
     private var frozenScriptInput: SceneFrameInput?
     private var stoppedScriptIDs: Set<UUID> = []
+    /// Waiting for the next script run, which sees each one once.
+    private var pendingPointerPresses: [ScenePointerPress] = []
+    /// What is playing, while a script reads it.
+    private var media: SceneMediaState? {
+        didSet {
+            guard media != oldValue else { return }
+            current.media = media
+            target.media = media
+            redraw()
+        }
+    }
+    private let mediaSubscriptionID = UUID()
+    private var isSubscribedToMedia = false
+    private struct Artwork {
+        var source: String
+        var id: String
+        var palette: SceneMediaPalette?
+    }
+    private var artwork: Artwork?
     var scriptIssueHandler: (([SceneScriptIssue]) -> Void)?
     var scriptLogHandler: (([UUID: String]) -> Void)?
 
@@ -163,6 +182,9 @@ final class SceneMetalLayer: CAMetalLayer {
             current.viewport = viewport
             target.viewport = viewport
         }
+        current.media = media
+        target.media = media
+        updateMediaSubscription()
         readClock()
         // SwiftUI may still be attaching or resizing the backing layer here.
         // Draw during the ensuing CA display transaction, after its surface settles.
@@ -180,6 +202,45 @@ final class SceneMetalLayer: CAMetalLayer {
         videoPath = nil
         target = .rest
         current = .rest
+        updateMediaSubscription()
+    }
+
+    private func updateMediaSubscription() {
+        let wanted = renderer?.document.scripts.contains { $0.canRun && $0.usesMedia } == true
+        guard wanted != isSubscribedToMedia else { return }
+        isSubscribedToMedia = wanted
+        if !wanted { media = nil }
+        MainActor.assumeIsolated {
+            LocalWebIntegration.shared.update(id: mediaSubscriptionID, subscription: wanted ? .init(
+                spectrum: false, media: true, receiveSpectrum: { _ in },
+                receiveMedia: { [weak self] value, enabled in self?.receiveMedia(value, isAvailable: enabled) }
+            ) : nil)
+        }
+    }
+
+    private func receiveMedia(_ value: WebNowPlaying, isAvailable: Bool) {
+        guard isSubscribedToMedia else { return }
+        guard isAvailable else {
+            media = SceneMediaState(isAvailable: false)
+            return
+        }
+        if artwork?.source != value.artwork {
+            var decoded: SceneMediaPalette?
+            if let comma = value.artwork.firstIndex(of: ","), value.artwork.hasPrefix("data:image/"),
+               let data = Data(base64Encoded: String(value.artwork[value.artwork.index(after: comma)...])) {
+                do { decoded = try SceneMediaPalette(imageData: data) } catch {
+                    AppLog.windowRefresh.error("media artwork colours failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+            artwork = Artwork(source: value.artwork, id: value.artwork.isEmpty ? "" : "\(value.artwork.utf8.count):\(value.artwork.hashValue)",
+                              palette: decoded)
+        }
+        media = SceneMediaState(
+            isAvailable: true, playback: SceneMediaState.Playback(rawValue: value.state) ?? .stopped,
+            title: value.title, artist: value.artist, album: value.album, position: value.position,
+            duration: value.duration,
+            artworkID: artwork?.id ?? "", palette: artwork?.palette
+        )
     }
 
     func suspend() {
@@ -229,6 +290,16 @@ final class SceneMetalLayer: CAMetalLayer {
             return
         }
         applyCursor(uv: cursor.flatMap(canvasUV(of:)), parallax: SIMD2(Float(parallax.x), Float(-parallax.y)))
+    }
+
+    /// A press or release of the primary button on the desktop, at `point` in this
+    /// layer's coordinates (origin bottom-left).
+    func addPointerPress(at point: CGPoint, isDown: Bool) {
+        guard simulatedCursor == nil, let position = canvasUV(of: point),
+              renderer?.document.scripts.contains(where: { $0.canRun && $0.usesCursor }) == true else { return }
+        // A script run that never comes (a stopped script) must not grow this forever.
+        pendingPointerPresses = Array((pendingPointerPresses + [.init(isDown: isDown, position: position)]).suffix(32))
+        redraw()
     }
 
     /// `parallax` is -1...1 with +y down.
@@ -283,7 +354,11 @@ final class SceneMetalLayer: CAMetalLayer {
             isEvaluatingScript = true
             let generation = scriptGeneration
             let document = renderer.document
-            let input = frozenScriptInput ?? current
+            var input = frozenScriptInput ?? current
+            if frozenScriptInput == nil {
+                input.pointerPresses = pendingPointerPresses
+                pendingPointerPresses = []
+            }
             let requestedTimeOfDay = timeOfDay
             scriptWorker.evaluate(document, input: input, timeOfDay: requestedTimeOfDay) { [weak self] result in
                 guard let self else { return }

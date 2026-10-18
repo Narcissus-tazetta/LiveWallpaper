@@ -68,6 +68,17 @@ extension SettingsView {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
 
+            if let warnings = wallpaper.webSource?.warnings, !warnings.isEmpty {
+                Label(model.localizedString("未対応"), systemImage: "exclamationmark.circle")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .help(warnings.joined(separator: "\n"))
+                    .accessibilityLabel(warnings.joined(separator: "\n"))
+            }
+            if let source = wallpaper.webSource {
+                Button(model.localizedString("作品の設定")) { localWebSettingsSource = source }
+                    .controlSize(.small)
+            }
             if !model.isExternalWallpaperReady(wallpaper) {
                 externalScenePreparationStatus(wallpaper)
             } else if model.libraryPath(forExternalWallpaperID: wallpaper.id) != nil {
@@ -111,7 +122,7 @@ struct ExternalWallpaperThumbnail: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                Image(systemName: "film.stack")
+                Image(systemName: wallpaper.webSource == nil ? "film.stack" : "globe")
                     .font(.system(size: 22))
                     .foregroundColor(.secondary)
             }
@@ -126,7 +137,7 @@ struct ExternalWallpaperThumbnail: View {
     private static func load(_ wallpaper: ExternalWallpaper) async -> CGImage? {
         if let path = wallpaper.thumbnailPath,
            let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
-           let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+           let image = CGImageSourceCreateThumbnailAtIndex(source, CGImageSourceGetCount(source) / 2, [
                kCGImageSourceCreateThumbnailFromImageAlways: true,
                kCGImageSourceCreateThumbnailWithTransform: true,
                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
@@ -134,6 +145,7 @@ struct ExternalWallpaperThumbnail: View {
         {
             return image
         }
+        if wallpaper.webSource != nil { return nil }
         let generator =
             AVAssetImageGenerator(asset: AVURLAsset(url: URL(fileURLWithPath: wallpaper.path)))
         generator.appliesPreferredTrackTransform = true

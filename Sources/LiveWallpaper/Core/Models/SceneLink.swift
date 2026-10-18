@@ -34,6 +34,7 @@ struct SceneLinkValues: Codable, Equatable {
     /// Degrees, clockwise.
     var rotation: Double = 0
     var scale: Double = 1
+    var scaleY: Double?
     /// Multiplies the layer's opacity.
     var opacity: Double = 1
     /// -1...1: -1 is black, 1 doubles.
@@ -53,6 +54,7 @@ struct SceneLinkValues: Codable, Equatable {
         offsetY = (try? container.decode(Double.self, forKey: .offsetY)) ?? 0
         rotation = (try? container.decode(Double.self, forKey: .rotation)) ?? 0
         scale = (try? container.decode(Double.self, forKey: .scale)) ?? 1
+        scaleY = try? container.decodeIfPresent(Double.self, forKey: .scaleY)
         opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
         brightness = (try? container.decode(Double.self, forKey: .brightness)) ?? 0
         saturation = (try? container.decode(Double.self, forKey: .saturation)) ?? 1
@@ -71,6 +73,7 @@ struct SceneLinkValues: Codable, Equatable {
         result.rotation = rotation * t
         // Log space, so a zoom feels even, as in keyframes.
         result.scale = exp(log(max(scale, 0.01)) * t)
+        if let scaleY { result.scaleY = exp(log(max(scaleY, 0.01)) * t) }
         result.opacity = 1 + (opacity - 1) * t
         result.brightness = brightness * t
         result.saturation = 1 + (saturation - 1) * t
@@ -84,6 +87,9 @@ struct SceneLinkValues: Codable, Equatable {
         result.offsetY += other.offsetY
         result.rotation += other.rotation
         result.scale *= other.scale
+        if scaleY != nil || other.scaleY != nil {
+            result.scaleY = (scaleY ?? scale) * (other.scaleY ?? other.scale)
+        }
         result.opacity *= other.opacity
         result.brightness += other.brightness
         result.saturation *= other.saturation

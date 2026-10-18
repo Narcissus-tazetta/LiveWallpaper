@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ImageIO
 
 @MainActor
 final class WebWallpaperThumbnailStore: ObservableObject {
@@ -19,6 +20,20 @@ final class WebWallpaperThumbnailStore: ObservableObject {
         guard !inFlight.contains(source.id), !attempted.contains(source.id) else {
             return
         }
+
+        if let path = source.thumbnailPath {
+            if let imageSource = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
+               let image = CGImageSourceCreateThumbnailAtIndex(imageSource, CGImageSourceGetCount(imageSource) / 2, [
+                   kCGImageSourceCreateThumbnailFromImageAlways: true,
+                   kCGImageSourceCreateThumbnailWithTransform: true,
+                   kCGImageSourceThumbnailMaxPixelSize: 480
+               ] as CFDictionary) {
+                imagesBySourceID[source.id] = NSImage(cgImage: image, size: .zero)
+            }
+            attempted.insert(source.id)
+            return
+        }
+        if source.localFolderPath != nil { attempted.insert(source.id); return }
 
         if let directURL = WebWallpaperThumbnailProvider.directThumbnailURL(for: source.url) {
             fetchImage(from: directURL, sourceID: source.id)

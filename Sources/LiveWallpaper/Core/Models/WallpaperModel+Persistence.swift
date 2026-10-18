@@ -380,6 +380,8 @@ extension WallpaperModel {
         UserDefaults.standard.set(enabled, forKey: PrefsKey.webWallpaperFeatureEnabled)
         syncActivePlaylistPaths()
 
+        if !enabled, activeExternalWallpaper?.webSource != nil { stopExternalWallpaper() }
+
         // 機能を隠すとWeb壁紙を切り替える手段がなくなるため、表示中なら動画へ戻す。
         // 戻せる動画が1本もない場合だけ再生を維持する。
         if !enabled, isWebWallpaperActive {

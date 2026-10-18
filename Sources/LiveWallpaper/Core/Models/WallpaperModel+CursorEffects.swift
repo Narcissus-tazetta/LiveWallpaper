@@ -266,6 +266,7 @@ extension WallpaperModel {
         updateCursorEffectsObservers()
         let targets = cursorEffectTargets()
         updateClickMonitor(targets: targets)
+        updateScenePressMonitor(targets: targets)
         let motion = cursorMotionAllowed
         let spotlight = spotlightAllowed
         let needsTracking = targets.contains { target in
@@ -391,13 +392,48 @@ extension WallpaperModel {
         }
     }
 
-    private func handleClick(at location: CGPoint) {
-        guard let primaryHeight = NSScreen.screens.first?.frame.height else {
-            return
+    /// Scene scripts that follow the pointer also see presses on the desktop. They
+    /// follow the same rule as the cursor masks (spotlightAllowed).
+    private func updateScenePressMonitor(targets: [CursorEffectTarget]) {
+        let active = spotlightAllowed && targets.contains {
+            !coveredDisplayIDs.contains($0.displayID) && $0.view.sceneScriptsUsePointer
         }
-        let topLeftPoint = CGPoint(x: location.x, y: primaryHeight - location.y)
-        let isDesktop = DesktopClickDetector.isDesktopClick(
-            at: topLeftPoint,
+        if active, scenePressMonitor == nil {
+            scenePressMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { [weak self] event in
+                let isDown = event.type == .leftMouseDown
+                MainActor.assumeIsolated {
+                    self?.handleScenePress(at: NSEvent.mouseLocation, isDown: isDown)
+                }
+            }
+        } else if !active, let monitor = scenePressMonitor {
+            NSEvent.removeMonitor(monitor)
+            scenePressMonitor = nil
+            scenePressIsDown = false
+        }
+    }
+
+    private func handleScenePress(at location: CGPoint, isDown: Bool) {
+        if isDown {
+            scenePressIsDown = isDesktopClick(at: location)
+            guard scenePressIsDown else { return }
+        } else {
+            guard scenePressIsDown else { return }
+            scenePressIsDown = false
+        }
+        for target in cursorEffectTargets() where !coveredDisplayIDs.contains(target.displayID) {
+            guard let frame = target.view.window?.frame, frame.contains(location) else {
+                continue
+            }
+            target.view.addScenePointerPress(CGPoint(x: location.x - frame.minX, y: location.y - frame.minY), isDown: isDown)
+        }
+    }
+
+    private func isDesktopClick(at location: CGPoint) -> Bool {
+        guard let primaryHeight = NSScreen.screens.first?.frame.height else {
+            return false
+        }
+        return DesktopClickDetector.isDesktopClick(
+            at: CGPoint(x: location.x, y: primaryHeight - location.y),
             windows: Self.onScreenWindows(),
             finderPID: NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
                 .first?.processIdentifier,
@@ -405,7 +441,10 @@ extension WallpaperModel {
                 .first?.processIdentifier,
             ownPID: ProcessInfo.processInfo.processIdentifier
         )
-        guard isDesktop else {
+    }
+
+    private func handleClick(at location: CGPoint) {
+        guard isDesktopClick(at: location) else {
             return
         }
         for target in cursorEffectTargets() where target.settings.clickEnabled {
