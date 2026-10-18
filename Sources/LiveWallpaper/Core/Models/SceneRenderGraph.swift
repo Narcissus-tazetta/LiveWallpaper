@@ -92,18 +92,18 @@ struct SceneRenderGraph: Codable, Equatable {
     }
 }
 
-/// The system audio's loudness per frequency band, low to high, each 0...1.
+/// The system audio's loudness per frequency band, low to high, normally 0...1.
 struct SceneAudioSpectrum: Equatable {
     static let bandCount = 64
     var left: [Float]
     var right: [Float]
 
-    /// `count` bands (a divisor of 64), each the mean of the bands it covers.
+    /// `count` bands (a divisor of 64), each the loudest of the bands it covers.
     func bands(_ count: Int, right isRight: Bool) -> [Float] {
         let source = isRight ? right : left
         let group = Self.bandCount / count
         return (0 ..< count).map { band in
-            source[band * group ..< (band + 1) * group].reduce(0, +) / Float(group)
+            source[band * group ..< (band + 1) * group].max()!
         }
     }
 }

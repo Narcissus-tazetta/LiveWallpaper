@@ -190,7 +190,7 @@ final class SceneRenderGraphTests: XCTestCase {
         left[60 ..< 64] = [1, 1, 1, 1]
         let loud = try render(renderer, device: device, input: input(device),
                               audio: SceneAudioSpectrum(left: left, right: Array(repeating: 0, count: 64)))
-        XCTAssertEqual(Array(loud[0 ..< 3]), [51, 128, 255])
+        XCTAssertEqual(Array(loud[0 ..< 3]), [51, 255, 255])
         let silent = try render(renderer, device: device, input: input(device))
         XCTAssertEqual(Array(silent[0 ..< 3]), [0, 0, 0])
     }

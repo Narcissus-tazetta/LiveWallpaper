@@ -17,6 +17,7 @@ final class WebAudioSpectrum {
     private var outputReal = [Float](repeating: 0, count: count)
     private var outputImaginary = [Float](repeating: 0, count: count)
     private var windowSum: Float = 0
+    private var loudness = SpectrumLoudness()
 
     init() {
         vDSP_hann_window(&window, vDSP_Length(Self.count), Int32(vDSP_HANN_NORM))
@@ -40,8 +41,12 @@ final class WebAudioSpectrum {
         filled = min(Self.count, filled + frames)
         sinceLastOutput += frames
         guard filled == Self.count, sinceLastOutput >= Int(sampleRate / 30) else { return nil }
+        let elapsed = Float(Double(sinceLastOutput) / sampleRate)
         sinceLastOutput %= Int(sampleRate / 30)
-        return bands(left, sampleRate: sampleRate) + bands(right, sampleRate: sampleRate)
+        return loudness.process(
+            bands(left, sampleRate: sampleRate) + bands(right, sampleRate: sampleRate),
+            elapsed: elapsed
+        )
     }
 
     private func bands(_ samples: [Float], sampleRate: Double) -> [Float] {
@@ -69,9 +74,61 @@ final class WebAudioSpectrum {
                 energy += outputReal[bin] * outputReal[bin] + outputImaginary[bin] *
                     outputImaginary[bin]
             }
-            result[band] = min(1, sqrt(energy) * normalization)
+            result[band] = sqrt(energy) * normalization
         }
         return result
+    }
+}
+
+/// Wallpaper Engine's per-group auto gain and smoothing, read from its executable.
+/// Each channel's 64 bands are split into groups of 8; every group is divided by its own
+/// slowly tracked peak, so a quiet passage still moves the bars. Output is not clamped
+/// to 1: the original leaves that to the shader.
+struct SpectrumLoudness {
+    static let groupSize = 8
+    private static let floor: Float = 0.001
+    private static let silence: Float = 0.0001
+    private var peaks = [Float](repeating: 0, count: 16)
+    private var smoothed = [Float](repeating: 0, count: 128)
+    private var output = [Float](repeating: 0, count: 128)
+
+    /// `raw` is 64 left bands then 64 right bands; `elapsed` is the time since the last call.
+    mutating func process(_ raw: [Float], elapsed: Float) -> [Float] {
+        let dt = min(elapsed, 1)
+        var groupMax = (0 ..< 16).map { raw[$0 * Self.groupSize ..< ($0 + 1) * Self.groupSize].max()! }
+        let loudest = groupMax.max()!
+        let isSilent = loudest < Self.silence
+        // Without this floor a group with no energy would be amplified to full height by
+        // its own tiny peak.
+        for group in 0 ..< 16 { groupMax[group] = max(groupMax[group], loudest * 0.333) }
+
+        if peaks[0] <= Self.silence, !isSilent {
+            peaks = [Float](repeating: 1, count: 16)
+        }
+        for group in 0 ..< 16 {
+            let difference = groupMax[group] - peaks[group]
+            if abs(difference) <= Self.silence {
+                peaks[group] = groupMax[group]
+            } else {
+                // Rises by at most 1 per second and falls by at most 0.5 per second.
+                peaks[group] += min(abs(difference), dt) * (difference > 0 ? 1 : -0.5)
+            }
+        }
+
+        guard !isSilent else {
+            output = [Float](repeating: 0, count: 128)
+            return output
+        }
+        let blend = min(1, dt * 20)
+        let rise = dt * 40
+        let fall = max(-1, dt * -40)
+        for index in 0 ..< 128 {
+            let target = raw[index] / max(peaks[index / Self.groupSize], Self.floor)
+            smoothed[index] += (target - smoothed[index]) * blend
+            let change = smoothed[index] - output[index]
+            output[index] += change > 0 ? min(change, rise) : max(change, fall)
+        }
+        return output
     }
 }
 
