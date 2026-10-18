@@ -28,6 +28,9 @@ final class SceneScriptRuntime {
         guard SceneScript.supports(version: script.version) else {
             throw SceneScriptIssue(scriptID: script.id, name: script.name, message: "Unsupported script API version: \(script.version)")
         }
+        // Cached programs have already passed bundle validation; rescanning large
+        // module sources on every frame costs more than running their JavaScript.
+        if programs[script.id]?.script == script { return }
         guard !script.source.contains("\0") else {
             throw SceneScriptIssue(scriptID: script.id, name: script.name, message: "Script source cannot contain NUL")
         }
@@ -36,7 +39,6 @@ final class SceneScriptRuntime {
               (script.modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 1048576,
               script.modules?.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }) != false
         else { throw issue("Script bundle exceeds supported limits", script: script) }
-        if programs[script.id]?.script == script { return }
         if let old = programs.removeValue(forKey: script.id) { lwjs_destroy(old.pointer) }
         var error: UnsafeMutablePointer<CChar>?
         let pointer: OpaquePointer?

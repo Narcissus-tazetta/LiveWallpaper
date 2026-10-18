@@ -47,6 +47,20 @@ final class SceneScriptModuleTests: XCTestCase {
         XCTAssertEqual(decoded.scripts[0].modules, document.scripts[0].modules)
     }
 
+    func testPreparedBundleChangesAreStillValidated() throws {
+        let runtime = SceneScriptRuntime()
+        var script = SceneScript(source: "export function update(){return []}", layerIDs: [])
+        script.modules = ["values": "export const amount=0.1;"]
+        try runtime.prepare(script)
+        try runtime.prepare(script)
+        script.modules?["values"] = "export const amount=0.1;\0"
+        XCTAssertThrowsError(try runtime.prepare(script))
+        script.modules?["values"] = "export const amount=0.2;"
+        try runtime.prepare(script)
+        script.source += "\0"
+        XCTAssertThrowsError(try runtime.prepare(script))
+    }
+
     func testPartFailureIsReportedWhileTheRestRuns() throws {
         let document = scene(source: """
         export function update(c){return {adjustments:[{id:c.targets[0].id,values:{offsetX:0.1}}],warnings:['Part.visible update: boom']};}

@@ -87,20 +87,31 @@ extension SettingsView {
     /// A scene is baked into a video before it can be shown; nothing for videos.
     @ViewBuilder
     func externalScenePreparationStatus(_ wallpaper: ExternalWallpaper) -> some View {
-        if model.isPreparingExternalScene(wallpaper) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.localizedString("変換中…"))
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                if let progress = model.sceneBakeProgress[wallpaper.path] {
-                    ProgressView(value: progress)
-                        .controlSize(.small)
-                }
-            }
-        } else if model.didFailToPrepareExternalScene(wallpaper) {
+        if model.didFailToPrepareExternalScene(wallpaper) {
             Text(model.localizedString("変換できませんでした"))
                 .font(.caption2)
                 .foregroundColor(.red)
+        } else if !model.isExternalWallpaperReady(wallpaper) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    if let progress = model.sceneBakeProgress[wallpaper.path] {
+                        Text(model.localizedString("変換中…"))
+                        Text(progress, format: .percent.precision(.fractionLength(0)))
+                            .monospacedDigit()
+                    } else {
+                        ProgressView().controlSize(.mini)
+                        Text(model.localizedString("準備中…"))
+                    }
+                }
+                if let progress = model.sceneBakeProgress[wallpaper.path] {
+                    ProgressView(value: progress).controlSize(.small)
+                }
+                Text(model.localizedString("バックグラウンドで準備しています。完了すると追加できます。"))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.caption2)
+            .foregroundColor(.secondary)
+            .accessibilityElement(children: .combine)
         }
     }
 }
