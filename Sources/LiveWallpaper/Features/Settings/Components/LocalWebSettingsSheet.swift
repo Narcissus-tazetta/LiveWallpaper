@@ -43,7 +43,7 @@ struct LocalWebSettingsSheet: View {
                                 if settings.audioReactiveEnabled,
                                    let error = integration.audioError
                                 {
-                                    integrationFailure(error, privacy: "Privacy_ScreenCapture")
+                                    IntegrationFailureNote(model: model, message: error, privacy: "Privacy_ScreenCapture")
                                 }
                             }
                             if package.supportsMedia == true {
@@ -51,7 +51,7 @@ struct LocalWebSettingsSheet: View {
                                 Text(localized("起動中のアプリから曲名・ジャケット・再生状態を取得します。初回はオートメーションの許可が必要です。"))
                                     .font(.caption).foregroundColor(.secondary)
                                 if settings.mediaEnabled, let error = integration.mediaError {
-                                    integrationFailure(error, privacy: "Privacy_Automation")
+                                    IntegrationFailureNote(model: model, message: error, privacy: "Privacy_Automation")
                                 }
                             }
                         }.padding(4)
@@ -234,22 +234,5 @@ struct LocalWebSettingsSheet: View {
             try model.saveLocalWebSettings(settings, source: source)
             error = nil
         } catch { self.error = error.localizedDescription }
-    }
-
-    private func integrationFailure(_ message: String, privacy: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(localized("連携を利用できません") + ": " + message).font(.caption).foregroundColor(.red)
-            HStack {
-                Button(localized("システム設定を開く")) {
-                    NSWorkspace.shared
-                        .open(
-                            URL(
-                                string: "x-apple.systempreferences:com.apple.preference.security?\(privacy)"
-                            )!
-                        )
-                }
-                Button(localized("再試行")) { integration.retry() }
-            }
-        }
     }
 }

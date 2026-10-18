@@ -769,7 +769,6 @@
 "全体に戻す" = "Usar Camada Inteira";
 "全体を塗る" = "Pintar Tudo";
 "動き" = "Movimento";
-"動きはこの長さで一周します。ロック画面とスクリーンセーバーには、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。" = "O movimento se repete nesta duração. A Tela Bloqueada e o Protetor de Tela usam um vídeo desta duração; loops mais longos demoram mais para exportar.";
 "動きを有効にする" = "Ativar Movimento";
 "動きを追加" = "Adicionar Movimento";
 "向き" = "Direção";
@@ -1189,3 +1188,8 @@
 "準備中…" = "Preparando…";
 
 "バックグラウンドで準備しています。完了すると追加できます。" = "Preparando em segundo plano. Você poderá adicionar quando estiver pronto.";
+"動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。" = "O movimento se repete nesta duração. Ao escolher este papel de parede para a Tela Bloqueada ou o Protetor de Tela, um vídeo desta duração é exportado para ele; loops mais longos demoram mais para exportar. Um Protetor de Tela que acompanha a mesa usa o último vídeo exportado.";
+"「%@」のJavaScriptを実行しますか？" = "Executar o JavaScript de “%@”?";
+"この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Este papel de parede usa JavaScript para mudar o movimento e a exibição. Se você permitir, ele será executado automaticamente sempre que este papel de parede for exibido. Você pode interrompê-lo depois no Editor de Cena, em “Scripts (JavaScript)”.";
+"実行を許可" = "Permitir";
+"許可しない" = "Não Permitir";

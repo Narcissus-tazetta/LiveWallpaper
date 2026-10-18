@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var launchAtLoginEnabled: Bool = false
     var autoUpdateEnabled: Bool = true
     var cancellables = Set<AnyCancellable>()
+    var isPresentingSceneScriptApproval = false
     var hotKeyCenter: GlobalHotKeyCenter?
     var settingsKeyMonitor: Any?
     var sceneHistoryBreakMonitor: Any?
@@ -72,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         setupStatusBar()
         setupSettingsWindow()
+        setupSceneScriptApprovalPrompts()
         setupGlobalHotKeys()
         setupScreenUnlockObserver()
         setupAppearanceObserver()

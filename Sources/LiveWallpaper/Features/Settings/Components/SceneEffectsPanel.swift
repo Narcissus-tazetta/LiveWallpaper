@@ -427,7 +427,8 @@ extension SettingsView {
             }
             .padding(.leading, sceneEffectLabelWidth + 12)
             if effect.maskFile != nil, effect.kind.canMoveOnItsOwnLayer,
-               model.sceneDocumentsByPath[path]?.layers.first(where: { $0.id == layerID })?.kind == .image
+               let owner = model.sceneDocumentsByPath[path]?.layers.first(where: { $0.id == layerID }),
+               owner.kind == .image, owner.videoFile == nil
             {
                 HStack(spacing: 8) {
                     Button(model.localizedString("塗った範囲を別のレイヤーにする")) {

@@ -24,6 +24,8 @@ struct SceneFrameInput: Equatable {
     var pointerPresses: [ScenePointerPress] = []
     /// What is playing, for scripts that read it; nil where nothing provides it (a bake).
     var media: SceneMediaState?
+    /// The system audio, for effects that react to it; nil plays them silent.
+    var audio: SceneAudioSpectrum?
 
     static let rest = SceneFrameInput()
 }
@@ -147,6 +149,14 @@ final class SceneRenderer {
     private(set) var document: SceneDocument
     private let videoPath: String
     private var textures: [String: MTLTexture] = [:]
+    /// By file name; loaded by the owner (SceneMetalLayer, prepareVideos) because
+    /// reading a video's tracks is asynchronous. Until then the layer shows its image.
+    private var videoFrames: [String: SceneVideoFrames] = [:]
+    /// The frame each video layer draws, held until the next encode so the GPU can read it.
+    private var videoFramesShown: [String: SceneVideoFrames.Frame] = [:]
+    /// Live drawing decodes on the video's queue and shows the newest frame (one
+    /// request behind); otherwise each frame waits for its exact video frame (a bake).
+    var decodesVideoAhead = false
     private struct TextTexture {
         let text: SceneText
         let texture: MTLTexture?
@@ -209,6 +219,23 @@ final class SceneRenderer {
 
     var usesCursor: Bool {
         document.usesCursor
+    }
+
+    /// Video layers whose frames are not loaded yet, with the file to load.
+    var videosToLoad: [(file: String, url: URL)] {
+        Set(document.layers.compactMap(\.videoFile)).subtracting(videoFrames.keys).sorted().map { ($0, fileURL($0)) }
+    }
+
+    func install(_ frames: SceneVideoFrames, videoFile: String) {
+        guard document.layers.contains(where: { $0.videoFile == videoFile }) else { return }
+        videoFrames[videoFile] = frames
+    }
+
+    /// Loads every video layer, for renderers that draw a fixed sequence of frames.
+    func prepareVideos() async throws {
+        for video in videosToLoad {
+            install(try await SceneVideoFrames.load(url: video.url, device: device), videoFile: video.file)
+        }
     }
 
     /// Shows `override` in place of that effect's saved mask or flow map, with a tint
@@ -321,6 +348,11 @@ final class SceneRenderer {
         }.map(\.element)
         for layer in ordered where layer.kind == .text {
             try prepareText(evaluated.layers[layer.id]!.layer)
+        }
+        for file in Set(ordered.filter { evaluated.layers[$0.id]!.layer.isVisible }.compactMap(\.videoFile)) {
+            guard let frames = videoFrames[file] else { continue }
+            if decodesVideoAhead { frames.request(input.time) } else { try frames.advance(to: input.time) }
+            videoFramesShown[file] = frames.frame
         }
         let visible = ordered.filter { layer in
             evaluated.layers[layer.id]!.layer.isVisible &&
@@ -663,7 +695,7 @@ final class SceneRenderer {
         }
         if let graph = graphRenderers[layer.id] {
             source = try graph.encode(input: source, images: graphResources[layer.id]!, time: input.time,
-                                      cursor: input.cursor, commandBuffer: commandBuffer)
+                                      cursor: input.cursor, audio: input.audio, commandBuffer: commandBuffer)
         }
         var effects = layer.activeEffects
         // While a particle area is painted, an effect pass that changes nothing
@@ -689,7 +721,8 @@ final class SceneRenderer {
         for (index, effect) in effects.enumerated() {
             if let graph = graphRenderers[effect.id] {
                 current = try graph.encode(input: current, images: graphResources[effect.id]!, time: input.time,
-                                           cursor: input.cursor, values: effect.values, commandBuffer: commandBuffer)
+                                           cursor: input.cursor, values: effect.values, audio: input.audio,
+                                           commandBuffer: commandBuffer)
                 continue
             }
             let destination = targets[index % 2]
@@ -1132,7 +1165,8 @@ final class SceneRenderer {
 
     /// The picture a layer composites before its effects; particles draw their own.
     private func picture(for layer: SceneLayer) -> MTLTexture? {
-        layer.kind == .text ? textTextures[layer.id]?.texture : textures[layer.imageFile]
+        if layer.kind == .text { return textTextures[layer.id]?.texture }
+        return layer.videoFile.flatMap { videoFramesShown[$0]?.texture } ?? textures[layer.imageFile]
     }
 
     /// A text layer's position is where its aligned edge sits, so its picture is
@@ -1229,6 +1263,10 @@ final class SceneRenderer {
         for layer in document.layers where layer.kind == .text {
             try prepareText(layer)
         }
+
+        let videos = Set(document.layers.compactMap(\.videoFile))
+        videoFrames = videoFrames.filter { videos.contains($0.key) }
+        videoFramesShown = videoFramesShown.filter { videos.contains($0.key) }
 
         let images = Set(document.layers.filter { $0.kind == .image && !$0.imageFile.isEmpty }.map(\.imageFile))
         textures = textures.filter { images.contains($0.key) }

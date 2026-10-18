@@ -769,7 +769,6 @@
 "全体に戻す" = "Katmanın Tamamına Dön";
 "全体を塗る" = "Tümünü Boya";
 "動き" = "Hareket";
-"動きはこの長さで一周します。ロック画面とスクリーンセーバーには、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。" = "Hareket bu uzunlukta bir tur döner. Kilitli Ekran ve ekran koruyucu bu uzunlukta dışa aktarılan bir video kullanır; uzun döngülerin dışa aktarılması daha uzun sürer.";
 "動きを有効にする" = "Hareketi Etkinleştir";
 "動きを追加" = "Hareket Ekle";
 "向き" = "Yön";
@@ -1189,3 +1188,8 @@
 "準備中…" = "Hazırlanıyor…";
 
 "バックグラウンドで準備しています。完了すると追加できます。" = "Arka planda hazırlanıyor. Hazır olduğunda ekleyebilirsiniz.";
+"動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。" = "Hareket bu uzunlukta bir tur döner. Bu duvar kâğıdı Kilitli Ekran veya ekran koruyucu için seçildiğinde bu uzunlukta bir video dışa aktarılır; uzun döngülerin dışa aktarılması daha uzun sürer. Masaüstünü izleyen ekran koruyucu en son dışa aktarılan videoyu kullanır.";
+"「%@」のJavaScriptを実行しますか？" = "“%@” içindeki JavaScript çalıştırılsın mı?";
+"この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Bu duvar kâğıdı hareketini ve görünümünü JavaScript ile değiştirir. İzin verirseniz bu duvar kâğıdı her gösterildiğinde otomatik olarak çalışır. Daha sonra Sahne Düzenleyici’de “Betikler (JavaScript)” altından durdurabilirsiniz.";
+"実行を許可" = "İzin Ver";
+"許可しない" = "İzin Verme";

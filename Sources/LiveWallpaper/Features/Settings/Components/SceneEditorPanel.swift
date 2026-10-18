@@ -217,8 +217,12 @@ extension SettingsView {
             .fixedSize()
         }
         settingsFootnote(
-            model.localizedString("動きはこの長さで一周します。ロック画面とスクリーンセーバーには、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。")
+            model.localizedString("動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。")
         )
+
+        if document.usesAudio {
+            SceneSoundReactionToggle(model: model, path: path)
+        }
 
         HStack(alignment: .top, spacing: 16) {
             sceneLayerList(path: path, document: document, selectedID: selectedID)
@@ -639,7 +643,8 @@ extension SettingsView {
                 )
             }
             sceneLayoutControls(path: path, layer: layer)
-            if layer.kind == .image {
+            // The cut-out and depth work on one still picture; a video layer has none.
+            if layer.kind == .image, layer.videoFile == nil {
                 sceneAIControls(path: path, layer: layer)
             }
         }

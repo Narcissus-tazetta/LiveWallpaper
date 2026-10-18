@@ -291,7 +291,15 @@ final class SceneLinkTests: XCTestCase {
         let next = try XCTUnwrap(scene.nextTimeOfDayChange(after: Date()))
         XCTAssertEqual(fire.timeIntervalSince(next), 1, accuracy: 1)
 
-        model.sceneBakedTimesOfDay[video.path] = SceneTimeOfDay.allCases.first { $0 != now }
+        let other = SceneTimeOfDay.allCases.first { $0 != now }
+        model.sceneBakedTimesOfDay[video.path] = other
+        model.updateSceneTimesOfDay()
+        XCTAssertFalse(model.scenesBaking.contains(video.path), "no video wanted: drawn live instead")
+        XCTAssertTrue(model.sceneStaleVideoPaths.contains(video.path))
+
+        model.lockScreenVideoPath = video.path
+        model.cancelSceneBake(path: video.path)
+        model.sceneBakedTimesOfDay[video.path] = other
         model.updateSceneTimesOfDay()
         XCTAssertTrue(model.scenesBakeRunning.contains(video.path), "bakes at once, not after edits pause")
         XCTAssertEqual(model.sceneBakingTimesOfDay[video.path], now)

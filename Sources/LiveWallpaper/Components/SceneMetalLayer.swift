@@ -27,6 +27,10 @@ final class SceneMetalLayer: CAMetalLayer {
             if let layer { layer.poll() } else { sender.invalidate() }
         }
 
+        @objc func soundReactionDidChange(_: Notification) {
+            layer?.updateMediaSubscription()
+        }
+
         private func invalidate(_ sender: AnyObject) {
             if #available(macOS 14, *), let link = sender as? CADisplayLink { link.invalidate() }
             (sender as? Timer)?.invalidate()
@@ -68,12 +72,14 @@ final class SceneMetalLayer: CAMetalLayer {
     }
     private let mediaSubscriptionID = UUID()
     private var isSubscribedToMedia = false
+    private var isSubscribedToSpectrum = false
     private struct Artwork {
         var source: String
         var id: String
         var palette: SceneMediaPalette?
     }
     private var artwork: Artwork?
+    private var loadingVideos: Set<String> = []
     var scriptIssueHandler: (([SceneScriptIssue]) -> Void)?
     var scriptLogHandler: (([UUID: String]) -> Void)?
 
@@ -155,6 +161,10 @@ final class SceneMetalLayer: CAMetalLayer {
         maximumDrawableCount = 2
         needsDisplayOnBoundsChange = true
         actions = ["bounds": NSNull(), "position": NSNull(), "contents": NSNull(), "hidden": NSNull()]
+        // Posted on the main thread by SceneSoundReaction.setEnabled.
+        NotificationCenter.default.addObserver(
+            tickTarget, selector: #selector(TickTarget.soundReactionDidChange(_:)), name: SceneSoundReaction.didChange, object: nil
+        )
     }
 
     func show(_ document: SceneDocument, videoPath: String) throws {
@@ -173,6 +183,7 @@ final class SceneMetalLayer: CAMetalLayer {
         } else {
             let renderer = try SceneRenderer(document: document, videoPath: videoPath)
             renderer.effectResolutionScale = 0.5
+            renderer.decodesVideoAhead = true
             renderer.timeOfDay = timeOfDay
             self.renderer = renderer
             self.videoPath = videoPath
@@ -185,6 +196,7 @@ final class SceneMetalLayer: CAMetalLayer {
         current.media = media
         target.media = media
         updateMediaSubscription()
+        loadVideos()
         readClock()
         // SwiftUI may still be attaching or resizing the backing layer here.
         // Draw during the ensuing CA display transaction, after its surface settles.
@@ -205,17 +217,60 @@ final class SceneMetalLayer: CAMetalLayer {
         updateMediaSubscription()
     }
 
-    private func updateMediaSubscription() {
-        let wanted = renderer?.document.scripts.contains { $0.canRun && $0.usesMedia } == true
-        guard wanted != isSubscribedToMedia else { return }
-        isSubscribedToMedia = wanted
-        if !wanted { media = nil }
+    /// Until its frames load, a video layer shows its first frame (the layer's image).
+    private func loadVideos() {
+        guard let renderer else { return }
+        let device = renderer.device
+        for video in renderer.videosToLoad where !loadingVideos.contains(video.file) {
+            loadingVideos.insert(video.file)
+            Task { [weak self, weak renderer] in
+                do {
+                    let frames = try await SceneVideoFrames.load(url: video.url, device: device)
+                    // Another scene may have the same file name; only its own renderer takes it.
+                    if let self, let renderer, self.renderer === renderer {
+                        renderer.install(frames, videoFile: video.file)
+                        self.redraw()
+                    }
+                } catch {
+                    AppLog.windowRefresh.error("scene video failed: \(error.localizedDescription, privacy: .public)")
+                }
+                self?.loadingVideos.remove(video.file)
+                // A scene shown meanwhile may need a file of the same name.
+                if self?.renderer !== renderer { self?.loadVideos() }
+            }
+        }
+    }
+
+    fileprivate func updateMediaSubscription() {
+        let wantsMedia = renderer?.document.scripts.contains { $0.canRun && $0.usesMedia } == true
+        let wantsSpectrum = renderer?.document.usesAudio == true
+            && videoPath.map { SceneSoundReaction.isEnabled(videoPath: $0) } == true
+        guard wantsMedia != isSubscribedToMedia || wantsSpectrum != isSubscribedToSpectrum else { return }
+        isSubscribedToMedia = wantsMedia
+        isSubscribedToSpectrum = wantsSpectrum
+        if !wantsMedia { media = nil }
+        if !wantsSpectrum { setAudio(nil) }
         MainActor.assumeIsolated {
-            LocalWebIntegration.shared.update(id: mediaSubscriptionID, subscription: wanted ? .init(
-                spectrum: false, media: true, receiveSpectrum: { _ in },
+            LocalWebIntegration.shared.update(id: mediaSubscriptionID, subscription: wantsMedia || wantsSpectrum ? .init(
+                spectrum: wantsSpectrum, media: wantsMedia,
+                receiveSpectrum: { [weak self] values in self?.receiveSpectrum(values) },
                 receiveMedia: { [weak self] value, enabled in self?.receiveMedia(value, isAvailable: enabled) }
             ) : nil)
         }
+    }
+
+    /// 64 bands per channel, left first, as LocalWebIntegration sends them.
+    private func receiveSpectrum(_ values: [Float]) {
+        guard isSubscribedToSpectrum, values.count == 2 * SceneAudioSpectrum.bandCount else { return }
+        let count = SceneAudioSpectrum.bandCount
+        setAudio(SceneAudioSpectrum(left: Array(values[..<count]), right: Array(values[count...])))
+    }
+
+    /// The next tick draws it: a scene with sound effects animates while its clock runs,
+    /// and a paused scene should not move with the sound.
+    private func setAudio(_ audio: SceneAudioSpectrum?) {
+        current.audio = audio
+        target.audio = audio
     }
 
     private func receiveMedia(_ value: WebNowPlaying, isAvailable: Bool) {

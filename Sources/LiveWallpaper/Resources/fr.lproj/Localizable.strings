@@ -769,7 +769,6 @@
 "全体に戻す" = "Revenir à tout le calque";
 "全体を塗る" = "Tout peindre";
 "動き" = "Mouvement";
-"動きはこの長さで一周します。ロック画面とスクリーンセーバーには、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。" = "Le mouvement se répète sur cette durée. L’écran verrouillé et l’économiseur d’écran utilisent une vidéo de cette durée ; plus elle est longue, plus l’exportation prend du temps.";
 "動きを有効にする" = "Activer le mouvement";
 "動きを追加" = "Ajouter un mouvement";
 "向き" = "Direction";
@@ -1189,3 +1188,8 @@
 "準備中…" = "Préparation…";
 
 "バックグラウンドで準備しています。完了すると追加できます。" = "Préparation en arrière-plan. Vous pourrez l’ajouter une fois prêt.";
+"動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。" = "Le mouvement se répète sur cette durée. Si ce fond d’écran est choisi pour l’écran verrouillé ou l’économiseur d’écran, une vidéo de cette durée est exportée pour lui ; plus elle est longue, plus l’exportation prend du temps. Un économiseur d’écran qui suit le bureau utilise la dernière vidéo exportée.";
+"「%@」のJavaScriptを実行しますか？" = "Exécuter le JavaScript de « %@ » ?";
+"この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Ce fond d’écran utilise JavaScript pour modifier son mouvement et son affichage. Si vous l’autorisez, il s’exécute automatiquement chaque fois que ce fond d’écran est affiché. Vous pourrez l’arrêter plus tard dans l’Éditeur de scène, sous « Scripts (JavaScript) ».";
+"実行を許可" = "Autoriser";
+"許可しない" = "Ne pas autoriser";

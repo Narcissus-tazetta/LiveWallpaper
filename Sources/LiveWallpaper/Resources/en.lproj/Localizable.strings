@@ -769,7 +769,6 @@
 "全体に戻す" = "Use Whole Layer";
 "全体を塗る" = "Fill All";
 "動き" = "Motion";
-"動きはこの長さで一周します。ロック画面とスクリーンセーバーには、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。" = "Motion repeats over this length. The Lock Screen and screen saver use a video of this length; longer loops take longer to export.";
 "動きを有効にする" = "Enable Motion";
 "動きを追加" = "Add Motion";
 "向き" = "Direction";
@@ -1189,3 +1188,8 @@
 "準備中…" = "Preparing…";
 
 "バックグラウンドで準備しています。完了すると追加できます。" = "Preparing in the background. You can add it when ready.";
+"動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。" = "Motion repeats over this length. When this wallpaper is chosen for the Lock Screen or the screen saver, a video of this length is exported for it; longer loops take longer to export. A screen saver that follows the desktop uses the last exported video.";
+"「%@」のJavaScriptを実行しますか？" = "Run the JavaScript in “%@”?";
+"この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "This wallpaper uses JavaScript to change its motion and display. If you allow it, it runs automatically every time this wallpaper is shown. You can stop it later in Scene Editor under Scripts (JavaScript).";
+"実行を許可" = "Allow";
+"許可しない" = "Don’t Allow";

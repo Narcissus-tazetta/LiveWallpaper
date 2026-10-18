@@ -21,6 +21,18 @@ enum SceneScriptPermissions {
         UserDefaults.standard.set(permissions.sorted(), forKey: key)
     }
 
+    static func authorizeAll(_ document: SceneDocument, path: String) {
+        for script in document.scripts { authorize(script, path: path) }
+    }
+
+    /// Scripts allowed at `source` stay allowed in the copy at `destination`.
+    static func carry(_ document: SceneDocument, from source: String, to destination: String) {
+        let permissions = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+        for script in document.scripts where permissions.contains(fingerprint(script, path: source)) {
+            authorize(script, path: destination)
+        }
+    }
+
     static func revoke(_ document: SceneDocument, path: String) {
         var permissions = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
         for script in document.scripts { permissions.remove(fingerprint(script, path: path)) }

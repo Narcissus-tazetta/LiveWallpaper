@@ -104,12 +104,14 @@ extension AppDelegate {
           "Update prerequisite issue: \(self.updateEnvironmentIssueDescription(issue), privacy: .public)"
         )
       }
+      #if !DEBUG
       DispatchQueue.main.async {
         self.showUpdateEnvironmentAlert(
           issues: issues,
           title: self.localized("アップデートを有効化するにはアプリをApplicationsに移動してください")
         )
       }
+      #endif
     }
   }
 }

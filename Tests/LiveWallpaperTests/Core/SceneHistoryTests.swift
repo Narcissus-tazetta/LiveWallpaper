@@ -191,12 +191,31 @@ final class SceneHistoryTests: XCTestCase {
         XCTAssertFalse(layer.isLocked)
     }
 
-    func testRenamingOrLockingDoesNotRebake() {
+    func testRenamingOrLockingLeavesTheVideoCurrent() {
         edit { $0.layers[1].name = "renamed" }
         edit { $0.layers[1].isLocked = true }
+        XCTAssertFalse(model.sceneStaleVideoPaths.contains(video.path))
+        XCTAssertFalse(model.scenesBaking.contains(video.path))
+    }
+
+    /// Edits only mark the video out of date; the desktop draws the scene live. The
+    /// video is baked once the scene is chosen for the lock screen or screen saver.
+    func testEditsBakeOnlyForTheLockScreenOrScreenSaver() {
+        edit { $0.layers[1].opacity = 0.5 }
+        XCTAssertTrue(model.sceneStaleVideoPaths.contains(video.path))
         XCTAssertFalse(model.scenesBaking.contains(video.path))
 
-        edit { $0.layers[1].opacity = 0.5 }
+        model.lockScreenVideoPath = video.path
         XCTAssertTrue(model.scenesBaking.contains(video.path))
+        model.cancelSceneBake(path: video.path)
+        model.lockScreenVideoPath = nil
+
+        model.screenSaverVideoPath = video.path
+        XCTAssertTrue(model.scenesBaking.contains(video.path))
+        model.cancelSceneBake(path: video.path)
+        model.screenSaverVideoPath = nil
+
+        edit { $0.layers[1].opacity = 0.25 }
+        XCTAssertFalse(model.scenesBaking.contains(video.path))
     }
 }

@@ -231,7 +231,7 @@ final class PackageImporter {
                 .appendingPathComponent(video.id, isDirectory: true)
             do {
                 let document = try SceneStore.importScene(from: source, videoPath: videoPath)
-                model.registerImportedScene(document, path: videoPath)
+                model.registerImportedScene(document, path: videoPath, asksAgain: true)
             } catch {
                 AppLog.persistence.error(
                     "skipped scene of imported video id=\(video.id, privacy: .public): \(error.localizedDescription, privacy: .public)"

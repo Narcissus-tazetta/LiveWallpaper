@@ -57,6 +57,8 @@ extension SettingsView {
                 .frame(width: cardWidth, height: cardWidth * 9 / 16)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .accessibilityHidden(true)
+                // Clipping the image does not keep its hit region out of adjacent rows.
+                .allowsHitTesting(false)
 
             Text(wallpaper.name)
                 .font(.system(size: 12, weight: .medium))
@@ -89,6 +91,7 @@ extension SettingsView {
                 ProgressView().controlSize(.small)
             } else {
                 Button(model.localizedString("追加")) {
+                    AppLog.externalWallpapers.info("add button clicked for \(wallpaper.id, privacy: .public)")
                     Task {
                         await model.importExternalWallpaper(id: wallpaper.id)
                     }
@@ -96,6 +99,7 @@ extension SettingsView {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(model.importingExternalWallpaperID != nil)
+                .contentShape(Rectangle())
                 .accessibilityLabel("\(model.localizedString("追加")) \(wallpaper.name)")
                 if model.failedExternalWallpaperImportID == wallpaper.id {
                     Text(model.localizedString("追加できませんでした"))
@@ -105,6 +109,7 @@ extension SettingsView {
             }
         }
         .frame(width: cardWidth, alignment: .leading)
+        .id(wallpaper.id)
         .accessibilityElement(children: .contain)
     }
 }
@@ -127,6 +132,8 @@ struct ExternalWallpaperThumbnail: View {
                     .foregroundColor(.secondary)
             }
         }
+        .clipped()
+        .contentShape(Rectangle())
         .task(id: wallpaper.id) {
             image = await Self.load(wallpaper)
         }

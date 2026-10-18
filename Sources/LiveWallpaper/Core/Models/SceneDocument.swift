@@ -678,6 +678,9 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var kind: SceneLayerKind = .image
     /// File name inside the scene folder; empty for particle and text layers.
     var imageFile: String
+    /// An MP4 in the scene folder that plays in a loop in place of the image; the
+    /// image holds its first frame for wherever the video is not ready.
+    var videoFile: String?
     /// Reads the canvas below as its input instead of an image file.
     var capturesCanvas = false
     var isVisible = true
@@ -735,6 +738,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         name = try container.decode(String.self, forKey: .name)
         kind = (try? container.decode(SceneLayerKind.self, forKey: .kind)) ?? .image
         imageFile = (try? container.decode(String.self, forKey: .imageFile)) ?? ""
+        videoFile = try container.decodeIfPresent(String.self, forKey: .videoFile)
         capturesCanvas = (try? container.decode(Bool.self, forKey: .capturesCanvas)) ?? false
         particles = try? container.decodeIfPresent(SceneParticles.self, forKey: .particles)
         text = try container.decodeIfPresent(SceneText.self, forKey: .text)
@@ -842,7 +846,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var isAnimated: Bool {
         !activeEffects.isEmpty || (isVisible && kind == .particles && particles != nil)
             || (isVisible && hasDepth && depthAutoMotion > 0) || (isVisible && isKeyframed)
-            || (isVisible && (renderGraph != nil || placement != nil))
+            || (isVisible && (renderGraph != nil || placement != nil || videoFile != nil))
     }
 }
 

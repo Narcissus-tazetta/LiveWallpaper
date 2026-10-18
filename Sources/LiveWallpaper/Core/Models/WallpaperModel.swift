@@ -156,6 +156,8 @@ final class WallpaperModel: ObservableObject {
     var sceneStaleVideoPaths: Set<String> = []
     @Published var sceneErrorMessage: String?
     @Published var sceneScriptIssues: [String: [SceneScriptIssue]] = [:]
+    /// Downloaded scenes whose JavaScript waits for the user's yes; asked one at a time.
+    @Published var sceneScriptApprovalRequests: [SceneScriptApprovalRequest] = []
     @Published var sceneScriptLogs: [String: [UUID: String]] = [:]
     var sceneScriptLogTimes: [String: TimeInterval] = [:]
     /// Video path → undo history of its scene, kept per wallpaper until the app quits.
@@ -242,7 +244,9 @@ final class WallpaperModel: ObservableObject {
     @Published var screenSaverInstallState: ScreenSaverInstallState = .unavailable
     @Published var screenSaverErrorMessage: String?
     /// The video the screen saver plays on every display; nil plays what the desktop shows.
-    @Published var screenSaverVideoPath: String?
+    @Published var screenSaverVideoPath: String? {
+        didSet { if screenSaverVideoPath != oldValue { bakeSceneVideoIfOutOfDate(path: screenSaverVideoPath) } }
+    }
     let screenSaverInstaller = ScreenSaverInstaller()
     var lastWrittenScreenSaverConfig: ScreenSaverConfig?
     var screenSaverSyncCancellable: AnyCancellable?
@@ -284,7 +288,9 @@ final class WallpaperModel: ObservableObject {
     @Published var playlists: [WallpaperPlaylist] = []
     @Published var selectedPlaylistID: UUID?
     @Published var currentVideoPath: String?
-    @Published var lockScreenVideoPath: String?
+    @Published var lockScreenVideoPath: String? {
+        didSet { if lockScreenVideoPath != oldValue { bakeSceneVideoIfOutOfDate(path: lockScreenVideoPath) } }
+    }
     /// Source seconds each lock screen video begins at; a video without an entry
     /// starts automatically at its first visible frame.
     @Published var lockScreenStartSecondsByVideo: [String: Double] = [:]

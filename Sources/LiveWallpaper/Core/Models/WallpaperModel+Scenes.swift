@@ -132,13 +132,19 @@ extension WallpaperModel {
         return effect
     }
 
-    func registerImportedScene(_ document: SceneDocument, path: String) {
-        SceneScriptPermissions.revoke(document, path: path)
-        var document = document
-        for index in document.scripts.indices {
-            document.scripts[index].isAuthorized = false
+    /// `asksAgain`: a package someone sent replaced the scene, so its scripts and its
+    /// sound reaction wait for the user again. Otherwise scripts the user allowed
+    /// (the same code at this path) keep running.
+    func registerImportedScene(_ document: SceneDocument, path: String, asksAgain: Bool = false) {
+        if asksAgain {
+            SceneScriptPermissions.revoke(document, path: path)
+            SceneSoundReaction.setEnabled(false, videoPath: path)
         }
+        let document = SceneScriptPermissions.restored(document, path: path)
         sceneDocumentsByPath[path] = document
+        if SceneStore.isNewerThanVideo(videoPath: path) {
+            sceneStaleVideoPaths.insert(path)
+        }
         refreshCursorEffects()
         if document.usesTimeOfDay {
             scheduleNextSceneTimeOfDayUpdate(after: Date())
@@ -701,6 +707,23 @@ extension WallpaperModel {
         }
     }
 
+    /// Only the lock screen and the screen saver need a scene's video, and only when
+    /// this scene is the one chosen for them. Elsewhere the desktop draws the scene
+    /// live, so a bake for every edit (a script run, a drag) is wasted work.
+    func sceneVideoIsWanted(path: String) -> Bool {
+        lockScreenVideoPath == path || screenSaverVideoPath == path
+    }
+
+    /// Bakes a scene whose video lags behind its edits, once it is chosen for the
+    /// lock screen or the screen saver.
+    func bakeSceneVideoIfOutOfDate(path: String?) {
+        guard let path, sceneDocumentsByPath[path] != nil, sceneBakeWorkItems[path] == nil,
+              !scenesBakeRunning.contains(path),
+              sceneStaleVideoPaths.contains(path) || SceneStore.isNewerThanVideo(videoPath: path)
+        else { return }
+        scheduleSceneBake(path: path)
+    }
+
     func scheduleSceneBake(path: String) {
         cancelSceneBake(path: path)
         guard sceneDocumentsByPath[path]?.hasUnapprovedScripts != true else {
@@ -709,6 +732,14 @@ extension WallpaperModel {
         }
         sceneVideosAwaitingScriptApproval.remove(path)
         sceneBakeFailures[path] = nil
+        // The video is out of date either way: the desktop draws the scene live, and
+        // scene.json, saved after the edit, stays newer than the video until a bake.
+        sceneStaleVideoPaths.insert(path)
+        guard sceneVideoIsWanted(path: path) else {
+            AppLog.windowRefresh.info("scene bake deferred, not on the lock screen or screen saver path=\(path, privacy: .public)")
+            refreshCursorEffects()
+            return
+        }
         let workItem = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 self?.startSceneBake(path: path)
@@ -716,7 +747,6 @@ extension WallpaperModel {
         }
         sceneBakeWorkItems[path] = workItem
         scenesBaking.insert(path)
-        sceneStaleVideoPaths.insert(path)
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.sceneBakeDelay, execute: workItem)
     }
 
@@ -822,9 +852,9 @@ extension WallpaperModel {
 
     /// Bakes a scene that is not in the library (one an external app offers), with
     /// its progress in sceneBakeProgress like any bake.
-    func bakeSceneOutsideLibrary(_ document: SceneDocument, videoPath: String) async throws {
+    func bakeSceneOutsideLibrary(_ document: SceneDocument, videoPath: String, stillOnly: Bool = false) async throws {
         defer { sceneBakeProgress.removeValue(forKey: videoPath) }
-        try await bakeScene(document, videoPath: videoPath)
+        try await bakeScene(document, videoPath: videoPath, stillOnly: stillOnly)
     }
 
     /// Writes the scene's video at `videoPath`: one seamless loop when anything moves,
@@ -833,19 +863,20 @@ extension WallpaperModel {
         _ document: SceneDocument,
         videoPath: String,
         timeOfDay: SceneTimeOfDay? = nil,
-        generation: UUID? = nil
+        generation: UUID? = nil,
+        stillOnly: Bool = false
     ) async throws {
         let timeOfDay = timeOfDay ?? document.timeOfDay(at: Date())
         try Task.checkCancellation()
         let output = URL(fileURLWithPath: videoPath)
         let stagedOutput = output.deletingLastPathComponent().appendingPathComponent(".scene-\(UUID().uuidString).mp4")
         defer { removeLeftovers(of: [stagedOutput]) }
-        if document.isAnimated {
+        if document.isAnimated, !stillOnly {
             sceneBakeProgress[videoPath] = 0
         }
         let throttle = MediaImportProgressThrottle()
         try await SceneVideoBaker.bake(
-            document: document, videoPath: videoPath, timeOfDay: timeOfDay, to: stagedOutput
+            document: document, videoPath: videoPath, timeOfDay: timeOfDay, stillOnly: stillOnly, to: stagedOutput
         ) { [weak self] value in
             guard throttle.shouldReport(value) else { return }
             Task { @MainActor [weak self] in

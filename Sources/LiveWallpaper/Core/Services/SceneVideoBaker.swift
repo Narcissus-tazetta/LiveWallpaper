@@ -31,13 +31,14 @@ enum SceneVideoBaker {
         document: SceneDocument,
         videoPath: String,
         timeOfDay: SceneTimeOfDay? = nil,
+        stillOnly: Bool = false,
         to outputURL: URL,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         let timeOfDay = timeOfDay ?? document.timeOfDay(at: Date())
         let task = Task.detached(priority: .utility) {
             try Task.checkCancellation()
-            if document.isAnimated {
+            if document.isAnimated, !stillOnly {
                 try await render(
                     document: document, videoPath: videoPath, timeOfDay: timeOfDay, outputURL: outputURL, progress: progress
                 )
@@ -94,6 +95,7 @@ enum SceneVideoBaker {
     ) async throws {
         let renderer = try SceneRenderer(document: document, videoPath: videoPath)
         renderer.timeOfDay = timeOfDay
+        try await renderer.prepareVideos()
         // Its own queue: on the shared one, every live preview frame waited behind a
         // full-resolution bake frame and stalled the main thread in nextDrawable.
         guard let commandQueue = renderer.device.makeCommandQueue() else {

@@ -219,14 +219,7 @@ final class ExternalWallpaperProviderMonitor {
     nonisolated static var currentAppSignature: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
-        let execDate: String
-        if let execURL = Bundle.main.executableURL,
-           let mtime = (try? FileManager.default.attributesOfItem(atPath: execURL.path)[.modificationDate] as? Date) {
-            execDate = String(mtime.timeIntervalSince1970)
-        } else {
-            execDate = ""
-        }
-        return "\(version)-\(build)-\(execDate)"
+        return "\(version)-\(build)"
     }
 
     /// One folder per item, named by a hash: item IDs are the provider's strings.

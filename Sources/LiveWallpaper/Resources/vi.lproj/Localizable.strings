@@ -769,7 +769,6 @@
 "全体に戻す" = "Dùng toàn bộ lớp";
 "全体を塗る" = "Tô toàn bộ";
 "動き" = "Chuyển động";
-"動きはこの長さで一周します。ロック画面とスクリーンセーバーには、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。" = "Chuyển động lặp lại theo độ dài này. Màn hình khóa và trình bảo vệ màn hình dùng video có độ dài này; càng dài thì xuất càng lâu.";
 "動きを有効にする" = "Bật chuyển động";
 "動きを追加" = "Thêm chuyển động";
 "向き" = "Hướng";
@@ -1189,3 +1188,8 @@
 "準備中…" = "Đang chuẩn bị…";
 
 "バックグラウンドで準備しています。完了すると追加できます。" = "Đang chuẩn bị trong nền. Bạn có thể thêm sau khi hoàn tất.";
+"動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。" = "Chuyển động lặp lại theo độ dài này. Khi chọn hình nền này cho màn hình khóa hoặc trình bảo vệ màn hình, video có độ dài này sẽ được xuất để dùng; càng dài thì xuất càng lâu. Trình bảo vệ màn hình đi theo màn hình nền sẽ dùng video được xuất gần nhất.";
+"「%@」のJavaScriptを実行しますか？" = "Chạy JavaScript trong “%@”?";
+"この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Hình nền này dùng JavaScript để thay đổi chuyển động và cách hiển thị. Nếu bạn cho phép, JavaScript sẽ tự động chạy mỗi khi hình nền này được hiển thị. Bạn có thể dừng sau trong Trình chỉnh sửa cảnh, tại “Tập lệnh (JavaScript)”.";
+"実行を許可" = "Cho phép";
+"許可しない" = "Không cho phép";

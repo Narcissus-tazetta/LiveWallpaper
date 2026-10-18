@@ -75,7 +75,8 @@ final class SceneRenderGraphTests: XCTestCase {
         device: MTLDevice,
         input: MTLTexture,
         time: Double = 0,
-        values: [String: Double] = [:]
+        values: [String: Double] = [:],
+        audio: SceneAudioSpectrum? = nil
     ) throws -> [UInt8] {
         let queue = try XCTUnwrap(device.makeCommandQueue())
         let command = try XCTUnwrap(queue.makeCommandBuffer())
@@ -85,6 +86,7 @@ final class SceneRenderGraphTests: XCTestCase {
             time: time,
             cursor: nil,
             values: values,
+            audio: audio,
             commandBuffer: command
         )
         let length = result.width * result.height * 4
@@ -167,6 +169,38 @@ final class SceneRenderGraphTests: XCTestCase {
         let renderer = try SceneRenderGraphRenderer(graph: graph, device: device)
         let pixels = try render(renderer, device: device, input: input(device), time: 0.25)
         XCTAssertEqual(pixels[0], 64)
+    }
+
+    /// 16 bands from the 64: each the mean of the four it covers, one per 16 bytes
+    /// as std140 lays out a float array; silence without audio.
+    func testAudioSpectrumUniformWritesBandsAtTheirStride() throws {
+        let device = try device()
+        let graph = graph(fragment: """
+        #include <metal_stdlib>
+        using namespace metal;
+        struct Bands { float4 left[16]; };
+        fragment float4 fragmentMain(constant Bands& u [[buffer(0)]]) { return float4(u.left[0].x, u.left[1].x, u.left[15].x, 1); }
+        """, uniforms: Data(repeating: 0, count: 256), updates: [
+            .init(offset: 0, value: .audioSpectrum, stride: 16, key: "left", components: 16)
+        ])
+        let renderer = try SceneRenderGraphRenderer(graph: graph, device: device)
+        var left = [Float](repeating: 0, count: 64)
+        left[0 ..< 4] = [0.2, 0.2, 0.2, 0.2]
+        left[4 ..< 8] = [0, 0, 1, 1]
+        left[60 ..< 64] = [1, 1, 1, 1]
+        let loud = try render(renderer, device: device, input: input(device),
+                              audio: SceneAudioSpectrum(left: left, right: Array(repeating: 0, count: 64)))
+        XCTAssertEqual(Array(loud[0 ..< 3]), [51, 128, 255])
+        let silent = try render(renderer, device: device, input: input(device))
+        XCTAssertEqual(Array(silent[0 ..< 3]), [0, 0, 0])
+    }
+
+    func testAudioSpectrumUpdateOutsideItsBufferIsRejected() throws {
+        let device = try device()
+        let graph = graph(fragment: "", uniforms: Data(repeating: 0, count: 64), updates: [
+            .init(offset: 0, value: .audioSpectrum, stride: 16, key: "left", components: 16)
+        ])
+        XCTAssertThrowsError(try SceneRenderGraphRenderer(graph: graph, device: device))
     }
 
     func testSamplingDrawAttachmentIsRejected() throws {

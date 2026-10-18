@@ -40,6 +40,16 @@ enum SceneStore {
     }
 
     /// The scene was saved after its video was last written.
+    /// Dates scene.json after the video, so the video counts as out of date
+    /// (isNewerThanVideo) until a real bake, across launches and library imports.
+    static func markVideoOutOfDate(videoPath: String) throws {
+        let videoDate = try FileManager.default.attributesOfItem(atPath: videoPath)[.modificationDate] as? Date ?? Date()
+        try FileManager.default.setAttributes(
+            [.modificationDate: videoDate.addingTimeInterval(1)],
+            ofItemAtPath: folderURL(forVideoPath: videoPath).appendingPathComponent(documentFileName).path
+        )
+    }
+
     static func isNewerThanVideo(videoPath: String) -> Bool {
         let scene = folderURL(forVideoPath: videoPath).appendingPathComponent(documentFileName)
         do {
@@ -241,7 +251,7 @@ enum SceneStore {
             if layer.kind == .image {
                 files.insert(layer.imageFile)
             }
-            files.formUnion([layer.particles?.maskFile, layer.depthFile, layer.text?.fontFile].compactMap { $0 })
+            files.formUnion([layer.particles?.maskFile, layer.depthFile, layer.text?.fontFile, layer.videoFile].compactMap { $0 })
             if let graph = layer.renderGraph { files.formUnion(graph.images.values) }
             for effect in layer.effects {
                 if let graph = effect.renderGraph { files.formUnion(graph.images.values) }
@@ -280,7 +290,7 @@ enum SceneStore {
     /// Installs a scene from an unpacked package next to the imported video. The
     /// package comes from anyone: only plain files that scene.json names, with plain
     /// names, are copied.
-    static func importScene(from source: URL, videoPath: String) throws -> SceneDocument {
+    static func importScene(from source: URL, videoPath: String, videoIsOutOfDate: Bool = false) throws -> SceneDocument {
         let documentURL = source.appendingPathComponent(documentFileName)
         let document = try JSONDecoder().decode(SceneDocument.self, from: Data(contentsOf: documentURL))
         let root = source.resolvingSymlinksInPath().standardizedFileURL.path
@@ -315,10 +325,12 @@ enum SceneStore {
             // scene.json only becomes newer than the video (isNewerThanVideo) once edited.
             // A scene installed before its first bake has no video yet.
             if FileManager.default.fileExists(atPath: videoPath),
-               let videoDate = try FileManager.default.attributesOfItem(atPath: videoPath)[.modificationDate]
+               let videoDate = try FileManager.default.attributesOfItem(atPath: videoPath)[.modificationDate] as? Date
             {
+                // A video that is only a stand-in (videoIsOutOfDate) stays out of date.
                 try FileManager.default.setAttributes(
-                    [.modificationDate: videoDate], ofItemAtPath: staging.appendingPathComponent(documentFileName).path
+                    [.modificationDate: videoIsOutOfDate ? videoDate.addingTimeInterval(1) : videoDate],
+                    ofItemAtPath: staging.appendingPathComponent(documentFileName).path
                 )
             }
             if FileManager.default.fileExists(atPath: destination.path) {

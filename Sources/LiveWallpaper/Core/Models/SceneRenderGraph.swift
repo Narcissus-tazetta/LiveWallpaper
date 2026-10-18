@@ -16,7 +16,9 @@ struct SceneRenderGraph: Codable, Equatable {
     }
 
     struct UniformUpdate: Codable, Equatable {
-        enum Value: String, Codable { case time, cursor, textureSize, boneMatrices, boneOpacity, effectValue }
+        /// `audioSpectrum` writes `components` bands (16, 32 or 64) of the `key` channel
+        /// ("left" or "right"), `stride` bytes apart.
+        enum Value: String, Codable { case time, cursor, textureSize, boneMatrices, boneOpacity, effectValue, audioSpectrum }
         var offset: Int
         var value: Value
         var texture: String?
@@ -78,10 +80,30 @@ struct SceneRenderGraph: Codable, Equatable {
     var images: [String: String] = [:]
     var straightAlphaImages: Bool?
 
+    var usesAudio: Bool {
+        uses(.audioSpectrum)
+    }
+
     func uses(_ value: UniformUpdate.Value) -> Bool {
         passes.contains { pass in
             guard let draw = pass.draw else { return false }
             return (draw.vertex.updates + draw.fragment.updates).contains { $0.value == value }
+        }
+    }
+}
+
+/// The system audio's loudness per frequency band, low to high, each 0...1.
+struct SceneAudioSpectrum: Equatable {
+    static let bandCount = 64
+    var left: [Float]
+    var right: [Float]
+
+    /// `count` bands (a divisor of 64), each the mean of the bands it covers.
+    func bands(_ count: Int, right isRight: Bool) -> [Float] {
+        let source = isRight ? right : left
+        let group = Self.bandCount / count
+        return (0 ..< count).map { band in
+            source[band * group ..< (band + 1) * group].reduce(0, +) / Float(group)
         }
     }
 }

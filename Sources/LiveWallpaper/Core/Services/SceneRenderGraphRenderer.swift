@@ -139,6 +139,7 @@ final class SceneRenderGraphRenderer {
         time: Double,
         cursor: SIMD2<Float>?,
         values: [String: Double] = [:],
+        audio: SceneAudioSpectrum? = nil,
         commandBuffer: MTLCommandBuffer
     ) throws -> MTLTexture {
         let newSize = SIMD2(input.width, input.height)
@@ -216,7 +217,8 @@ final class SceneRenderGraphRenderer {
                     time: time,
                     cursor: cursor,
                     pose: pose,
-                    effectValues: values
+                    effectValues: values,
+                    audio: audio
                 )
                 let fragment = try uniformBinding(
                     draw.fragment,
@@ -225,7 +227,8 @@ final class SceneRenderGraphRenderer {
                     time: time,
                     cursor: cursor,
                     pose: pose,
-                    effectValues: values
+                    effectValues: values,
+                    audio: audio
                 )
                 let descriptor = MTLRenderPassDescriptor()
                 descriptor.colorAttachments[0].texture = target
@@ -324,7 +327,8 @@ final class SceneRenderGraphRenderer {
         time: Double,
         cursor: SIMD2<Float>?,
         pose: SceneSkeletonEvaluator.Pose?,
-        effectValues: [String: Double]
+        effectValues: [String: Double],
+        audio: SceneAudioSpectrum?
     ) throws -> UniformBinding {
         guard let data = updatedUniforms(
             stage,
@@ -332,7 +336,8 @@ final class SceneRenderGraphRenderer {
             time: time,
             cursor: cursor,
             pose: pose,
-            effectValues: effectValues
+            effectValues: effectValues,
+            audio: audio
         )
         else { return .buffer(cached) }
         // Metal's inline argument storage is limited to 4 KiB; larger animated blocks
@@ -369,7 +374,8 @@ final class SceneRenderGraphRenderer {
         time: Double,
         cursor: SIMD2<Float>?,
         pose: SceneSkeletonEvaluator.Pose?,
-        effectValues: [String: Double]
+        effectValues: [String: Double],
+        audio: SceneAudioSpectrum?
     ) -> Data? {
         guard !stage.updates.isEmpty else { return nil }
         var data = stage.uniforms
@@ -400,6 +406,18 @@ final class SceneRenderGraphRenderer {
                     var value = value
                     withUnsafeBytes(of: &value) { bytes in
                         let offset = update.offset + index * (update.stride ?? 16)
+                        data.replaceSubrange(offset ..< offset + bytes.count, with: bytes)
+                    }
+                }
+                continue
+            case .audioSpectrum:
+                let count = update.components!
+                // Silence when nothing listens (a bake, sound reaction off).
+                let bands = audio?.bands(count, right: update.key == "right") ?? Array(repeating: 0, count: count)
+                for (index, value) in bands.enumerated() {
+                    var value = value
+                    withUnsafeBytes(of: &value) { bytes in
+                        let offset = update.offset + index * update.stride!
                         data.replaceSubrange(offset ..< offset + bytes.count, with: bytes)
                     }
                 }
@@ -573,6 +591,15 @@ final class SceneRenderGraphRenderer {
                         "invalid effect uniform update"
                     )
                     bytes = count * 4
+                case .audioSpectrum:
+                    let count = update.components ?? 0
+                    let stride = update.stride ?? 0
+                    try require(
+                        [16, 32, 64].contains(count) && ["left", "right"].contains(update.key ?? "")
+                            && stride >= 4 && stride <= 64,
+                        "invalid audio spectrum uniform update"
+                    )
+                    bytes = (count - 1) * stride + 4
                 }
                 try require(
                     update.offset >= 0 && update.offset <= stage.uniforms.count - bytes,

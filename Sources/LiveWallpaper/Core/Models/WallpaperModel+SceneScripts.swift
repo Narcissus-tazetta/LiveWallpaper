@@ -65,3 +65,40 @@ extension WallpaperModel {
         updateScene(document, path: path, coalescing: false)
     }
 }
+
+struct SceneScriptApprovalRequest: Equatable {
+    /// The external wallpaper's ID.
+    let id: String
+    let name: String
+    /// Where the scene was prepared; a library copy made later is found by `id`.
+    let path: String
+}
+
+@MainActor
+extension WallpaperModel {
+    /// Asks once, when a downloaded scene is first ready, if it has scripts not yet allowed.
+    func requestSceneScriptApproval(id: String, name: String, path: String) {
+        guard sceneDocumentsByPath[path]?.hasUnapprovedScripts == true,
+              !sceneScriptApprovalRequests.contains(where: { $0.id == id })
+        else { return }
+        sceneScriptApprovalRequests.append(SceneScriptApprovalRequest(id: id, name: name, path: path))
+    }
+
+    /// Allowed scripts run whenever the scene shows, from now on and after relaunches,
+    /// until their code changes. Declining leaves them stopped; the editor's script
+    /// panel can still run them later.
+    func answerSceneScriptApproval(_ request: SceneScriptApprovalRequest, allow: Bool) {
+        sceneScriptApprovalRequests.removeAll { $0 == request }
+        guard allow else { return }
+        for path in [request.path, libraryPath(forExternalWallpaperID: request.id)].compactMap({ $0 }) {
+            guard let document = sceneDocumentsByPath[path] else { continue }
+            SceneScriptPermissions.authorizeAll(document, path: path)
+            sceneDocumentsByPath[path] = SceneScriptPermissions.restored(document, path: path)
+            sceneScriptIssues[path] = []
+            if sceneVideosAwaitingScriptApproval.contains(path) {
+                scheduleSceneBake(path: path)
+            }
+        }
+        refreshCursorEffects()
+    }
+}

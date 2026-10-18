@@ -769,7 +769,6 @@
 "全体に戻す" = "Usar toda la capa";
 "全体を塗る" = "Pintar todo";
 "動き" = "Movimiento";
-"動きはこの長さで一周します。ロック画面とスクリーンセーバーには、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。" = "El movimiento se repite con esta duración. La pantalla de bloqueo y el salvapantallas usan un vídeo de esta duración; los bucles más largos tardan más en exportarse.";
 "動きを有効にする" = "Activar movimiento";
 "動きを追加" = "Añadir movimiento";
 "向き" = "Dirección";
@@ -1189,3 +1188,8 @@
 "準備中…" = "Preparando…";
 
 "バックグラウンドで準備しています。完了すると追加できます。" = "Se está preparando en segundo plano. Podrás añadirlo cuando esté listo.";
+"動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。" = "El movimiento se repite con esta duración. Si eliges este fondo para la pantalla de bloqueo o el salvapantallas, se exporta un vídeo de esta duración; los bucles más largos tardan más en exportarse. Un salvapantallas que sigue al escritorio usa el último vídeo exportado.";
+"「%@」のJavaScriptを実行しますか？" = "¿Ejecutar el JavaScript de «%@»?";
+"この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Este fondo de pantalla usa JavaScript para cambiar su movimiento y su aspecto. Si lo permites, se ejecutará automáticamente cada vez que se muestre este fondo. Puedes detenerlo más tarde en el Editor de escena, en «Scripts (JavaScript)».";
+"実行を許可" = "Permitir";
+"許可しない" = "No permitir";

@@ -769,7 +769,6 @@
 "全体に戻す" = "Ganze Ebene verwenden";
 "全体を塗る" = "Alles bemalen";
 "動き" = "Bewegung";
-"動きはこの長さで一周します。ロック画面とスクリーンセーバーには、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。" = "Die Bewegung wiederholt sich in dieser Länge. Sperrbildschirm und Bildschirmschoner verwenden ein Video dieser Länge; längere Schleifen brauchen länger zum Exportieren.";
 "動きを有効にする" = "Bewegung aktivieren";
 "動きを追加" = "Bewegung hinzufügen";
 "向き" = "Richtung";
@@ -1189,3 +1188,8 @@
 "準備中…" = "Wird vorbereitet …";
 
 "バックグラウンドで準備しています。完了すると追加できます。" = "Wird im Hintergrund vorbereitet. Danach können Sie es hinzufügen.";
+"動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。" = "Die Bewegung wiederholt sich in dieser Länge. Wird dieses Hintergrundbild für den Sperrbildschirm oder den Bildschirmschoner gewählt, wird dafür ein Video dieser Länge exportiert; längere Schleifen brauchen länger zum Exportieren. Ein Bildschirmschoner, der dem Schreibtisch folgt, verwendet das zuletzt exportierte Video.";
+"「%@」のJavaScriptを実行しますか？" = "JavaScript in „%@“ ausführen?";
+"この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Dieses Hintergrundbild ändert Bewegung und Darstellung mit JavaScript. Wenn du es erlaubst, wird es jedes Mal automatisch ausgeführt, wenn dieses Hintergrundbild angezeigt wird. Du kannst es später im Szenen-Editor unter „Skripte (JavaScript)“ stoppen.";
+"実行を許可" = "Erlauben";
+"許可しない" = "Nicht erlauben";
