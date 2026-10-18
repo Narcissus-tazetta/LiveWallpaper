@@ -24,13 +24,18 @@ extension WallpaperModel {
         path: String,
         isActive: Bool
     ) -> AVQueuePlayer {
-        if let existing = dedicatedSlotsByScreenID[screenID]?[path] {
+        if dedicatedSlotsByScreenID[screenID]?[path] != nil {
+            if isActive, effectiveLightweightMode,
+               let proxy = lightweightProxyCache.cachedProxyURL(for: path)
+            {
+                replaceDedicatedPlaybackURL(proxy, screenID: screenID, path: path)
+            }
             guard isActive, activeDedicatedPathByScreenID[screenID] != path else {
                 if isActive {
                     demotePreviousActiveSlotIfNeeded(forScreenID: screenID, newActivePath: path)
                     activeDedicatedPathByScreenID[screenID] = path
                 }
-                return existing.player
+                return dedicatedSlotsByScreenID[screenID]![path]!.player
             }
             // 温存(warmStandby)状態から現在スロットへ昇格する場合。AVPlayerLooper は
             // templateItem を外部に公開せず、ループのたびに内部で保持したコピーを
@@ -52,7 +57,8 @@ extension WallpaperModel {
         let player = createConfiguredPlayer(muted: true)
 
         let profile = resolvePlaybackProfile(role: isActive ? .active : .warmStandby)
-        let item = AVPlayerItem(asset: AVURLAsset(url: resolvedPlaybackURL(for: path)))
+        let playbackURL = resolvedPlaybackURL(for: path)
+        let item = AVPlayerItem(asset: AVURLAsset(url: playbackURL))
         item.preferredPeakBitRate = profile.bitRate
         item.preferredForwardBufferDuration = profile.buffer
         item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
@@ -78,7 +84,7 @@ extension WallpaperModel {
 
         var slots = dedicatedSlotsByScreenID[screenID] ?? [:]
         slots[path] = DedicatedPlayerSlot(
-            player: player, looper: looper,
+            playbackURL: playbackURL, player: player, looper: looper,
             audioController: PlayerAudioTrackController(player: player, isAudioEnabled: false)
         )
         dedicatedSlotsByScreenID[screenID] = slots
@@ -97,7 +103,76 @@ extension WallpaperModel {
                 "no saved position display=\(screenID, privacy: .public) path=\((path as NSString).lastPathComponent, privacy: .public)"
             )
         }
+        if isActive { ensureLightweightProxyIfNeeded(for: path) }
         return player
+    }
+
+    func replaceDedicatedPlaybackURL(_ url: URL, screenID: String, path: String) {
+        guard activeDedicatedPathByScreenID[screenID] == path,
+              let slot = dedicatedSlotsByScreenID[screenID]?[path],
+              slot.playbackURL != url else { return }
+        let resumeTime = slot.player.currentTime()
+        let rate = slot.player.rate
+        // A destroyed looper restores its queue's old settings, even after a replacement
+        // looper was installed. A new player keeps that teardown off the new queue.
+        let player = createConfiguredPlayer(muted: true)
+        let profile = resolvePlaybackProfile()
+        let item = AVPlayerItem(url: url)
+        item.preferredPeakBitRate = profile.bitRate
+        item.preferredForwardBufferDuration = profile.buffer
+        item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
+        let looper = makeWallpaperLooper(
+            player: player,
+            templateItem: item,
+            path: path,
+            playsIntro: false,
+            context: "dedicated proxy display=\(screenID)"
+        )
+        dedicatedSlotsByScreenID[screenID]?[path] = DedicatedPlayerSlot(
+            playbackURL: url, player: player, looper: looper,
+            audioController: PlayerAudioTrackController(player: player, isAudioEnabled: false)
+        )
+        for (index, view) in playerViews.enumerated()
+            where displayIDForWindow(at: index) == screenID && view.player === slot.player
+        {
+            view.player = player
+        }
+        slot.looper.disableLooping()
+        slot.player.pause()
+        slot.player.removeAllItems()
+        Task { [weak self, weak player] in
+            let deadline = ProcessInfo.processInfo.systemUptime + 15
+            while let player, player.currentItem == nil || player.currentItem?.status == .unknown,
+                  looper.status != .failed, ProcessInfo.processInfo.systemUptime < deadline
+            {
+                guard self?.dedicatedSlotsByScreenID[screenID]?[path]?.looper === looper
+                else { return }
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { continuation.resume() }
+                }
+            }
+            guard let self, let player,
+                  self.dedicatedSlotsByScreenID[screenID]?[path]?.looper === looper,
+                  self.activeDedicatedPathByScreenID[screenID] == path else { return }
+            if let item = player.currentItem, item.status == .readyToPlay,
+               resumeTime.isNumeric,
+               let seconds = self.clampedResumeSeconds(
+                   resumeTime.seconds,
+                   path: path,
+                   itemDurationSeconds: item.duration.seconds
+               )
+            {
+                await player.seek(
+                    to: CMTime(seconds: seconds, preferredTimescale: 600),
+                    toleranceBefore: .zero,
+                    toleranceAfter: .zero
+                )
+            }
+            guard self.dedicatedSlotsByScreenID[screenID]?[path]?.looper === looper,
+                  self.activeDedicatedPathByScreenID[screenID] == path,
+                  !self.suspendedDisplayIDs.contains(screenID) else { return }
+            if rate > 0 { player.playImmediately(atRate: rate) }
+        }
     }
 
     func ensureDedicatedPlayer(forScreenID screenID: String, path: String) -> AVQueuePlayer {
@@ -145,6 +220,7 @@ extension WallpaperModel {
             activeDedicatedPathByScreenID.removeValue(forKey: screenID)
             dedicatedFreezeFrameByScreenID.removeValue(forKey: screenID)
         }
+        refreshLightweightProxyState()
     }
 
     /// トリム/ループ編集が保存されたときに呼ぶ。この動画を専用プレイヤーで

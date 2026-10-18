@@ -44,6 +44,8 @@ final class LightweightProxyCache {
 
     final class ActiveGeneration {
         let path: String
+        var completions: [(GenerationResult) -> Void] = []
+        var isCancelled = false
         var session: AVAssetExportSession?
         var task: Task<Void, Never>?
 
@@ -55,12 +57,25 @@ final class LightweightProxyCache {
     // Bump whenever the encoding of proxies changes (e.g. a fixed scaling transform,
     // keeping HDR sources HDR): a version mismatch wipes the cached files so they get
     // regenerated, instead of serving proxies made under the old scheme.
-    nonisolated static let metadataVersion = 3
+    nonisolated static let metadataVersion = 4
     nonisolated static let metadataFileName = "metadata.json"
     /// Target long edge, in pixels, for the transcoded proxy. Sources at or below this
     /// (and at or below the frame-rate cap) are treated as passthrough — see +Generation.swift.
     nonisolated static let targetLongEdge: CGFloat = 1280
     nonisolated static let targetFrameRate: Float = 30
+
+    let rootDirectory: URL?
+    var dataDirectory: URL? {
+        rootDirectory?.appendingPathComponent("data", isDirectory: true)
+    }
+
+    var metadataURL: URL? {
+        rootDirectory?.appendingPathComponent(Self.metadataFileName)
+    }
+
+    init(rootDirectory: URL? = LightweightProxyCache.rootDirectoryURL()) {
+        self.rootDirectory = rootDirectory
+    }
 
     let maxDiskBytes: UInt64 = 2 * 1024 * 1024 * 1024
     let ioQueue = DispatchQueue(label: "LiveWallpaper.lightweightProxyCache.io", qos: .utility)
@@ -71,7 +86,7 @@ final class LightweightProxyCache {
     var metadataFlushWorkItem: DispatchWorkItem?
     let metadataFlushDelay: TimeInterval = 2.0
     var willTerminateObserver: NSObjectProtocol?
-    var pendingGenerationRequest: (path: String, completion: (GenerationResult) -> Void)?
+    var pendingGenerationRequests: [(path: String, completions: [(GenerationResult) -> Void])] = []
     var activeGeneration: ActiveGeneration?
 
     deinit {
@@ -92,7 +107,7 @@ final class LightweightProxyCache {
             return nil
         }
         guard let fileName = entry.fileName,
-              let fileURL = Self.dataDirectoryURL()?.appendingPathComponent(fileName),
+              let fileURL = dataDirectory?.appendingPathComponent(fileName),
               FileManager.default.fileExists(atPath: fileURL.path)
         else {
             return nil
@@ -102,49 +117,67 @@ final class LightweightProxyCache {
     }
 
     func cancelActiveGeneration() {
-        pendingGenerationRequest = nil
-        guard let active = activeGeneration else {
-            return
+        retainGenerationRequests(for: [])
+    }
+
+    func retainGenerationRequests(for paths: Set<String>) {
+        let removed = pendingGenerationRequests.filter { !paths.contains($0.path) }
+        pendingGenerationRequests.removeAll { !paths.contains($0.path) }
+        var completions = removed.flatMap(\.completions)
+        if let active = activeGeneration, !paths.contains(active.path) {
+            completions += active.completions
+            active.completions = []
+            active.isCancelled = true
+            active.session?.cancelExport()
+            active.task?.cancel()
         }
-        active.session?.cancelExport()
-        active.task?.cancel()
-        activeGeneration = nil
+        // An export must finish cancelling before the next one reuses its .tmp file.
+        for completion in completions {
+            completion(.cancelled)
+        }
     }
 
     func generateProxyIfNeeded(for path: String, completion: @escaping (GenerationResult) -> Void) {
+        if let active = activeGeneration, active.path == path, !active.isCancelled {
+            active.completions.append(completion)
+            return
+        }
+        if let index = pendingGenerationRequests.firstIndex(where: { $0.path == path }) {
+            pendingGenerationRequests[index].completions.append(completion)
+        } else {
+            pendingGenerationRequests.append((path, [completion]))
+        }
         ensureInitialized()
-        guard initializationState == .ready else {
-            pendingGenerationRequest = (path, completion)
-            return
-        }
+        startNextGeneration()
+    }
 
-        if let cached = cachedProxyURL(for: path) {
-            completion(.ready(cached))
-            return
-        }
-        if let entry = metadata.entries[path],
-           entry.isPassthrough,
-           SourceValidityCheck.isValid(path: path, entry: entry)
-        {
-            completion(.passthrough)
-            return
-        }
-        guard activeGeneration?.path != path else {
-            return
-        }
-        cancelActiveGeneration()
-
-        let active = ActiveGeneration(path: path)
+    func startNextGeneration() {
+        guard initializationState == .ready, activeGeneration == nil,
+              !pendingGenerationRequests.isEmpty else { return }
+        let request = pendingGenerationRequests.removeFirst()
+        let active = ActiveGeneration(path: request.path)
+        active.completions = request.completions
         activeGeneration = active
         active.task = Task { [weak self] in
-            guard let self else {
-                return
+            guard let self else { return }
+            let result: GenerationResult
+            if active.isCancelled {
+                result = .cancelled
+            } else if let cached = cachedProxyURL(for: active.path) {
+                result = .ready(cached)
+            } else if let entry = metadata.entries[active.path], entry.isPassthrough,
+                      SourceValidityCheck.isValid(path: active.path, entry: entry)
+            {
+                result = .passthrough
+            } else {
+                result = await performGeneration(path: active.path, activeGeneration: active)
             }
-            let result = await self.performGeneration(path: path, activeGeneration: active)
-            if self.activeGeneration === active {
-                self.activeGeneration = nil
+            let completions = active.completions
+            activeGeneration = nil
+            for completion in completions {
+                completion(active.isCancelled ? .cancelled : result)
             }
-            completion(result)
+            startNextGeneration()
         }
     }
 }

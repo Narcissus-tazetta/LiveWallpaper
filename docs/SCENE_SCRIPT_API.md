@@ -1,8 +1,8 @@
-# 壁紙スクリプトAPI v3
+# 壁紙スクリプトAPI v4
 
 画像壁紙の「シーン編集」→「スクリプト(JavaScript)」でサンプルを追加し、対象レイヤーと入力を選択する。「実行して適用」でコードと設定を検証して保存する。入力中の下書きは実行中のコードと別に保持される。
 
-追加メニューの先頭は「空白のスクリプト」。`update(ctx)`と空の出力だけが入り、入力依存はすべてオフ、パラメーターは空。対象は全レイヤーで、後から追加したレイヤーも含む。空白を含めて28種類のテンプレートがある。作成・適用するスクリプトはAPI v3。保存済みのAPI v1・v2も評価できる。
+追加メニューの先頭は「空白のスクリプト」。`update(ctx)`と空の出力だけが入り、入力依存はすべてオフ、パラメーターは空。対象は全レイヤーで、後から追加したレイヤーも含む。空白を含めて28種類のテンプレートがある。作成・適用するスクリプトはAPI v4。保存済みのAPI v1〜v3も評価できる。
 
 スクリプト、パラメーター、API説明、ログの見出しは行全体で開閉でき、右側の余白もクリック対象になる。
 
@@ -28,7 +28,7 @@ function update(ctx) {
 }
 ```
 
-同期関数`update(ctx)`が、対象ごとの調整を配列で返す。グローバル変数は評価ごとに初期化される。状態を蓄積せず、時刻などの入力から結果を計算する。これにより任意時刻への移動と動画書き出しで同じ結果を得られる。
+同期関数`update(ctx)`が、対象ごとの調整を配列で返す。通常スクリプト(`modules`が未指定またはnull)では、グローバル変数は評価ごとに初期化される。任意時刻への移動と動画書き出しで同じ結果を得るには、状態を蓄積せず、時刻などの入力から結果を計算する。モジュール形式では評価間で状態を保持する(後述)。
 
 ## 入力
 
@@ -39,14 +39,19 @@ function update(ctx) {
 | `ctx.canvas` | `width`, `height`, `aspectRatio` |
 | `ctx.loopSeconds` | ループの秒数 |
 | `ctx.time` | ループ内の秒数。「ループ時刻」が必要 |
+| `ctx.elapsedTime` | 入力時刻の秒数。ループ内に折り返さない。「ループ時刻」が必要 |
 | `ctx.phase` | ループ内の割合、0以上1未満。「ループ時刻」が必要 |
 | `ctx.timeOfDay` | `morning`, `day`, `evening`, `night`。「時間帯」が必要 |
+| `ctx.wallClock` | `{epochMilliseconds, timeZoneOffsetMinutes}`。UNIX時刻のミリ秒とUTCからの時差(分)。「時間帯」が必要 |
 | `ctx.cursor` | `{x, y}`。画面左・上が-1、右・下が1。平滑化済み。「カーソル」が必要 |
 | `ctx.cursorActive` | カーソルへ反応できるか。「カーソル」が必要 |
+| `ctx.pointer` | キャンバス座標の`{x,y}`。左上が0、右下が1。反応できない場合はnull。平滑化しない。「カーソル」が必要 |
+| `ctx.pointerPresses` | 前回のスクリプト評価以降の主ボタンの押下・解放。古い順の`{isDown,x,y}`配列。座標は`pointer`と同じ。「カーソル」が必要 |
+| `ctx.media` | Music / Spotify の曲情報。「曲情報」が必要。詳細は後述 |
 
-未選択の入力にアクセスするとエラーになる。動画書き出しではカーソルは中立の`{x:0,y:0}`で、`cursorActive`はfalse。時間帯は書き出し開始時に固定され、アプリが動いている間は時間帯境界で動画を更新する。
+未選択の入力にアクセスするとエラーになる。動画書き出しではカーソルは中立の`{x:0,y:0}`、`cursorActive`はfalse、`pointer`はnull、`pointerPresses`は空配列、`media`は`{isAvailable:false}`になる。時間帯は書き出し開始時に固定され、アプリが動いている間は時間帯境界で動画を更新する。`wallClock`はリアルタイム描画では現在時刻、書き出しでは最初のフレームを基準に入力時刻の差分だけ進む。画面上のポインタ操作は、評価までに蓄積した直近32件を保持する。
 
-各対象は`id`, `name`, `kind`, `isLocked`, `transform`, `opacity`, `values`, `appearance`, `effects`, `particles`を持つ。配置や透明度にはGUIのキーフレームと連動を反映する。画像ファイルやマスクのパスは含まない。`effects`のIDを使って、その対象の既存エフェクトを操作できる。粒子がない対象の`particles`はnull。
+各対象は`id`, `name`, `kind`, `isLocked`, `transform`, `opacity`, `values`, `appearance`, `effects`, `particles`, `text`, `rigs`を持つ。配置や透明度にはGUIのキーフレームと連動を反映する。画像ファイルやマスクのパスは含まない。`effects`のIDを使って、その対象の既存エフェクトを操作できる。粒子がない対象の`particles`、テキストがない対象の`text`はnull。`rigs`は対象の配置・描画パスで参照しているスケルトンの配列。
 
 対象のIDは`ctx.targets`から取得する。レイヤーを複製すると同じスクリプトの対象へ追加される。表示名は識別子ではなく、エフェクトのIDは複製元と別になる。
 
@@ -71,7 +76,7 @@ function update(ctx) {
 | --- | --- | --- |
 | `offsetX`, `offsetY` | -4〜4。キャンバス幅・高さに対する割合 | 加算 |
 | `rotation` | -3600〜3600。時計回りの度数 | 加算 |
-| `scale` | 0.01〜16 | 乗算 |
+| `scale`, `scaleY` | 通常形式は0.05〜16、モジュール形式は-64〜64 | 乗算。`scale`は横倍率で、`scaleY`未指定時は縦にも同じ倍率 |
 | `opacity` | 0〜1 | 乗算 |
 | `brightness` | -1〜1。-1で黒、1で明るさ2倍 | 加算 |
 | `saturation` | 0〜4。1で変更なし | 乗算 |
@@ -94,7 +99,7 @@ function update(ctx) {
 }
 ```
 
-エフェクトの調整は`id`と、`kind`, `fixedEdge`, `isEnabled`, `strength`, `scale`, `direction`, `cycles`, `centerX`, `centerY`, `reversed`の任意の組み合わせ。強さ・大きさ・中心座標は0〜1、周期は整数1〜12、方向は-3600〜3600度。`kind`は既存GUIのエフェクト種類、`fixedEdge`は`none/top/bottom/left/right`。種類によって使用される値が異なり、新しいエフェクトや画像マスクをこの出力で追加することはできない。
+エフェクトの調整は`id`と、`kind`, `fixedEdge`, `isEnabled`, `strength`, `scale`, `direction`, `cycles`, `centerX`, `centerY`, `reversed`, `values`の任意の組み合わせ。強さ・大きさ・中心座標は0〜1、周期は整数1〜12、方向は-3600〜3600度。`kind`は既存GUIのエフェクト種類、`fixedEdge`は`none/top/bottom/left/right`。種類によって使用される値が異なり、新しいエフェクトや画像マスクをこの出力で追加することはできない。`values`は種類固有の数値パラメーター辞書で、最大64項目、各値は有限数の-1e9〜1e9。未指定のキーは現在値を維持する。
 
 ```js
 function update(ctx) {
@@ -133,6 +138,7 @@ function update(ctx) {
 | `appearance`の項目 | 仕様 |
 | --- | --- |
 | `isVisible` | boolean。表示のオン／オフ |
+| `tint` | `{red,green,blue,alpha}`。全項目が必要で、各値0〜1 |
 | `blendMode` | `normal/multiply/screen/overlay/add` |
 | `parallaxDepth` | 0〜1。レイヤー全体の視差 |
 | `depthStrength` | 0〜1。既存の深度マップの強さ |
@@ -143,6 +149,75 @@ function update(ctx) {
 | `clearCursorMask` | trueでカーソルマスクを除く。同時に`cursorMask`は指定できない |
 
 入力の`layer.appearance`には現在の設定と`hasDepthMap`が入る。ファイルのパスは入らず、深度画像の新規作成や読み込みはGUIで行う。視差・カーソルマスク・粒子のカーソル反応を使う場合は「カーソル」、自動運動を使う場合は「ループ時刻」を宣言する。
+
+## 曲情報
+
+「曲情報」を有効にすると`ctx.media`を読める。Music / Spotify の情報取得にはmacOSのオートメーション許可が必要。取得できない場合は`{isAvailable:false}`だけが渡るので、他の項目を読む前に確認する。
+
+| `media`の項目 | 仕様 |
+| --- | --- |
+| `isAvailable` | 曲情報を取得できるか |
+| `playback` | `stopped/playing/paused` |
+| `title`, `artist`, `album` | 曲名・アーティスト・アルバム名の文字列 |
+| `position`, `duration` | 再生位置・曲の長さ(秒) |
+| `artworkID` | アートワーク変更時に変わる識別子。ない場合は空文字列 |
+| `palette` | アートワークから抽出した色。取得できた場合のみ存在する。`primary`, `secondary`, `tertiary`, `text`, `highContrast`がそれぞれ0〜1の`[red,green,blue]` |
+
+```js
+function update(ctx) {
+  const title = ctx.media.isAvailable ? ctx.media.title : "";
+  return ctx.targets.filter(layer => layer.text !== null).map(layer => ({
+    id: layer.id,
+    text: { string: title },
+  }));
+}
+```
+
+## テキスト・描画順・スケルトン再生
+
+出力には`values`などに加えて、以下も指定できる。いずれも既存の対象を調整する。
+
+| 出力の項目 | 仕様 |
+| --- | --- |
+| `text.string` | テキストレイヤーの文字列。最大4096文字 |
+| `text.color` | `{red,green,blue}`。全項目が必要で、各値0〜1。既存のアルファを維持する |
+| `order` | 描画順を指定する整数。0〜全レイヤー数-1。未指定は元の順序。同順位は元のレイヤー順 |
+| `rigs` | `[{id,playback:[{index,frame?,rate?,weight?}]}]`。対象に属するスケルトンの既存再生設定を調整する |
+
+`layer.text`は`{string,color:{red,green,blue}}`。`layer.rigs`の各要素は`id`と`playback`を持つ。各再生設定には`index`, `name`, `frameCount`, `framesPerSecond`, `startFrame`, `rate`, `weight`, `loops`が入る。
+
+`rigs[].playback`の`index`は既存再生設定のインデックス。`frame`は-1e9〜1e9で、そのフレームに固定する(`rate`を0にする)。`rate`は-1000〜1000、`weight`は0〜1。`frame`と`rate`は同時指定できない。1つの対象の出力で同じリグID・再生インデックスは重複指定できない。共有リグへの調整は、そのリグを参照する他のレイヤーにも反映される。
+
+## モジュール形式
+
+シーンドキュメントのスクリプトに`modules`辞書がある場合は、ソースをESモジュールとして扱う。空の辞書`{}`でもモジュール形式になり、エントリーソースは`update`を名前付きでexportする。通常の追加メニューのテンプレートは`modules`未指定の通常形式。
+
+同梱するモジュールは`modules`のキーを名前、値をJavaScriptソースとする。エントリーのファイル名は`entry.js`。相対importは参照元から解決され、解決後の名前が辞書にあるソースだけを読み込む。ディスクやネットワークからの取得は行わない。
+
+たとえば`modules`に以下を同梱する。
+
+```json
+{
+  "lib/motion.js": "export const amplitude = 0.05;"
+}
+```
+
+エントリーソース:
+
+```js
+import { amplitude } from "./lib/motion.js";
+
+export function update(ctx) {
+  return ctx.targets.map(layer => ({
+    id: layer.id,
+    values: { offsetY: wave(ctx.phase) * amplitude },
+  }));
+}
+```
+
+モジュールの初期化は一度だけで、変数の状態を評価間で保持する。「ループ時刻」が有効で`elapsedTime`が前回より小さくなった場合は、再コンパイルして状態を初期化する。スクリプトのソースや設定が変わった場合も再コンパイルする。状態を使う処理の結果は評価履歴に依存するため、任意時刻への移動・書き出しで同じ結果が必要な処理は入力時刻から計算する。
+
+モジュール形式の戻り値は通常の調整配列に加えて、`{adjustments: [...], warnings: [...]}`も使える。`warnings`は最大16個の文字列で、各メッセージはUTF-8で1KiB以内。警告を表示しながら正常な部分の調整を適用できる。例外をthrowした場合はスクリプト全体の失敗として扱う。非同期の初期化・`update`は利用できない。
 
 ## 補助関数と診断
 
@@ -183,14 +258,14 @@ function update(ctx) {
 
 イージングの種類は`linear/smooth/smoother/inQuad/outQuad/inOutQuad/inCubic/outCubic/inOutCubic/inOutSine/outBack/outElastic/outBounce`。BackとElasticは途中で0〜1を超えるので、透明度などへ使う場合は`clamp`で収める。軌道の座標はキャンバス比率で扱い、必要なら`ctx.canvas.aspectRatio`で補正する。
 
-時間・乱数は明示した入力から計算する。`Date`、`Math.random`、タイマー、非同期の`update`、Promiseを使う処理、外部モジュール、ファイル、ネットワーク、外部コマンドは利用できない。
+時間・乱数は明示した入力から計算する。`Date`、`Math.random`、タイマー、非同期の`update`、Promiseを使う処理、バンドル外のモジュール、ファイル、ネットワーク、外部コマンドは利用できない。
 
 ## 実行制限と停止
 
-スクリプトはメインスレッド外で実行する。上限はスクリプト32個、ソース64KiB、パラメーター64個、対象128個、エフェクト調整16個／対象、出力256KiB。VMごとのメモリは16MiB、評価器全体のVMメモリは128MiB、スタックは最大512KiBで、実行スレッドの残り容量の半分までに抑える。コンパイルは100ms、フレーム実行は1スクリプト8ms・全体16msを上限とする。本数にかかわらず重い組み合わせは総予算で停止する。
+スクリプトはメインスレッド外で実行する。上限はスクリプト32個、ソース64KiB、パラメーター64個、エディターで適用する対象128個、評価時の対象・出力調整512個、エフェクト調整16個／対象、出力256KiB。パラメーター名はUTF-8で128バイト以内、値は有限数。モジュールは最大256個で、名前とソースのUTF-8合計は1MiBまで。VMごとのメモリは16MiB、評価器全体のVMメモリは128MiB、スタックは最大512KiBで、実行スレッドの残り容量の半分までに抑える。コンパイルは100ms。ライブ評価のフレーム実行は1スクリプト8ms・全体16ms、書き出し用評価器は1スクリプト250ms・全体1秒を上限とする。モジュール形式の初回評価(初期化と最初の`update`)には、通常のフレーム予算とは別に最低100msを割り当てる。本数にかかわらず重い組み合わせは総予算で停止する。
 
-値の型・範囲、対象外ID、未知の項目、NaN・Infinity、資源上限違反はエラーになる。エラーになったスクリプトは自動で再試行せず、エディターへ理由を表示する。修正して「実行して適用」を押すと再開する。書き出し中の失敗では旧動画を保持する。
+値の型・範囲、対象外ID、未知の項目、NaN・Infinity、資源上限違反はエラーになる。エラーになったスクリプトは停止し、エディターへ理由を表示する。実行時間超過は一時停止として扱い、ライブ評価では2秒後に再試行する。それ以外は自動再試行しない。修正して「実行して適用」を押すと再開する。モジュールの部分的な失敗は、返された`warnings`を表示し、残りの調整を適用する。書き出し中の失敗では旧動画を保持する。
 
-共有・Storeから取り込んだスクリプトは、保存元の有効設定にかかわらず利用者の許可なしでは動かない。許可は端末内の壁紙パス・ソース内容・API版に結び付く。未許可の間は添付動画を維持する。
+共有・Storeから取り込んだスクリプトは、保存元の有効設定にかかわらず利用者の許可なしでは動かない。許可は端末内の壁紙パス・ソース内容・API版・同梱モジュールに結び付く。未許可の間は添付動画を維持する。
 
 コードは既存の描画を調整する機能であり、画像の追加・削除、マスク生成、シェーダー生成はGUIで行う。ループのつながりは作者が周期関数などで設計し、既存の終端確認操作で確認する。

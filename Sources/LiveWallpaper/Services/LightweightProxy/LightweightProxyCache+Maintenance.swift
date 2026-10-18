@@ -20,7 +20,7 @@ extension LightweightProxyCache {
         if let previous = metadata.entries[path],
            let previousFileName = previous.fileName,
            previousFileName != fileName,
-           let dataURL = Self.dataDirectoryURL()
+           let dataURL = dataDirectory
         {
             let staleURL = dataURL.appendingPathComponent(previousFileName)
             ioQueue.async {
@@ -40,7 +40,7 @@ extension LightweightProxyCache {
     func trimDiskIfNeeded() {
         let entries = metadata.entries
         let maxBytes = maxDiskBytes
-        guard let dataURL = Self.dataDirectoryURL() else {
+        guard let dataURL = dataDirectory else {
             return
         }
         ioQueue.async { [weak self] in
@@ -135,7 +135,7 @@ extension LightweightProxyCache {
         metadataFlushWorkItem = nil
 
         let snapshot = metadata
-        guard let metadataURL = Self.metadataFileURL() else {
+        guard let metadataURL = self.metadataURL else {
             return
         }
         ioQueue.async {
@@ -157,7 +157,7 @@ extension LightweightProxyCache {
         metadataFlushWorkItem = nil
 
         let snapshot = metadata
-        guard let metadataURL = Self.metadataFileURL() else {
+        guard let metadataURL = self.metadataURL else {
             return
         }
         ioQueue.sync {

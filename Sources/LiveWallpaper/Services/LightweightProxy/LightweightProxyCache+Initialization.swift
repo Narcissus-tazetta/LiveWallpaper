@@ -7,8 +7,8 @@ extension LightweightProxyCache {
         }
         initializationState = .loading
 
-        guard let dataURL = Self.dataDirectoryURL(),
-              let metadataURL = Self.metadataFileURL()
+        guard let dataURL = dataDirectory,
+              let metadataURL = self.metadataURL
         else {
             initializationState = .ready
             return
@@ -79,10 +79,7 @@ extension LightweightProxyCache {
                     self.flushMetadataIfNeeded()
                 }
 
-                if let pending = self.pendingGenerationRequest {
-                    self.pendingGenerationRequest = nil
-                    self.generateProxyIfNeeded(for: pending.path, completion: pending.completion)
-                }
+                self.startNextGeneration()
             }
         }
     }

@@ -107,7 +107,7 @@ final class WallpaperModel: ObservableObject {
     let playbackEnvironment: PlaybackEnvironment
     let lockScreenSyncService: LockScreenSyncService = .init()
     let desktopIconsService: DesktopIconsService = .init()
-    let lightweightProxyCache: LightweightProxyCache = .init()
+    let lightweightProxyCache: LightweightProxyCache
     var lockScreenSyncTask: Task<Void, Never>?
     /// Identifies the running sync, so progress from a replaced one is ignored.
     var lockScreenSyncID = UUID()
@@ -123,6 +123,8 @@ final class WallpaperModel: ObservableObject {
     @Published var fitMode: VideoFitMode = .fill
     @Published var lightweightMode: Bool = false
     @Published var hdrDisplayEnabled: Bool = true
+    var lightweightProxyStatesByPath: [String: LightweightProxyCache.ProxyGenerationState] = [:]
+    var lightweightProxyRequests: [String: UUID] = [:]
     @Published var lightweightProxyState: LightweightProxyCache.ProxyGenerationState = .idle
     @Published var audioEnabled: Bool = false
     @Published var audioVolume: Float = 1.0
@@ -329,6 +331,7 @@ final class WallpaperModel: ObservableObject {
     /// 画面ID → その画面が従うプレイリストID。未設定ならライブラリ全体を対象にする。
     @Published var screenPlaylistByScreenID: [String: UUID] = [:]
     struct DedicatedPlayerSlot {
+        let playbackURL: URL
         let player: AVQueuePlayer
         let looper: AVPlayerLooper
         let audioController: PlayerAudioTrackController
@@ -466,7 +469,8 @@ final class WallpaperModel: ObservableObject {
         )
     }
 
-    init() {
+    init(lightweightProxyCache: LightweightProxyCache? = nil) {
+        self.lightweightProxyCache = lightweightProxyCache ?? LightweightProxyCache()
         playbackEnvironment = Self.detectPlaybackEnvironment()
         configurePlayer()
         restoreState()

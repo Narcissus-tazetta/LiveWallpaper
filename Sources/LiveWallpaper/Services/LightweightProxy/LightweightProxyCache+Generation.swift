@@ -32,6 +32,8 @@ extension LightweightProxyCache {
             return .failed
         }
 
+        guard !Task.isCancelled else { return .cancelled }
+
         guard case let .needsTranscode(composition, presetName) = eligibility else {
             recordEntry(
                 path: path,
@@ -47,7 +49,7 @@ extension LightweightProxyCache {
             return .cancelled
         }
 
-        guard let dataURL = Self.dataDirectoryURL() else {
+        guard let dataURL = dataDirectory else {
             return .failed
         }
         do {
@@ -83,6 +85,11 @@ extension LightweightProxyCache {
             exportSessionBox.session.exportAsynchronously {
                 continuation.resume(returning: exportSessionBox.session.status)
             }
+        }
+
+        guard !Task.isCancelled else {
+            try? FileManager.default.removeItem(at: tmpURL)
+            return .cancelled
         }
 
         switch status {
@@ -178,6 +185,8 @@ extension LightweightProxyCache {
         }
         composition.renderSize = CGSize(width: newWidth, height: newHeight)
 
+        // Source-track timing takes precedence over frameDuration for single-track assets.
+        composition.sourceTrackIDForFrameTiming = kCMPersistentTrackID_Invalid
         let minFrameDuration = CMTime(value: 1, timescale: Int32(targetFrameRate))
         if composition.frameDuration < minFrameDuration {
             composition.frameDuration = minFrameDuration

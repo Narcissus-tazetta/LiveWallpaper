@@ -23,47 +23,67 @@ extension WallpaperModel {
         ensureLightweightProxyIfNeeded(for: path)
     }
 
-    private func ensureLightweightProxyIfNeeded(for path: String) {
+    func ensureLightweightProxyIfNeeded(for path: String) {
         guard effectiveLightweightMode else {
-            lightweightProxyCache.cancelActiveGeneration()
-            lightweightProxyState = .idle
+            resetLightweightProxyRequests()
             return
         }
+        guard lightweightProxyRequests[path] == nil else { return }
         if lightweightProxyCache.cachedProxyURL(for: path) != nil {
-            lightweightProxyState = .ready
+            lightweightProxyStatesByPath[path] = .ready
+            refreshLightweightProxyState()
             return
         }
-        lightweightProxyState = .generating
+        let requestID = UUID()
+        lightweightProxyRequests[path] = requestID
+        lightweightProxyStatesByPath[path] = .generating
+        refreshLightweightProxyState()
         lightweightProxyCache.generateProxyIfNeeded(for: path) { [weak self] result in
-            // Re-validate both that this is still the current video AND that
-            // lightweight mode is still on — a generation started before the
-            // user switched video/toggled the mode off may resolve after either
-            // has already changed, and must not resurrect stale UI state.
-            guard let self, self.currentVideoPath == path, self.effectiveLightweightMode else {
-                return
-            }
+            guard let self, self.lightweightProxyRequests[path] == requestID else { return }
+            self.lightweightProxyRequests[path] = nil
+            guard self.effectiveLightweightMode else { return }
             switch result {
             case .ready(let proxyURL):
-                self.lightweightProxyState = .ready
-                // If the wallpaper is deep-suspended, the video is torn down and
-                // not playing — don't rebuild it now just to swap to the proxy.
-                // Resume from deep suspend re-resolves the URL (picking up this
-                // freshly-cached proxy) via resolvedPlaybackURL, so the swap
-                // happens naturally when the wallpaper comes back.
-                guard !self.isDeepSuspended else {
-                    return
+                self.lightweightProxyStatesByPath[path] = .ready
+                if self.currentVideoPath == path, !self.isDeepSuspended {
+                    let resumeTime = self.sharedPlayer?.currentTime() ?? .zero
+                    self.reinstallPlayerItemContinuingPlayback(url: proxyURL, attach: true)
+                    self.restorePlaybackPositionAfterProxySwap(resumeTime)
                 }
-                let resumeTime = self.sharedPlayer?.currentTime() ?? .zero
-                self.reinstallPlayerItemContinuingPlayback(url: proxyURL, attach: true)
-                self.restorePlaybackPositionAfterProxySwap(resumeTime)
+                for (screenID, activePath) in self.activeDedicatedPathByScreenID
+                    where activePath == path
+                {
+                    self.replaceDedicatedPlaybackURL(proxyURL, screenID: screenID, path: path)
+                }
             case .passthrough:
-                self.lightweightProxyState = .ready
+                self.lightweightProxyStatesByPath[path] = .ready
             case .cancelled:
-                break
+                self.lightweightProxyStatesByPath[path] = .idle
             case .failed:
-                self.lightweightProxyState = .failed
+                self.lightweightProxyStatesByPath[path] = .failed
             }
+            self.refreshLightweightProxyState()
         }
+    }
+
+    func resetLightweightProxyRequests() {
+        lightweightProxyRequests = [:]
+        lightweightProxyStatesByPath = [:]
+        lightweightProxyCache.cancelActiveGeneration()
+        lightweightProxyState = .idle
+    }
+
+    func refreshLightweightProxyState() {
+        let paths = Set(activeDedicatedPathByScreenID.values)
+            .union(currentVideoPath.map { [$0] } ?? [])
+        lightweightProxyCache.retainGenerationRequests(for: paths)
+        lightweightProxyStatesByPath = lightweightProxyStatesByPath
+            .filter { paths.contains($0.key) }
+        let states = lightweightProxyStatesByPath.values
+        lightweightProxyState = !effectiveLightweightMode ? .idle
+            : states.contains(.failed) ? .failed
+            : states.contains(.generating) ? .generating
+            : states.contains(.ready) ? .ready : .idle
     }
 
     private func restorePlaybackPositionAfterProxySwap(_ requestedTime: CMTime) {

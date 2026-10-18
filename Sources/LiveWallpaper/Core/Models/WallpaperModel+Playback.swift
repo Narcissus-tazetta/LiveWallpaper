@@ -258,6 +258,7 @@ extension WallpaperModel {
     }
 
     func applyLightweightSettings() {
+        if !effectiveLightweightMode { resetLightweightProxyRequests() }
         sharedPlayer?.automaticallyWaitsToMinimizeStalling = effectiveLightweightMode
         for entry in allDedicatedSlotEntries() {
             entry.slot.player.automaticallyWaitsToMinimizeStalling = effectiveLightweightMode
@@ -430,6 +431,12 @@ extension WallpaperModel {
             if let currentPath = currentVideoPath {
                 playRegisteredVideo(path: currentPath)
             }
+            for entry in allDedicatedSlotEntries() where entry.isActive {
+                let url = resolvedPlaybackURL(for: entry.path)
+                replaceDedicatedPlaybackURL(url, screenID: entry.screenID, path: entry.path)
+                if effectiveLightweightMode { ensureLightweightProxyIfNeeded(for: entry.path) }
+            }
+            refreshLightweightProxyState()
         }
     }
 
