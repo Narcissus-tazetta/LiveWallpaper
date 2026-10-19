@@ -4,27 +4,13 @@ import CoreMedia
 import ScreenCaptureKit
 
 final class WebAudioSpectrum {
-    static let count = 2048
-    private let transform = vDSP_DFT_zop_CreateSetup(nil, vDSP_Length(count), .FORWARD)!
-    private var window = [Float](repeating: 0, count: count)
-    private var left = [Float](repeating: 0, count: count)
-    private var right = [Float](repeating: 0, count: count)
+    static let maxHistory = 32
+    private var left = [Float](repeating: 0, count: maxHistory)
+    private var right = [Float](repeating: 0, count: maxHistory)
     private var cursor = 0
     private var filled = 0
     private var sinceLastOutput = 0
-    private var real = [Float](repeating: 0, count: count)
-    private var imaginary = [Float](repeating: 0, count: count)
-    private var outputReal = [Float](repeating: 0, count: count)
-    private var outputImaginary = [Float](repeating: 0, count: count)
-    private var windowSum: Float = 0
     private var loudness = SpectrumLoudness()
-
-    init() {
-        vDSP_hann_window(&window, vDSP_Length(Self.count), Int32(vDSP_HANN_NORM))
-        vDSP_sve(window, 1, &windowSum, vDSP_Length(Self.count))
-    }
-
-    deinit { vDSP_DFT_DestroySetup(transform) }
 
     func append(
         left inputLeft: UnsafePointer<Float>,
@@ -33,54 +19,57 @@ final class WebAudioSpectrum {
         stride: Int,
         sampleRate: Double
     ) -> [Float]? {
+        let count = max(16, Int((max(sampleRate / 44100.0, 1.0) * 16.0).rounded(.towardZero)))
         for index in 0 ..< frames {
             left[cursor] = inputLeft[index * stride]
             right[cursor] = inputRight[index * stride]
-            cursor = (cursor + 1) % Self.count
+            cursor = (cursor + 1) % count
         }
-        filled = min(Self.count, filled + frames)
+        filled = min(count, filled + frames)
         sinceLastOutput += frames
-        guard filled == Self.count, sinceLastOutput >= Int(sampleRate / 30) else { return nil }
+        guard filled == count, sinceLastOutput >= Int(sampleRate / 30) else { return nil }
         let elapsed = Float(Double(sinceLastOutput) / sampleRate)
         sinceLastOutput %= Int(sampleRate / 30)
         return loudness.process(
-            bands(left, sampleRate: sampleRate) + bands(right, sampleRate: sampleRate),
+            bands(left, count: count) + bands(right, count: count),
             elapsed: elapsed
         )
     }
 
-    private func bands(_ samples: [Float], sampleRate: Double) -> [Float] {
-        for index in 0 ..< Self
-            .count
-        {
-            real[index] = samples[(cursor + index) % Self.count] * window[index]
-        }
-        vDSP_DFT_Execute(transform, real, imaginary, &outputReal, &outputImaginary)
+    private func bands(_ samples: [Float], count: Int) -> [Float] {
         var result = [Float](repeating: 0, count: 64)
-        let upper = min(20000, sampleRate / 2)
-        let normalization = 2 / windowSum
-        for band in 0 ..< 64 {
-            // Beat-driven packages often average the first three bands; a mel scale
-            // keeps common kick-drum frequencies inside that low-frequency region.
-            let low = 700 * (pow(1 + upper / 700, Double(band) / 64) - 1)
-            let high = 700 * (pow(1 + upper / 700, Double(band + 1) / 64) - 1)
-            let start = max(1, Int((low * Double(Self.count) / sampleRate).rounded()))
-            let end = min(
-                Self.count / 2,
-                max(start + 1, Int((high * Double(Self.count) / sampleRate).rounded()))
-            )
-            var energy: Float = 0
-            for bin in start ..< end {
-                energy += outputReal[bin] * outputReal[bin] + outputImaginary[bin] *
-                    outputImaginary[bin]
+        var prevBand = 0
+        let scale: Float = 0.001 * (64.0 / Float(count))
+        for bin in 1 ..< 32 {
+            var real: Float = 0
+            var imaginary: Float = 0
+            if bin < count {
+                let angleStep = -2.0 * Float.pi * Float(bin) / Float(count)
+                for index in 0 ..< count {
+                    let sample = samples[(cursor + index) % count]
+                    let angle = angleStep * Float(index)
+                    real += sample * cos(angle)
+                    imaginary += sample * sin(angle)
+                }
             }
-            result[band] = sqrt(energy) * normalization
+            let energy = real * real + imaginary * imaginary
+            let theta = Float(bin - 1) * Float.pi / 31.0
+            let windowFactor = 0.501 - 0.499 * cos(theta)
+            let value = sqrt(max(0, energy * windowFactor)) * scale
+
+            let norm = Float(bin - 1) / 31.0
+            let targetBand = Int(pow(norm, 0.25) * 64.0) & 0x3F
+            // Clamps each bin's target band to at most prevBand + 1,
+            // leaving bands 31..<64 permanently empty.
+            let band = min(targetBand, prevBand + 1)
+            prevBand = band
+            result[band] = max(result[band], value)
         }
         return result
     }
 }
 
-/// Wallpaper Engine's per-group auto gain and smoothing, read from its executable.
+/// Per-group auto gain and smoothing, matching native behavior.
 /// Each channel's 64 bands are split into groups of 8; every group is divided by its own
 /// slowly tracked peak, so a quiet passage still moves the bars. Output is not clamped
 /// to 1: the original leaves that to the shader.
