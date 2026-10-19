@@ -133,9 +133,24 @@ final class ScenePlacementTests: XCTestCase {
         XCTAssertEqual(picked.y, 0.5, accuracy: 0.00001)
         document.layers[0].transform.offsetY = -0.25
         try renderer.update(document: document)
-        _ = try draw(time: 1)
+        let movedPixels = try draw(time: 1)
         let moved = try XCTUnwrap(renderer.canvasUV(layerUV: SIMD2(0.5, 0.5), layerID: layer.id))
         XCTAssertEqual(moved.y, 0.25, accuracy: 0.00001)
+
+        let original = document.layers[0].transform
+        for scale in [1e-36, 1e-42, 0] {
+            document.layers[0].transform.scale = scale
+            document.layers[0].transform.scaleY = original.scale
+            try renderer.update(document: document)
+            let collapsed = try draw(time: 1)
+            XCTAssertFalse(stride(from: 1, to: collapsed.count, by: 4).contains { collapsed[$0] != 0 })
+            if let point = renderer.layerUV(canvasUV: SIMD2(0.5, 0.5), layerID: layer.id) {
+                XCTAssertTrue(point.x.isFinite && point.y.isFinite)
+            }
+        }
+        document.layers[0].transform = original
+        try renderer.update(document: document)
+        XCTAssertEqual(try draw(time: 1), movedPixels)
     }
 
     func testNonUniformScaleTransform() throws {

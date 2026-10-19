@@ -54,6 +54,52 @@ final class SceneScriptRenderingTests: XCTestCase {
         XCTAssertEqual(restored.y, uv.y, accuracy: 0.00001)
     }
 
+    func testMediaArtworkChangesAndUnavailableMediaRestoresTheLayerImage() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ArtworkRender-\(UUID())")
+        defer { try! FileManager.default.removeItem(at: directory) }
+        var (document, path) = try fixture(directory)
+        document.scripts = []
+        let mask = try XCTUnwrap(CGContext(data: nil, width: 64, height: 48, bitsPerComponent: 8, bytesPerRow: 0,
+                                         space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        mask.setFillColor(CGColor(gray: 1, alpha: 1))
+        mask.fillEllipse(in: CGRect(x: 0, y: 0, width: 64, height: 48))
+        document.layers[0].imageFile = try SceneStore.writeImage(XCTUnwrap(mask.makeImage()), prefix: "artwork-mask", videoPath: path)
+        document.layers[0].usesMediaArtwork = true
+        let restored = try JSONDecoder().decode(SceneDocument.self, from: JSONEncoder().encode(document))
+        XCTAssertTrue(restored.layers[0].usesMediaArtwork)
+        XCTAssertTrue(restored.requiresRealTimePlayback)
+        let renderer = try SceneRenderer(document: restored, videoPath: path)
+        let evaluator = SceneFrameEvaluator()
+        func draw(_ media: SceneMediaState?) throws -> [UInt8] {
+            let input = SceneFrameInput(media: media)
+            let frame = try evaluator.evaluate(restored, input: input, timeOfDay: .day)
+            return try pixels(renderer, input: input, frame: frame)
+        }
+        func artwork(_ color: CGColor) throws -> Data {
+            let context = try XCTUnwrap(CGContext(data: nil, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 0,
+                                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.setFillColor(color)
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+            return try XCTUnwrap(NSBitmapImageRep(cgImage: XCTUnwrap(context.makeImage())).representation(using: .png, properties: [:]))
+        }
+        let fallback = try draw(nil)
+        let center = (24 * 64 + 32) * 4
+        var media = SceneMediaState(isAvailable: true, artworkID: "red", artworkData: try artwork(CGColor(red: 1, green: 0, blue: 0, alpha: 1)))
+        let red = try draw(media)
+        XCTAssertGreaterThan(Int(red[center + 2]) - Int(red[center + 1]), 150)
+        XCTAssertEqual(Array(red.prefix(4)), Array(fallback.prefix(4)))
+        media.artworkID = "green"
+        media.artworkData = try artwork(CGColor(red: 0, green: 1, blue: 0, alpha: 1))
+        let green = try draw(media)
+        XCTAssertGreaterThan(Int(green[center + 1]) - Int(green[center + 2]), 150)
+        media.isAvailable = false
+        XCTAssertEqual(try draw(media), fallback)
+        media.isAvailable = true
+        media.artworkID = ""
+        media.artworkData = nil
+        XCTAssertEqual(try draw(media), fallback)
+    }
+
     func testBakerWritesScriptMotionAndFailureKeepsThePreviousVideo() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ScriptBake-\(UUID())")
         defer { try! FileManager.default.removeItem(at: directory) }

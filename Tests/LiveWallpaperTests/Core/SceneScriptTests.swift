@@ -153,7 +153,8 @@ final class SceneScriptTests: XCTestCase {
             document.scripts[0].usesTime = sample.usesTime
             document.scripts[0].usesCursor = sample.usesCursor
             document.scripts[0].usesTimeOfDay = sample.usesTimeOfDay
-            let evaluator = SceneFrameEvaluator()
+            // Sample correctness must not depend on the CI runner meeting a live frame deadline.
+            let evaluator = SceneFrameEvaluator(budget: .offline)
             for time in [0.0, 5, 10, 19.99] {
                 for band in SceneTimeOfDay.allCases {
                     XCTAssertNoThrow(try evaluator.evaluate(document, input: SceneFrameInput(time: time), timeOfDay: band), sample.rawValue)

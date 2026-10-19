@@ -681,6 +681,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     /// An MP4 in the scene folder that plays in a loop in place of the image; the
     /// image holds its first frame for wherever the video is not ready.
     var videoFile: String?
+    var usesMediaArtwork = false
     /// Reads the canvas below as its input instead of an image file.
     var capturesCanvas = false
     var isVisible = true
@@ -739,6 +740,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         kind = (try? container.decode(SceneLayerKind.self, forKey: .kind)) ?? .image
         imageFile = (try? container.decode(String.self, forKey: .imageFile)) ?? ""
         videoFile = try container.decodeIfPresent(String.self, forKey: .videoFile)
+        usesMediaArtwork = try container.decodeIfPresent(Bool.self, forKey: .usesMediaArtwork) ?? false
         capturesCanvas = (try? container.decode(Bool.self, forKey: .capturesCanvas)) ?? false
         particles = try? container.decodeIfPresent(SceneParticles.self, forKey: .particles)
         text = try container.decodeIfPresent(SceneText.self, forKey: .text)
@@ -917,7 +919,7 @@ struct SceneDocument: Codable, Equatable {
 
     var requiresRealTimePlayback: Bool {
         runsInRealTime || layers.contains { layer in
-            layer.activeEffects.contains { $0.kind.runsOnRealTime } || (layer.isVisible && (layer.renderGraph != nil || layer.placement != nil))
+            layer.activeEffects.contains { $0.kind.runsOnRealTime } || (layer.isVisible && (layer.renderGraph != nil || layer.placement != nil || layer.usesMediaArtwork))
         }
     }
 

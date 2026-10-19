@@ -77,6 +77,7 @@ final class SceneMetalLayer: CAMetalLayer {
         var source: String
         var id: String
         var palette: SceneMediaPalette?
+        var data: Data?
     }
     private var artwork: Artwork?
     private var loadingVideos: Set<String> = []
@@ -243,6 +244,7 @@ final class SceneMetalLayer: CAMetalLayer {
 
     fileprivate func updateMediaSubscription() {
         let wantsMedia = renderer?.document.scripts.contains { $0.canRun && $0.usesMedia } == true
+            || renderer?.document.layers.contains { $0.isVisible && $0.usesMediaArtwork } == true
         let wantsSpectrum = renderer?.document.usesAudio == true
             && videoPath.map { SceneSoundReaction.isEnabled(videoPath: $0) } == true
         guard wantsMedia != isSubscribedToMedia || wantsSpectrum != isSubscribedToSpectrum else { return }
@@ -281,20 +283,22 @@ final class SceneMetalLayer: CAMetalLayer {
         }
         if artwork?.source != value.artwork {
             var decoded: SceneMediaPalette?
+            var imageData: Data?
             if let comma = value.artwork.firstIndex(of: ","), value.artwork.hasPrefix("data:image/"),
                let data = Data(base64Encoded: String(value.artwork[value.artwork.index(after: comma)...])) {
+                imageData = data
                 do { decoded = try SceneMediaPalette(imageData: data) } catch {
                     AppLog.windowRefresh.error("media artwork colours failed: \(error.localizedDescription, privacy: .public)")
                 }
             }
             artwork = Artwork(source: value.artwork, id: value.artwork.isEmpty ? "" : "\(value.artwork.utf8.count):\(value.artwork.hashValue)",
-                              palette: decoded)
+                              palette: decoded, data: imageData)
         }
         media = SceneMediaState(
             isAvailable: true, playback: SceneMediaState.Playback(rawValue: value.state) ?? .stopped,
             title: value.title, artist: value.artist, album: value.album, position: value.position,
             duration: value.duration,
-            artworkID: artwork?.id ?? "", palette: artwork?.palette
+            artworkID: artwork?.id ?? "", palette: artwork?.palette, artworkData: artwork?.data
         )
     }
 

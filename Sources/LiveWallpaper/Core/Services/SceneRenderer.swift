@@ -52,6 +52,7 @@ struct SceneMediaState: Equatable {
     /// Changes whenever the artwork does; empty without artwork.
     var artworkID = ""
     var palette: SceneMediaPalette?
+    var artworkData: Data?
 }
 
 /// A mask or flow map being painted, shown before it is saved to a file.
@@ -146,9 +147,12 @@ final class SceneRenderer {
     private var rigs: SceneSkeletonRegistry?
     private var placementEvaluator: ScenePlacementEvaluator?
     private var lastPlacements: [UUID: simd_float3x3] = [:]
+    private var lastInversePlacements: [UUID: simd_float3x3] = [:]
     private(set) var document: SceneDocument
     private let videoPath: String
     private var textures: [String: MTLTexture] = [:]
+    private var mediaArtworkID = ""
+    private var mediaArtworkTextures: [UUID: MTLTexture] = [:]
     /// By file name; loaded by the owner (SceneMetalLayer, prepareVideos) because
     /// reading a video's tracks is asynchronous. Until then the layer shows its image.
     private var videoFrames: [String: SceneVideoFrames] = [:]
@@ -266,9 +270,9 @@ final class SceneRenderer {
         guard let layer = document.layers.first(where: { $0.id == layerID }) else {
             return nil
         }
-        if let matrix = lastPlacements[layerID] {
-            guard simd_determinant(matrix) != 0 else { return nil }
-            let point = simd_inverse(matrix) * SIMD3(canvasUV.x, canvasUV.y, 1)
+        if lastPlacements[layerID] != nil {
+            guard let inverse = lastInversePlacements[layerID] else { return nil }
+            let point = inverse * SIMD3(canvasUV.x, canvasUV.y, 1)
             return SIMD2(point.x, point.y)
         }
         let placement = placement(for: placedTransform(layer, currentTransform(layerID: layerID) ?? layer.pose(at: lastPhase).transform))
@@ -333,12 +337,14 @@ final class SceneRenderer {
         let evaluated = try frame ?? frameEvaluator.evaluate(document, input: input, timeOfDay: timeOfDay)
         rigs!.setPlaybackOverrides(evaluated.rigPlayback)
         lastFrame = evaluated
+        try prepareMediaArtwork(input.media)
         lastPlacements = placementEvaluator!.evaluate(time: input.time)
         for (id, matrix) in lastPlacements {
             let layer = evaluated.layers[id]!
             let reference = layer.layer.placement!.referenceTransform
             lastPlacements[id] = placementMatrix(layer.transform) * simd_inverse(placementMatrix(reference)) * matrix
         }
+        lastInversePlacements = lastPlacements.compactMapValues(Self.inversePlacement)
         lastPhase = Double(loopPhase(input.time))
         let targetSize = SIMD2(Float(target.width), Float(target.height))
         let ordered = document.layers.enumerated().sorted { a, b in
@@ -356,7 +362,7 @@ final class SceneRenderer {
         }
         let visible = ordered.filter { layer in
             evaluated.layers[layer.id]!.layer.isVisible &&
-                (lastPlacements[layer.id].map { simd_determinant($0) != 0 } ?? true) &&
+                (lastPlacements[layer.id] == nil || lastInversePlacements[layer.id] != nil) &&
                 (layer.capturesCanvas || (layer.kind == .particles ? layer.particles != nil : picture(for: layer) != nil))
         }
         if !visible.contains(where: \.capturesCanvas), allowsSinglePassComposite, let fetch = pipeline.compositeFetch {
@@ -1056,6 +1062,23 @@ final class SceneRenderer {
         let offset: SIMD2<Float>
     }
 
+    private static func inversePlacement(_ matrix: simd_float3x3) -> simd_float3x3? {
+        // A script can shrink one axis until Float's reciprocal determinant overflows,
+        // even while every element of the inverse still fits in Float.
+        let wide = simd_double3x3(columns: (
+            SIMD3<Double>(matrix.columns.0), SIMD3<Double>(matrix.columns.1), SIMD3<Double>(matrix.columns.2)
+        ))
+        guard simd_determinant(wide) != 0 else { return nil }
+        let inverse = simd_inverse(wide)
+        let result = simd_float3x3(columns: (
+            SIMD3<Float>(inverse.columns.0), SIMD3<Float>(inverse.columns.1), SIMD3<Float>(inverse.columns.2)
+        ))
+        // Collapsed geometry has no representable UV mapping for the GPU or picking.
+        return [result.columns.0, result.columns.1, result.columns.2].allSatisfy {
+            $0.x.isFinite && $0.y.isFinite && $0.z.isFinite
+        } ? result : nil
+    }
+
     private func placementMatrix(_ transform: SceneTransform) -> simd_float3x3 {
         let angle = Float(transform.rotation * .pi / 180)
         let scaleX = Float(transform.scale), scaleY = Float(transform.scaleY ?? transform.scale), aspect = Float(document.aspectRatio)
@@ -1103,7 +1126,7 @@ final class SceneRenderer {
         let custom = lastPlacements[layer.id]
         let placement: Placement
         if let custom {
-            let inverse = simd_inverse(custom)
+            let inverse = lastInversePlacements[layer.id]!
             let center = custom * SIMD3(0.5, 0.5, 1)
             placement = Placement(column0: SIMD2(inverse.columns.0.x, inverse.columns.0.y),
                                   column1: SIMD2(inverse.columns.1.x, inverse.columns.1.y),
@@ -1113,8 +1136,8 @@ final class SceneRenderer {
         }
         let scale: SIMD2<Float> = custom == nil ? layerUVScale(for: layer) : .one
         func layerDirection(_ value: SIMD2<Float>) -> SIMD2<Float> {
-            guard let custom else { return value * scale }
-            let direction = simd_inverse(custom) * SIMD3(value.x, value.y, 0)
+            guard custom != nil else { return value * scale }
+            let direction = lastInversePlacements[layer.id]! * SIMD3(value.x, value.y, 0)
             return SIMD2(direction.x, direction.y)
         }
         // The travel is a fraction of the canvas, converted into layer UV units.
@@ -1166,7 +1189,43 @@ final class SceneRenderer {
     /// The picture a layer composites before its effects; particles draw their own.
     private func picture(for layer: SceneLayer) -> MTLTexture? {
         if layer.kind == .text { return textTextures[layer.id]?.texture }
+        if layer.usesMediaArtwork, let texture = mediaArtworkTextures[layer.id] { return texture }
         return layer.videoFile.flatMap { videoFramesShown[$0]?.texture } ?? textures[layer.imageFile]
+    }
+
+    private func prepareMediaArtwork(_ media: SceneMediaState?) throws {
+        let id = media?.isAvailable == true ? media!.artworkID : ""
+        guard mediaArtworkID != id else { return }
+        mediaArtworkTextures = [:]
+        mediaArtworkID = ""
+        guard !id.isEmpty, let data = media?.artworkData else { return }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw RendererError.imageDecodeFailed("media artwork")
+        }
+        for layer in document.layers where layer.usesMediaArtwork {
+            let mask = try Self.decodeImage(url: fileURL(layer.imageFile))
+            let width = mask.width, height = mask.height
+            var bytes = [UInt8](repeating: 0, count: width * height * 4)
+            let drew = bytes.withUnsafeMutableBytes { buffer -> Bool in
+                guard let context = CGContext(
+                    data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                    bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                ) else { return false }
+                let rect = CGRect(x: 0, y: 0, width: width, height: height)
+                context.draw(image, in: rect)
+                // Imported album frames use their image's alpha for rounded corners.
+                context.setBlendMode(.destinationIn)
+                context.draw(mask, in: rect)
+                return true
+            }
+            guard drew else { throw RendererError.imageDecodeFailed("media artwork") }
+            mediaArtworkTextures[layer.id] = try Self.makeTexture(
+                device: device, pixelFormat: .rgba8Unorm, width: width, height: height, bytes: bytes
+            )
+        }
+        mediaArtworkID = id
     }
 
     /// A text layer's position is where its aligned edge sits, so its picture is
@@ -1228,6 +1287,9 @@ final class SceneRenderer {
         }
         placementEvaluator = try ScenePlacementEvaluator(layers: document.layers, rigs: rigs!)
         lastPlacements.removeAll()
+        lastInversePlacements.removeAll()
+        mediaArtworkID = ""
+        mediaArtworkTextures = [:]
         let layerIDs = Set(document.layers.map(\.id))
         effectTargets = effectTargets.filter { layerIDs.contains($0.key) }
         particleTargets = particleTargets.filter { layerIDs.contains($0.key) }

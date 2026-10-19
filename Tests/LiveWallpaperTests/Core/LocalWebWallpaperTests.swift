@@ -110,6 +110,10 @@ final class LocalWebWallpaperTests: XCTestCase {
             model.stopAllPlayers()
             Array(model.transitionHeldPlayers.values).forEach { $0.release() }
         }
+        model.wallpaperKind = .video
+        model.activeExternalWallpaperID = nil
+        model.wallpaperTransitionDuration = 0.5
+        model.systemReduceMotionEnabled = false
         model.currentVideoPath = video.path
         model.playVideo(url: video)
         let source = WebWallpaperSource(

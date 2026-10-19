@@ -40,6 +40,7 @@
             } catch {
                 Self.reportSparkleError(error)
                 #if !DEBUG
+                let message = error.localizedDescription
                 DispatchQueue.main.async {
                     let alert = NSAlert()
                     alert.messageText = self.localized("アップデータ初期化に失敗しました")
