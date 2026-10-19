@@ -351,11 +351,7 @@ extension WallpaperModel {
         case .video(let path):
             selectRegisteredVideo(path: path, clearsPin: clearsPin)
         case .web(let id):
-            let isSameEntry = wallpaperKind == .web && currentWebWallpaperID == id
-            if clearsPin, pinCurrentVideo, !isSameEntry {
-                clearPinCurrentVideo()
-            }
-            selectWebWallpaper(id: id)
+            selectWebWallpaper(id: id, clearsPin: clearsPin)
         }
     }
 

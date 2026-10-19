@@ -53,7 +53,7 @@
 "音声を再生" = "Reproduzir Áudio";
 "ループ再生" = "Reproduzir em Loop";
 "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。" = "Um único vídeo sempre é reproduzido em loop. Com vários vídeos, a reprodução contínua passa para o próximo vídeo.";
-"この動画で固定" = "Fixar Este Vídeo";
+"この壁紙で固定" = "Fixar este papel de parede";
 "固定中" = "Fixado";
 "プレイリスト連続再生" = "Reprodução Contínua da Playlist";
 "シャッフル" = "Aleatório";
@@ -222,7 +222,7 @@
 "設定の保存に失敗しています。空き容量などを確認してください。" = "Não foi possível salvar os ajustes. Verifique, por exemplo, o espaço de armazenamento disponível.";
 "キャッシュの削除に失敗しました" = "Não foi possível limpar o cache";
 "保存先フォルダへのアクセスに失敗した可能性があります。" = "Talvez não tenha sido possível acessar a pasta de armazenamento.";
-"固定はアプリ再起動まで有効です。" = "A fixação vale até o app ser aberto novamente.";
+"固定中は自動で壁紙が切り替わりません。再起動後も固定を維持します。" = "Fixar impede mudanças automáticas do papel de parede e continua ativo após reiniciar o app.";
 "環境に応じて再生負荷を自動調整" = "Ajustar automaticamente a carga de reprodução conforme o ambiente";
 "バッテリー残量に応じて画質を自動調整" = "Ajustar automaticamente a qualidade conforme o nível da bateria";
 "バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "Quando o Mac está usando a bateria e a carga cai para 10% ou menos, a carga de reprodução é reduzida automaticamente para economizar energia.";

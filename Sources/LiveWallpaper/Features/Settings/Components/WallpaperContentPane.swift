@@ -670,7 +670,7 @@ extension SettingsView {
 
                 if model.canPinCurrentVideo || model.pinCurrentVideo {
                     compactToggle(
-                        model.localizedString("この動画で固定"),
+                        model.localizedString("この壁紙で固定"),
                         isOn: Binding<Bool>(
                             get: { model.pinCurrentVideo },
                             set: { model.setPinCurrentVideo($0) }
@@ -736,7 +736,7 @@ extension SettingsView {
             }
 
             if model.canPinCurrentVideo || model.pinCurrentVideo {
-                Text(model.localizedString("固定はアプリ再起動まで有効です。"))
+                Text(model.localizedString("固定中は自動で壁紙が切り替わりません。再起動後も固定を維持します。"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }

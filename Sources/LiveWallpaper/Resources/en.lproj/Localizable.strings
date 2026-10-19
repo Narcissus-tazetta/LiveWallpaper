@@ -53,7 +53,7 @@
 "音声を再生" = "Play audio";
 "ループ再生" = "Loop playback";
 "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。" = "A single video always loops. During continuous playback with multiple videos, it advances to the next video.";
-"この動画で固定" = "Pin this video";
+"この壁紙で固定" = "Pin this wallpaper";
 "固定中" = "Pinned";
 "プレイリスト連続再生" = "Continuous playlist playback";
 "シャッフル" = "Shuffle";
@@ -222,7 +222,7 @@
 "設定の保存に失敗しています。空き容量などを確認してください。" = "Failed to save settings. Check available storage and try again.";
 "キャッシュの削除に失敗しました" = "Couldn’t clear the cache";
 "保存先フォルダへのアクセスに失敗した可能性があります。" = "The app may not have access to the storage folder.";
-"固定はアプリ再起動まで有効です。" = "Pinning stays active until the app restarts.";
+"固定中は自動で壁紙が切り替わりません。再起動後も固定を維持します。" = "Pinning prevents automatic wallpaper changes and stays active after restarting the app.";
 "環境に応じて再生負荷を自動調整" = "Automatically adjust playback load for current conditions";
 "バッテリー残量に応じて画質を自動調整" = "Automatically adjust quality based on battery level";
 "バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "When running on battery and charge drops to 10% or below, playback load is automatically reduced to save power.";

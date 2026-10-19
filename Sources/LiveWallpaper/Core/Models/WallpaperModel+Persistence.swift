@@ -24,10 +24,8 @@ extension WallpaperModel {
         persistPlaylistStateImmediately()
     }
 
-    /// Must run after the last syncActivePlaylistPaths() of the restore: the earlier
-    /// sync runs before webWallpaperFeatureEnabled is restored, so a queue that only
-    /// reaches 2 entries with web wallpapers looks unpinnable there, and
-    /// normalizePlaybackConstraints() would clear the saved pin.
+    // Web壁紙の機能フラグ復元前はWebだけのキューが空に見えるため、
+    // 最後のsyncActivePlaylistPaths()を終えてから固定を復元する。
     private func restorePinCurrentVideo() {
         guard UserDefaults.standard.bool(forKey: PrefsKey.pinCurrentVideo) else {
             return

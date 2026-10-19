@@ -53,7 +53,7 @@
 "音声を再生" = "Phát âm thanh";
 "ループ再生" = "Phát lặp lại";
 "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。" = "Khi chỉ có một video, video luôn được phát lặp lại. Khi có nhiều video, trong lúc phát liên tục sẽ chuyển sang video tiếp theo.";
-"この動画で固定" = "Ghim video này";
+"この壁紙で固定" = "Ghim hình nền này";
 "固定中" = "Đã ghim";
 "プレイリスト連続再生" = "Phát liên tục danh sách phát";
 "シャッフル" = "Xáo trộn";
@@ -222,7 +222,7 @@
 "設定の保存に失敗しています。空き容量などを確認してください。" = "Không thể lưu cài đặt. Hãy kiểm tra dung lượng lưu trữ còn trống.";
 "キャッシュの削除に失敗しました" = "Không thể xóa bộ nhớ đệm";
 "保存先フォルダへのアクセスに失敗した可能性があります。" = "Có thể không truy cập được thư mục lưu trữ.";
-"固定はアプリ再起動まで有効です。" = "Ghim có hiệu lực cho đến khi ứng dụng được mở lại.";
+"固定中は自動で壁紙が切り替わりません。再起動後も固定を維持します。" = "Ghim ngăn tự động đổi hình nền và vẫn được giữ sau khi khởi động lại ứng dụng.";
 "環境に応じて再生負荷を自動調整" = "Tự động điều chỉnh tải phát lại theo môi trường";
 "バッテリー残量に応じて画質を自動調整" = "Tự động điều chỉnh chất lượng theo mức pin";
 "バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "Khi máy đang dùng pin và mức pin giảm xuống 10% hoặc thấp hơn, tải phát lại sẽ tự động giảm để tiết kiệm điện.";

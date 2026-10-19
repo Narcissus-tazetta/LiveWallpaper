@@ -43,9 +43,12 @@ extension WallpaperModel {
         return source
     }
 
-    func selectWebWallpaper(id: UUID) {
+    func selectWebWallpaper(id: UUID, clearsPin: Bool = true) {
         guard webWallpaperSources.contains(where: { $0.id == id }) else {
             return
+        }
+        if clearsPin, currentPlaybackEntry != .web(id) {
+            clearPinCurrentVideo()
         }
         performSharedWallpaperTransition(to: .web(id)) {
             applyWebWallpaperSelection(id: id)

@@ -53,7 +53,7 @@
 "音声を再生" = "Lire l’audio";
 "ループ再生" = "Lecture en boucle";
 "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。" = "Une vidéo seule est toujours lue en boucle. S’il y en a plusieurs, la lecture continue passe à la vidéo suivante.";
-"この動画で固定" = "Épingler cette vidéo";
+"この壁紙で固定" = "Épingler ce fond";
 "固定中" = "Épinglée";
 "プレイリスト連続再生" = "Lecture continue de la playlist";
 "シャッフル" = "Aléatoire";
@@ -222,7 +222,7 @@
 "設定の保存に失敗しています。空き容量などを確認してください。" = "Impossible d’enregistrer les réglages. Vérifiez notamment l’espace de stockage disponible.";
 "キャッシュの削除に失敗しました" = "Impossible de vider le cache";
 "保存先フォルダへのアクセスに失敗した可能性があります。" = "L’accès au dossier de stockage a peut-être échoué.";
-"固定はアプリ再起動まで有効です。" = "L’épinglage reste actif jusqu’à la réouverture de l’app.";
+"固定中は自動で壁紙が切り替わりません。再起動後も固定を維持します。" = "L’épinglage empêche les changements automatiques de fond et reste actif après le redémarrage de l’app.";
 "環境に応じて再生負荷を自動調整" = "Ajuster automatiquement la charge de lecture selon l’environnement";
 "バッテリー残量に応じて画質を自動調整" = "Ajuster automatiquement la qualité selon le niveau de la batterie";
 "バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "Lorsque le Mac fonctionne sur batterie et que la charge descend à 10 % ou moins, la charge de lecture est automatiquement réduite pour économiser l’énergie.";

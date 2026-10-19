@@ -9,7 +9,7 @@ extension WallpaperModel {
     }
 
     var canPinCurrentVideo: Bool {
-        playlistPlaybackEnabled && registeredPlaybackEntries.count > 1
+        !registeredPlaybackEntries.isEmpty
     }
 
     var isVideoLoopSettingEnabled: Bool {

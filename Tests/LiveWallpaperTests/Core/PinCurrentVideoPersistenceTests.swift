@@ -2,11 +2,14 @@ import XCTest
 
 @testable import LiveWallpaper
 
-/// 「この動画で固定」が再起動(WallpaperModel の作り直し)をまたいで残るかを検証する。
 @MainActor
 final class PinCurrentVideoPersistenceTests: XCTestCase {
     private let keys = [
         PrefsKey.pinCurrentVideo,
+        PrefsKey.wallpaperKind,
+        PrefsKey.currentWebWallpaperID,
+        PrefsKey.wallpaperTransitionDuration,
+        PrefsKey.autoSwitchIntervalMinutes,
         PrefsKey.playlistPlaybackEnabled,
         PrefsKey.shufflePlaybackEnabled,
         PrefsKey.libraryVideoPaths,
@@ -57,9 +60,7 @@ final class PinCurrentVideoPersistenceTests: XCTestCase {
         XCTAssertFalse(relaunched.pinCurrentVideo)
     }
 
-    /// 1本の動画 + Web壁紙で2エントリになるキュー。起動途中の同期は Web壁紙の
-    /// 機能フラグ復元前に走るため、そこで固定が消されないことを確かめる。
-    func testPinSurvivesRelaunchWhenQueueNeedsWebWallpaperToReachTwoEntries() throws {
+    func testPinSurvivesRelaunchWithMixedQueue() throws {
         UserDefaults.standard.set(["/a.mp4"], forKey: PrefsKey.libraryVideoPaths)
         UserDefaults.standard.set(true, forKey: PrefsKey.playlistPlaybackEnabled)
         UserDefaults.standard.set(true, forKey: PrefsKey.webWallpaperFeatureEnabled)
@@ -76,15 +77,82 @@ final class PinCurrentVideoPersistenceTests: XCTestCase {
         XCTAssertTrue(relaunched.pinCurrentVideo)
     }
 
-    func testPinIsDroppedWhenQueueNoLongerAllowsIt() {
+    func testPinIsDroppedWhenQueueIsEmpty() {
         UserDefaults.standard.set(["/a.mp4", "/b.mp4"], forKey: PrefsKey.libraryVideoPaths)
         UserDefaults.standard.set(true, forKey: PrefsKey.playlistPlaybackEnabled)
         let model = WallpaperModel()
         model.setPinCurrentVideo(true)
-        UserDefaults.standard.set(["/a.mp4"], forKey: PrefsKey.libraryVideoPaths)
+        UserDefaults.standard.set([String](), forKey: PrefsKey.libraryVideoPaths)
 
         let relaunched = WallpaperModel()
 
         XCTAssertFalse(relaunched.pinCurrentVideo)
     }
+
+    func testWebWallpaperCanBePinnedWithoutContinuousPlaybackAndSurvivesRelaunch() throws {
+        let source = WebWallpaperSource(url: URL(string: "https://example.com")!)
+        UserDefaults.standard.set(true, forKey: PrefsKey.webWallpaperFeatureEnabled)
+        UserDefaults.standard.set(try JSONEncoder().encode([source]), forKey: PrefsKey.webWallpaperSourcesData)
+        UserDefaults.standard.set(WallpaperKind.web.rawValue, forKey: PrefsKey.wallpaperKind)
+        UserDefaults.standard.set(source.id.uuidString, forKey: PrefsKey.currentWebWallpaperID)
+        let model = WallpaperModel()
+        XCTAssertFalse(model.playlistPlaybackEnabled)
+        XCTAssertTrue(model.canPinCurrentVideo)
+
+        model.setPinCurrentVideo(true)
+        model.setPlaylistPlaybackEnabled(true)
+        model.setPlaylistPlaybackEnabled(false)
+        let relaunched = WallpaperModel()
+
+        XCTAssertTrue(model.pinCurrentVideo)
+        XCTAssertTrue(relaunched.pinCurrentVideo)
+        XCTAssertEqual(relaunched.currentPlaybackEntry, .web(source.id))
+        XCTAssertEqual(relaunched.playbackEndBehavior(), .loopCurrent)
+    }
+
+    func testSelectingAnotherWebWallpaperClearsPinButReselectingDoesNot() throws {
+        let sources = ["https://example.com/a", "https://example.com/b"].map {
+            WebWallpaperSource(url: URL(string: $0)!)
+        }
+        UserDefaults.standard.set(true, forKey: PrefsKey.webWallpaperFeatureEnabled)
+        UserDefaults.standard.set(try JSONEncoder().encode(sources), forKey: PrefsKey.webWallpaperSourcesData)
+        UserDefaults.standard.set(WallpaperKind.web.rawValue, forKey: PrefsKey.wallpaperKind)
+        UserDefaults.standard.set(sources[0].id.uuidString, forKey: PrefsKey.currentWebWallpaperID)
+        UserDefaults.standard.set(0, forKey: PrefsKey.wallpaperTransitionDuration)
+        let model = WallpaperModel()
+        model.setPinCurrentVideo(true)
+        model.selectWebWallpaper(id: sources[0].id)
+        XCTAssertTrue(model.pinCurrentVideo)
+
+        model.selectWebWallpaper(id: sources[1].id)
+
+        XCTAssertFalse(model.pinCurrentVideo)
+        XCTAssertEqual(model.currentPlaybackEntry, .web(sources[1].id))
+    }
+
+    func testPinPreventsTimerSwitchUntilReleased() throws {
+        let sources = ["https://example.com/a", "https://example.com/b"].map {
+            WebWallpaperSource(url: URL(string: $0)!)
+        }
+        UserDefaults.standard.set(true, forKey: PrefsKey.webWallpaperFeatureEnabled)
+        UserDefaults.standard.set(try JSONEncoder().encode(sources), forKey: PrefsKey.webWallpaperSourcesData)
+        UserDefaults.standard.set(WallpaperKind.web.rawValue, forKey: PrefsKey.wallpaperKind)
+        UserDefaults.standard.set(sources[0].id.uuidString, forKey: PrefsKey.currentWebWallpaperID)
+        UserDefaults.standard.set(0, forKey: PrefsKey.wallpaperTransitionDuration)
+        let model = WallpaperModel()
+        model.scheduleRules = []
+        model.displayIDByWindow[ObjectIdentifier(model)] = "pin-test-display"
+        model.setAutoSwitchInterval(minutes: 5)
+        let timer = try XCTUnwrap(model.autoSwitchTimer)
+        defer { timer.invalidate() }
+
+        model.setPinCurrentVideo(true)
+        timer.fire()
+        XCTAssertEqual(model.currentPlaybackEntry, .web(sources[0].id))
+
+        model.setPinCurrentVideo(false)
+        timer.fire()
+        XCTAssertEqual(model.currentPlaybackEntry, .web(sources[1].id))
+    }
+
 }

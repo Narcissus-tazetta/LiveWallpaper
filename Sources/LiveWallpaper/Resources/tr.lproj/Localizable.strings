@@ -53,7 +53,7 @@
 "音声を再生" = "Sesi Oynat";
 "ループ再生" = "Döngüde oynat";
 "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。" = "Tek bir video varsa her zaman döngüde oynatılır. Birden fazla video varsa sürekli oynatma sırasında sonraki videoya geçilir.";
-"この動画で固定" = "Bu Videoda Sabitle";
+"この壁紙で固定" = "Bu duvar kâğıdını sabitle";
 "固定中" = "Sabitlendi";
 "プレイリスト連続再生" = "Çalma Listesini Sürekli Oynat";
 "シャッフル" = "Karıştır";
@@ -222,7 +222,7 @@
 "設定の保存に失敗しています。空き容量などを確認してください。" = "Ayarlar kaydedilemiyor. Kullanılabilir depolama alanını ve benzerlerini denetleyin.";
 "キャッシュの削除に失敗しました" = "Önbellek temizlenemedi";
 "保存先フォルダへのアクセスに失敗した可能性があります。" = "Kayıt klasörüne erişilemiyor olabilir.";
-"固定はアプリ再起動まで有効です。" = "Sabitleme, uygulama yeniden açılana kadar geçerlidir.";
+"固定中は自動で壁紙が切り替わりません。再起動後も固定を維持します。" = "Sabitleme otomatik duvar kâğıdı değişikliklerini engeller ve uygulama yeniden başlatıldıktan sonra da etkin kalır.";
 "環境に応じて再生負荷を自動調整" = "Oynatma yükünü ortama göre otomatik olarak ayarla";
 "バッテリー残量に応じて画質を自動調整" = "Kaliteyi pil düzeyine göre otomatik olarak ayarla";
 "バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "Mac pil gücüyle çalışırken şarj %10 veya altına düştüğünde, güç tasarrufu için oynatma yükü otomatik olarak azaltılır.";

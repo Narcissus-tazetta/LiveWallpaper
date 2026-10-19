@@ -512,7 +512,7 @@ extension AppDelegate {
     }
 
     func pinCurrentVideoMenuTitle(_ enabled: Bool) -> String {
-        toggleMenuTitle(localized("この動画で固定"), enabled)
+        toggleMenuTitle(localized("この壁紙で固定"), enabled)
     }
 
     /// 「この動画を現在のデスクトップに割り当て」を表示できる状態か。
@@ -614,7 +614,7 @@ extension AppDelegate {
     }
 
     func pinCurrentVideoMenuIcon() -> NSImage? {
-        menuIcon(systemSymbolName: "pin.fill", accessibilityDescription: localized("この動画で固定"))
+        menuIcon(systemSymbolName: "pin.fill", accessibilityDescription: localized("この壁紙で固定"))
     }
 
     func shuffleMenuIcon() -> NSImage? {

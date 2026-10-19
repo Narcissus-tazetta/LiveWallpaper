@@ -32,6 +32,13 @@ extension SettingsView {
                     HStack {
                         webWallpaperStatusBadge(isActive: isActive)
                         Spacer(minLength: 0)
+                        if isActive, model.pinCurrentVideo {
+                            Label(model.localizedString("固定中"), systemImage: "pin.fill")
+                                .font(.system(size: 9, weight: .semibold))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 3)
+                                .background(.ultraThinMaterial, in: Capsule())
+                        }
                     }
                     .padding(.top, 4)
                     .padding(.horizontal, 4)

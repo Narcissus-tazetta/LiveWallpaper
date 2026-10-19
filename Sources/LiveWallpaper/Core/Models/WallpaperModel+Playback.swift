@@ -98,7 +98,6 @@ extension WallpaperModel {
         UserDefaults.standard.set(enabled, forKey: PrefsKey.playlistPlaybackEnabled)
         if !enabled {
             setShufflePlaybackEnabled(false)
-            clearPinCurrentVideo()
         }
         normalizePlaybackConstraints()
         requestPlaybackReconfiguration()
