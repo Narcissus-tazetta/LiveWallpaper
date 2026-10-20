@@ -40,6 +40,8 @@
 "30fps" = "30 fps";
 "60fps" = "60 fps";
 "クリック貫通を有効にする" = "Enable click-through";
+"壁紙内のボタンをクリックで操作する" = "Click buttons inside the wallpaper";
+"アクセシビリティの許可が必要です。システム設定のプライバシーとセキュリティで許可してください。" = "Accessibility permission is required. Allow it in System Settings under Privacy & Security.";
 "ログイン時に自動起動する" = "Launch at login";
 "音声を再生する" = "Play audio";
 "音量" = "Volume";

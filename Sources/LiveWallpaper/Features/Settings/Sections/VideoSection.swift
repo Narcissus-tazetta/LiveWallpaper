@@ -1,3 +1,4 @@
+import ApplicationServices
 import SwiftUI
 
 extension SettingsView {
@@ -9,6 +10,7 @@ extension SettingsView {
     "APNG",
     "アニメ画像",
     "クリック貫通を有効にする",
+    "壁紙内のボタンをクリックで操作する",
     "ログイン時に自動起動する",
     "音声を再生する",
     "音量",
@@ -17,6 +19,13 @@ extension SettingsView {
   var videoSettingsSection: some View {
     Section(header: SettingsSectionHeader(title: model.localizedString("動画"))) {
       Toggle(model.localizedString("クリック貫通を有効にする"), isOn: clickThroughBinding)
+      Toggle(model.localizedString("壁紙内のボタンをクリックで操作する"), isOn: webInteractionBinding)
+        .disabled(!model.clickThrough)
+      if model.webInteractionEnabled, !AXIsProcessTrusted() {
+        Text(model.localizedString("アクセシビリティの許可が必要です。システム設定のプライバシーとセキュリティで許可してください。"))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
       Toggle(model.localizedString("ログイン時に自動起動する"), isOn: launchAtLoginBinding)
       Toggle(model.localizedString("音声を再生する"), isOn: audioEnabledBinding)
 

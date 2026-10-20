@@ -53,6 +53,30 @@ final class DesktopClickDetectorTests: XCTestCase {
         XCTAssertFalse(isDesktop(1100, 200))
     }
 
+    func testPointerWindowIsLookedThrough() {
+        var list = windows
+        list.insert(OnScreenWindow(ownerPID: windowServer, isWindowServer: true, layer: DesktopClickDetector.cursorLayer,
+                                   bounds: CGRect(x: 880, y: 780, width: 28, height: 40), alpha: 1), at: 0)
+        XCTAssertTrue(isDesktop(900, 800, windows: list))
+    }
+
+    func testStageManagerOverlayIsLookedThroughButItsThumbnailsAreNot() {
+        let windowManager: pid_t = 700
+        var list = windows
+        list.insert(OnScreenWindow(ownerPID: windowManager, isWindowServer: false, layer: 18,
+                                   bounds: CGRect(x: 0, y: 0, width: 1470, height: 956), alpha: 1), at: 2)
+        list.insert(OnScreenWindow(ownerPID: windowManager, isWindowServer: false, layer: 18,
+                                   bounds: CGRect(x: 20, y: 200, width: 120, height: 90), alpha: 1), at: 2)
+        func check(_ x: CGFloat, _ y: CGFloat) -> Bool {
+            DesktopClickDetector.isDesktopClick(
+                at: CGPoint(x: x, y: y), windows: list, finderPID: finder, dockPID: dock, ownPID: own,
+                windowManagerPID: windowManager, screenSizes: [CGSize(width: 1470, height: 956)]
+            )
+        }
+        XCTAssertTrue(check(900, 800))
+        XCTAssertFalse(check(60, 240))
+    }
+
     func testFinderWindowIsNotTheDesktop() {
         var list = windows
         list.insert(OnScreenWindow(ownerPID: finder, isWindowServer: false, layer: 0,

@@ -179,13 +179,18 @@ struct OnScreenWindow: Equatable {
 enum DesktopClickDetector {
     /// kCGDesktopIconWindowLevel: Finder's desktop (icons) window.
     static let desktopIconLayer = Int(CGWindowLevelForKey(.desktopIconWindow))
+    /// The pointer image is a window of its own, always under the pointer.
+    static let cursorLayer = Int(CGWindowLevelForKey(.cursorWindow))
 
     /// Whether the frontmost window under `point` is Finder's desktop. The Dock owns a
     /// transparent window over the whole screen and the window server owns
     /// invisible strips below the menu bar, so those are looked through. Desktop
     /// widgets sit just above the desktop and do count as being in front of it.
+    /// WindowManager (Stage Manager) keeps a screen-sized overlay over the desktop;
+    /// its Stage Manager thumbnails are smaller and do count as being in front.
     static func isDesktopClick(
-        at point: CGPoint, windows: [OnScreenWindow], finderPID: pid_t?, dockPID: pid_t?, ownPID: pid_t
+        at point: CGPoint, windows: [OnScreenWindow], finderPID: pid_t?, dockPID: pid_t?, ownPID: pid_t,
+        windowManagerPID: pid_t? = nil, screenSizes: [CGSize] = []
     ) -> Bool {
         for window in windows {
             guard window.alpha > 0, !window.bounds.isEmpty, window.bounds.contains(point) else {
@@ -194,7 +199,10 @@ enum DesktopClickDetector {
             if window.ownerPID == dockPID || window.ownerPID == ownPID {
                 continue
             }
-            if window.isWindowServer, window.layer < 0 {
+            if window.isWindowServer, window.layer < 0 || window.layer == cursorLayer {
+                continue
+            }
+            if window.ownerPID == windowManagerPID, screenSizes.contains(window.bounds.size) {
                 continue
             }
             return window.ownerPID == finderPID && window.layer == desktopIconLayer

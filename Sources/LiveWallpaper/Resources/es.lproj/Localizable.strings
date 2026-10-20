@@ -40,6 +40,8 @@
 "30fps" = "30 fps";
 "60fps" = "60 fps";
 "クリック貫通を有効にする" = "Activar el clic a través";
+"壁紙内のボタンをクリックで操作する" = "Pulsar los botones dentro del fondo";
+"アクセシビリティの許可が必要です。システム設定のプライバシーとセキュリティで許可してください。" = "Se necesita el permiso de Accesibilidad. Actívalo en Ajustes del Sistema, en Privacidad y seguridad.";
 "ログイン時に自動起動する" = "Abrir al iniciar sesión";
 "音声を再生する" = "Reproducir audio";
 "音量" = "Volumen";

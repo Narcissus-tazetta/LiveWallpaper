@@ -40,6 +40,8 @@
 "30fps" = "30 fps";
 "60fps" = "60 fps";
 "クリック貫通を有効にする" = "Tıklamaların arkaya geçmesine izin ver";
+"壁紙内のボタンをクリックで操作する" = "Duvar kağıdındaki düğmelere tıklayarak kullan";
+"アクセシビリティの許可が必要です。システム設定のプライバシーとセキュリティで許可してください。" = "Erişilebilirlik izni gerekli. Sistem Ayarları'nda Gizlilik ve Güvenlik altından izin verin.";
 "ログイン時に自動起動する" = "Oturum açıldığında aç";
 "音声を再生する" = "Sesi oynat";
 "音量" = "Ses düzeyi";

@@ -43,6 +43,8 @@ extension WallpaperModel {
 
     private func restoreDisplayAndWindowPrefs() {
         clickThrough = UserDefaults.standard.object(forKey: PrefsKey.clickThrough) as? Bool ?? true
+        webInteractionEnabled = UserDefaults.standard.bool(forKey: PrefsKey.webWallpaperInteraction)
+        observeAppActivationForWebInteraction()
         if let modeValue: String = UserDefaults.standard.string(forKey: PrefsKey.displayMode),
            let restoredMode = DisplayMode(rawValue: modeValue)
         {

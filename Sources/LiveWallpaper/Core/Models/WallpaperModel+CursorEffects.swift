@@ -267,6 +267,7 @@ extension WallpaperModel {
         let targets = cursorEffectTargets()
         updateClickMonitor(targets: targets)
         updateScenePressMonitor(targets: targets)
+        updateWebInteractionMonitor()
         let motion = cursorMotionAllowed
         let spotlight = spotlightAllowed
         let needsTracking = targets.contains { target in
@@ -428,7 +429,7 @@ extension WallpaperModel {
         }
     }
 
-    private func isDesktopClick(at location: CGPoint) -> Bool {
+    func isDesktopClick(at location: CGPoint) -> Bool {
         guard let primaryHeight = NSScreen.screens.first?.frame.height else {
             return false
         }
@@ -439,7 +440,10 @@ extension WallpaperModel {
                 .first?.processIdentifier,
             dockPID: NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
                 .first?.processIdentifier,
-            ownPID: ProcessInfo.processInfo.processIdentifier
+            ownPID: ProcessInfo.processInfo.processIdentifier,
+            windowManagerPID: NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.WindowManager")
+                .first?.processIdentifier,
+            screenSizes: NSScreen.screens.map(\.frame.size)
         )
     }
 
@@ -459,7 +463,7 @@ extension WallpaperModel {
         }
     }
 
-    private static func onScreenWindows() -> [OnScreenWindow] {
+    static func onScreenWindows() -> [OnScreenWindow] {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
             return []
         }

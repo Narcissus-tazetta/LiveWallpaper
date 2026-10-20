@@ -23,6 +23,93 @@ final class WebPlayerView: NSView {
     })();
     """
 
+    /// The wallpaper window ignores the mouse, so desktop clicks are replayed into the
+    /// page as synthetic events. Only elements that look clickable take a press;
+    /// range inputs ignore synthetic events and are driven by value instead.
+    private static let pointerForwardScript = """
+    (function() {
+      var target = null, isRange = false;
+      var clickable = 'a[href],button,input,select,textarea,summary,label,[role=button],[role=slider],[role=checkbox],[role=tab],[role=menuitem],[role=option],[onclick]';
+      function interactive(el) {
+        while (el && el.nodeType === 1) {
+          if (el.matches(clickable)) return el;
+          var c = getComputedStyle(el).cursor;
+          if (c === 'pointer' || c === 'grab' || c === 'ew-resize' || c === 'col-resize') return el;
+          el = el.parentElement;
+        }
+        return null;
+      }
+      function fire(el, name, x, y, buttons, pointer) {
+        var o = { bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y,
+                  screenX: x, screenY: y, button: 0, buttons: buttons, detail: 1,
+                  pointerId: 1, pointerType: 'mouse', isPrimary: true };
+        el.dispatchEvent(pointer ? new PointerEvent(name, o) : new MouseEvent(name, o));
+      }
+      function setRange(el, x) {
+        var r = el.getBoundingClientRect();
+        var f = Math.min(1, Math.max(0, (x - r.left) / r.width));
+        var min = +el.min || 0, max = el.max === '' ? 100 : +el.max, step = +el.step || 1;
+        el.value = Math.round((min + f * (max - min) - min) / step) * step + min;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      window.__liveWallpaperPointer = function(phase, x, y, dx, dy) {
+        if (phase === 'wheel') {
+          for (var el = document.elementFromPoint(x, y); el; el = el.parentElement) {
+            if (/(auto|scroll)/.test(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight) {
+              el.scrollBy(dx, dy);
+              return true;
+            }
+          }
+          return false;
+        }
+        if (phase === 'down') {
+          target = interactive(document.elementFromPoint(x, y));
+          if (!target) return false;
+          isRange = target.matches('input[type=range]');
+          if (isRange) { setRange(target, x); return true; }
+          fire(target, 'pointerdown', x, y, 1, true);
+          fire(target, 'mousedown', x, y, 1, false);
+          return true;
+        }
+        if (!target) return false;
+        if (phase === 'move') {
+          if (isRange) { setRange(target, x); return true; }
+          fire(target, 'pointermove', x, y, 1, true);
+          fire(target, 'mousemove', x, y, 1, false);
+          return true;
+        }
+        var t = target;
+        target = null;
+        if (isRange) { t.dispatchEvent(new Event('change', { bubbles: true })); return true; }
+        fire(t, 'pointerup', x, y, 0, true);
+        fire(t, 'mouseup', x, y, 0, false);
+        var under = document.elementFromPoint(x, y);
+        if (under && t.contains(under)) t.click();
+        return true;
+      };
+    })();
+    """
+
+    enum PointerPhase: String {
+        case down, move, up, wheel
+    }
+
+    /// `point` is in page coordinates (top-left origin). `onDeclined` runs when the page
+    /// had nothing clickable there, so the rest of that press is not forwarded.
+    func forwardPointer(
+        _ phase: PointerPhase, at point: CGPoint, scroll: CGVector = .zero, onDeclined: (() -> Void)? = nil
+    ) {
+        let call = "window.__liveWallpaperPointer ? window.__liveWallpaperPointer('\(phase.rawValue)', \(point.x), \(point.y), \(scroll.dx), \(scroll.dy)) : false"
+        webView.evaluateJavaScript(call) { result, error in
+            if let error {
+                AppLog.externalWallpapers
+                    .error("pointer forward failed: \(error.localizedDescription, privacy: .public)")
+            } else if (result as? Bool) != true {
+                onDeclined?()
+            }
+        }
+    }
+
     let webView: WKWebView
     private let navigationDelegate: NavigationDelegate
     private let scriptMessageHandler: EmbedReadyMessageHandler
@@ -630,6 +717,13 @@ final class WebPlayerView: NSView {
         contentController.addUserScript(
             WKUserScript(
                 source: bootstrapScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
+        contentController.addUserScript(
+            WKUserScript(
+                source: pointerForwardScript,
                 injectionTime: .atDocumentEnd,
                 forMainFrameOnly: true
             )

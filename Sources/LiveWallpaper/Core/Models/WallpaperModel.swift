@@ -119,6 +119,13 @@ final class WallpaperModel: ObservableObject {
     var presentationCacheByPlayerView: [ObjectIdentifier: PresentationCacheKey] = [:]
 
     @Published var clickThrough: Bool = true
+    /// Forwards desktop clicks on a web wallpaper's buttons into the page while click-through is on.
+    @Published var webInteractionEnabled: Bool = false
+    var webInteractionMonitor: Any?
+    var webInteractionObserver: NSObjectProtocol?
+    /// The page that got the last press, so the drag and release go to it too.
+    var webInteractionPressTarget: WebPlayerView?
+    var webInteractionWheelProbe: (location: CGPoint, time: TimeInterval, accepted: Bool)?
     @Published var displayMode: DisplayMode = .mainOnly
     @Published var fitMode: VideoFitMode = .fill
     @Published var lightweightMode: Bool = false

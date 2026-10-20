@@ -13,6 +13,10 @@ extension SettingsView {
         modelBinding(model.clickThrough) { model.setClickThrough($0) }
     }
 
+    var webInteractionBinding: Binding<Bool> {
+        modelBinding(model.webInteractionEnabled) { model.setWebInteractionEnabled($0) }
+    }
+
     var launchAtLoginBinding: Binding<Bool> {
         modelBinding(model.launchAtLoginEnabled) {
             NotificationCenter.default.post(name: .toggleLaunchAtLogin, object: $0)

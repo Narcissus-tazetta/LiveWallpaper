@@ -40,6 +40,8 @@
 "30fps" = "30 fps";
 "60fps" = "60 fps";
 "クリック貫通を有効にする" = "Bật bấm xuyên qua";
+"壁紙内のボタンをクリックで操作する" = "Bấm các nút trong hình nền";
+"アクセシビリティの許可が必要です。システム設定のプライバシーとセキュリティで許可してください。" = "Cần quyền Trợ năng. Hãy cho phép trong Cài đặt Hệ thống, mục Quyền riêng tư & Bảo mật.";
 "ログイン時に自動起動する" = "Mở khi đăng nhập";
 "音声を再生する" = "Phát âm thanh";
 "音量" = "Âm lượng";

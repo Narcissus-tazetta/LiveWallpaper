@@ -14,6 +14,7 @@ enum PrefsKey {
     static let autoUpdateEnabled = "autoUpdateEnabled"
     static let batteryAwareQualityEnabled = "batteryAwareQualityEnabled"
     static let clickThrough = "clickThrough"
+    static let webWallpaperInteraction = "webWallpaperInteraction"
     static let currentWebWallpaperID = "currentWebWallpaperID"
     static let decodeMode = "decodeMode"
     static let dedicatedPlaybackContinuityEnabled = "dedicatedPlaybackContinuityEnabled"
