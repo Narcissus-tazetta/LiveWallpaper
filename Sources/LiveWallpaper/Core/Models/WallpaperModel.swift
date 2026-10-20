@@ -338,6 +338,8 @@ final class WallpaperModel: ObservableObject {
     @Published var failedExternalScenes: [String: Date] = [:]
     /// External scene ID → the revision being copied and baked.
     var externalScenePreparations: [String: (revision: Date, task: Task<Void, Never>)] = [:]
+    /// A scene chosen before its bake finished, shown as soon as it is ready.
+    var pendingShowExternalWallpaperID: String?
     /// 自動停止(作業中の停止など)の対象から除外する画面ID。ここに含まれる画面は
     /// 他の画面での作業やウィンドウ被覆に関わらず常に再生を続ける。
     @Published var suspendDisabledDisplayIDs: Set<String> = []

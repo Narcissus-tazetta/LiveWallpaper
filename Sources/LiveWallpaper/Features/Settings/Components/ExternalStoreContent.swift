@@ -119,6 +119,19 @@ struct ExternalWallpaperThumbnail: View {
     let wallpaper: ExternalWallpaper
     @State private var image: CGImage?
 
+    private static let cache: NSCache<NSString, CGImage> = {
+        let cache = NSCache<NSString, CGImage>()
+        cache.countLimit = 24
+        cache.totalCostLimit = 16 * 1024 * 1024
+        return cache
+    }()
+
+    private static func cacheKey(for wallpaper: ExternalWallpaper) -> NSString {
+        let rev = wallpaper.sceneRevision?.timeIntervalSince1970 ?? 0
+        let thumb = wallpaper.thumbnailPath ?? ""
+        return "\(wallpaper.id):\(rev):\(thumb)" as NSString
+    }
+
     var body: some View {
         ZStack {
             Color.secondary.opacity(0.15)
@@ -134,36 +147,54 @@ struct ExternalWallpaperThumbnail: View {
         }
         .clipped()
         .contentShape(Rectangle())
+        .onAppear {
+            if image == nil, let cached = Self.cache.object(forKey: Self.cacheKey(for: wallpaper)) {
+                image = cached
+            }
+        }
         .task(id: wallpaper.id) {
-            image = await Self.load(wallpaper)
+            if image == nil {
+                image = await Self.load(wallpaper)
+            }
         }
     }
 
     private static let maxPixelSize = 480
 
     private static func load(_ wallpaper: ExternalWallpaper) async -> CGImage? {
+        let key = cacheKey(for: wallpaper)
+        if let cached = cache.object(forKey: key) {
+            return cached
+        }
+        let image: CGImage?
         if let path = wallpaper.thumbnailPath,
            let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
-           let image = CGImageSourceCreateThumbnailAtIndex(source, CGImageSourceGetCount(source) / 2, [
+           let generated = CGImageSourceCreateThumbnailAtIndex(source, CGImageSourceGetCount(source) / 2, [
                kCGImageSourceCreateThumbnailFromImageAlways: true,
                kCGImageSourceCreateThumbnailWithTransform: true,
                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
            ] as CFDictionary)
         {
-            return image
-        }
-        if wallpaper.webSource != nil { return nil }
-        let generator =
-            AVAssetImageGenerator(asset: AVURLAsset(url: URL(fileURLWithPath: wallpaper.path)))
-        generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
-        do {
-            return try await generator.image(at: CMTime(seconds: 1, preferredTimescale: 600)).image
-        } catch {
-            AppLog.externalWallpapers.error(
-                "no thumbnail for \(wallpaper.id, privacy: .public): \(error.localizedDescription, privacy: .public)"
-            )
+            image = generated
+        } else if wallpaper.webSource != nil || wallpaper.path.isEmpty || !FileManager.default.fileExists(atPath: wallpaper.path) {
             return nil
+        } else {
+            let generator =
+                AVAssetImageGenerator(asset: AVURLAsset(url: URL(fileURLWithPath: wallpaper.path)))
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
+            do {
+                image = try await generator.image(at: CMTime(seconds: 1, preferredTimescale: 600)).image
+            } catch {
+                AppLog.externalWallpapers.error(
+                    "no thumbnail for \(wallpaper.id, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+                return nil
+            }
         }
+        if let image {
+            cache.setObject(image, forKey: key, cost: image.bytesPerRow * image.height)
+        }
+        return image
     }
 }

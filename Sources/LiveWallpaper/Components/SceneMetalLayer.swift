@@ -73,6 +73,7 @@ final class SceneMetalLayer: CAMetalLayer {
     private let mediaSubscriptionID = UUID()
     private var isSubscribedToMedia = false
     private var isSubscribedToSpectrum = false
+    private(set) var isSuspended = false
     private struct Artwork {
         var source: String
         var id: String
@@ -207,6 +208,7 @@ final class SceneMetalLayer: CAMetalLayer {
 
     func clear() {
         suspend()
+        isSuspended = false
         scriptWorker = SceneScriptWorker()
         frozenScriptInput = nil
         scriptGeneration = UUID()
@@ -303,10 +305,18 @@ final class SceneMetalLayer: CAMetalLayer {
     }
 
     func suspend() {
+        guard !isSuspended else { return }
+        isSuspended = true
         scriptGeneration = UUID()
         needsScriptEvaluation = false
         stopTicking()
         stopPolling()
+    }
+
+    func resume() {
+        guard isSuspended else { return }
+        isSuspended = false
+        clockDidChange()
     }
 
     /// Call when the clock may have started or stopped.
@@ -405,7 +415,7 @@ final class SceneMetalLayer: CAMetalLayer {
     }
 
     func redraw() {
-        guard let renderer else { return }
+        guard !isSuspended, let renderer else { return }
         if renderer.document.scripts.contains(where: \.canRun) {
             needsScriptEvaluation = true
             guard !isEvaluatingScript else { return }
@@ -524,6 +534,11 @@ final class SceneMetalLayer: CAMetalLayer {
     }
 
     private func updateTicking() {
+        guard !isSuspended else {
+            stopTicking()
+            stopPolling()
+            return
+        }
         if isAnimating || isEasing {
             stopPolling()
             startTicking()

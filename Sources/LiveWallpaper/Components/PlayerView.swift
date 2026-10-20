@@ -50,6 +50,17 @@ final class PlayerView: NSView {
     /// Set while a hidden scene stays up until the video layer has a frame again;
     /// removing it sooner shows the desktop for the ~30 ms that takes.
     private var sceneRemovalObservation: NSKeyValueObservation?
+    private(set) var isSuspended = false
+
+    func setSuspended(_ suspended: Bool) {
+        guard isSuspended != suspended else { return }
+        isSuspended = suspended
+        if suspended {
+            sceneLayer?.suspend()
+        } else {
+            sceneLayer?.resume()
+        }
+    }
 
     private lazy var readabilityDimOverlayView: NSView = {
         let view = NSView()
@@ -202,6 +213,9 @@ final class PlayerView: NSView {
         layer.isHidden = false
         CATransaction.commit()
         try layer.show(document, videoPath: videoPath)
+        if isSuspended {
+            layer.suspend()
+        }
     }
 
     private func sceneClockReading() -> SceneClockReading {

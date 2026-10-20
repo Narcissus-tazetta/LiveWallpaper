@@ -54,6 +54,7 @@ extension WallpaperModel {
         }
 
         if allSuspended {
+            suspendSharedPlayerViews(displayIDs: displayIDs)
             // If we've already deep-suspended (item torn down to save memory),
             // there is nothing live to capture — the shared player is empty and
             // reading currentTime()/capturing would be meaningless. Just keep the
@@ -115,8 +116,10 @@ extension WallpaperModel {
             guard isSharedPlayerDisplay(displayID) else {
                 continue
             }
-            let expectedPlayer = suspendedDisplayIDs.contains(displayID) ? nil : player
+            let isSuspended = suspendedDisplayIDs.contains(displayID)
+            let expectedPlayer = isSuspended ? nil : player
             let view = playerViews[index]
+            view.setSuspended(isSuspended)
             let layer = view.playerLayer
             guard view.player !== expectedPlayer else {
                 continue
@@ -237,5 +240,14 @@ extension WallpaperModel {
             return CMTime(seconds: trimStart, preferredTimescale: 600)
         }
         return time
+    }
+
+    private func suspendSharedPlayerViews(displayIDs: [String]) {
+        for index in playerViews.indices {
+            let displayID = index < displayIDs.count ? displayIDs[index] : displayIDForWindow(at: index)
+            if isSharedPlayerDisplay(displayID) {
+                playerViews[index].setSuspended(true)
+            }
+        }
     }
 }

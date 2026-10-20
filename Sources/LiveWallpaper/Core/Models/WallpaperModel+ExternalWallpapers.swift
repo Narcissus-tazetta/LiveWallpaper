@@ -143,11 +143,16 @@ extension WallpaperModel {
 
     func showExternalWallpaper(id: String) {
         guard canShowExternalWallpaper,
-              let wallpaper = externalWallpapers.first(where: { $0.id == id }), isExternalWallpaperReady(wallpaper),
-              activeExternalWallpaperID != id
+              let wallpaper = externalWallpapers.first(where: { $0.id == id })
         else {
             return
         }
+        guard isExternalWallpaperReady(wallpaper) else {
+            pendingShowExternalWallpaperID = id
+            return
+        }
+        pendingShowExternalWallpaperID = nil
+        guard activeExternalWallpaperID != id else { return }
         let previousPath = activeExternalWallpaper?.path
         let changesWeb = isWebWallpaperActive || wallpaper.webSource != nil
         let change = {
@@ -293,6 +298,9 @@ extension WallpaperModel {
         readyExternalScenes[wallpaper.id] = revision
         AppLog.externalWallpapers.info("reused cached baked scene \(wallpaper.id, privacy: .public)")
         objectWillChange.send()
+        if pendingShowExternalWallpaperID == wallpaper.id {
+            showExternalWallpaper(id: wallpaper.id)
+        }
     }
 
     private func prepareExternalScene(_ wallpaper: ExternalWallpaper) {
@@ -335,6 +343,9 @@ extension WallpaperModel {
                 }
                 self.readyExternalScenes[id] = revision
                 AppLog.externalWallpapers.info("scene ready \(id, privacy: .public)")
+                if self.pendingShowExternalWallpaperID == id {
+                    self.showExternalWallpaper(id: id)
+                }
             } catch is CancellationError {
                 // discardExternalScene cancelled it and cleans up.
                 return
@@ -352,6 +363,9 @@ extension WallpaperModel {
     }
 
     private func discardExternalScene(id: String) {
+        if pendingShowExternalWallpaperID == id {
+            pendingShowExternalWallpaperID = nil
+        }
         externalScenePreparations.removeValue(forKey: id)?.task.cancel()
         readyExternalScenes.removeValue(forKey: id)
         failedExternalScenes.removeValue(forKey: id)

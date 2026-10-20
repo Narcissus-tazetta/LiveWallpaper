@@ -545,6 +545,7 @@ extension WallpaperModel {
             let view = playerViews[index]
             let layer = view.playerLayer
             if suspendedDisplayIDs.contains(displayID) {
+                view.setSuspended(true)
                 let player = activeDedicatedSlot(forScreenID: displayID)?.player
                 // プレイヤー未生成(停止中に起動・画面接続・割り当てされた場合)でも
                 // 静止画は必ず貼る。何も貼らないとその画面だけ黒いままになる。
@@ -568,6 +569,7 @@ extension WallpaperModel {
                     "dedicated suspend display=\(displayID, privacy: .public) hasPlayer=\(player != nil)"
                 )
             } else {
+                view.setSuspended(false)
                 let player = ensureDedicatedSlot(forScreenID: displayID, path: path, isActive: true)
                 if view.player !== player {
                     if layer.contents != nil, !layer.isReadyForDisplay {
