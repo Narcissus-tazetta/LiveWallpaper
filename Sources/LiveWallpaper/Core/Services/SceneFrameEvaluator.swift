@@ -13,6 +13,7 @@ struct SceneEvaluatedFrame {
     var logs: [UUID: String]
     var rigPlayback: [UUID: [SceneSkeleton.Playback]] = [:]
     var order: [UUID: Int] = [:]
+    var meshes: [SceneMeshFrame] = []
 }
 
 final class SceneFrameEvaluator {
@@ -83,6 +84,7 @@ final class SceneFrameEvaluator {
         var result = base
         var targetInputs: [UUID: [String: Any]] = [:]
         var warnings: [SceneScriptIssue] = []
+        var meshes: [SceneMeshFrame] = []
         for script in document.scripts where script.canRun && !script.targetLayerIDs(in: document.layers).isEmpty {
             if let issue = stopped[script.id] {
                 if failOnError { throw issue }
@@ -160,6 +162,7 @@ final class SceneFrameEvaluator {
                 warnings += output.warnings.map {
                     SceneScriptIssue(scriptID: script.id, name: script.name, message: $0, isPartial: true)
                 }
+                meshes += output.meshes
                 for (id, adjustment) in output.adjustments {
                     if let position = adjustment.order { order[id] = position }
                     for (rigID, changes) in adjustment.rigPlayback {
@@ -190,7 +193,7 @@ final class SceneFrameEvaluator {
                 if failOnError { throw issue }
             }
         }
-        return SceneEvaluatedFrame(input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order)
+        return SceneEvaluatedFrame(input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes)
     }
 
     /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets

@@ -701,7 +701,8 @@ final class SceneRenderer {
         }
         if let graph = graphRenderers[layer.id] {
             source = try graph.encode(input: source, images: graphResources[layer.id]!, time: input.time,
-                                      cursor: input.cursor, audio: input.audio, commandBuffer: commandBuffer)
+                                      cursor: input.cursor, audio: input.audio, meshes: lastFrame?.meshes ?? [],
+                                      commandBuffer: commandBuffer)
         }
         var effects = layer.activeEffects
         // While a particle area is painted, an effect pass that changes nothing
@@ -728,7 +729,7 @@ final class SceneRenderer {
             if let graph = graphRenderers[effect.id] {
                 current = try graph.encode(input: current, images: graphResources[effect.id]!, time: input.time,
                                            cursor: input.cursor, values: effect.values, audio: input.audio,
-                                           commandBuffer: commandBuffer)
+                                           meshes: lastFrame?.meshes ?? [], commandBuffer: commandBuffer)
                 continue
             }
             let destination = targets[index % 2]

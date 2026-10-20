@@ -42,7 +42,10 @@ struct SceneRenderGraph: Codable, Equatable {
     }
 
     struct Draw: Codable, Equatable {
-        enum Blend: String, Codable { case sourceOver, additive, maximum }
+        /// `sourceOver`, `additive` and `maximum` take premultiplied colour; the two `alpha`
+        /// cases weight straight colour by its own alpha (source alpha, then one or one
+        /// minus source alpha), alpha channel included.
+        enum Blend: String, Codable { case sourceOver, additive, maximum, alphaAdditive, alphaOver }
         struct Command: Codable, Equatable {
             var firstIndex: Int
             var indexCount: Int
@@ -51,6 +54,7 @@ struct SceneRenderGraph: Codable, Equatable {
         }
         var vertex: Stage
         var fragment: Stage
+        /// Ignored when `dynamic` is set.
         var vertices: Data
         var vertexStride: Int
         var vertexCount: Int
@@ -61,6 +65,23 @@ struct SceneRenderGraph: Codable, Equatable {
         var indices: Data?
         var blend: Blend?
         var commands: [Command]?
+        /// Quads that a script sends every frame instead of the fixed `vertices`.
+        var dynamic: DynamicMesh?
+        /// Whether the pass starts from a cleared target (the default). A pass that
+        /// accumulates onto what an earlier pass drew sets this to false.
+        var clears: Bool?
+    }
+
+    /// Geometry made at run time. Each mesh frame is four vertices per quad of nine
+    /// floats (position xyz, uv, colour rgba), so `vertexStride` is 36.
+    struct DynamicMesh: Codable, Equatable {
+        /// Only meshes made for this parent are drawn by the pass.
+        var parent: String
+        /// Quads the pass draws per frame, at most 16383 (16-bit indices).
+        var capacity: Int
+        /// A mesh's material to the textures it samples. A `textureSize` update of the
+        /// fragment stage names `slot:<index>` for the texture bound at that index.
+        var materials: [String: [Texture]]
     }
 
     struct Pass: Codable, Equatable {
@@ -90,6 +111,16 @@ struct SceneRenderGraph: Codable, Equatable {
             return (draw.vertex.updates + draw.fragment.updates).contains { $0.value == value }
         }
     }
+}
+
+/// One mesh a script made, as it should look this frame.
+struct SceneMeshFrame: Equatable {
+    static let floatsPerQuad = 36
+    static let vertexStride = 36
+    var parent: String
+    var material: String
+    /// Whole quads: 36 floats each.
+    var vertices: [Float]
 }
 
 /// The system audio's loudness per frequency band, low to high, normally 0...1.

@@ -37,73 +37,83 @@ final class WebNowPlayingReader: @unchecked Sendable {
     private func readSynchronously(runningIDs: Set<String>) throws -> WebNowPlaying {
         var snapshots: [WebNowPlaying] = []
         for id in ["com.apple.Music", "com.spotify.client"] where runningIDs.contains(id) {
-            let spotify = id == "com.spotify.client"
-            let target = NSAppleEventDescriptor(bundleIdentifier: id)
-            let playback = try get(property("pPlS"), target: target).enumCodeValue
-            guard playback != code("kPSS") else { continue }
-            let track = property("pTrk")
-            var value = WebNowPlaying()
-            value.state = playback == code("kPSp") ? "paused" : "playing"
-            value.title = try get(property("pnam", inside: track), target: target).stringValue ?? ""
-            value.artist = try get(property(
-                "pArt",
-                inside: track
-            ), target: target).stringValue ?? ""
-            value.album = try get(property("pAlb", inside: track), target: target).stringValue ?? ""
-            value.duration = try get(property("pDur", inside: track), target: target).doubleValue
-            // Spotify's Apple event duration uses milliseconds; Music uses seconds.
-            if spotify { value.duration /= 1000 }
-            value.position = try get(property("pPos"), target: target).doubleValue
-            value.trackID = try get(
-                property(spotify ? "ID  " : "pPIS", inside: track),
-                target: target
-            ).stringValue ?? ""
-            value.source = id
-            if spotify {
-                value.artwork = try get(property("aUrl", inside: track), target: target)
-                    .stringValue ?? ""
-            } else {
-                let key = id + ":" + value.trackID
-                if let cached = artworkCache[key] {
-                    value.artwork = cached
+            // The track can vanish between Apple events (track change, stop), and a busy
+            // player can miss the 2 s timeout; neither is a failure of the automation
+            // itself, so this poll skips the player. Permission errors still propagate.
+            do {
+                let spotify = id == "com.spotify.client"
+                let target = NSAppleEventDescriptor(bundleIdentifier: id)
+                let playback = try get(property("pPlS"), target: target).enumCodeValue
+                guard playback != code("kPSS") else { continue }
+                let track = property("pTrk")
+                var value = WebNowPlaying()
+                value.state = playback == code("kPSp") ? "paused" : "playing"
+                value.title = try get(property("pnam", inside: track), target: target).stringValue ?? ""
+                value.artist = try get(property(
+                    "pArt",
+                    inside: track
+                ), target: target).stringValue ?? ""
+                value.album = try get(property("pAlb", inside: track), target: target).stringValue ?? ""
+                value.duration = try get(property("pDur", inside: track), target: target).doubleValue
+                // Spotify's Apple event duration uses milliseconds; Music uses seconds.
+                if spotify { value.duration /= 1000 }
+                value.position = try get(property("pPos"), target: target).doubleValue
+                value.trackID = try get(
+                    property(spotify ? "ID  " : "pPIS", inside: track),
+                    target: target
+                ).stringValue ?? ""
+                value.source = id
+                if spotify {
+                    value.artwork = try get(property("aUrl", inside: track), target: target)
+                        .stringValue ?? ""
                 } else {
-                    let artwork = NSAppleEventDescriptor.record()
-                    artwork.setDescriptor(
-                        NSAppleEventDescriptor(typeCode: code("cArt")),
-                        forKeyword: UInt32(keyAEDesiredClass)
-                    )
-                    artwork.setDescriptor(track, forKeyword: UInt32(keyAEContainer))
-                    artwork.setDescriptor(
-                        NSAppleEventDescriptor(enumCode: UInt32(formAbsolutePosition)),
-                        forKeyword: UInt32(keyAEKeyForm)
-                    )
-                    artwork.setDescriptor(
-                        NSAppleEventDescriptor(int32: 1),
-                        forKeyword: UInt32(keyAEKeyData)
-                    )
-                    let firstArtwork = artwork
-                        .coerce(toDescriptorType: UInt32(typeObjectSpecifier))!
-                    do {
-                        let raw = try get(property("pRaw", inside: firstArtwork), target: target)
-                        if let source = CGImageSourceCreateWithData(raw.data as CFData, nil),
-                           let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                               kCGImageSourceCreateThumbnailFromImageAlways: true,
-                               kCGImageSourceThumbnailMaxPixelSize: 512
-                           ] as CFDictionary),
-                           let png = NSBitmapImageRep(cgImage: image).representation(
-                               using: .png,
-                               properties: [:]
-                           )
-                        {
-                            value.artwork = "data:image/png;base64," + png.base64EncodedString()
+                    let key = id + ":" + value.trackID
+                    if let cached = artworkCache[key] {
+                        value.artwork = cached
+                    } else {
+                        let artwork = NSAppleEventDescriptor.record()
+                        artwork.setDescriptor(
+                            NSAppleEventDescriptor(typeCode: code("cArt")),
+                            forKeyword: UInt32(keyAEDesiredClass)
+                        )
+                        artwork.setDescriptor(track, forKeyword: UInt32(keyAEContainer))
+                        artwork.setDescriptor(
+                            NSAppleEventDescriptor(enumCode: UInt32(formAbsolutePosition)),
+                            forKeyword: UInt32(keyAEKeyForm)
+                        )
+                        artwork.setDescriptor(
+                            NSAppleEventDescriptor(int32: 1),
+                            forKeyword: UInt32(keyAEKeyData)
+                        )
+                        let firstArtwork = artwork
+                            .coerce(toDescriptorType: UInt32(typeObjectSpecifier))!
+                        do {
+                            let raw = try get(property("pRaw", inside: firstArtwork), target: target)
+                            if let source = CGImageSourceCreateWithData(raw.data as CFData, nil),
+                               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                                   kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                   kCGImageSourceThumbnailMaxPixelSize: 512
+                               ] as CFDictionary),
+                               let png = NSBitmapImageRep(cgImage: image).representation(
+                                   using: .png,
+                                   properties: [:]
+                               )
+                            {
+                                value.artwork = "data:image/png;base64," + png.base64EncodedString()
+                            }
+                        } catch let error as NSError where error.code == errAENoSuchObject {
+                            value.artwork = ""
                         }
-                    } catch let error as NSError where error.code == errAENoSuchObject {
-                        value.artwork = ""
+                        artworkCache = [key: value.artwork]
                     }
-                    artworkCache = [key: value.artwork]
                 }
+                snapshots.append(value)
+            } catch let error as NSError where error.domain == NSOSStatusErrorDomain
+                && [Int(errAENoSuchObject), Int(errAETimeout)].contains(error.code)
+            {
+                AppLog.externalWallpapers.error("media poll skipped for \(id, privacy: .public): \(error.code)")
+                continue
             }
-            snapshots.append(value)
         }
         let playing = Set(snapshots.filter { $0.state == "playing" }.map(\.source))
         if let newlyPlaying = playing.subtracting(previouslyPlaying).sorted()

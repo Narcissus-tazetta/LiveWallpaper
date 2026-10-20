@@ -18,6 +18,7 @@ final class SceneRenderGraphRenderer {
         var indices: MTLBuffer?
         var skeleton: SceneSkeletonEvaluator?
         var commands: [CompiledCommand]
+        var materialSamplers: [String: [MTLSamplerState]]
     }
 
     private struct CompiledCommand {
@@ -60,13 +61,13 @@ final class SceneRenderGraphRenderer {
             if let blend = draw.blend {
                 let attachment = descriptor.colorAttachments[0]!
                 attachment.isBlendingEnabled = true
-                attachment.sourceRGBBlendFactor = .one
-                attachment.sourceAlphaBlendFactor = .one
-                attachment
-                    .destinationRGBBlendFactor = blend == .sourceOver ? .oneMinusSourceAlpha : .one
-                attachment
-                    .destinationAlphaBlendFactor = blend == .sourceOver ?
-                    .oneMinusSourceAlpha : .one
+                let weighted = blend == .alphaAdditive || blend == .alphaOver
+                let source: MTLBlendFactor = weighted ? .sourceAlpha : .one
+                attachment.sourceRGBBlendFactor = source
+                attachment.sourceAlphaBlendFactor = source
+                let destination: MTLBlendFactor = blend == .sourceOver || blend == .alphaOver ? .oneMinusSourceAlpha : .one
+                attachment.destinationRGBBlendFactor = destination
+                attachment.destinationAlphaBlendFactor = destination
                 if blend == .maximum {
                     attachment.rgbBlendOperation = .max
                     attachment.alphaBlendOperation = .max
@@ -80,13 +81,16 @@ final class SceneRenderGraphRenderer {
             }
             layout.layouts[1].stride = draw.vertexStride
             descriptor.vertexDescriptor = layout
-            guard let vertices = draw.vertices.withUnsafeBytes({ bytes in
-                device.makeBuffer(
-                    bytes: bytes.baseAddress!,
-                    length: bytes.count,
-                    options: .storageModeShared
-                )
-            }) else { throw GraphError(detail: "pass \(index) vertex allocation failed") }
+            guard let vertices = draw.dynamic != nil
+                ? device.makeBuffer(length: 16, options: .storageModeShared)
+                : draw.vertices.withUnsafeBytes({ bytes in
+                    device.makeBuffer(
+                        bytes: bytes.baseAddress!,
+                        length: bytes.count,
+                        options: .storageModeShared
+                    )
+                })
+            else { throw GraphError(detail: "pass \(index) vertex allocation failed") }
             func samplers(_ textures: [SceneRenderGraph.Texture]) throws -> [MTLSamplerState] {
                 try textures.map { texture in
                     let sampler = MTLSamplerDescriptor()
@@ -116,9 +120,11 @@ final class SceneRenderGraphRenderer {
                 samplers: samplers(draw.textures),
                 vertexUniforms: staticUniforms(draw.vertex),
                 fragmentUniforms: staticUniforms(draw.fragment),
-                indices: draw.indices.map { try makeBuffer($0) },
+                indices: draw.dynamic.map { try makeBuffer(Self.quadIndices($0.capacity)) }
+                    ?? draw.indices.map { try makeBuffer($0) },
                 skeleton: skeletonEvaluator(draw),
-                commands: commands
+                commands: commands,
+                materialSamplers: (draw.dynamic?.materials ?? [:]).mapValues(samplers)
             )
         }
     }
@@ -140,6 +146,7 @@ final class SceneRenderGraphRenderer {
         cursor: SIMD2<Float>?,
         values: [String: Double] = [:],
         audio: SceneAudioSpectrum? = nil,
+        meshes: [SceneMeshFrame] = [],
         commandBuffer: MTLCommandBuffer
     ) throws -> MTLTexture {
         let newSize = SIMD2(input.width, input.height)
@@ -209,6 +216,12 @@ final class SceneRenderGraphRenderer {
                 encoder.endEncoding()
             case .draw:
                 let draw = pass.draw!, compiled = draws[index]!
+                // A pass that adds to its target and has nothing to add costs a full
+                // load and store of the target for no change.
+                if let dynamic = draw.dynamic, draw.clears == false,
+                   !meshes.contains(where: { $0.parent == dynamic.parent && dynamic.materials[$0.material] != nil }) {
+                    continue
+                }
                 let pose = compiled.skeleton?.evaluate(time: time)
                 let vertex = try uniformBinding(
                     draw.vertex,
@@ -220,7 +233,8 @@ final class SceneRenderGraphRenderer {
                     effectValues: values,
                     audio: audio
                 )
-                let fragment = try uniformBinding(
+                // A mesh pass fills its own fragment block per material.
+                let fragment = try draw.dynamic != nil ? UniformBinding.buffer(nil) : uniformBinding(
                     draw.fragment,
                     cached: compiled.fragmentUniforms,
                     resources: resources,
@@ -232,7 +246,7 @@ final class SceneRenderGraphRenderer {
                 )
                 let descriptor = MTLRenderPassDescriptor()
                 descriptor.colorAttachments[0].texture = target
-                descriptor.colorAttachments[0].loadAction = .clear
+                descriptor.colorAttachments[0].loadAction = draw.clears == false ? .load : .clear
                 descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
                 descriptor.colorAttachments[0].storeAction = .store
                 guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor)
@@ -250,17 +264,91 @@ final class SceneRenderGraphRenderer {
                     encoder.setVertexSamplerState(sampler, index: binding.index)
                     encoder.setFragmentSamplerState(sampler, index: binding.index)
                 }
-                drawGeometry(
-                    draw,
-                    compiled: compiled,
-                    fragment: fragment,
-                    resources: resources,
-                    encoder: encoder
-                )
+                if let dynamic = draw.dynamic {
+                    do {
+                        try drawMeshes(
+                            draw, dynamic: dynamic, compiled: compiled, meshes: meshes, resources: resources,
+                            time: time, cursor: cursor, effectValues: values, audio: audio, encoder: encoder
+                        )
+                    } catch {
+                        // Metal traps on an encoder that is released without ending.
+                        encoder.endEncoding()
+                        throw error
+                    }
+                } else {
+                    drawGeometry(
+                        draw,
+                        compiled: compiled,
+                        fragment: fragment,
+                        resources: resources,
+                        encoder: encoder
+                    )
+                }
                 encoder.endEncoding()
             }
         }
         return resources[graph.output]!
+    }
+
+    private static func quadIndices(_ capacity: Int) -> Data {
+        var indices: [UInt16] = []
+        indices.reserveCapacity(capacity * 6)
+        for quad in 0 ..< capacity {
+            let first = UInt16(quad * 4)
+            indices += [first, first + 1, first + 2, first, first + 2, first + 3]
+        }
+        return indices.withUnsafeBytes { Data($0) }
+    }
+
+    /// Writes the meshes made for this pass's parent into one buffer, in the order
+    /// they arrive, and draws each run of quads with its own material's textures.
+    private func drawMeshes(
+        _ draw: SceneRenderGraph.Draw, dynamic: SceneRenderGraph.DynamicMesh, compiled: CompiledDraw,
+        meshes: [SceneMeshFrame], resources: [String: MTLTexture], time: Double, cursor: SIMD2<Float>?,
+        effectValues: [String: Double], audio: SceneAudioSpectrum?, encoder: MTLRenderCommandEncoder
+    ) throws {
+        struct Run { var material: String; var firstQuad: Int; var quads: Int }
+        var floats: [Float] = []
+        var runs: [Run] = []
+        var quads = 0
+        for mesh in meshes where mesh.parent == dynamic.parent && dynamic.materials[mesh.material] != nil {
+            let count = mesh.vertices.count / SceneMeshFrame.floatsPerQuad
+            guard quads + count <= dynamic.capacity else {
+                throw GraphError(detail: "mesh quads exceed the pass capacity of \(dynamic.capacity)")
+            }
+            guard count > 0 else { continue }
+            floats += mesh.vertices[0 ..< count * SceneMeshFrame.floatsPerQuad]
+            runs.append(Run(material: mesh.material, firstQuad: quads, quads: count))
+            quads += count
+        }
+        guard quads > 0 else { return }
+        guard let buffer = floats.withUnsafeBytes({ device.makeBuffer(
+            bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared
+        ) }) else { throw GraphError(detail: "mesh vertex allocation failed") }
+        encoder.setVertexBuffer(buffer, offset: 0, index: 1)
+        for run in runs {
+            var slots = resources
+            let textures = dynamic.materials[run.material]!
+            for (binding, sampler) in zip(textures, compiled.materialSamplers[run.material]!) {
+                let texture = resources[binding.source]!
+                slots["slot:\(binding.index)"] = texture
+                encoder.setVertexTexture(texture, index: binding.index)
+                encoder.setFragmentTexture(texture, index: binding.index)
+                encoder.setVertexSamplerState(sampler, index: binding.index)
+                encoder.setFragmentSamplerState(sampler, index: binding.index)
+            }
+            bindUniforms(
+                try uniformBinding(
+                    draw.fragment, cached: compiled.fragmentUniforms, resources: slots, time: time,
+                    cursor: cursor, pose: nil, effectValues: effectValues, audio: audio
+                ),
+                encoder: encoder, vertex: false
+            )
+            encoder.drawIndexedPrimitives(
+                type: .triangle, indexCount: run.quads * 6, indexType: .uint16,
+                indexBuffer: compiled.indices!, indexBufferOffset: run.firstQuad * 12
+            )
+        }
     }
 
     private func drawGeometry(
@@ -477,11 +565,30 @@ final class SceneRenderGraphRenderer {
                 )
                 let draw = pass.draw!
                 _ = try skeletonEvaluator(draw)
-                try require(
-                    draw.vertexCount > 0 && draw.vertexStride > 0 && draw.vertexCount <= draw
-                        .vertices.count / draw.vertexStride,
-                    "pass \(index) has invalid vertex data"
-                )
+                if let dynamic = draw.dynamic {
+                    try require(
+                        draw.vertexStride == SceneMeshFrame.vertexStride &&
+                            (1 ... 16383).contains(dynamic.capacity) && !dynamic.parent.isEmpty &&
+                            draw.indices == nil && draw.commands == nil && draw.textures.isEmpty &&
+                            draw.skeleton == nil && draw.skeletonID == nil,
+                        "pass \(index) has an invalid dynamic mesh"
+                    )
+                    for textures in dynamic.materials.values {
+                        try require(
+                            Set(textures.map(\.index)).count == textures.count && textures.allSatisfy {
+                                (0 ..< 16).contains($0.index) && resources.contains($0.source) &&
+                                    $0.source != pass.target
+                            },
+                            "pass \(index) has an invalid material texture"
+                        )
+                    }
+                } else {
+                    try require(
+                        draw.vertexCount > 0 && draw.vertexStride > 0 && draw.vertexCount <= draw
+                            .vertices.count / draw.vertexStride,
+                        "pass \(index) has invalid vertex data"
+                    )
+                }
                 if let indices = draw.indices {
                     try require(
                         !indices.isEmpty && indices.count % 6 == 0,
@@ -607,7 +714,7 @@ final class SceneRenderGraphRenderer {
                 )
                 if update.value == .textureSize {
                     try require(
-                        update.texture.map { resources.contains($0) } == true,
+                        update.texture.map { resources.contains($0) || ($0.hasPrefix("slot:") && draw.dynamic != nil) } == true,
                         "uniform references an unknown texture"
                     )
                 }

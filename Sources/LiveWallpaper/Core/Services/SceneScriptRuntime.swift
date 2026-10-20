@@ -97,6 +97,7 @@ final class SceneScriptRuntime {
             programs[script.id]!.memoryBytes = lwjs_memory_usage(programs[script.id]!.pointer)
             var output = try JSONSerialization.jsonObject(with: Data(String(cString: result!).utf8))
             var warnings: [String] = []
+            var meshes: [SceneMeshFrame] = []
             // A module bundle runs several independent scripts; one that failed is
             // reported here while the rest keep running.
             if script.modules != nil, let wrapped = output as? [String: Any] {
@@ -106,10 +107,13 @@ final class SceneScriptRuntime {
                     throw failure("output.warnings: expected at most 16 messages of at most 1 KiB")
                 }
                 warnings = list
+                var length = 0
+                let bytes = lwjs_meshes(programs[script.id]!.pointer, &length)
+                meshes = try Self.readMeshes(bytes, length: length)
                 output = wrapped["adjustments"] as Any
             }
             return SceneScriptOutput(adjustments: try Self.readOutput(output, script: script, layers: layers, rigs: rigs),
-                                     warnings: warnings)
+                                     warnings: warnings, meshes: meshes)
         } catch let failure as SceneScriptIssue {
             throw issue(failure.message, script: script)
         } catch {
@@ -184,6 +188,47 @@ final class SceneScriptRuntime {
 
     private static func decode<T: Decodable>(_ type: T.Type, _ value: [String: Any]) throws -> T {
         try JSONDecoder().decode(type, from: JSONSerialization.data(withJSONObject: value))
+    }
+
+    static let maximumMeshFloats = 8_000_000
+
+    /// The meshes the script emitted: per mesh a parent and a material (u32 length, UTF-8)
+    /// and u32 count of float32, whole quads of 36.
+    private static func readMeshes(_ bytes: UnsafePointer<UInt8>?, length: Int) throws -> [SceneMeshFrame] {
+        guard let bytes, length > 0 else { return [] }
+        let data = UnsafeRawBufferPointer(start: bytes, count: length)
+        var offset = 0
+        func readCount() throws -> Int {
+            guard offset + 4 <= length else { throw failure("output.meshes: truncated") }
+            defer { offset += 4 }
+            return Int(data.loadUnaligned(fromByteOffset: offset, as: UInt32.self))
+        }
+        func readString() throws -> String {
+            let size = try readCount()
+            guard size <= 4096, offset + size <= length,
+                  let text = String(bytes: data[offset ..< offset + size], encoding: .utf8)
+            else { throw failure("output.meshes: invalid string") }
+            offset += size
+            return text
+        }
+        var meshes: [SceneMeshFrame] = []
+        var total = 0
+        while offset < length {
+            let parent = try readString(), material = try readString()
+            let count = try readCount()
+            total += count
+            guard count % SceneMeshFrame.floatsPerQuad == 0, offset + count * 4 <= length, total <= maximumMeshFloats,
+                  meshes.count < 256
+            else { throw failure("output.meshes: expected whole quads within the limits") }
+            let vertices = [Float](unsafeUninitializedCapacity: count) { buffer, filled in
+                if count > 0 { UnsafeMutableRawBufferPointer(buffer).copyMemory(from: UnsafeRawBufferPointer(rebasing: data[offset ..< offset + count * 4])) }
+                filled = count
+            }
+            guard vertices.allSatisfy(\.isFinite) else { throw failure("output.meshes: vertices must be finite") }
+            offset += count * 4
+            meshes.append(SceneMeshFrame(parent: parent, material: material, vertices: vertices))
+        }
+        return meshes
     }
 
     private static func readText(_ raw: Any, layer: SceneLayer) throws -> SceneScriptTextValues {

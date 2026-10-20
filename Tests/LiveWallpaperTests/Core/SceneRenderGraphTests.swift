@@ -113,6 +113,86 @@ final class SceneRenderGraphTests: XCTestCase {
         ))
     }
 
+    private let meshShader = """
+    #include <metal_stdlib>
+    using namespace metal;
+    struct V { float3 position [[attribute(0)]]; float2 uv [[attribute(1)]]; float4 color [[attribute(2)]]; };
+    struct O { float4 position [[position]]; float4 color; };
+    vertex O meshVertex(V v [[stage_in]]) { return {float4(v.position, 1), v.color}; }
+    fragment float4 meshFragment(O v [[stage_in]]) { return v.color; }
+    """
+
+    private func meshPass(clears: Bool?, blend: SceneRenderGraph.Draw.Blend, parent: String = "layer") -> SceneRenderGraph.Pass {
+        .init(operation: .draw, target: "work", draw: .init(
+            vertex: .init(source: meshShader, entryPoint: "meshVertex"),
+            fragment: .init(source: meshShader, entryPoint: "meshFragment"),
+            vertices: Data(), vertexStride: SceneMeshFrame.vertexStride, vertexCount: 0,
+            attributes: [.init(location: 0, offset: 0, format: .float3), .init(location: 1, offset: 12, format: .float2),
+                         .init(location: 2, offset: 20, format: .float4)],
+            textures: [], blend: blend,
+            dynamic: .init(parent: parent, capacity: 8, materials: ["soft": []]), clears: clears
+        ))
+    }
+
+    private func quad(_ rect: SIMD4<Float>, color: SIMD4<Float>, parent: String = "layer", material: String = "soft") -> SceneMeshFrame {
+        let corners: [(Float, Float)] = [(rect.x, rect.w), (rect.x, rect.y), (rect.z, rect.y), (rect.z, rect.w)]
+        let vertices: [Float] = corners.flatMap { (corner: (Float, Float)) -> [Float] in [corner.0, corner.1, 0, 0, 0, color.x, color.y, color.z, color.w] }
+        return SceneMeshFrame(parent: parent, material: material, vertices: vertices)
+    }
+
+    private func renderMeshes(_ graph: SceneRenderGraph, meshes: [SceneMeshFrame]) throws -> [UInt8] {
+        let device = try device()
+        let renderer = try SceneRenderGraphRenderer(graph: graph, device: device)
+        let queue = try XCTUnwrap(device.makeCommandQueue())
+        let command = try XCTUnwrap(queue.makeCommandBuffer())
+        let result = try renderer.encode(input: input(device), images: [:], time: 0, cursor: nil, meshes: meshes, commandBuffer: command)
+        let length = result.width * result.height * 4
+        let buffer = try XCTUnwrap(device.makeBuffer(length: length, options: .storageModeShared))
+        let blit = try XCTUnwrap(command.makeBlitCommandEncoder())
+        blit.copy(from: result, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(),
+                  sourceSize: MTLSize(width: result.width, height: result.height, depth: 1),
+                  to: buffer, destinationOffset: 0, destinationBytesPerRow: result.width * 4, destinationBytesPerImage: length)
+        blit.endEncoding()
+        command.commit()
+        command.waitUntilCompleted()
+        if let error = command.error { throw error }
+        return Array(UnsafeBufferPointer(start: buffer.contents().assumingMemoryBound(to: UInt8.self), count: length))
+    }
+
+    func testDynamicMeshDrawsOnlyItsParentsQuadsWithAlphaWeightedAddition() throws {
+        let graph = SceneRenderGraph(targets: [.init(name: "work")], passes: [meshPass(clears: nil, blend: .alphaAdditive)], output: "work")
+        let full = SIMD4<Float>(-1, -1, 1, 1)
+        let pixels = try renderMeshes(graph, meshes: [
+            quad(full, color: SIMD4(1, 0.5, 0, 0.5)),
+            quad(full, color: SIMD4(1, 0.5, 0, 0.5)),
+            quad(full, color: SIMD4(0, 1, 0, 1), parent: "other")
+        ])
+        // Two half-alpha quads add: rgb += colour * alpha, alpha += alpha * alpha.
+        XCTAssertEqual(Int(pixels[0]), 255, accuracy: 2)
+        XCTAssertEqual(Int(pixels[1]), 128, accuracy: 3)
+        XCTAssertEqual(Int(pixels[2]), 0)
+        XCTAssertEqual(Int(pixels[3]), 128, accuracy: 3)
+    }
+
+    func testDynamicMeshPassWithoutClearKeepsWhatAnEarlierPassDrew() throws {
+        let graph = SceneRenderGraph(targets: [.init(name: "work")], passes: [
+            meshPass(clears: nil, blend: .alphaAdditive, parent: "a"),
+            meshPass(clears: false, blend: .alphaAdditive, parent: "b")
+        ], output: "work")
+        let full = SIMD4<Float>(-1, -1, 1, 1)
+        let pixels = try renderMeshes(graph, meshes: [
+            quad(full, color: SIMD4(0.25, 0, 0, 1), parent: "a"), quad(full, color: SIMD4(0, 0.25, 0, 1), parent: "b")
+        ])
+        XCTAssertEqual(Int(pixels[0]), 64, accuracy: 2)
+        XCTAssertEqual(Int(pixels[1]), 64, accuracy: 2)
+    }
+
+    func testDynamicMeshAboveItsCapacityIsRejected() throws {
+        let graph = SceneRenderGraph(targets: [.init(name: "work")], passes: [meshPass(clears: nil, blend: .alphaOver)], output: "work")
+        let many = (0 ..< 9).map { _ in quad(SIMD4(-1, -1, 1, 1), color: SIMD4(1, 1, 1, 1)) }
+        XCTAssertThrowsError(try renderMeshes(graph, meshes: many))
+    }
+
     func testFeedbackCopyAndResizeReset() throws {
         let device = try device()
         let graph = graph(fragment: """

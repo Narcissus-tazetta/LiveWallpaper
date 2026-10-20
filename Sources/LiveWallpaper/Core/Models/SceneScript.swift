@@ -79,6 +79,7 @@ struct SceneScriptOutput {
     var adjustments: [UUID: SceneScriptAdjustment]
     /// Parts of the script that failed while the rest kept running.
     var warnings: [String]
+    var meshes: [SceneMeshFrame] = []
 }
 
 struct SceneScriptAdjustment {

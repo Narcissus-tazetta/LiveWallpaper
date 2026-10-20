@@ -22,7 +22,14 @@ struct LWJSProgram {
     int module_started;
     size_t log_length;
     int log_count;
+    /* Meshes a script emitted during one evaluation: per mesh a parent and a material
+       (length-prefixed strings) and a length-prefixed run of float32. */
+    uint8_t *meshes;
+    size_t mesh_length;
+    size_t mesh_capacity;
 };
+
+#define LWJS_MAX_MESH_BYTES (32u * 1024 * 1024)
 
 static double now(void) {
     struct timespec time;
@@ -120,6 +127,56 @@ static JSValue console_log(JSContext *context, JSValueConst this_value, int coun
     return JS_UNDEFINED;
 }
 
+static int append_mesh_bytes(LWJSProgram *program, const void *bytes, size_t length) {
+    if (length > LWJS_MAX_MESH_BYTES - program->mesh_length) return -1;
+    size_t needed = program->mesh_length + length;
+    if (needed > program->mesh_capacity) {
+        size_t capacity = program->mesh_capacity ? program->mesh_capacity : 65536;
+        while (capacity < needed) capacity *= 2;
+        uint8_t *grown = realloc(program->meshes, capacity);
+        if (!grown) return -1;
+        program->meshes = grown;
+        program->mesh_capacity = capacity;
+    }
+    memcpy(program->meshes + program->mesh_length, bytes, length);
+    program->mesh_length = needed;
+    return 0;
+}
+
+static int append_mesh_string(LWJSProgram *program, JSContext *context, JSValueConst value) {
+    size_t length;
+    const char *text = JS_ToCStringLen(context, &length, value);
+    if (!text) return -1;
+    uint32_t prefix = (uint32_t)length;
+    int failed = length > 4096 || append_mesh_bytes(program, &prefix, 4) < 0 || append_mesh_bytes(program, text, length) < 0;
+    JS_FreeCString(context, text);
+    return failed ? -1 : 0;
+}
+
+/* emitMesh(parent, material, float32Array, floatCount): the quads of one mesh. */
+static JSValue emit_mesh(JSContext *context, JSValueConst this_value, int count, JSValueConst *values) {
+    (void)this_value;
+    LWJSProgram *program = JS_GetContextOpaque(context);
+    if (count != 4) return JS_ThrowTypeError(context, "emitMesh expects a parent, a material, a Float32Array and a count");
+    size_t offset, byte_length, element;
+    JSValue buffer = JS_GetTypedArrayBuffer(context, values[2], &offset, &byte_length, &element);
+    if (JS_IsException(buffer)) return JS_EXCEPTION;
+    size_t capacity;
+    uint8_t *data = JS_GetArrayBuffer(context, &capacity, buffer);
+    int64_t floats;
+    if (!data || element != 4 || JS_ToInt64(context, &floats, values[3]) < 0 || floats < 0 ||
+        (uint64_t)floats * 4 > byte_length || offset + byte_length > capacity) {
+        JS_FreeValue(context, buffer);
+        return JS_ThrowTypeError(context, "emitMesh expects a Float32Array of at least count floats");
+    }
+    uint32_t prefix = (uint32_t)floats;
+    int failed = append_mesh_string(program, context, values[0]) < 0 || append_mesh_string(program, context, values[1]) < 0 ||
+                 append_mesh_bytes(program, &prefix, 4) < 0 || append_mesh_bytes(program, data + offset, (size_t)floats * 4) < 0;
+    JS_FreeValue(context, buffer);
+    if (failed) return JS_ThrowRangeError(context, "Mesh output exceeds its limit");
+    return JS_UNDEFINED;
+}
+
 static JSContext *new_context(LWJSProgram *program) {
     JSContext *context = JS_NewContextRaw(program->runtime);
     if (!context) return NULL;
@@ -153,6 +210,7 @@ static JSContext *new_context(LWJSProgram *program) {
     JSValue console = JS_NewObject(context);
     JS_SetPropertyStr(context, console, "log", JS_NewCFunction(context, console_log, "log", 1));
     JS_SetPropertyStr(context, global, "console", console);
+    JS_SetPropertyStr(context, global, "__lwjs_emitMesh", JS_NewCFunction(context, emit_mesh, "emitMesh", 4));
     JS_FreeValue(context, global);
     return context;
 }
@@ -267,6 +325,7 @@ char *lwjs_evaluate(LWJSProgram *program, const char *input, double budget_secon
     program->logs[0] = 0;
     program->log_length = 0;
     program->log_count = 0;
+    program->mesh_length = 0;
     update_stack_limit(program->runtime);
     JSContext *context = program->module_context ? program->module_context : new_context(program);
     if (!context) {
@@ -367,6 +426,7 @@ char *lwjs_evaluate(LWJSProgram *program, const char *input, double budget_secon
 
 void lwjs_destroy(LWJSProgram *program) {
     if (!program) return;
+    free(program->meshes);
     if (program->module_context) {
         JS_FreeValue(program->module_context, program->module_entry);
         JS_FreeValue(program->module_context, program->module_namespace);
@@ -381,6 +441,10 @@ void lwjs_destroy(LWJSProgram *program) {
 
 void lwjs_free_string(char *string) { free(string); }
 const char *lwjs_logs(LWJSProgram *program) { return program->logs; }
+const uint8_t *lwjs_meshes(LWJSProgram *program, size_t *length) {
+    *length = program->mesh_length;
+    return program->meshes;
+}
 size_t lwjs_memory_usage(LWJSProgram *program) {
     JSMemoryUsage usage;
     JS_ComputeMemoryUsage(program->runtime, &usage);
