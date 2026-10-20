@@ -9,29 +9,57 @@ extension SettingsView {
             query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)
         }
         return VStack(alignment: .leading, spacing: 10) {
-            SearchField(
-                placeholder: model.localizedString("タイトルで検索"),
-                text: $externalStoreSearchText,
-                isFocused: $isStoreSearchFocused,
-                isSearching: false,
-                clearButtonLabel: model.localizedString("検索をクリア")
-            )
-            .frame(maxWidth: 260)
+            HStack(alignment: .center) {
+                SearchField(
+                    placeholder: model.localizedString("タイトルで検索"),
+                    text: $externalStoreSearchText,
+                    isFocused: $isStoreSearchFocused,
+                    isSearching: false,
+                    clearButtonLabel: model.localizedString("検索をクリア")
+                )
+                .frame(maxWidth: 260)
+
+                Spacer()
+
+                Button {
+                    model.openExternalWallpaperProvider()
+                } label: {
+                    Label(model.localizedString("Workshopで探す"), systemImage: "arrow.up.forward.app")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .help(model.localizedString("we-import を開いて Steam Workshop から壁紙を探します"))
+            }
 
             if wallpapers.isEmpty {
-                SearchEmptyState(
-                    isSearchActive: true,
-                    noContentText: "",
-                    noMatchText: model.localizedString("検索条件に一致する壁紙がありません"),
-                    clearButtonTitle: model.localizedString("検索をクリア"),
-                    onClearSearch: { externalStoreSearchText = ""; isStoreSearchFocused = true }
-                )
+                VStack(spacing: 12) {
+                    SearchEmptyState(
+                        isSearchActive: !query.isEmpty,
+                        noContentText: model.localizedString("外部アプリの壁紙がありません"),
+                        noMatchText: model.localizedString("検索条件に一致する壁紙がありません"),
+                        clearButtonTitle: model.localizedString("検索をクリア"),
+                        onClearSearch: { externalStoreSearchText = ""; isStoreSearchFocused = true }
+                    )
+                    if query.isEmpty {
+                        Button {
+                            model.openExternalWallpaperProvider()
+                        } label: {
+                            Label(model.localizedString("Workshopで壁紙を探す"), systemImage: "arrow.up.forward.app")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 200)
             } else {
                 GeometryReader { proxy in
                     let layout = wallpaperGridLayout(for: proxy.size.width)
                     ScrollView {
                         LazyVGrid(
-                            columns: layout.0,
+                            columns: layout.0.map { column in
+                                var column = column
+                                column.alignment = .top
+                                return column
+                            },
                             alignment: .leading,
                             spacing: wallpaperGridRowSpacing
                         ) {
@@ -77,36 +105,40 @@ extension SettingsView {
                     .help(warnings.joined(separator: "\n"))
                     .accessibilityLabel(warnings.joined(separator: "\n"))
             }
-            if let source = wallpaper.webSource {
-                Button(model.localizedString("作品の設定")) { localWebSettingsSource = source }
+            HStack(alignment: .top, spacing: 6) {
+                if let source = wallpaper.webSource {
+                    Button(model.localizedString("作品の設定")) { localWebSettingsSource = source }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
+                if !model.isExternalWallpaperReady(wallpaper) {
+                    externalScenePreparationStatus(wallpaper)
+                } else if model.libraryPath(forExternalWallpaperID: wallpaper.id) != nil {
+                    Text(model.localizedString("追加しました"))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else if model.importingExternalWallpaperID == wallpaper.id {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button(model.localizedString("追加")) {
+                        AppLog.externalWallpapers.info("add button clicked for \(wallpaper.id, privacy: .public)")
+                        Task {
+                            await model.importExternalWallpaper(id: wallpaper.id)
+                        }
+                    }
+                    .buttonStyle(.bordered)
                     .controlSize(.small)
-            }
-            if !model.isExternalWallpaperReady(wallpaper) {
-                externalScenePreparationStatus(wallpaper)
-            } else if model.libraryPath(forExternalWallpaperID: wallpaper.id) != nil {
-                Text(model.localizedString("追加しました"))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            } else if model.importingExternalWallpaperID == wallpaper.id {
-                ProgressView().controlSize(.small)
-            } else {
-                Button(model.localizedString("追加")) {
-                    AppLog.externalWallpapers.info("add button clicked for \(wallpaper.id, privacy: .public)")
-                    Task {
-                        await model.importExternalWallpaper(id: wallpaper.id)
+                    .disabled(model.importingExternalWallpaperID != nil)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("\(model.localizedString("追加")) \(wallpaper.name)")
+                    if model.failedExternalWallpaperImportID == wallpaper.id {
+                        Text(model.localizedString("追加できませんでした"))
+                            .font(.caption)
+                            .foregroundColor(.red)
                     }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(model.importingExternalWallpaperID != nil)
-                .contentShape(Rectangle())
-                .accessibilityLabel("\(model.localizedString("追加")) \(wallpaper.name)")
-                if model.failedExternalWallpaperImportID == wallpaper.id {
-                    Text(model.localizedString("追加できませんでした"))
-                        .font(.caption)
-                        .foregroundColor(.red)
-                }
             }
+            .frame(minHeight: 22, alignment: .topLeading)
         }
         .frame(width: cardWidth, alignment: .leading)
         .id(wallpaper.id)

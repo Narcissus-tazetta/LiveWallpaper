@@ -1096,6 +1096,13 @@
 "ロック画面と、アプリを終了している間のデスクトップは、このコマから始まります。それより前の部分は最後に回ります。保存すると変換し直します(数分かかることがあります)。" = "A Tela Bloqueada, e a mesa enquanto o app não está aberto, começam neste quadro. A parte anterior é reproduzida no final. Salvar converte o vídeo novamente (pode levar alguns minutos).";
 "先頭が暗い動画は、明るくなったコマから始めます。ロック画面と、アプリを終了している間のデスクトップに使われます。" = "Um vídeo que começa escuro inicia no primeiro quadro claro. Usado na Tela Bloqueada e na mesa enquanto o app não está aberto.";
 "外部アプリの壁紙" = "Imagens de Fundo de Outros Apps";
+"外部アプリの壁紙を適用中:" = "Imagem de fundo de outro app aplicada:";
+"%d件" = "%d itens";
+"Storeで確認" = "Ver na Store";
+"Workshopで探す" = "Navegar na Workshop";
+"Workshopで壁紙を探す" = "Encontrar imagens de fundo na Workshop";
+"we-import を開いて Steam Workshop から壁紙を探します" = "Abre o we-import para encontrar imagens de fundo na Steam Workshop";
+"外部アプリの壁紙がありません" = "Nenhuma imagem de fundo de outros apps";
 "元の壁紙に戻す" = "Restaurar Minha Imagem de Fundo";
 "Web壁紙の表示中は使えません" = "Indisponível enquanto uma imagem de fundo web é exibida";
 "外部アプリ" = "Outros Apps";

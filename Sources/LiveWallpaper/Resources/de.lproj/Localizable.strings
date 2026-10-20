@@ -1096,6 +1096,13 @@
 "ロック画面と、アプリを終了している間のデスクトップは、このコマから始まります。それより前の部分は最後に回ります。保存すると変換し直します(数分かかることがあります)。" = "Der Sperrbildschirm und der Schreibtisch, solange die App nicht läuft, beginnen bei diesem Bild. Der Teil davor wird am Ende abgespielt. Beim Sichern wird das Video erneut konvertiert (das kann einige Minuten dauern).";
 "先頭が暗い動画は、明るくなったコマから始めます。ロック画面と、アプリを終了している間のデスクトップに使われます。" = "Ein Video, das dunkel beginnt, startet beim ersten hellen Bild. Wird für den Sperrbildschirm und den Schreibtisch verwendet, solange die App nicht läuft.";
 "外部アプリの壁紙" = "Hintergrundbilder anderer Apps";
+"外部アプリの壁紙を適用中:" = "Hintergrundbild anderer App aktiv:";
+"%d件" = "%d Objekte";
+"Storeで確認" = "Im Store ansehen";
+"Workshopで探す" = "Im Workshop stöbern";
+"Workshopで壁紙を探す" = "Hintergrundbilder im Workshop finden";
+"we-import を開いて Steam Workshop から壁紙を探します" = "Öffnet we-import, um Hintergrundbilder im Steam Workshop zu finden";
+"外部アプリの壁紙がありません" = "Keine Hintergrundbilder anderer Apps vorhanden";
 "元の壁紙に戻す" = "Eigenes Hintergrundbild wiederherstellen";
 "Web壁紙の表示中は使えません" = "Nicht verfügbar, während ein Web-Hintergrundbild angezeigt wird";
 "外部アプリ" = "Andere Apps";

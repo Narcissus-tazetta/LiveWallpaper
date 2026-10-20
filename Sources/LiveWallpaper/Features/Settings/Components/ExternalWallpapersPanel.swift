@@ -4,32 +4,55 @@ extension SettingsView {
     /// Shown only while a provider app offers wallpapers, so the library looks the same
     /// as always when none is running.
     var externalWallpapersPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(model.localizedString("外部アプリの壁紙"))
-                    .font(.headline)
-                Text(providerNames)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-                if model.activeExternalWallpaperID != nil {
-                    Button(model.localizedString("元の壁紙に戻す")) {
-                        model.stopExternalWallpaper()
+        HStack(spacing: 10) {
+            Image(systemName: "square.stack.3d.up.fill")
+                .foregroundColor(.accentColor)
+                .font(.system(size: 14))
+
+            if let active = model.activeExternalWallpaper {
+                HStack(spacing: 6) {
+                    Text(model.localizedString("外部アプリの壁紙を適用中:"))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text(active.name)
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Button(model.localizedString("元の壁紙に戻す")) {
+                    model.stopExternalWallpaper()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            } else {
+                HStack(spacing: 4) {
+                    Text(model.localizedString("外部アプリの壁紙:"))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text(String.localizedStringWithFormat(model.localizedString("%d件"), model.externalWallpapers.count))
+                        .font(.subheadline.weight(.medium))
+                    if !providerNames.isEmpty {
+                        Text("(\(providerNames))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
+                Spacer(minLength: 8)
             }
-            if !model.canShowExternalWallpaper {
-                Text(model.localizedString("Web壁紙の表示中は使えません"))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 10) {
-                    ForEach(model.externalWallpapers) { wallpaper in
-                        externalWallpaperButton(wallpaper)
-                    }
+
+            Button {
+                selectedTab = .store
+                storeTabMode = .external
+            } label: {
+                HStack(spacing: 4) {
+                    Text(model.localizedString("Storeで確認"))
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
                 }
+                .font(.subheadline)
             }
+            .buttonStyle(.borderless)
+            .foregroundColor(.accentColor)
         }
     }
 
@@ -39,49 +62,6 @@ extension SettingsView {
         return model.externalWallpapers.map(\.providerName)
             .filter { seen.insert($0).inserted }
             .joined(separator: model.localizedString("・"))
-    }
-
-    private func externalWallpaperButton(_ wallpaper: ExternalWallpaper) -> some View {
-        let isActive = model.activeExternalWallpaperID == wallpaper.id
-        let width: CGFloat = 132
-        return Button {
-            model.showExternalWallpaper(id: wallpaper.id)
-        } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                ExternalWallpaperThumbnail(wallpaper: wallpaper)
-                    .frame(width: width, height: width * 9 / 16)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.accentColor, lineWidth: isActive ? 2.5 : 0)
-                    )
-                Text(wallpaper.name)
-                    .font(.caption)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .frame(width: width, alignment: .leading)
-                if let warnings = wallpaper.webSource?.warnings, !warnings.isEmpty {
-                    Image(systemName: "exclamationmark.circle")
-                        .foregroundColor(.secondary)
-                        .help(warnings.joined(separator: "\n"))
-                        .accessibilityLabel(warnings.joined(separator: "\n"))
-                }
-                externalScenePreparationStatus(wallpaper)
-                    .frame(width: width, alignment: .leading)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!model.canShowExternalWallpaper || !model.isExternalWallpaperReady(wallpaper))
-        .opacity(model.canShowExternalWallpaper && model.isExternalWallpaperReady(wallpaper) ? 1 : 0.5)
-        .contextMenu {
-            if let source = wallpaper.webSource {
-                Button(model.localizedString("作品の設定")) { localWebSettingsSource = source }
-            }
-        }
-        .help(wallpaper.name)
-        .accessibilityLabel(wallpaper.name)
-        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
     /// A scene is baked into a video before it can be shown; nothing for videos.

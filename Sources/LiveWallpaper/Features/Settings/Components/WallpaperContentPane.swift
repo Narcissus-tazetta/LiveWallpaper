@@ -20,7 +20,8 @@ extension SettingsView {
         VStack(alignment: .leading, spacing: 10) {
             if !model.externalWallpapers.isEmpty, selectedAssignmentTarget == .desktop {
                 externalWallpapersPanel
-                    .padding(12)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .settingsCardBackground()
             }

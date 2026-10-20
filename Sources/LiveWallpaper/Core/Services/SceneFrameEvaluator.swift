@@ -36,6 +36,12 @@ final class SceneFrameEvaluator {
     private var stopped: [UUID: SceneScriptIssue] = [:]
     private var resumeTimes: [UUID: TimeInterval] = [:]
     private var previousScripts: [SceneScript] = []
+    /// What each script last returned, shown again for a frame it ran out of time in.
+    private var lastOutputs: [UUID: SceneScriptOutput] = [:]
+    private var consecutiveTimeouts: [UUID: Int] = [:]
+    /// A script that keeps running out of time is slower than the frame rate allows;
+    /// after this many frames in a row it is stopped, as one that cannot run at all.
+    private static let maximumHeldFrames = 30
     private var clockOrigin: Date?
 
     init(budget: Budget = .live, temporaryStopSeconds: TimeInterval = 2) {
@@ -47,6 +53,8 @@ final class SceneFrameEvaluator {
         if previousScripts != document.scripts {
             stopped = [:]
             resumeTimes = [:]
+            lastOutputs = [:]
+            consecutiveTimeouts = [:]
             previousScripts = document.scripts
             runtime.retainPrograms(for: Set(document.scripts.map(\.id)))
         }
@@ -156,9 +164,22 @@ final class SceneFrameEvaluator {
                 } else { missing.append("media") }
                 context["_missing"] = missing
                 let data = try JSONSerialization.data(withJSONObject: context)
-                let output = try runtime.evaluate(
-                    script, input: data, layers: document.layers, rigs: document.rigs, perScript: budget.perScript, deadline: deadline
-                )
+                let output: SceneScriptOutput
+                do {
+                    output = try runtime.evaluate(
+                        script, input: data, layers: document.layers, rigs: document.rigs, perScript: budget.perScript, deadline: deadline
+                    )
+                    consecutiveTimeouts[script.id] = nil
+                    lastOutputs[script.id] = output
+                } catch let issue as SceneScriptIssue where !failOnError && issue.isTemporary && runtime.isLoaded(script.id) {
+                    // A slow frame (other work took the CPU) is skipped: the script keeps its
+                    // state, so its animations carry on instead of restarting.
+                    let count = (consecutiveTimeouts[script.id] ?? 0) + 1
+                    guard count <= Self.maximumHeldFrames else { throw issue }
+                    consecutiveTimeouts[script.id] = count
+                    guard let held = lastOutputs[script.id] else { continue }
+                    output = held
+                }
                 warnings += output.warnings.map {
                     SceneScriptIssue(scriptID: script.id, name: script.name, message: $0, isPartial: true)
                 }

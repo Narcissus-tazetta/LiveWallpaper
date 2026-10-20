@@ -1,6 +1,7 @@
 import CoreFoundation
 import Foundation
 import QuickJS
+import OSLog
 
 final class SceneScriptRuntime {
     private struct Program {
@@ -21,7 +22,15 @@ final class SceneScriptRuntime {
     private(set) var logs: [UUID: String] = [:]
 
     deinit {
-        for program in programs.values { lwjs_destroy(program.pointer) }
+        for (id, program) in programs { destroy(program.pointer, id: id, reason: "deinit") }
+    }
+
+    /// The crash this traces aborts inside lwjs_destroy's final GC; the line goes out
+    /// first so the log shows which destroy it was and what led to it.
+    private func destroy(_ pointer: OpaquePointer, id: UUID, reason: String, detail: String = "") {
+        AppLog.sceneScript.info("destroy begin script=\(id.uuidString, privacy: .public) reason=\(reason, privacy: .public) memory=\(lwjs_memory_usage(pointer)) \(detail, privacy: .public)")
+        lwjs_destroy(pointer)
+        AppLog.sceneScript.info("destroy end script=\(id.uuidString, privacy: .public)")
     }
 
     func prepare(_ script: SceneScript) throws {
@@ -39,7 +48,7 @@ final class SceneScriptRuntime {
               (script.modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 1048576,
               script.modules?.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }) != false
         else { throw issue("Script bundle exceeds supported limits", script: script) }
-        if let old = programs.removeValue(forKey: script.id) { lwjs_destroy(old.pointer) }
+        if let old = programs.removeValue(forKey: script.id) { destroy(old.pointer, id: script.id, reason: "source changed") }
         var error: UnsafeMutablePointer<CChar>?
         let pointer: OpaquePointer?
         if let modules = script.modules {
@@ -56,7 +65,7 @@ final class SceneScriptRuntime {
         }
         let memory = lwjs_memory_usage(pointer!)
         guard programs.values.reduce(memory, { $0 + $1.memoryBytes }) <= Self.maximumMemoryBytes else {
-            lwjs_destroy(pointer!)
+            destroy(pointer!, id: script.id, reason: "memory limit")
             throw SceneScriptIssue(scriptID: script.id, name: script.name, message: "Combined script memory limit exceeded (128 MiB)")
         }
         programs[script.id] = Program(script: script, pointer: pointer!, memoryBytes: memory)
@@ -70,7 +79,8 @@ final class SceneScriptRuntime {
             if script.modules != nil,
                let time = (try JSONSerialization.jsonObject(with: input) as? [String: Any])?["elapsedTime"] as? Double {
                 if let previous = programs[script.id]?.lastTime, time < previous {
-                    lwjs_destroy(programs.removeValue(forKey: script.id)!.pointer)
+                    destroy(programs.removeValue(forKey: script.id)!.pointer, id: script.id,
+                            reason: "time went backwards", detail: "previous=\(previous) now=\(time)")
                     try prepare(script)
                 }
                 programs[script.id]!.lastTime = time
@@ -89,8 +99,18 @@ final class SceneScriptRuntime {
             if let error {
                 defer { lwjs_free_string(error) }
                 logs[script.id] = String(cString: lwjs_logs(programs[script.id]!.pointer))
-                lwjs_destroy(programs.removeValue(forKey: script.id)!.pointer)
-                throw failure(String(cString: error))
+                let message = String(cString: error)
+                // The interrupt is uncatchable and the bundle keeps its animation clocks in
+                // JavaScript, so a run cut short mid-frame leaves a usable program; throwing
+                // it away would restart every animation from its initial frame. A run cut
+                // short while the modules were still initializing is half-built, though.
+                if script.modules != nil, !starting, Self.timeLimitMessages.contains(message) {
+                    throw failure(message)
+                }
+                destroy(programs.removeValue(forKey: script.id)!.pointer, id: script.id,
+                        reason: Self.timeLimitMessages.contains(message) ? "time limit" : "script error",
+                        detail: "budget=\(budget) starting=\(starting) error=\(message.prefix(200))")
+                throw failure(message)
             }
             defer { lwjs_free_string(result) }
             logs[script.id] = String(cString: lwjs_logs(programs[script.id]!.pointer))
@@ -126,9 +146,15 @@ final class SceneScriptRuntime {
                          isTemporary: Self.timeLimitMessages.contains(message))
     }
 
+    /// Whether the script's program survived its last run, so a run that ran out of
+    /// time can be skipped instead of restarted.
+    func isLoaded(_ id: UUID) -> Bool {
+        programs[id] != nil
+    }
+
     func retainPrograms(for ids: Set<UUID>) {
         for id in Array(programs.keys) where !ids.contains(id) {
-            lwjs_destroy(programs.removeValue(forKey: id)!.pointer)
+            destroy(programs.removeValue(forKey: id)!.pointer, id: id, reason: "retain")
         }
         logs = logs.filter { ids.contains($0.key) }
     }

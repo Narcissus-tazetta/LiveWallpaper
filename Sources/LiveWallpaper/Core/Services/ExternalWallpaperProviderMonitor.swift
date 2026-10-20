@@ -19,6 +19,7 @@ struct ExternalWallpaper: Identifiable, Equatable {
     /// When the provider last wrote scene.json, so a rewritten scene is baked again.
     var sceneRevision: Date?
     var webSource: WebWallpaperSource?
+    var providerPID: pid_t? = nil
 
     var isScene: Bool {
         sceneFolderPath != nil
@@ -144,7 +145,8 @@ final class ExternalWallpaperProviderMonitor {
                 let thumbnail = item.thumbnail.flatMap { Self.isRegularFile($0) ? $0 : nil }
                 if let path = item.path, item.scene == nil, item.web == nil, Self.isRegularFile(path) {
                     wallpapers.append(ExternalWallpaper(
-                        id: id, providerName: manifest.name, name: item.name, path: path, thumbnailPath: thumbnail
+                        id: id, providerName: manifest.name, name: item.name, path: path, thumbnailPath: thumbnail,
+                        providerPID: pid
                     ))
                 } else if let scene = item.scene, item.path == nil, item.web == nil,
                           let revision = Self.sceneRevision(folder: scene)
@@ -152,7 +154,8 @@ final class ExternalWallpaperProviderMonitor {
                     wallpapers.append(ExternalWallpaper(
                         id: id, providerName: manifest.name, name: item.name,
                         path: Self.bakedScenePath(forID: id), thumbnailPath: thumbnail,
-                        sceneFolderPath: scene, sceneRevision: revision
+                        sceneFolderPath: scene, sceneRevision: revision,
+                        providerPID: pid
                     ))
                 } else if let web = item.web, item.path == nil, item.scene == nil {
                     do {
@@ -168,7 +171,8 @@ final class ExternalWallpaperProviderMonitor {
                         source.addedAt = Date(timeIntervalSince1970: 0)
                         wallpapers.append(ExternalWallpaper(
                             id: id, providerName: manifest.name, name: item.name, path: "",
-                            thumbnailPath: thumbnail ?? source.thumbnailPath, webSource: source
+                            thumbnailPath: thumbnail ?? source.thumbnailPath, webSource: source,
+                            providerPID: pid
                         ))
                     } catch {
                         AppLog.externalWallpapers.error("invalid web package of \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")

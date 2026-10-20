@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// Wallpapers that a running provider app lends to the desktop. They ride on the
@@ -398,6 +399,30 @@ extension WallpaperModel {
         {
             if dedicatedSlotsByScreenID[screenID]?[path] != nil {
                 evictDedicatedSlot(forScreenID: screenID, path: path)
+            }
+        }
+    }
+
+    func openExternalWallpaperProvider() {
+        var activated = false
+        for wallpaper in externalWallpapers {
+            if let pid = wallpaper.providerPID,
+               let app = NSRunningApplication(processIdentifier: pid)
+            {
+                app.activate(options: .activateIgnoringOtherApps)
+                activated = true
+            }
+        }
+        DistributedNotificationCenter.default().postNotificationName(
+            NSNotification.Name("com.livewallpaper.openWorkshop"),
+            object: nil,
+            userInfo: nil,
+            deliverImmediately: true
+        )
+        if !activated {
+            let appURL = URL(fileURLWithPath: "/Applications/we-import.app")
+            if FileManager.default.fileExists(atPath: appURL.path) {
+                NSWorkspace.shared.openApplication(at: appURL, configuration: .init(), completionHandler: nil)
             }
         }
     }

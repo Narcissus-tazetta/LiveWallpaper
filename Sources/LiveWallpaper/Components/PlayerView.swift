@@ -289,9 +289,9 @@ final class PlayerView: NSView {
             }
         }
         sceneRemovalObservation = observation
-        // isReadyForDisplay may never turn true (the item failed or was replaced);
-        // the desktop showing through briefly beats a scene that never leaves.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+        // isReadyForDisplay may take a couple of seconds for heavy 4K videos on startup;
+        // keep the scene layer visible until the video is genuinely ready.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.sceneRemovalObservation === observation else {
                     return

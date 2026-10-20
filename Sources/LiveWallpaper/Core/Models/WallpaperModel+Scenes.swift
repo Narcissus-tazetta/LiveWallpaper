@@ -35,9 +35,17 @@ extension WallpaperModel {
         guard let cacheDirectory = cacheDirectoryURL()?.path else {
             return
         }
+        let externalDirectory = ExternalWallpaperProviderMonitor.bakedScenesDirectoryURL.path
         var restored: [String: SceneDocument] = [:]
         var unbaked: [String] = []
-        for path in libraryVideoPaths where path.hasPrefix(cacheDirectory) {
+        var candidatePaths = Set(libraryVideoPaths)
+        if let current = currentVideoPath {
+            candidatePaths.insert(current)
+        }
+        for path in videoOverrideByScreenID.values {
+            candidatePaths.insert(path)
+        }
+        for path in candidatePaths where path.hasPrefix(cacheDirectory) || path.hasPrefix(externalDirectory) {
             do {
                 if let loaded = try SceneStore.load(videoPath: path) {
                     let document = SceneScriptPermissions.restored(loaded, path: path)
@@ -707,11 +715,25 @@ extension WallpaperModel {
         }
     }
 
-    /// Only the lock screen and the screen saver need a scene's video, and only when
-    /// this scene is the one chosen for them. Elsewhere the desktop draws the scene
-    /// live, so a bake for every edit (a script run, a drag) is wasted work.
+    /// A scene's video is needed when it plays on the lock screen or screen saver, or
+    /// when the desktop plays it without live interaction (cursor, audio, media).
     func sceneVideoIsWanted(path: String) -> Bool {
         lockScreenVideoPath == path || screenSaverVideoPath == path
+            || currentVideoPath == path
+            || videoOverrideByScreenID.values.contains(path)
+    }
+
+    func hasPlayableBakedVideo(forPath path: String) -> Bool {
+        guard FileManager.default.fileExists(atPath: path) else { return false }
+        guard !SceneStore.isNewerThanVideo(videoPath: path) else { return false }
+        // External import providers generate a tiny 0.5fps placeholder video before
+        // the real bake completes; scenes must stay live until the full loop is ready.
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+              let size = attrs[.size] as? Int64, size > 1_000_000
+        else {
+            return false
+        }
+        return true
     }
 
     /// Bakes a scene whose video lags behind its edits, once it is chosen for the
@@ -933,14 +955,13 @@ extension WallpaperModel {
                 view.hideScene()
                 continue
             }
-            let isStale = sceneStaleVideoPaths.contains(path)
+            let hasBakedVideo = hasPlayableBakedVideo(forPath: path)
+            let isStale = sceneStaleVideoPaths.contains(path) || !hasBakedVideo
             guard !document.hasUnapprovedScripts else {
                 view.hideScene()
                 continue
             }
-            // A real-time scene is drawn live so its effects keep their own speed;
-            // the baked video only has them rounded to the loop.
-            guard document.usesCursor || isStale || document.requiresRealTimePlayback else {
+            guard document.hasLiveInteraction || isStale else {
                 if view.isShowingScene {
                     AppLog.windowRefresh.info(
                         "scene video display=\(displayID, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"

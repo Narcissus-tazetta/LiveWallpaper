@@ -233,4 +233,60 @@ final class SceneScriptTests: XCTestCase {
             XCTAssertTrue((error as? SceneScriptIssue)?.message.contains("particles.count") == true, "\(error)")
         }
     }
+
+    func testModularScriptRequiresLiveInteraction() {
+        var script = SceneScript(source: "export function update(){}", layerIDs: [])
+        script.isAuthorized = true
+        script.usesCursor = true
+        XCTAssertTrue(script.requiresLiveInteraction)
+
+        script.modules = [
+            "scene-bridge": "export const engine = { cursor: { x: 0, y: 0 }, media: {} };",
+            "binding0.js": "export function update(v){ v.z = engine.runtime * 20; return v; }"
+        ]
+        XCTAssertFalse(script.requiresLiveInteraction)
+
+        script.modules?["binding1.js"] = "export function update(v){ if(engine.cursor.x > 0) v.z = 1; return v; }"
+        XCTAssertTrue(script.requiresLiveInteraction)
+
+        var clockScript = SceneScript(source: "export function update(){}", layerIDs: [])
+        clockScript.isAuthorized = true
+        clockScript.usesTimeOfDay = true
+        clockScript.modules = [
+            "clock.js": "export function update(c){ return [{id: c.targets[0].id, values:{rotation: c.wallClock.epochMilliseconds / 1000}}]; }"
+        ]
+        XCTAssertTrue(clockScript.requiresLiveInteraction)
+    }
+
+    func testSceneDocumentHasLiveInteraction() {
+        let plainLayer = SceneLayer(name: "BG", imageFile: "bg.png")
+        var document = SceneDocument(canvasWidth: 100, canvasHeight: 100, layers: [plainLayer])
+        XCTAssertFalse(document.hasLiveInteraction)
+
+        var cursorLayer = SceneLayer(name: "Cursor", imageFile: "cursor.png")
+        cursorLayer.parallaxDepth = 1.0
+        document.layers = [cursorLayer]
+        XCTAssertTrue(document.hasLiveInteraction)
+
+        var cursorDoc = SceneDocument(canvasWidth: 100, canvasHeight: 100, layers: [plainLayer])
+        var link = SceneLink(input: .cursorX, layerIDs: [plainLayer.id])
+        link.start.offsetX = 0.5
+        cursorDoc.links = [link]
+        XCTAssertTrue(cursorDoc.hasLiveInteraction)
+
+        var script = SceneScript(source: "export function update(){}", layerIDs: [])
+        script.isAuthorized = true
+        script.usesCursor = true
+        script.modules = [
+            "scene-bridge": "export const engine = { cursor: { x: 0, y: 0 } };",
+            "code.js": "export function update(v){ v.x += 1; return v; }"
+        ]
+        document.layers = [plainLayer]
+        document.scripts = [script]
+        XCTAssertFalse(document.hasLiveInteraction)
+
+        script.modules?["code.js"] = "export function update(v){ if (engine.cursor.x > 0) v.x += 1; return v; }"
+        document.scripts = [script]
+        XCTAssertTrue(document.hasLiveInteraction)
+    }
 }

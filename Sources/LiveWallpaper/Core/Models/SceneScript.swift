@@ -58,6 +58,22 @@ struct SceneScript: Codable, Equatable, Identifiable {
 
     var canRun: Bool { isEnabled && isAuthorized && Self.supports(version: version) }
 
+    var requiresLiveInteraction: Bool {
+        guard canRun else { return false }
+        guard usesCursor || usesMedia || usesTimeOfDay else { return false }
+        guard let modules, !modules.isEmpty else { return true }
+        // The imported runtime bridge declares cursor and media stubs even when
+        // the scene's actual bindings only animate over time.
+        let runtimeModules: Set<String> = [
+            "scene-bridge", "scene-types", "scene-config", "WEColor", "WEMath", "WEVector"
+        ]
+        let userCode = source + "\n" + modules.filter { !runtimeModules.contains($0.key) }.values.joined(separator: "\n")
+        let needsCursor = usesCursor && (userCode.contains("cursor") || userCode.contains("pointer") || userCode.contains("mouse"))
+        let needsMedia = usesMedia && (userCode.contains("media") || userCode.contains("mediaThumbnail"))
+        let needsClock = usesTimeOfDay && userCode.contains("wallClock")
+        return needsCursor || needsMedia || needsClock
+    }
+
     func targetLayerIDs(in layers: [SceneLayer]) -> [UUID] {
         targetsAllLayers ? layers.map(\.id) : layerIDs
     }

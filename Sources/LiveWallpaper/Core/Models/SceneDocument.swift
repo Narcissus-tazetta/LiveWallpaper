@@ -917,6 +917,17 @@ struct SceneDocument: Codable, Equatable {
             || scripts.contains { $0.canRun && $0.usesCursor }
     }
 
+    /// Whether the scene has interactive elements (cursor parallax, audio reaction,
+    /// or dynamic media artwork) that require drawing live on the desktop rather than
+    /// playing the baked 60fps video.
+    var hasLiveInteraction: Bool {
+        layers.contains(where: \.usesCursor)
+            || links.contains { $0.input.usesCursor && $0.hasEffect }
+            || usesAudio
+            || layers.contains { $0.isVisible && $0.usesMediaArtwork }
+            || scripts.contains { $0.requiresLiveInteraction }
+    }
+
     var requiresRealTimePlayback: Bool {
         runsInRealTime || layers.contains { layer in
             layer.activeEffects.contains { $0.kind.runsOnRealTime } || (layer.isVisible && (layer.renderGraph != nil || layer.placement != nil || layer.usesMediaArtwork))

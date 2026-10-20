@@ -329,4 +329,20 @@ final class ExternalWallpaperTests: XCTestCase {
             }
         }
     }
+
+    func testOpenExternalWallpaperProviderPostsDistributedNotification() {
+        let model = WallpaperModel()
+        let expectation = expectation(description: "Workshop notification received")
+        let observer = DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.livewallpaper.openWorkshop"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            expectation.fulfill()
+        }
+        defer { DistributedNotificationCenter.default().removeObserver(observer) }
+
+        model.openExternalWallpaperProvider()
+        wait(for: [expectation], timeout: 2.0)
+    }
 }

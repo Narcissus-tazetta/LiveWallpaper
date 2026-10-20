@@ -28,6 +28,45 @@ final class SceneScriptModuleTests: XCTestCase {
         XCTAssertEqual(reset.layers[id]!.transform.offsetX, 0.01)
     }
 
+    func testFrameThatRunsOutOfTimeIsSkippedWithoutRestartingTheBundle() throws {
+        let document = scene(source: """
+        import { next } from './lib/counter.js';
+        export function update(c) {
+          if (c.elapsedTime === 3) { while (true) {} }
+          return [{id:c.targets[0].id, values:{offsetX:next()}}];
+        }
+        """, modules: ["lib/counter.js": "let n=0; export function next(){return ++n/100;}"])
+        let evaluator = SceneFrameEvaluator()
+        let id = document.layers[0].id
+        func offset(_ time: Double) throws -> (Double, [SceneScriptIssue]) {
+            let frame = try evaluator.evaluate(document, input: .init(time: time), timeOfDay: .day, failOnError: false)
+            return (frame.layers[id]!.transform.offsetX, frame.issues)
+        }
+        XCTAssertEqual(try offset(1).0, 0.01)
+        XCTAssertEqual(try offset(2).0, 0.02)
+        let slow = try offset(3)
+        XCTAssertEqual(slow.0, 0.02)
+        XCTAssertTrue(slow.1.isEmpty)
+        XCTAssertEqual(try offset(4).0, 0.03)
+    }
+
+    func testBundleThatKeepsRunningOutOfTimeStops() throws {
+        let document = scene(source: """
+        export function update(c) {
+          if (c.elapsedTime > 1) { while (true) {} }
+          return [{id:c.targets[0].id, values:{offsetX:0.1}}];
+        }
+        """, modules: [:])
+        let evaluator = SceneFrameEvaluator(budget: .init(perScript: 0.001, perFrame: 0.016))
+        _ = try evaluator.evaluate(document, input: .init(time: 1), timeOfDay: .day, failOnError: false)
+        var stopped = false
+        for i in 0 ..< 40 {
+            let frame = try evaluator.evaluate(document, input: .init(time: 2 + Double(i)), timeOfDay: .day, failOnError: false)
+            if !frame.issues.isEmpty { stopped = true; break }
+        }
+        XCTAssertTrue(stopped)
+    }
+
     func testChangedModuleInvalidatesPermissionAndCompiledProgram() throws {
         var document = scene(source: """
         import { amount } from 'values';

@@ -1096,6 +1096,13 @@
 "ロック画面と、アプリを終了している間のデスクトップは、このコマから始まります。それより前の部分は最後に回ります。保存すると変換し直します(数分かかることがあります)。" = "Kilitli Ekran ve uygulama çalışmazken masaüstü bu kareden başlar. Önceki kısım sonda oynatılır. Kaydetmek videoyu yeniden dönüştürür (birkaç dakika sürebilir).";
 "先頭が暗い動画は、明るくなったコマから始めます。ロック画面と、アプリを終了している間のデスクトップに使われます。" = "Karanlık başlayan bir video ilk aydınlık kareden başlar. Kilitli Ekran’da ve uygulama çalışmazken masaüstünde kullanılır.";
 "外部アプリの壁紙" = "Diğer Uygulamalardan Duvar Kâğıtları";
+"外部アプリの壁紙を適用中:" = "Diğer uygulamadan duvar kâğıdı uygulanıyor:";
+"%d件" = "%d öge";
+"Storeで確認" = "Store'da Gör";
+"Workshopで探す" = "Workshop'a Göz At";
+"Workshopで壁紙を探す" = "Workshop'ta Duvar Kâğıdı Bul";
+"we-import を開いて Steam Workshop から壁紙を探します" = "Steam Workshop'tan duvar kâğıtları bulmak için we-import'u açın";
+"外部アプリの壁紙がありません" = "Diğer uygulamalardan duvar kâğıdı yok";
 "元の壁紙に戻す" = "Kendi Duvar Kâğıdımı Geri Yükle";
 "Web壁紙の表示中は使えません" = "Web duvar kâğıdı gösterilirken kullanılamaz";
 "外部アプリ" = "Diğer Uygulamalar";
