@@ -310,6 +310,9 @@ extension WallpaperModel {
         window.contentView = nil
     }
 
+        // The model owns the window; the default (true) makes close() release it a second
+        // time, which crashes later when an unplugged display's window is retired.
+        window.isReleasedWhenClosed = false
     private func retireWindows(_ windowsToRetire: [NSWindow]) {
         guard !windowsToRetire.isEmpty else {
             return
