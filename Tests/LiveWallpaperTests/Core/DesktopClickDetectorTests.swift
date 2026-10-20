@@ -60,17 +60,20 @@ final class DesktopClickDetectorTests: XCTestCase {
         XCTAssertTrue(isDesktop(900, 800, windows: list))
     }
 
-    func testStageManagerOverlayIsLookedThroughButItsThumbnailsAreNot() {
-        let windowManager: pid_t = 700
+    func testScreenSizedSystemOverlaysAreLookedThroughButSmallOnesAreNot() {
+        let overlay: pid_t = 700
         var list = windows
-        list.insert(OnScreenWindow(ownerPID: windowManager, isWindowServer: false, layer: 18,
-                                   bounds: CGRect(x: 0, y: 0, width: 1470, height: 956), alpha: 1), at: 2)
-        list.insert(OnScreenWindow(ownerPID: windowManager, isWindowServer: false, layer: 18,
+        // Stage Manager overlay, the screenshot UI and a Stage Manager thumbnail.
+        for layer in [18, 24] {
+            list.insert(OnScreenWindow(ownerPID: overlay, isWindowServer: false, layer: layer,
+                                       bounds: CGRect(x: 0, y: 0, width: 1470, height: 956), alpha: 1), at: 2)
+        }
+        list.insert(OnScreenWindow(ownerPID: overlay, isWindowServer: false, layer: 18,
                                    bounds: CGRect(x: 20, y: 200, width: 120, height: 90), alpha: 1), at: 2)
         func check(_ x: CGFloat, _ y: CGFloat) -> Bool {
             DesktopClickDetector.isDesktopClick(
                 at: CGPoint(x: x, y: y), windows: list, finderPID: finder, dockPID: dock, ownPID: own,
-                windowManagerPID: windowManager, screenSizes: [CGSize(width: 1470, height: 956)]
+                screenSizes: [CGSize(width: 1470, height: 956)]
             )
         }
         XCTAssertTrue(check(900, 800))

@@ -441,8 +441,6 @@ extension WallpaperModel {
             dockPID: NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
                 .first?.processIdentifier,
             ownPID: ProcessInfo.processInfo.processIdentifier,
-            windowManagerPID: NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.WindowManager")
-                .first?.processIdentifier,
             screenSizes: NSScreen.screens.map(\.frame.size)
         )
     }
