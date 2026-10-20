@@ -4,6 +4,9 @@ extension SettingsView {
     /// 右クリックメニューやStoreタブの「動画を共有」から呼ぶ共通の起点。
     /// トリム編集タブの選択状態は変えず、共有シート専用の対象パスだけを差し替える。
     func beginStoreShare(path: String) {
+        guard !model.isExternalOrImportedWallpaper(path: path) else {
+            return
+        }
         isStoreSharePickerPresented = false
         storeShareTargetPath = path
         storeShareStatus = .idle
@@ -36,7 +39,7 @@ extension SettingsView {
                 .buttonStyle(.bordered)
             }
 
-            if model.allRegisteredVideoPaths.isEmpty {
+            if model.shareableVideoPaths.isEmpty {
                 Text(model.localizedString("共有できる壁紙がありません"))
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -50,7 +53,7 @@ extension SettingsView {
                             alignment: .leading,
                             spacing: wallpaperGridRowSpacing
                         ) {
-                            ForEach(model.allRegisteredVideoPaths, id: \.self) { path in
+                            ForEach(model.shareableVideoPaths, id: \.self) { path in
                                 storeShareSelectionCard(path: path, cardWidth: layout.1)
                             }
                         }

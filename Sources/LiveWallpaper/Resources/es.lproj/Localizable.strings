@@ -1193,3 +1193,5 @@
 "この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Este fondo de pantalla usa JavaScript para cambiar su movimiento y su aspecto. Si lo permites, se ejecutará automáticamente cada vez que se muestre este fondo. Puedes detenerlo más tarde en el Editor de escena, en «Scripts (JavaScript)».";
 "実行を許可" = "Permitir";
 "許可しない" = "No permitir";
+
+"外部からインポートした壁紙はStoreに共有できません" = "Los fondos de pantalla importados desde fuentes externas no se pueden compartir en la Store.";

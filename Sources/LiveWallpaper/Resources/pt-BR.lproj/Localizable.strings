@@ -1193,3 +1193,5 @@
 "この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Este papel de parede usa JavaScript para mudar o movimento e a exibição. Se você permitir, ele será executado automaticamente sempre que este papel de parede for exibido. Você pode interrompê-lo depois no Editor de Cena, em “Scripts (JavaScript)”.";
 "実行を許可" = "Permitir";
 "許可しない" = "Não Permitir";
+
+"外部からインポートした壁紙はStoreに共有できません" = "Papéis de parede importados de fontes externas não podem ser compartilhados na Store.";

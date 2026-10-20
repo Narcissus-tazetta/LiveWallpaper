@@ -22,6 +22,7 @@ enum StoreClientError: LocalizedError {
     case invalidResponse
     case fileTooLarge(sizeBytes: Int, maxBytes: Int)
     case checksumMismatch
+    case cannotShareExternalWallpaper
 
     var errorDescription: String? {
         switch self {
@@ -40,6 +41,8 @@ enum StoreClientError: LocalizedError {
             return String(format: template, sizeText, maxText)
         case .checksumMismatch:
             return Self.localized("ダウンロードしたファイルの検証に失敗しました。もう一度お試しください")
+        case .cannotShareExternalWallpaper:
+            return Self.localized("外部からインポートした壁紙はStoreに共有できません")
         }
     }
 
@@ -104,6 +107,10 @@ final class StoreClient {
         license: String?,
         thumbnailCache: DiskThumbnailCache
     ) async throws -> StoreSubmissionResult {
+        guard !model.isExternalOrImportedWallpaper(path: videoPath) else {
+            throw StoreClientError.cannotShareExternalWallpaper
+        }
+
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer {

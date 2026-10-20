@@ -1193,3 +1193,5 @@
 "この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Bu duvar kâğıdı hareketini ve görünümünü JavaScript ile değiştirir. İzin verirseniz bu duvar kâğıdı her gösterildiğinde otomatik olarak çalışır. Daha sonra Sahne Düzenleyici’de “Betikler (JavaScript)” altından durdurabilirsiniz.";
 "実行を許可" = "İzin Ver";
 "許可しない" = "İzin Verme";
+
+"外部からインポートした壁紙はStoreに共有できません" = "Harici kaynaklardan içe aktarılan duvar kağıtları Store'da paylaşılamaz.";

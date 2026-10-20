@@ -50,6 +50,26 @@ extension WallpaperModel {
         return path
     }
 
+    /// External wallpapers are licensed only for local, personal use by the subscriber.
+    func isExternalOrImportedWallpaper(path: String) -> Bool {
+        if importedExternalWallpaperPaths.values.contains(path) {
+            return true
+        }
+        if externalWallpapers.contains(where: {
+            $0.path == path || $0.sceneFolderPath == path || $0.webSource?.localFolderPath == path
+        }) {
+            return true
+        }
+        if path.contains("/we-import/") || path.contains("/we-") {
+            return true
+        }
+        return false
+    }
+
+    var shareableVideoPaths: [String] {
+        libraryVideoPaths.filter { !isExternalOrImportedWallpaper(path: $0) }
+    }
+
     /// Copies the wallpaper into the app's own folder and registers it like any other
     /// video, so it stays after the provider quits.
     @discardableResult

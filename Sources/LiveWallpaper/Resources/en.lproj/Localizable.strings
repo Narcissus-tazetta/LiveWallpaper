@@ -1193,3 +1193,5 @@
 "この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "This wallpaper uses JavaScript to change its motion and display. If you allow it, it runs automatically every time this wallpaper is shown. You can stop it later in Scene Editor under Scripts (JavaScript).";
 "実行を許可" = "Allow";
 "許可しない" = "Don’t Allow";
+
+"外部からインポートした壁紙はStoreに共有できません" = "Wallpapers imported from external sources cannot be shared to the Store.";

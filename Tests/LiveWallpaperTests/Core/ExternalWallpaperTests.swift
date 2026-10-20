@@ -298,4 +298,35 @@ final class ExternalWallpaperTests: XCTestCase {
         thirdModel.updateExternalWallpapers([wallpaper])
         XCTAssertFalse(thirdModel.isExternalWallpaperReady(wallpaper), "rebake required when app signature changes")
     }
+
+    func testExternalWallpaperCannotBeSharedToStore() async throws {
+        let externalPath = "/Users/test/Library/Application Support/we-import/Wallpapers/we-12345/video.mp4"
+        let model = WallpaperModel()
+        XCTAssertTrue(model.isExternalOrImportedWallpaper(path: externalPath))
+
+        let importedPath = "/Users/test/Library/Application Support/LiveWallpaper/Videos/imported.mp4"
+        model.importedExternalWallpaperPaths["we-12345"] = importedPath
+        XCTAssertTrue(model.isExternalOrImportedWallpaper(path: importedPath))
+
+        let localPath = "/Users/test/Movies/local.mp4"
+        XCTAssertFalse(model.isExternalOrImportedWallpaper(path: localPath))
+
+        let client = StoreClient(packageExporter: PackageExporter())
+        do {
+            _ = try await client.submit(
+                model: model,
+                videoPath: externalPath,
+                title: "Test",
+                author: "Author",
+                license: nil,
+                thumbnailCache: DiskThumbnailCache()
+            )
+            XCTFail("External wallpaper submission should have thrown cannotShareExternalWallpaper")
+        } catch let error as StoreClientError {
+            guard case .cannotShareExternalWallpaper = error else {
+                XCTFail("Expected cannotShareExternalWallpaper, got \(error)")
+                return
+            }
+        }
+    }
 }

@@ -1193,3 +1193,5 @@
 "この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Hình nền này dùng JavaScript để thay đổi chuyển động và cách hiển thị. Nếu bạn cho phép, JavaScript sẽ tự động chạy mỗi khi hình nền này được hiển thị. Bạn có thể dừng sau trong Trình chỉnh sửa cảnh, tại “Tập lệnh (JavaScript)”.";
 "実行を許可" = "Cho phép";
 "許可しない" = "Không cho phép";
+
+"外部からインポートした壁紙はStoreに共有できません" = "Hình nền được nhập từ nguồn bên ngoài không thể chia sẻ lên Store.";

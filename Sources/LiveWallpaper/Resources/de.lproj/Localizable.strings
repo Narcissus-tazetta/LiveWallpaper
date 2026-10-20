@@ -1193,3 +1193,5 @@
 "この壁紙は、動きや表示をJavaScriptで変えます。許可すると、この壁紙を表示するたびに自動で実行します。あとからシーン編集の「スクリプト(JavaScript)」で止められます。" = "Dieses Hintergrundbild ändert Bewegung und Darstellung mit JavaScript. Wenn du es erlaubst, wird es jedes Mal automatisch ausgeführt, wenn dieses Hintergrundbild angezeigt wird. Du kannst es später im Szenen-Editor unter „Skripte (JavaScript)“ stoppen.";
 "実行を許可" = "Erlauben";
 "許可しない" = "Nicht erlauben";
+
+"外部からインポートした壁紙はStoreに共有できません" = "Aus externen Quellen importierte Hintergrundbilder können nicht im Store geteilt werden.";
