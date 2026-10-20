@@ -175,8 +175,10 @@ extension WallpaperModel {
         }
         applyMenuBarMaskState()
         applyDesktopReadabilityDimState()
+            windowsAwaitingOrdering.insert(ObjectIdentifier(window))
         refreshCursorEffects()
     }
+        windowsAwaitingOrdering.remove(ObjectIdentifier(window))
 
     /// ウィンドウ構築(Windowing)側からも呼ばれる。
     func reassertWallpaperOrdering(_ window: NSWindow) {
@@ -195,6 +197,10 @@ extension WallpaperModel {
     ) {
         activeSpaceTransitionLockWorkItem?.cancel()
         isActiveSpaceTransitioning = true
+            for window in windows where windowsAwaitingOrdering.contains(ObjectIdentifier(window)) {
+                reassertWallpaperOrdering(window)
+            }
+            windowsAwaitingOrdering.removeAll()
         AppLog.spaceTransition.info(
             "lock-start reason=\(reason, privacy: .public) duration=\(duration, format: .fixed(precision: 2)) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
         )

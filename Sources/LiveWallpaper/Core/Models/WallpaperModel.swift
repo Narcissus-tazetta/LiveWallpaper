@@ -100,6 +100,10 @@ final class WallpaperModel: ObservableObject {
     var autoFrameRateBufferAdjustment: TimeInterval = 0
     var coverageEvaluationWorkItem: DispatchWorkItem?
     var pendingSuspendConfirmationWorkItem: DispatchWorkItem?
+    /// Windows whose first orderFront was skipped by the space-transition lock. A window created
+    /// during the lock (e.g. a display plugged in) is otherwise never ordered in: later rebuilds
+    /// reuse it and only newly created windows are ordered.
+    var windowsAwaitingOrdering: Set<ObjectIdentifier> = []
     var isActiveSpaceTransitioning: Bool = false
     var activeSpaceTransitionLockWorkItem: DispatchWorkItem?
     var statePersistWorkItem: DispatchWorkItem?
