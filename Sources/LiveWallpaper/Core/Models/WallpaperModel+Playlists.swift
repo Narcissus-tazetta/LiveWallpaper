@@ -499,7 +499,6 @@ extension WallpaperModel {
             wallpaperKind = .video
             currentWebWallpaperID = nil
             webWallpaperLoadState = .idle
-            webPlayerViews.removeAll()
             UserDefaults.standard.set(WallpaperKind.video.rawValue, forKey: PrefsKey.wallpaperKind)
             UserDefaults.standard.removeObject(forKey: PrefsKey.currentWebWallpaperID)
             windowRetireWorkItem?.cancel()

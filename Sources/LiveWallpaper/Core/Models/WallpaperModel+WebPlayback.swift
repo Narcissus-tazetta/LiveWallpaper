@@ -85,6 +85,7 @@ extension WallpaperModel {
             }
         }
         let wasActive = currentWebWallpaperID == id
+        clearWebOverrides(forSourceID: id)
         webWallpaperSources.remove(at: index)
         pruneWebWallpaperIDsFromPlaylists()
         pruneScheduleRules(referencingWebWallpaperID: id)
@@ -133,53 +134,12 @@ extension WallpaperModel {
         for view in webPlayerViews {
             view.stopLoading()
             view.onLoadStateChanged = nil
+            // 止めたページは次の loadWebDisplays で読み直させる。
+            view.loadedSourceID = nil
         }
     }
 
-    func loadWebWallpaper(source: WebWallpaperSource) {
-        guard !webPlayerViews.isEmpty else {
-            webWallpaperLoadState = .loading
-            return
-        }
-
-        localWebLoadTask?.cancel()
-        if let folder = source.localFolderPath {
-            localWebLoadTask = Task { [weak self] in
-                guard let self else { return }
-                do {
-                    let url = try await localWebWallpaperServer.url(folder: URL(fileURLWithPath: folder))
-                    try Task.checkCancellation()
-                    guard isWebWallpaperActive, activeWebWallpaperSource?.id == source.id else { return }
-                    applyWebRequest(WebWallpaperPlaybackRequest(
-                        loadContent: .url(url), layoutMode: .generic,
-                        canonicalKey: "local:\(source.id)", isLocalPackage: true
-                    ))
-                } catch is CancellationError {
-                    return
-                } catch {
-                    guard !Task.isCancelled, activeWebWallpaperSource?.id == source.id else { return }
-                    webWallpaperLoadState = .failed
-                    webWallpaperErrorMessage = error.localizedDescription
-                    AppLog.externalWallpapers.error("local web load failed: \(error.localizedDescription, privacy: .public)")
-                }
-            }
-        } else {
-            applyWebRequest(WebWallpaperURLResolver.resolve(originalURL: source.url, audioEnabled: audioEnabled))
-        }
-    }
-
-    private func applyWebRequest(_ request: WebWallpaperPlaybackRequest) {
-        let reportLoadState: (WebWallpaperLoadState) -> Void = { [weak self] state in
-            self?.webWallpaperLoadState = state
-        }
-        for (index, view) in webPlayerViews.enumerated() {
-            view.onLoadStateChanged = index == 0 ? reportLoadState : nil
-            configureLocalWebEnvironment(view)
-            view.load(request: request, audioEnabled: audioEnabled)
-        }
-    }
-
-    private func configureLocalWebEnvironment(_ view: WebPlayerView) {
+    func configureLocalWebEnvironment(_ view: WebPlayerView) {
         let fps: Double
         switch frameRateLimit {
         case .fps30: fps = 30
@@ -202,27 +162,30 @@ extension WallpaperModel {
     }
 
     func applyWebAudioSettings() {
-        guard isWebWallpaperActive, let source = activeWebWallpaperSource else {
+        guard hasWebDisplay else {
             return
         }
-        if WebWallpaperURLResolver.requiresReloadForAudioChange(source.url) {
-            loadWebWallpaper(source: source)
+        let sharedSource = isWebWallpaperActive ? activeWebWallpaperSource : nil
+        if let source = sharedSource, WebWallpaperURLResolver.requiresReloadForAudioChange(source.url) {
+            loadWebDisplays(force: true)
             return
         }
-        for view in webPlayerViews {
-            view.setAudioEnabled(audioEnabled)
+        for entry in webDisplayEntries where !hasWebOverride(forScreenID: entry.displayID) {
+            entry.view.setAudioEnabled(audioEnabled)
         }
     }
 
     func applyWebSuspensionState() {
-        guard !webPlayerViews.isEmpty else {
+        let entries = webDisplayEntries
+        guard !entries.isEmpty else {
             cancelWebDeepSuspend()
             return
         }
-        let displayIDs = (0 ..< webPlayerViews.count).map { displayIDForWindow(at: $0) }
-        let allSuspended = displayIDs.allSatisfy { suspendedDisplayIDs.contains($0) }
-        for (index, view) in webPlayerViews.enumerated() {
-            view.setSuspended(allSuspended || suspendedDisplayIDs.contains(displayIDs[index]))
+        // 動画の画面が残っていれば、その画面は別に管理される。Web の解放は Web を
+        // 表示している画面がすべて被覆されたときだけ。
+        let allSuspended = entries.allSatisfy { suspendedDisplayIDs.contains($0.displayID) }
+        for entry in entries {
+            entry.view.setSuspended(allSuspended || suspendedDisplayIDs.contains(entry.displayID))
         }
 
         // Freeing the page only pays off once every display is covered — a page
@@ -299,6 +262,8 @@ extension WallpaperModel {
 
     func clearWebWallpaperState() {
         stopWebWallpaper()
+        webOverrideByScreenID.removeAll()
+        persistWebOverrides()
         let folders = webWallpaperSources.compactMap(\.localFolderPath).map { URL(fileURLWithPath: $0) }
             .filter { LocalWebWallpaperPackage.owns($0) }
         for folder in folders { localWebWallpaperServer.remove(folder: folder) }

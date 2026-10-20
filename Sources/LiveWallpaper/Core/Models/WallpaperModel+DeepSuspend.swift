@@ -102,21 +102,18 @@ extension WallpaperModel {
     /// 復帰(再ロード)は WebPlayerView.setSuspended(false) 側が担当する。
     private func performWebDeepSuspend() {
         webDeepSuspendWorkItem = nil
-        guard isWebWallpaperActive else {
-            return
-        }
         // タイマー発火までの間に被覆が解けていないか、ここで必ず取り直して確認する。
-        let displayIDs = (0 ..< webPlayerViews.count).map { displayIDForWindow(at: $0) }
-        guard !displayIDs.isEmpty,
-              displayIDs.allSatisfy({ suspendedDisplayIDs.contains($0) })
+        let entries = webDisplayEntries
+        guard !entries.isEmpty,
+              entries.allSatisfy({ suspendedDisplayIDs.contains($0.displayID) })
         else {
             return
         }
         AppLog.suspend.info(
-            "web deep suspend: unloading views=\(self.webPlayerViews.count)"
+            "web deep suspend: unloading views=\(entries.count)"
         )
-        for view in webPlayerViews {
-            view.deepUnload()
+        for entry in entries {
+            entry.view.deepUnload()
         }
     }
 

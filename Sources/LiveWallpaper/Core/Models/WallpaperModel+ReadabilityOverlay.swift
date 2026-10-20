@@ -17,8 +17,8 @@ extension WallpaperModel {
         for index in playerViews.indices {
             playerViews[index].readabilityDimOpacity = opacity
         }
-        for index in webPlayerViews.indices {
-            webPlayerViews[index].readabilityDimOpacity = opacity
+        for view in webPlayerViews {
+            view.readabilityDimOpacity = opacity
         }
     }
 }

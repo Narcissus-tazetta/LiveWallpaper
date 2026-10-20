@@ -145,6 +145,7 @@ extension WallpaperModel {
         applyLightweightSettings()
         restoreAutoSwitchInterval()
         restoreVideoOverrides()
+        restoreWebOverrides()
         restoreScreenPlaylists()
         restoreSpaceWallpaperState()
         restoreScheduleState()
@@ -379,6 +380,10 @@ extension WallpaperModel {
         webWallpaperFeatureEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: PrefsKey.webWallpaperFeatureEnabled)
         syncActivePlaylistPaths()
+
+        if !webOverrideByScreenID.isEmpty {
+            scheduleWindowRebuild(delay: 0.05)
+        }
 
         if !enabled, activeExternalWallpaper?.webSource != nil { stopExternalWallpaper() }
 

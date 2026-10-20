@@ -41,9 +41,12 @@ extension WallpaperModel {
             let screen = index < screens.count ? screens[index] : nil
             playerViews[index].menuBarMaskHeight = menuBarMaskHeight(for: screen, enabled: maskEnabled)
         }
-        for index in webPlayerViews.indices {
+        for (index, window) in windows.enumerated() {
+            guard let view = window.contentView as? WebPlayerView else {
+                continue
+            }
             let screen = index < screens.count ? screens[index] : nil
-            webPlayerViews[index].menuBarMaskHeight = menuBarMaskHeight(for: screen, enabled: maskEnabled)
+            view.menuBarMaskHeight = menuBarMaskHeight(for: screen, enabled: maskEnabled)
         }
     }
 

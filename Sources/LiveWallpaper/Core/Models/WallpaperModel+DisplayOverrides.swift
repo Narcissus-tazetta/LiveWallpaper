@@ -35,7 +35,7 @@ extension WallpaperModel {
     /// Space別壁紙(resolvedOverridePath 内で優先解決)もここを通じて全呼び出し元に
     /// 反映される。
     func isSharedPlayerDisplay(_ screenID: String) -> Bool {
-        resolvedOverridePath(forScreenID: screenID) == nil
+        resolvedOverridePath(forScreenID: screenID) == nil && !hasWebOverride(forScreenID: screenID)
     }
 
     /// 指定した画面IDのうち、共有プレイヤーが担当するものだけを返す。
@@ -54,6 +54,7 @@ extension WallpaperModel {
             guard FileManager.default.fileExists(atPath: path) else {
                 return
             }
+            removeWebOverrideForVideoAssignment(forScreenID: screenID)
             guard videoOverrideByScreenID[screenID] != path else {
                 return
             }

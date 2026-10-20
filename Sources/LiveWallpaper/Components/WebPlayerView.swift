@@ -306,6 +306,9 @@ final class WebPlayerView: NSView {
 
     var currentURL: URL?
     var onLoadStateChanged: ((WebWallpaperLoadState) -> Void)?
+    /// 最後に読み込ませた壁紙と音の有無。再構築のたびに同じページを読み直さないための記録。
+    var loadedSourceID: UUID?
+    var loadedWithAudio: Bool?
 
     override init(frame frameRect: NSRect) {
         let configuration = WKWebViewConfiguration()

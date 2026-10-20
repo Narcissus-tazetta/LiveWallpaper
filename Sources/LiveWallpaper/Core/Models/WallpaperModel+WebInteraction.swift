@@ -37,7 +37,7 @@ extension WallpaperModel {
     }
 
     func updateWebInteractionMonitor() {
-        let active = webInteractionEnabled && clickThrough && isWebWallpaperActive && AXIsProcessTrusted()
+        let active = webInteractionEnabled && clickThrough && hasWebDisplay && AXIsProcessTrusted()
         if active, webInteractionMonitor == nil {
             webInteractionMonitor = NSEvent.addGlobalMonitorForEvents(
                 matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .scrollWheel]
@@ -115,13 +115,13 @@ extension WallpaperModel {
     }
 
     private func webViewUnderCursor(at location: CGPoint) -> (WebPlayerView, CGPoint)? {
-        for (index, view) in webPlayerViews.enumerated() {
-            guard let frame = view.window?.frame, frame.contains(location),
-                  !coveredDisplayIDs.contains(displayIDForWindow(at: index))
+        for entry in webDisplayEntries {
+            guard let frame = entry.view.window?.frame, frame.contains(location),
+                  !coveredDisplayIDs.contains(entry.displayID)
             else {
                 continue
             }
-            return (view, CGPoint(x: location.x - frame.minX, y: frame.maxY - location.y))
+            return (entry.view, CGPoint(x: location.x - frame.minX, y: frame.maxY - location.y))
         }
         return nil
     }

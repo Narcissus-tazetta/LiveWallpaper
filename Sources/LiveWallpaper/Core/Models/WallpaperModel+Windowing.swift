@@ -149,6 +149,19 @@ extension WallpaperModel {
             let displayID = displayIDString(for: screen)
             let reusedWindow = reusableByDisplayID[displayID]
             let window = reusedWindow ?? makeBorderlessWallpaperWindow(for: screen, opaqueBackground: false)
+            if hasWebOverride(forScreenID: displayID) {
+                // この画面は固定された Web 壁紙を表示する。playerViews は windows と添字を
+                // 揃える前提のコードが多いため、ウィンドウに載せない空の PlayerView を置く。
+                installWebView(in: window, screen: screen)
+                if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedWindow != nil) {
+                    reassertWallpaperOrdering(window)
+                }
+                displayIDByWindow[ObjectIdentifier(window)] = displayID
+                reusedWindowIDs.insert(ObjectIdentifier(window))
+                nextWindows.append(window)
+                nextPlayerViews.append(PlayerView(frame: CGRect(origin: .zero, size: screen.frame.size)))
+                continue
+            }
             let playerView: PlayerView = {
                 if let existing = window.contentView as? PlayerView {
                     return existing
@@ -173,6 +186,9 @@ extension WallpaperModel {
                 playerView.player = player
             }
             if window.contentView !== playerView {
+                (window.contentView as? WebPlayerView)?.tearDown()
+                window.backgroundColor = .clear
+                window.isOpaque = false
                 window.contentView = playerView
             }
             if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedWindow != nil) {
@@ -190,11 +206,13 @@ extension WallpaperModel {
 
         windows = nextWindows
         playerViews = nextPlayerViews
-        webPlayerViews = []
 
         pruneDedicatedPlayers(activeDisplayIDs: Set(screens.map { displayIDString(for: $0) }))
         syncSuspendedDisplays(for: screens)
         applySuspensionStateToPlayers()
+        if !webPlayerViews.isEmpty {
+            loadWebDisplays()
+        }
 
         lastScreenSignatures = screenSignatures(for: screens)
     }
@@ -213,31 +231,13 @@ extension WallpaperModel {
         }
 
         var nextWindows: [NSWindow] = []
-        var nextWebPlayerViews: [WebPlayerView] = []
         var reusedWindowIDs: Set<ObjectIdentifier> = []
 
         for screen in screens {
             let displayID = displayIDString(for: screen)
             let reusedWindow = reusableByDisplayID[displayID]
             let window = reusedWindow ?? makeBorderlessWallpaperWindow(for: screen, opaqueBackground: true)
-            let webView: WebPlayerView = {
-                if let existing = window.contentView as? WebPlayerView {
-                    return existing
-                }
-                let view = WebPlayerView(frame: CGRect(origin: .zero, size: screen.frame.size))
-                view.autoresizingMask = [.width, .height]
-                return view
-            }()
-
-            applyWindowOptions(window)
-            window.ignoresMouseEvents = clickThrough
-            if window.frame != screen.frame {
-                window.setFrame(screen.frame, display: true)
-            }
-            if window.contentView !== webView {
-                (window.contentView as? PlayerView)?.hideScene()
-                window.contentView = webView
-            }
+            installWebView(in: window, screen: screen)
             if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedWindow != nil) {
                 reassertWallpaperOrdering(window)
             }
@@ -245,14 +245,12 @@ extension WallpaperModel {
             displayIDByWindow[ObjectIdentifier(window)] = displayID
             reusedWindowIDs.insert(ObjectIdentifier(window))
             nextWindows.append(window)
-            nextWebPlayerViews.append(webView)
         }
 
         let obsoleteWindows = windows.filter { !reusedWindowIDs.contains(ObjectIdentifier($0)) }
         retireObsoleteWindows(obsoleteWindows)
 
         windows = nextWindows
-        webPlayerViews = nextWebPlayerViews
         playerViews = []
 
         syncSuspendedDisplays(for: screens)
@@ -260,9 +258,31 @@ extension WallpaperModel {
 
         lastScreenSignatures = screenSignatures(for: screens)
 
-        if let source = activeWebWallpaperSource {
-            loadWebWallpaper(source: source)
+        loadWebDisplays()
+    }
+
+    /// 画面のウィンドウに Web ビューを載せる(あれば再利用)。
+    @discardableResult
+    private func installWebView(in window: NSWindow, screen: NSScreen) -> WebPlayerView {
+        let webView: WebPlayerView
+        if let existing = window.contentView as? WebPlayerView {
+            webView = existing
+        } else {
+            webView = WebPlayerView(frame: CGRect(origin: .zero, size: screen.frame.size))
+            webView.autoresizingMask = [.width, .height]
         }
+        applyWindowOptions(window)
+        window.ignoresMouseEvents = clickThrough
+        window.backgroundColor = .black
+        window.isOpaque = true
+        if window.frame != screen.frame {
+            window.setFrame(screen.frame, display: true)
+        }
+        if window.contentView !== webView {
+            (window.contentView as? PlayerView)?.hideScene()
+            window.contentView = webView
+        }
+        return webView
     }
 
     private func retireObsoleteWindows(_ obsoleteWindows: [NSWindow]) {
@@ -290,6 +310,9 @@ extension WallpaperModel {
             backing: .buffered,
             defer: false
         )
+        // The model owns the window; the default (true) makes close() release it a second
+        // time, which crashes later when an unplugged display's window is retired.
+        window.isReleasedWhenClosed = false
         window.backgroundColor = opaqueBackground ? .black : .clear
         window.isOpaque = opaqueBackground
         window.hasShadow = false

@@ -65,6 +65,7 @@ enum PrefsKey {
     static let videoOverrideByScreenID = "videoOverrideByScreenID"
     static let videoPath = "videoPath"
     static let wallpaperKind = "wallpaperKind"
+    static let webOverrideByScreenID = "webOverrideByScreenID"
     static let webWallpaperFeatureEnabled = "webWallpaperFeatureEnabled"
     static let webWallpaperSourcesData = "webWallpaperSourcesData"
     static let workProfile = "workProfile"
