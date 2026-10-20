@@ -383,9 +383,7 @@ extension WallpaperModel {
         }
         // Detach the moved views so playback updates and the new page load go only
         // to the views the following rebuild creates.
-        if wasWeb {
-            webPlayerViews = []
-        } else {
+        if !wasWeb {
             playerViews = []
         }
         if wallpaperTransitionStyle == .dipToBlack {

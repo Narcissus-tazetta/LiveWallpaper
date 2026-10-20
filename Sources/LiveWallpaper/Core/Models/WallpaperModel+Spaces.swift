@@ -25,6 +25,9 @@ extension WallpaperModel {
     /// すべてが「Space層が nil → ディスプレイ別 → 共有」という同一の
     /// フォールバック経路に乗る。
     func resolvedOverridePath(forScreenID screenID: String) -> String? {
+        if hasWebOverride(forScreenID: screenID) {
+            return nil
+        }
         if let path = activeExternalWallpaper?.path, FileManager.default.fileExists(atPath: path) {
             return path
         }

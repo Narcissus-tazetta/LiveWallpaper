@@ -117,9 +117,8 @@ extension SettingsView {
 
     private var mergedListEntries: [WallpaperListEntry] {
         let videoEntries = filteredPaths.map { WallpaperListEntry.video($0) }
-        // ディスプレイ/Space割り当てはまだ動画のみ対応(専用プレイヤーがWeb壁紙に非対応)。
+        // Space割り当ては動画のみ対応。
         guard model.webWallpaperFeatureEnabled,
-              activeDisplayOverrideScreenID == nil,
               activeSpaceScopeUUID == nil
         else {
             return videoEntries
@@ -533,8 +532,9 @@ extension SettingsView {
                             webWallpaperCard(
                                 source: source,
                                 cardWidth: layout.1,
-                                playlistEditingID: model.selectedPlaylistID,
-                                assignmentTarget: selectedAssignmentTarget
+                                playlistEditingID: activeDisplayOverrideScreenID == nil ? model.selectedPlaylistID : nil,
+                                assignmentTarget: selectedAssignmentTarget,
+                                displayScreenID: activeDisplayOverrideScreenID
                             )
                         }
                     }

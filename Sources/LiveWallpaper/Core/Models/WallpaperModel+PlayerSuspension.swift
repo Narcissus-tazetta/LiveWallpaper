@@ -7,8 +7,8 @@ import AVFoundation
 @MainActor
 extension WallpaperModel {
     func applySuspensionStateToPlayers() {
+        applyWebSuspensionState()
         if isWebWallpaperActive {
-            applyWebSuspensionState()
             return
         }
         // オーバーライド画面の専用プレイヤーは独立に処理し、以降の共有プレイヤー

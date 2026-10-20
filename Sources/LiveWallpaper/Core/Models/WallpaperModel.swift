@@ -51,7 +51,6 @@ final class WallpaperModel: ObservableObject {
 
     var windows: [NSWindow] = []
     var playerViews: [PlayerView] = []
-    var webPlayerViews: [WebPlayerView] = []
     var sharedPlayer: AVQueuePlayer?
     var sharedPlayerAudioController: PlayerAudioTrackController?
     var sharedLooper: AVPlayerLooper?
@@ -100,11 +99,11 @@ final class WallpaperModel: ObservableObject {
     var autoFrameRateBufferAdjustment: TimeInterval = 0
     var coverageEvaluationWorkItem: DispatchWorkItem?
     var pendingSuspendConfirmationWorkItem: DispatchWorkItem?
+    var isActiveSpaceTransitioning: Bool = false
     /// Windows whose first orderFront was skipped by the space-transition lock. A window created
     /// during the lock (e.g. a display plugged in) is otherwise never ordered in: later rebuilds
     /// reuse it and only newly created windows are ordered.
     var windowsAwaitingOrdering: Set<ObjectIdentifier> = []
-    var isActiveSpaceTransitioning: Bool = false
     var activeSpaceTransitionLockWorkItem: DispatchWorkItem?
     var statePersistWorkItem: DispatchWorkItem?
     var persistenceFailureCount: Int = 0
@@ -325,6 +324,8 @@ final class WallpaperModel: ObservableObject {
     @Published var wallpaperEditByPath: [String: WallpaperEditMetadata] = [:]
     /// 画面ID → その画面に固定表示する動画パス。空ならオーバーライドなし。
     @Published var videoOverrideByScreenID: [String: String] = [:]
+    /// 画面ごとに固定した Web 壁紙(WebWallpaperSource.id)。同じ画面の videoOverrideByScreenID とは排他。
+    @Published var webOverrideByScreenID: [String: UUID] = [:]
     /// Wallpapers offered by provider apps that are running right now. Never saved.
     @Published var externalWallpapers: [ExternalWallpaper] = []
     /// The external wallpaper shown on every screen in place of the user's own choice.

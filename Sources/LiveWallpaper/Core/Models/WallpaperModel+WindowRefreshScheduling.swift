@@ -146,12 +146,7 @@ extension WallpaperModel {
                 if window.frame != screen.frame {
                     window.setFrame(screen.frame, display: true)
                 }
-                if isWebWallpaperActive, index < webPlayerViews.count {
-                    let webView = webPlayerViews[index]
-                    if window.contentView !== webView {
-                        window.contentView = webView
-                    }
-                } else if index < playerViews.count {
+                if !(window.contentView is WebPlayerView), index < playerViews.count {
                     let playerView = playerViews[index]
                     applyPlayerPresentation(to: playerView, screen: screen)
                     if isSharedPlayerDisplay(displayID),
@@ -168,17 +163,11 @@ extension WallpaperModel {
                 reassertWallpaperOrdering(window)
             }
         }
-        if isWebWallpaperActive {
-            applyWebSuspensionState()
-        } else {
-            applySuspensionStateToPlayers()
-        }
+        applySuspensionStateToPlayers()
         applyMenuBarMaskState()
         applyDesktopReadabilityDimState()
-            windowsAwaitingOrdering.insert(ObjectIdentifier(window))
         refreshCursorEffects()
     }
-        windowsAwaitingOrdering.remove(ObjectIdentifier(window))
 
     /// ウィンドウ構築(Windowing)側からも呼ばれる。
     func reassertWallpaperOrdering(_ window: NSWindow) {
@@ -186,8 +175,10 @@ extension WallpaperModel {
             AppLog.windowRefresh.info(
                 "skip-reorder active-space-transition at=\(Self.windowRefreshTimestamp(), privacy: .public)"
             )
+            windowsAwaitingOrdering.insert(ObjectIdentifier(window))
             return
         }
+        windowsAwaitingOrdering.remove(ObjectIdentifier(window))
         window.orderFront(nil)
     }
 
@@ -197,10 +188,6 @@ extension WallpaperModel {
     ) {
         activeSpaceTransitionLockWorkItem?.cancel()
         isActiveSpaceTransitioning = true
-            for window in windows where windowsAwaitingOrdering.contains(ObjectIdentifier(window)) {
-                reassertWallpaperOrdering(window)
-            }
-            windowsAwaitingOrdering.removeAll()
         AppLog.spaceTransition.info(
             "lock-start reason=\(reason, privacy: .public) duration=\(duration, format: .fixed(precision: 2)) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
         )
@@ -210,6 +197,10 @@ extension WallpaperModel {
             }
             isActiveSpaceTransitioning = false
             activeSpaceTransitionLockWorkItem = nil
+            for window in windows where windowsAwaitingOrdering.contains(ObjectIdentifier(window)) {
+                reassertWallpaperOrdering(window)
+            }
+            windowsAwaitingOrdering.removeAll()
             AppLog.spaceTransition.info(
                 "lock-end reason=\(reason, privacy: .public) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
             )
