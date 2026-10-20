@@ -187,6 +187,20 @@ final class SceneRenderGraphTests: XCTestCase {
         XCTAssertEqual(Int(pixels[1]), 64, accuracy: 2)
     }
 
+    func testOmittedClearDiscardsEarlierPassOnSameTarget() throws {
+        let graph = SceneRenderGraph(targets: [.init(name: "work")], passes: [
+            meshPass(clears: nil, blend: .alphaAdditive, parent: "a"),
+            meshPass(clears: nil, blend: .alphaAdditive, parent: "b")
+        ], output: "work")
+        let full = SIMD4<Float>(-1, -1, 1, 1)
+        let pixels = try renderMeshes(graph, meshes: [
+            quad(full, color: SIMD4(0.25, 0, 0, 1), parent: "a"),
+            quad(full, color: SIMD4(0, 0.25, 0, 1), parent: "b")
+        ])
+        XCTAssertEqual(Int(pixels[0]), 0)
+        XCTAssertEqual(Int(pixels[1]), 64, accuracy: 2)
+    }
+
     func testDynamicMeshAboveItsCapacityIsRejected() throws {
         let graph = SceneRenderGraph(targets: [.init(name: "work")], passes: [meshPass(clears: nil, blend: .alphaOver)], output: "work")
         let many = (0 ..< 9).map { _ in quad(SIMD4(-1, -1, 1, 1), color: SIMD4(1, 1, 1, 1)) }

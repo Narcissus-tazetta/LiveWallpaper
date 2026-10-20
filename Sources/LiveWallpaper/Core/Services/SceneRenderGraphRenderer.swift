@@ -9,7 +9,7 @@ final class SceneRenderGraphRenderer {
         }
     }
 
-    private struct CompiledDraw {
+    private final class CompiledDraw {
         var pipeline: MTLRenderPipelineState
         var vertices: MTLBuffer
         var samplers: [MTLSamplerState]
@@ -19,6 +19,32 @@ final class SceneRenderGraphRenderer {
         var skeleton: SceneSkeletonEvaluator?
         var commands: [CompiledCommand]
         var materialSamplers: [String: [MTLSamplerState]]
+        var dynamicVertexBuffers: [MTLBuffer]
+        var dynamicBufferIndex: Int = 0
+
+        init(
+            pipeline: MTLRenderPipelineState,
+            vertices: MTLBuffer,
+            samplers: [MTLSamplerState],
+            vertexUniforms: MTLBuffer?,
+            fragmentUniforms: MTLBuffer?,
+            indices: MTLBuffer?,
+            skeleton: SceneSkeletonEvaluator?,
+            commands: [CompiledCommand],
+            materialSamplers: [String: [MTLSamplerState]],
+            dynamicVertexBuffers: [MTLBuffer] = []
+        ) {
+            self.pipeline = pipeline
+            self.vertices = vertices
+            self.samplers = samplers
+            self.vertexUniforms = vertexUniforms
+            self.fragmentUniforms = fragmentUniforms
+            self.indices = indices
+            self.skeleton = skeleton
+            self.commands = commands
+            self.materialSamplers = materialSamplers
+            self.dynamicVertexBuffers = dynamicVertexBuffers
+        }
     }
 
     private struct CompiledCommand {
@@ -114,6 +140,17 @@ final class SceneRenderGraphRenderer {
                     fragmentUniforms: command.fragmentUniforms.map(makeBuffer)
                 )
             }
+            var dynamicBuffers: [MTLBuffer] = []
+            if let dynamic = draw.dynamic {
+                let bytesPerQuad = SceneMeshFrame.floatsPerQuad * MemoryLayout<Float>.stride
+                let capacityInBytes = dynamic.capacity * bytesPerQuad
+                for _ in 0 ..< 3 {
+                    guard let buf = device.makeBuffer(length: capacityInBytes, options: .storageModeShared) else {
+                        throw GraphError(detail: "pass \(index) dynamic vertex buffer allocation failed")
+                    }
+                    dynamicBuffers.append(buf)
+                }
+            }
             draws[index] = try CompiledDraw(
                 pipeline: device.makeRenderPipelineState(descriptor: descriptor),
                 vertices: vertices,
@@ -124,7 +161,8 @@ final class SceneRenderGraphRenderer {
                     ?? draw.indices.map { try makeBuffer($0) },
                 skeleton: skeletonEvaluator(draw),
                 commands: commands,
-                materialSamplers: (draw.dynamic?.materials ?? [:]).mapValues(samplers)
+                materialSamplers: (draw.dynamic?.materials ?? [:]).mapValues(samplers),
+                dynamicVertexBuffers: dynamicBuffers
             )
         }
     }
@@ -190,102 +228,121 @@ final class SceneRenderGraphRenderer {
             else { throw GraphError(detail: "image \(file) is missing") }
             resources[name] = image
         }
-        for (index, pass) in graph.passes.enumerated() {
-            let target = resources[pass.target]!
-            switch pass.operation {
-            case .copy:
-                let source = resources[pass.source!]!
-                guard source.width == target.width, source.height == target.height,
-                      source.pixelFormat == target.pixelFormat
-                else {
-                    throw GraphError(detail: "copy pass \(index) requires matching size and format")
-                }
-                guard let encoder = commandBuffer.makeBlitCommandEncoder()
-                else { throw GraphError(detail: "copy encoder failed") }
-                encoder.copy(
-                    from: source,
-                    sourceSlice: 0,
-                    sourceLevel: 0,
-                    sourceOrigin: MTLOrigin(),
-                    sourceSize: MTLSize(width: source.width, height: source.height, depth: 1),
-                    to: target,
-                    destinationSlice: 0,
-                    destinationLevel: 0,
-                    destinationOrigin: MTLOrigin()
-                )
-                encoder.endEncoding()
-            case .draw:
-                let draw = pass.draw!, compiled = draws[index]!
-                // A pass that adds to its target and has nothing to add costs a full
-                // load and store of the target for no change.
-                if let dynamic = draw.dynamic, draw.clears == false,
-                   !meshes.contains(where: { $0.parent == dynamic.parent && dynamic.materials[$0.material] != nil }) {
-                    continue
-                }
-                let pose = compiled.skeleton?.evaluate(time: time)
-                let vertex = try uniformBinding(
-                    draw.vertex,
-                    cached: compiled.vertexUniforms,
-                    resources: resources,
-                    time: time,
-                    cursor: cursor,
-                    pose: pose,
-                    effectValues: values,
-                    audio: audio
-                )
-                // A mesh pass fills its own fragment block per material.
-                let fragment = try draw.dynamic != nil ? UniformBinding.buffer(nil) : uniformBinding(
-                    draw.fragment,
-                    cached: compiled.fragmentUniforms,
-                    resources: resources,
-                    time: time,
-                    cursor: cursor,
-                    pose: pose,
-                    effectValues: values,
-                    audio: audio
-                )
-                let descriptor = MTLRenderPassDescriptor()
-                descriptor.colorAttachments[0].texture = target
-                descriptor.colorAttachments[0].loadAction = draw.clears == false ? .load : .clear
-                descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
-                descriptor.colorAttachments[0].storeAction = .store
-                guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor)
-                else {
-                    throw GraphError(detail: "draw encoder failed")
-                }
-                encoder.setRenderPipelineState(compiled.pipeline)
-                encoder.setVertexBuffer(compiled.vertices, offset: 0, index: 1)
-                bindUniforms(vertex, encoder: encoder, vertex: true)
-                bindUniforms(fragment, encoder: encoder, vertex: false)
-                for (binding, sampler) in zip(draw.textures, compiled.samplers) {
-                    let texture = resources[binding.source]!
-                    encoder.setVertexTexture(texture, index: binding.index)
-                    encoder.setFragmentTexture(texture, index: binding.index)
-                    encoder.setVertexSamplerState(sampler, index: binding.index)
-                    encoder.setFragmentSamplerState(sampler, index: binding.index)
-                }
-                if let dynamic = draw.dynamic {
-                    do {
+        var activeEncoder: MTLRenderCommandEncoder?
+        var activeTargetName: String?
+        func endActiveEncoder() {
+            activeEncoder?.endEncoding()
+            activeEncoder = nil
+            activeTargetName = nil
+        }
+
+        do {
+            for (index, pass) in graph.passes.enumerated() {
+                let target = resources[pass.target]!
+                switch pass.operation {
+                case .copy:
+                    endActiveEncoder()
+                    let source = resources[pass.source!]!
+                    guard source.width == target.width, source.height == target.height,
+                          source.pixelFormat == target.pixelFormat
+                    else {
+                        throw GraphError(detail: "copy pass \(index) requires matching size and format")
+                    }
+                    guard let encoder = commandBuffer.makeBlitCommandEncoder()
+                    else { throw GraphError(detail: "copy encoder failed") }
+                    encoder.copy(
+                        from: source,
+                        sourceSlice: 0,
+                        sourceLevel: 0,
+                        sourceOrigin: MTLOrigin(),
+                        sourceSize: MTLSize(width: source.width, height: source.height, depth: 1),
+                        to: target,
+                        destinationSlice: 0,
+                        destinationLevel: 0,
+                        destinationOrigin: MTLOrigin()
+                    )
+                    encoder.endEncoding()
+                case .draw:
+                    let draw = pass.draw!, compiled = draws[index]!
+                    // A pass that adds to its target and has nothing to add costs a full
+                    // load and store of the target for no change.
+                    if let dynamic = draw.dynamic, draw.clears == false,
+                       !meshes.contains(where: { $0.parent == dynamic.parent && dynamic.materials[$0.material] != nil }) {
+                        continue
+                    }
+                    let pose = compiled.skeleton?.evaluate(time: time)
+                    let vertex = try uniformBinding(
+                        draw.vertex,
+                        cached: compiled.vertexUniforms,
+                        resources: resources,
+                        time: time,
+                        cursor: cursor,
+                        pose: pose,
+                        effectValues: values,
+                        audio: audio
+                    )
+                    // A mesh pass fills its own fragment block per material.
+                    let fragment = try draw.dynamic != nil ? UniformBinding.buffer(nil) : uniformBinding(
+                        draw.fragment,
+                        cached: compiled.fragmentUniforms,
+                        resources: resources,
+                        time: time,
+                        cursor: cursor,
+                        pose: pose,
+                        effectValues: values,
+                        audio: audio
+                    )
+                    let requiresNewEncoder = activeEncoder == nil
+                        || activeTargetName != pass.target
+                        || draw.clears != false
+                    if requiresNewEncoder {
+                        endActiveEncoder()
+                        let descriptor = MTLRenderPassDescriptor()
+                        descriptor.colorAttachments[0].texture = target
+                        descriptor.colorAttachments[0].loadAction = draw.clears == false ? .load : .clear
+                        descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
+                        descriptor.colorAttachments[0].storeAction = .store
+                        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor)
+                        else {
+                            throw GraphError(detail: "draw encoder failed")
+                        }
+                        activeEncoder = encoder
+                        activeTargetName = pass.target
+                    }
+                    guard let encoder = activeEncoder else {
+                        throw GraphError(detail: "draw encoder missing")
+                    }
+                    encoder.setRenderPipelineState(compiled.pipeline)
+                    encoder.setVertexBuffer(compiled.vertices, offset: 0, index: 1)
+                    bindUniforms(vertex, encoder: encoder, vertex: true)
+                    bindUniforms(fragment, encoder: encoder, vertex: false)
+                    for (binding, sampler) in zip(draw.textures, compiled.samplers) {
+                        let texture = resources[binding.source]!
+                        encoder.setVertexTexture(texture, index: binding.index)
+                        encoder.setFragmentTexture(texture, index: binding.index)
+                        encoder.setVertexSamplerState(sampler, index: binding.index)
+                        encoder.setFragmentSamplerState(sampler, index: binding.index)
+                    }
+                    if let dynamic = draw.dynamic {
                         try drawMeshes(
                             draw, dynamic: dynamic, compiled: compiled, meshes: meshes, resources: resources,
                             time: time, cursor: cursor, effectValues: values, audio: audio, encoder: encoder
                         )
-                    } catch {
-                        // Metal traps on an encoder that is released without ending.
-                        encoder.endEncoding()
-                        throw error
+                    } else {
+                        drawGeometry(
+                            draw,
+                            compiled: compiled,
+                            fragment: fragment,
+                            resources: resources,
+                            encoder: encoder
+                        )
                     }
-                } else {
-                    drawGeometry(
-                        draw,
-                        compiled: compiled,
-                        fragment: fragment,
-                        resources: resources,
-                        encoder: encoder
-                    )
                 }
-                encoder.endEncoding()
             }
+            endActiveEncoder()
+        } catch {
+            endActiveEncoder()
+            throw error
         }
         return resources[graph.output]!
     }
@@ -308,23 +365,47 @@ final class SceneRenderGraphRenderer {
         effectValues: [String: Double], audio: SceneAudioSpectrum?, encoder: MTLRenderCommandEncoder
     ) throws {
         struct Run { var material: String; var firstQuad: Int; var quads: Int }
-        var floats: [Float] = []
         var runs: [Run] = []
+        var totalQuads = 0
+        for mesh in meshes where mesh.parent == dynamic.parent && dynamic.materials[mesh.material] != nil {
+            let count = mesh.vertices.count / SceneMeshFrame.floatsPerQuad
+            guard count > 0 else { continue }
+            guard totalQuads + count <= dynamic.capacity else {
+                throw GraphError(detail: "mesh quads exceed the pass capacity of \(dynamic.capacity)")
+            }
+            totalQuads += count
+        }
+        guard totalQuads > 0 else { return }
+
+        let buffer: MTLBuffer
+        if !compiled.dynamicVertexBuffers.isEmpty {
+            buffer = compiled.dynamicVertexBuffers[compiled.dynamicBufferIndex]
+            compiled.dynamicBufferIndex = (compiled.dynamicBufferIndex + 1) % compiled.dynamicVertexBuffers.count
+        } else {
+            let byteCount = totalQuads * SceneMeshFrame.floatsPerQuad * MemoryLayout<Float>.stride
+            guard let buf = device.makeBuffer(length: byteCount, options: .storageModeShared) else {
+                throw GraphError(detail: "mesh vertex allocation failed")
+            }
+            buffer = buf
+        }
+
+        let rawPointer = buffer.contents()
+        var currentFloatOffset = 0
         var quads = 0
         for mesh in meshes where mesh.parent == dynamic.parent && dynamic.materials[mesh.material] != nil {
             let count = mesh.vertices.count / SceneMeshFrame.floatsPerQuad
-            guard quads + count <= dynamic.capacity else {
-                throw GraphError(detail: "mesh quads exceed the pass capacity of \(dynamic.capacity)")
-            }
             guard count > 0 else { continue }
-            floats += mesh.vertices[0 ..< count * SceneMeshFrame.floatsPerQuad]
+            let floatCount = count * SceneMeshFrame.floatsPerQuad
+            mesh.vertices.withUnsafeBufferPointer { src in
+                guard let base = src.baseAddress else { return }
+                rawPointer.advanced(by: currentFloatOffset * MemoryLayout<Float>.stride)
+                    .copyMemory(from: base, byteCount: floatCount * MemoryLayout<Float>.stride)
+            }
             runs.append(Run(material: mesh.material, firstQuad: quads, quads: count))
+            currentFloatOffset += floatCount
             quads += count
         }
-        guard quads > 0 else { return }
-        guard let buffer = floats.withUnsafeBytes({ device.makeBuffer(
-            bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared
-        ) }) else { throw GraphError(detail: "mesh vertex allocation failed") }
+
         encoder.setVertexBuffer(buffer, offset: 0, index: 1)
         for run in runs {
             var slots = resources

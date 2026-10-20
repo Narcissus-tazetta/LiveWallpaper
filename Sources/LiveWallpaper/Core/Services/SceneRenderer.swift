@@ -171,7 +171,10 @@ final class SceneRenderer {
     private var textTextures: [UUID: TextTexture] = [:]
     private var maskTextures: [String: MTLTexture] = [:]
     private var flowTextures: [String: MTLTexture] = [:]
-    private var effectTargets: [UUID: [MTLTexture]] = [:]
+    private var effectLayerTargets: [UUID: MTLTexture] = [:]
+    private var effectScratchTargets: [SIMD2<Int>: MTLTexture] = [:]
+    private var usedEffectScratchSizes: Set<SIMD2<Int>> = []
+    private var captureTargets: [UUID: MTLTexture] = [:]
     private var particleTargets: [UUID: MTLTexture] = [:]
     private var accumulation: [MTLTexture] = []
     private let blackTexture: MTLTexture
@@ -331,6 +334,12 @@ final class SceneRenderer {
 
     /// Encodes the scene into `target` (bgra8Unorm, renderTarget usage).
     func encode(into target: MTLTexture, commandBuffer: MTLCommandBuffer, input: SceneFrameInput, frame: SceneEvaluatedFrame? = nil) throws {
+        usedEffectScratchSizes.removeAll(keepingCapacity: true)
+        defer {
+            if effectScratchTargets.count != usedEffectScratchSizes.count {
+                effectScratchTargets = effectScratchTargets.filter { usedEffectScratchSizes.contains($0.key) }
+            }
+        }
         if frame == nil, document.scripts.contains(where: \.canRun), Thread.isMainThread {
             throw SceneScriptIssue(scriptID: document.scripts.first!.id, name: "JavaScript", message: "Scripts must be evaluated off the main thread")
         }
@@ -365,38 +374,117 @@ final class SceneRenderer {
                 (lastPlacements[layer.id] == nil || lastInversePlacements[layer.id] != nil) &&
                 (layer.capturesCanvas || (layer.kind == .particles ? layer.particles != nil : picture(for: layer) != nil))
         }
-        if !visible.contains(where: \.capturesCanvas), allowsSinglePassComposite, let fetch = pipeline.compositeFetch {
-            // Effects and particles render into their own textures first, so the
-            // composite can then run as a single pass.
-            var prepared: [PreparedLayer] = []
+        if allowsSinglePassComposite, let fetch = pipeline.compositeFetch {
+            enum Segment {
+                case batch([SceneLayer])
+                case capture(SceneLayer)
+            }
+            var segments: [Segment] = []
+            var currentBatch: [SceneLayer] = []
             for layer in visible {
-                let drawn = evaluated.layers[layer.id]!
-                let layerTexture = try applyEffects(
-                    to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize
-                )
-                prepared.append(PreparedLayer(
-                    layerTexture: layerTexture,
-                    uniforms: compositeUniforms(for: drawn.layer, drawn: drawn, input: input, targetSize: targetSize),
-                    depth: layer.depthFile.flatMap { maskTextures[$0] }
-                ))
+                if layer.capturesCanvas {
+                    if !currentBatch.isEmpty {
+                        segments.append(.batch(currentBatch))
+                        currentBatch.removeAll()
+                    }
+                    segments.append(.capture(layer))
+                } else {
+                    currentBatch.append(layer)
+                }
             }
-            let pass = MTLRenderPassDescriptor()
-            pass.colorAttachments[0].texture = target
-            pass.colorAttachments[0].loadAction = .clear
-            pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
-            pass.colorAttachments[0].storeAction = .store
-            guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
-                throw RendererError.textureAllocationFailed
+            if !currentBatch.isEmpty {
+                segments.append(.batch(currentBatch))
             }
-            encoder.setRenderPipelineState(fetch)
-            for item in prepared {
-                var uniforms = item.uniforms
-                encoder.setFragmentTexture(item.layerTexture, index: 1)
-                encoder.setFragmentTexture(item.depth ?? whiteMask, index: 2)
-                encoder.setFragmentBytes(&uniforms, length: MemoryLayout<LayerUniforms>.stride, index: 0)
-                encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+
+            try ensureAccumulation(width: target.width, height: target.height)
+            var source: MTLTexture? = nil
+            var nextIndex = 0
+
+            for (segIndex, segment) in segments.enumerated() {
+                let isLast = (segIndex == segments.count - 1)
+                let destination = isLast ? target : accumulation[nextIndex]
+
+                switch segment {
+                case .batch(let layers):
+                    var prepared: [PreparedLayer] = []
+                    for layer in layers {
+                        let drawn = evaluated.layers[layer.id]!
+                        let layerTexture = try applyEffects(
+                            to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize
+                        )
+                        prepared.append(PreparedLayer(
+                            layerTexture: layerTexture,
+                            uniforms: compositeUniforms(for: drawn.layer, drawn: drawn, input: input, targetSize: targetSize),
+                            depth: layer.depthFile.flatMap { maskTextures[$0] }
+                        ))
+                    }
+
+                    if let currentSource = source {
+                        if currentSource !== destination {
+                            guard let blit = commandBuffer.makeBlitCommandEncoder() else {
+                                throw RendererError.textureAllocationFailed
+                            }
+                            blit.copy(
+                                from: currentSource, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(),
+                                sourceSize: MTLSize(width: currentSource.width, height: currentSource.height, depth: 1),
+                                to: destination, destinationSlice: 0, destinationLevel: 0, destinationOrigin: MTLOrigin()
+                            )
+                            blit.endEncoding()
+                        }
+                    }
+
+                    let pass = MTLRenderPassDescriptor()
+                    pass.colorAttachments[0].texture = destination
+                    if source == nil {
+                        pass.colorAttachments[0].loadAction = .clear
+                        pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+                    } else {
+                        pass.colorAttachments[0].loadAction = .load
+                    }
+                    pass.colorAttachments[0].storeAction = .store
+                    guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
+                        throw RendererError.textureAllocationFailed
+                    }
+                    encoder.setRenderPipelineState(fetch)
+                    for item in prepared {
+                        var uniforms = item.uniforms
+                        encoder.setFragmentTexture(item.layerTexture, index: 1)
+                        encoder.setFragmentTexture(item.depth ?? whiteMask, index: 2)
+                        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<LayerUniforms>.stride, index: 0)
+                        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+                    }
+                    encoder.endEncoding()
+                    source = destination
+                    nextIndex = 1 - nextIndex
+
+                case .capture(let layer):
+                    let drawn = evaluated.layers[layer.id]!
+                    let uniforms = compositeUniforms(for: drawn.layer, drawn: drawn, input: input, targetSize: targetSize)
+                    let base = source ?? blackTexture
+                    let layerTexture = try applyEffects(
+                        to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize,
+                        canvasSource: base, compositeUniforms: uniforms
+                    )
+                    try compositePass(
+                        commandBuffer: commandBuffer, destination: destination, base: base,
+                        layerTexture: layerTexture, uniforms: uniforms, depth: layer.depthFile.flatMap { maskTextures[$0] }
+                    )
+                    source = destination
+                    nextIndex = 1 - nextIndex
+                }
             }
-            encoder.endEncoding()
+            if source == nil {
+                // No visible layers: clear target to black
+                let pass = MTLRenderPassDescriptor()
+                pass.colorAttachments[0].texture = target
+                pass.colorAttachments[0].loadAction = .clear
+                pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+                pass.colorAttachments[0].storeAction = .store
+                guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
+                    throw RendererError.textureAllocationFailed
+                }
+                encoder.endEncoding()
+            }
             return
         }
 
@@ -684,12 +772,12 @@ final class SceneRenderer {
         if layer.capturesCanvas {
             let width = max(Int((targetSize.x * effectResolutionScale).rounded()), 16)
             let height = max(Int((targetSize.y * effectResolutionScale).rounded()), 16)
-            let targets = try effectTextures(for: layer.id, width: width, height: height)
+            let capture = try captureTexture(for: layer.id, width: width, height: height)
             try capturePass(
-                commandBuffer: commandBuffer, destination: targets[1], base: canvasSource ?? blackTexture,
+                commandBuffer: commandBuffer, destination: capture, base: canvasSource ?? blackTexture,
                 uniforms: compositeUniforms ?? Self.passThroughUniforms
             )
-            source = targets[1]
+            source = capture
         } else if layer.kind == .particles, let particles = layer.particles {
             source = try renderParticles(
                 particles, layerID: layer.id, commandBuffer: commandBuffer, input: input, targetSize: targetSize
@@ -720,19 +808,28 @@ final class SceneRenderer {
         // distortions are smooth, and this pass is most of the GPU time.
         let width = layer.capturesCanvas ? source.width : max(min(Int(shown.x.rounded()), source.width), 16)
         let height = layer.capturesCanvas ? source.height : max(min(Int(shown.y.rounded()), source.height), 16)
-        let targets = try effectTextures(for: layer.id, width: width, height: height)
+
+        let standardEffectCount = effects.filter { graphRenderers[$0.id] == nil }.count
+        let layerTarget = standardEffectCount > 0 ? try effectLayerTexture(for: layer.id, width: width, height: height) : nil
+        let scratchTarget = standardEffectCount > 1 ? try effectScratchTexture(width: width, height: height) : nil
 
         let phase = loopPhase(input.time)
         let aspect = Float(source.width) / Float(max(source.height, 1))
         var current = source
-        for (index, effect) in effects.enumerated() {
+        var standardIndex = 0
+        let startsWithLayerTarget = (standardEffectCount % 2 != 0)
+
+        for effect in effects {
             if let graph = graphRenderers[effect.id] {
                 current = try graph.encode(input: current, images: graphResources[effect.id]!, time: input.time,
                                            cursor: input.cursor, values: effect.values, audio: input.audio,
                                            meshes: lastFrame?.meshes ?? [], commandBuffer: commandBuffer)
                 continue
             }
-            let destination = targets[index % 2]
+            let isLayerTarget = startsWithLayerTarget ? (standardIndex % 2 == 0) : (standardIndex % 2 != 0)
+            let destination = isLayerTarget ? layerTarget! : scratchTarget!
+            standardIndex += 1
+
             let override = paintOverride?.effectID == effect.id ? paintOverride : nil
             let mask = override?.target == .mask ? paintOverrideTexture : effect.maskFile.flatMap {
                 effect.kind == .opacityMask ? flowTextures[$0] : maskTextures[$0]
@@ -815,8 +912,8 @@ final class SceneRenderer {
         return result
     }
 
-    private func effectTextures(for layerID: UUID, width: Int, height: Int) throws -> [MTLTexture] {
-        if let existing = effectTargets[layerID], existing[0].width == width, existing[0].height == height {
+    private func effectLayerTexture(for layerID: UUID, width: Int, height: Int) throws -> MTLTexture {
+        if let existing = effectLayerTargets[layerID], existing.width == width, existing.height == height {
             return existing
         }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
@@ -824,13 +921,45 @@ final class SceneRenderer {
         )
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .private
-        guard let first = device.makeTexture(descriptor: descriptor),
-              let second = device.makeTexture(descriptor: descriptor)
-        else {
+        guard let texture = device.makeTexture(descriptor: descriptor) else {
             throw RendererError.textureAllocationFailed
         }
-        effectTargets[layerID] = [first, second]
-        return [first, second]
+        effectLayerTargets[layerID] = texture
+        return texture
+    }
+
+    private func effectScratchTexture(width: Int, height: Int) throws -> MTLTexture {
+        let key = SIMD2(width, height)
+        usedEffectScratchSizes.insert(key)
+        if let existing = effectScratchTargets[key] {
+            return existing
+        }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm, width: width, height: height, mipmapped: false
+        )
+        descriptor.usage = [.renderTarget, .shaderRead]
+        descriptor.storageMode = .private
+        guard let texture = device.makeTexture(descriptor: descriptor) else {
+            throw RendererError.textureAllocationFailed
+        }
+        effectScratchTargets[key] = texture
+        return texture
+    }
+
+    private func captureTexture(for layerID: UUID, width: Int, height: Int) throws -> MTLTexture {
+        if let existing = captureTargets[layerID], existing.width == width, existing.height == height {
+            return existing
+        }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm, width: width, height: height, mipmapped: false
+        )
+        descriptor.usage = [.renderTarget, .shaderRead]
+        descriptor.storageMode = .private
+        guard let texture = device.makeTexture(descriptor: descriptor) else {
+            throw RendererError.textureAllocationFailed
+        }
+        captureTargets[layerID] = texture
+        return texture
     }
 
     // MARK: - Particles
@@ -1292,7 +1421,8 @@ final class SceneRenderer {
         mediaArtworkID = ""
         mediaArtworkTextures = [:]
         let layerIDs = Set(document.layers.map(\.id))
-        effectTargets = effectTargets.filter { layerIDs.contains($0.key) }
+        effectLayerTargets = effectLayerTargets.filter { layerIDs.contains($0.key) }
+        captureTargets = captureTargets.filter { layerIDs.contains($0.key) }
         particleTargets = particleTargets.filter { layerIDs.contains($0.key) }
         var graphs: [UUID: SceneRenderGraph] = [:]
         for layer in document.layers {

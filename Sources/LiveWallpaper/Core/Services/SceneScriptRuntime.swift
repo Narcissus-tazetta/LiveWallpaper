@@ -73,17 +73,19 @@ final class SceneScriptRuntime {
 
     /// Stops the script after `perScript` seconds, or at `deadline` when that comes first.
     func evaluate(
-        _ script: SceneScript, input: Data, layers: [SceneLayer], rigs: [UUID: SceneSkeleton] = [:], perScript: TimeInterval, deadline: TimeInterval
+        _ script: SceneScript, input: Data, elapsedTime: Double? = nil, layers: [SceneLayer], rigs: [UUID: SceneSkeleton] = [:], perScript: TimeInterval, deadline: TimeInterval
     ) throws -> SceneScriptOutput {
         do {
-            if script.modules != nil,
-               let time = (try JSONSerialization.jsonObject(with: input) as? [String: Any])?["elapsedTime"] as? Double {
-                if let previous = programs[script.id]?.lastTime, time < previous {
-                    destroy(programs.removeValue(forKey: script.id)!.pointer, id: script.id,
-                            reason: "time went backwards", detail: "previous=\(previous) now=\(time)")
-                    try prepare(script)
+            if script.modules != nil {
+                let time = try elapsedTime ?? ((JSONSerialization.jsonObject(with: input) as? [String: Any])?["elapsedTime"] as? Double)
+                if let time {
+                    if let previous = programs[script.id]?.lastTime, time < previous {
+                        destroy(programs.removeValue(forKey: script.id)!.pointer, id: script.id,
+                                reason: "time went backwards", detail: "previous=\(previous) now=\(time)")
+                        try prepare(script)
+                    }
+                    programs[script.id]!.lastTime = time
                 }
-                programs[script.id]!.lastTime = time
             }
             let starting = script.modules != nil && !programs[script.id]!.hasStarted
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
@@ -92,8 +94,19 @@ final class SceneScriptRuntime {
             var error: UnsafeMutablePointer<CChar>?
             let otherMemory = programs.filter { $0.key != script.id }.values.reduce(0) { $0 + $1.memoryBytes }
             lwjs_set_memory_limit(programs[script.id]!.pointer, min(16 * 1024 * 1024, Self.maximumMemoryBytes - otherMemory))
-            let result = String(decoding: input, as: UTF8.self).withCString {
-                lwjs_evaluate(programs[script.id]!.pointer, $0, budget, &error)
+            let result: UnsafeMutablePointer<CChar>?
+            if input.last == 0 {
+                result = input.withUnsafeBytes { raw in
+                    guard let base = raw.baseAddress else { return nil }
+                    return lwjs_evaluate(programs[script.id]!.pointer, base.assumingMemoryBound(to: CChar.self), budget, &error)
+                }
+            } else {
+                var nullTerminated = input
+                nullTerminated.append(0)
+                result = nullTerminated.withUnsafeBytes { raw in
+                    guard let base = raw.baseAddress else { return nil }
+                    return lwjs_evaluate(programs[script.id]!.pointer, base.assumingMemoryBound(to: CChar.self), budget, &error)
+                }
             }
             programs[script.id]?.hasStarted = true
             if let error {
@@ -115,7 +128,9 @@ final class SceneScriptRuntime {
             defer { lwjs_free_string(result) }
             logs[script.id] = String(cString: lwjs_logs(programs[script.id]!.pointer))
             programs[script.id]!.memoryBytes = lwjs_memory_usage(programs[script.id]!.pointer)
-            var output = try JSONSerialization.jsonObject(with: Data(String(cString: result!).utf8))
+            let outputLength = strlen(result!)
+            let outputData = Data(bytesNoCopy: result!, count: outputLength, deallocator: .none)
+            var output = try JSONSerialization.jsonObject(with: outputData)
             var warnings: [String] = []
             var meshes: [SceneMeshFrame] = []
             // A module bundle runs several independent scripts; one that failed is
