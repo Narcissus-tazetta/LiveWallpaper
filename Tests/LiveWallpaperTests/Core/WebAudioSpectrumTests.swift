@@ -2,6 +2,41 @@ import XCTest
 @testable import LiveWallpaper
 
 final class WebAudioSpectrumTests: XCTestCase {
+    func testQuietTonesStayVisibleAcrossCaptureBlockSizes() {
+        let sampleRate = 48000.0
+        for (frequency, decibels) in [(100.0, -20.0), (1000.0, -40.0)] {
+            let amplitude = pow(10.0, decibels / 20)
+            let samples = (0 ..< 48000).map { index in
+                Float((32767 * amplitude * sin(2 * .pi * frequency * Double(index) / sampleRate)).rounded()) / 32768
+            }
+            for blockSize in [512, 1600, 2048] {
+                let spectrum = WebAudioSpectrum()
+                var outputs = 0
+                var hasDetectedTone = false
+                samples.withUnsafeBufferPointer { buffer in
+                    for start in stride(from: 0, to: samples.count, by: blockSize) {
+                        let values = spectrum.append(
+                            left: buffer.baseAddress!.advanced(by: start),
+                            right: buffer.baseAddress!.advanced(by: start),
+                            frames: min(blockSize, samples.count - start),
+                            stride: 1,
+                            sampleRate: sampleRate
+                        )
+                        if let values {
+                            let peak = values.max()!
+                            if peak > 0 { hasDetectedTone = true }
+                            if hasDetectedTone {
+                                outputs += 1
+                                XCTAssertGreaterThan(peak, 0, "\(frequency)Hz, \(blockSize) frames, offset \(start)")
+                            }
+                        }
+                    }
+                }
+                XCTAssertGreaterThan(outputs, 20)
+            }
+        }
+    }
+
     func testNativePipelineLeavesHighBandsEmpty() {
         let spectrum = WebAudioSpectrum()
         let sampleRate = 48000.0

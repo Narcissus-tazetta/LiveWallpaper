@@ -69,7 +69,7 @@ final class WebAudioSpectrum {
     }
 }
 
-/// Per-group auto gain and smoothing, matching native behavior.
+/// Per-group auto gain and smoothing with a hysteretic silence gate.
 /// Each channel's 64 bands are split into groups of 8; every group is divided by its own
 /// slowly tracked peak, so a quiet passage still moves the bars. Output is not clamped
 /// to 1: the original leaves that to the shader.
@@ -77,6 +77,10 @@ struct SpectrumLoudness {
     static let groupSize = 8
     private static let floor: Float = 0.001
     private static let silence: Float = 0.0001
+    private static let silenceRelease: Float = silence * 0.5
+    private static let silenceHold: Float = 0.1
+    private var isSilent = true
+    private var belowReleaseDuration: Float = 0
     private var peaks = [Float](repeating: 0, count: 16)
     private var smoothed = [Float](repeating: 0, count: 128)
     private var output = [Float](repeating: 0, count: 128)
@@ -86,7 +90,17 @@ struct SpectrumLoudness {
         let dt = min(elapsed, 1)
         var groupMax = (0 ..< 16).map { raw[$0 * Self.groupSize ..< ($0 + 1) * Self.groupSize].max()! }
         let loudest = groupMax.max()!
-        let isSilent = loudest < Self.silence
+        // The short DFT window can cross zero between capture blocks even during a
+        // steady tone. Closing immediately would bypass smoothing and blink the bars.
+        if loudest >= Self.silence {
+            isSilent = false
+            belowReleaseDuration = 0
+        } else if loudest < Self.silenceRelease {
+            belowReleaseDuration += dt
+            if belowReleaseDuration >= Self.silenceHold { isSilent = true }
+        } else {
+            belowReleaseDuration = 0
+        }
         // Without this floor a group with no energy would be amplified to full height by
         // its own tiny peak.
         for group in 0 ..< 16 { groupMax[group] = max(groupMax[group], loudest * 0.333) }
@@ -105,6 +119,7 @@ struct SpectrumLoudness {
         }
 
         guard !isSilent else {
+            smoothed = [Float](repeating: 0, count: 128)
             output = [Float](repeating: 0, count: 128)
             return output
         }

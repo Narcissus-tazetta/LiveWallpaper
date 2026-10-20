@@ -35,6 +35,40 @@ final class SpectrumLoudnessTests: XCTestCase {
         XCTAssertTrue(values.allSatisfy { $0 == 0 })
     }
 
+    func testQuietSoundDoesNotBlinkWhenCrossingTheSilenceThreshold() {
+        var loudness = SpectrumLoudness()
+        for frame in 0 ..< 120 {
+            let level: Float = frame % 3 == 0 ? 0.00015 : 0.00006
+            let values = loudness.process(spectrum(band: 10, level: level), elapsed: 1.0 / 30)
+            XCTAssertGreaterThan(values[10], 0, "frame \(frame)")
+        }
+    }
+
+    func testBriefQuietDipsDoNotMuteTheSpectrum() {
+        var loudness = SpectrumLoudness()
+        for frame in 0 ..< 120 {
+            let level: Float = frame % 3 == 0 ? 0.00015 : 0.000001
+            let values = loudness.process(spectrum(band: 10, level: level), elapsed: 1.0 / 30)
+            XCTAssertGreaterThan(values[10], 0, "frame \(frame)")
+        }
+    }
+
+    func testSustainedSilenceClearsTheSpectrumAndItsSmoothingHistory() {
+        var loudness = SpectrumLoudness()
+        for _ in 0 ..< 120 {
+            _ = loudness.process(spectrum(band: 10, level: 0.02), elapsed: 1.0 / 30)
+        }
+        var values = [Float]()
+        for _ in 0 ..< 4 {
+            values = loudness.process(spectrum(band: 10, level: 0.00004), elapsed: 1.0 / 30)
+        }
+        XCTAssertTrue(values.allSatisfy { $0 == 0 })
+
+        values = loudness.process(spectrum(band: 20, level: 0.02), elapsed: 1.0 / 30)
+        XCTAssertEqual(values[10], 0)
+        XCTAssertGreaterThan(values[20], 0)
+    }
+
     func testRiseIsLimitedPerFrame() {
         var loudness = SpectrumLoudness()
         let values = loudness.process(spectrum(band: 3, level: 0.5), elapsed: 1.0 / 30)
