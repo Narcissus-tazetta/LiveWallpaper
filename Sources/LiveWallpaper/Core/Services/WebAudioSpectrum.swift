@@ -73,14 +73,21 @@ final class WebAudioSpectrum {
 /// Each channel's 64 bands are split into groups of 8; every group is divided by its own
 /// slowly tracked peak, so a quiet passage still moves the bars. Output is not clamped
 /// to 1: the original leaves that to the shader.
+/// Sources quieter than `referenceLevel` are first raised by a slowly releasing input gain:
+/// the per-group divisor below is floored at `floor`, which otherwise caps the bars of a
+/// source whose raw band values sit under it (e.g. a player at low volume).
 struct SpectrumLoudness {
     static let groupSize = 8
     private static let floor: Float = 0.001
     private static let silence: Float = 0.0001
     private static let silenceRelease: Float = silence * 0.5
     private static let silenceHold: Float = 0.1
+    private static let referenceLevel: Float = 0.002
+    private static let maxInputGain: Float = 100
+    private static let levelHalfLife: Float = 4
     private var isSilent = true
     private var belowReleaseDuration: Float = 0
+    private var level: Float = 0
     private var peaks = [Float](repeating: 0, count: 16)
     private var smoothed = [Float](repeating: 0, count: 128)
     private var output = [Float](repeating: 0, count: 128)
@@ -88,8 +95,13 @@ struct SpectrumLoudness {
     /// `raw` is 64 left bands then 64 right bands; `elapsed` is the time since the last call.
     mutating func process(_ raw: [Float], elapsed: Float) -> [Float] {
         let dt = min(elapsed, 1)
-        var groupMax = (0 ..< 16).map { raw[$0 * Self.groupSize ..< ($0 + 1) * Self.groupSize].max()! }
-        let loudest = groupMax.max()!
+        let loudest = raw.max()!
+        // Attack is instant so a loud onset after a quiet passage is never over-amplified.
+        level = max(loudest, level * pow(0.5, dt / Self.levelHalfLife))
+        let gain = level > 0 ? min(max(Self.referenceLevel / level, 1), Self.maxInputGain) : 1
+        let boosted = gain > 1 ? raw.map { $0 * gain } : raw
+        var groupMax = (0 ..< 16).map { boosted[$0 * Self.groupSize ..< ($0 + 1) * Self.groupSize].max()! }
+        let boostedLoudest = groupMax.max()!
         // The short DFT window can cross zero between capture blocks even during a
         // steady tone. Closing immediately would bypass smoothing and blink the bars.
         if loudest >= Self.silence {
@@ -103,7 +115,7 @@ struct SpectrumLoudness {
         }
         // Without this floor a group with no energy would be amplified to full height by
         // its own tiny peak.
-        for group in 0 ..< 16 { groupMax[group] = max(groupMax[group], loudest * 0.333) }
+        for group in 0 ..< 16 { groupMax[group] = max(groupMax[group], boostedLoudest * 0.333) }
 
         if peaks[0] <= Self.silence, !isSilent {
             peaks = [Float](repeating: 1, count: 16)
@@ -127,7 +139,7 @@ struct SpectrumLoudness {
         let rise = dt * 40
         let fall = max(-1, dt * -40)
         for index in 0 ..< 128 {
-            let target = raw[index] / max(peaks[index / Self.groupSize], Self.floor)
+            let target = boosted[index] / max(peaks[index / Self.groupSize], Self.floor)
             smoothed[index] += (target - smoothed[index]) * blend
             let change = smoothed[index] - output[index]
             output[index] += change > 0 ? min(change, rise) : max(change, fall)

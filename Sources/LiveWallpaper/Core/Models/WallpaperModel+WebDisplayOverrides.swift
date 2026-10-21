@@ -6,7 +6,8 @@ import AppKit
 ///
 /// 割り切り:
 /// - 固定した画面の Web 壁紙は消音(音は共有の壁紙だけ)。
-/// - 共有が Web 壁紙のとき、別の画面を動画に固定することはできない。
+/// - 共有が Web 壁紙のとき、動画に固定した画面は専用プレイヤーでその動画を出す
+///   (動画の画面は消音・Space 別壁紙は無効)。
 /// - 再生キュー・自動切り替え・Space 別壁紙の対象外。
 @MainActor
 extension WallpaperModel {
@@ -130,7 +131,8 @@ extension WallpaperModel {
     func loadWebDisplays(force: Bool = false) {
         let entries = webDisplayEntries
         guard !entries.isEmpty else {
-            webWallpaperLoadState = .loading
+            // 共有が Web でも全画面が動画に固定されていれば、読み込む Web は無い。
+            webWallpaperLoadState = isWebWallpaperActive && !windows.isEmpty ? .loaded : .loading
             return
         }
 

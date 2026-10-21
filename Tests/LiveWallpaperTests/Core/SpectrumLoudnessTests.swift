@@ -22,6 +22,11 @@ final class SpectrumLoudnessTests: XCTestCase {
         XCTAssertGreaterThan(quiet[10], 0.8)
     }
 
+    func testSourceBelowTheDivisorFloorStillReachesFullHeight() {
+        let quiet = settle(spectrum(band: 10, level: 0.0003), frames: 300)
+        XCTAssertGreaterThan(quiet[10], 0.8)
+    }
+
     func testQuietChannelIsOnlyRaisedToAThirdOfTheLoudestGroup() {
         var raw = spectrum(band: 10, level: 0.5)
         raw[64 + 10] = 0.05

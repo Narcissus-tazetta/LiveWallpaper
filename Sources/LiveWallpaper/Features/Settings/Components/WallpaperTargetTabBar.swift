@@ -182,7 +182,7 @@ extension SettingsView {
         let tint = targetTint(for: target)
         let showsDisplayPicker =
             target == .desktop
-            && (model.availableDisplayScreens().count > 1 || showsSpaceScopeOptions)
+            && (model.availableDisplayScreens().count > 1 || showsSpaceScopeOptions || model.hasPinOnConnectedScreen)
 
         // カード全体を1つの Button にするとシェブロンのメニューと当たり判定が
         // 競合するため、本体(選択)とシェブロン(画面切り替え)を別コントロール
@@ -309,6 +309,9 @@ extension SettingsView {
         switch target {
         case .desktop:
             if let screenID = resolvedDisplayOverrideScreenID {
+                if let source = model.webOverrideSource(forScreenID: screenID) {
+                    return source.displayName
+                }
                 guard let path = model.videoOverride(forScreenID: screenID) else {
                     return model.localizedString("未設定")
                 }
@@ -367,14 +370,25 @@ extension SettingsView {
     @ViewBuilder
     private func displayOverrideWallpaperPreview(forScreenID screenID: String) -> some View {
         let path = model.videoOverride(forScreenID: screenID)
-        wallpaperPreviewThumbnail(
-            image: path.flatMap { thumbnailCache.image(for: $0) },
-            region: path.map { screenRegion(path: $0, screenID: screenID) },
-            accessibilityLabel: model.localizedString("現在の壁紙プレビュー")
-        )
-        .onAppear {
-            if let path {
-                requestWallpaperThumbnail(path: path)
+        if let source = model.webOverrideSource(forScreenID: screenID) {
+            WebWallpaperThumbnailView(
+                source: source,
+                isActive: true,
+                thumbnailStore: webThumbnailStore,
+                width: 72,
+                height: 40
+            )
+            .accessibilityLabel(model.localizedString("現在の壁紙プレビュー"))
+        } else {
+            wallpaperPreviewThumbnail(
+                image: path.flatMap { thumbnailCache.image(for: $0) },
+                region: path.map { screenRegion(path: $0, screenID: screenID) },
+                accessibilityLabel: model.localizedString("現在の壁紙プレビュー")
+            )
+            .onAppear {
+                if let path {
+                    requestWallpaperThumbnail(path: path)
+                }
             }
         }
     }

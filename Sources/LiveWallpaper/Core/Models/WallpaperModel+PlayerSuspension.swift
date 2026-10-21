@@ -8,12 +8,13 @@ import AVFoundation
 extension WallpaperModel {
     func applySuspensionStateToPlayers() {
         applyWebSuspensionState()
+        // オーバーライド画面の専用プレイヤーは独立に処理し、以降の共有プレイヤー
+        // ロジック(フリーズフレーム・deep suspend)は残りの画面だけを対象にする。
+        // 共有が Web のときも、動画に固定した画面の専用プレイヤーは動かす。
+        applyDedicatedSuspensionState()
         if isWebWallpaperActive {
             return
         }
-        // オーバーライド画面の専用プレイヤーは独立に処理し、以降の共有プレイヤー
-        // ロジック(フリーズフレーム・deep suspend)は残りの画面だけを対象にする。
-        applyDedicatedSuspensionState()
         guard let player = sharedPlayer else {
             return
         }

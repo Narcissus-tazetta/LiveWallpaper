@@ -215,9 +215,7 @@ extension WallpaperModel {
     func shouldRefreshWindowsForActiveSpace() -> Bool {
         let screens = targetScreens()
         if windows.count != screens.count
-            || (isWebWallpaperActive
-                ? webPlayerViews.count != screens.count
-                : playerViews.count != screens.count)
+            || playerViews.count != screens.count
         {
             return true
         }

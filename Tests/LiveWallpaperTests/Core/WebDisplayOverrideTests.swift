@@ -104,4 +104,17 @@ final class WebDisplayOverrideTests: XCTestCase {
 
         XCTAssertEqual(relaunched.webSource(forScreenID: "screen-2")?.id, source.id)
     }
+
+    func testVideoPinStaysDedicatedWhileSharedWallpaperIsWeb() {
+        let (model, source) = makeModel()
+        model.setVideoOverride(path: videoURL.path, forScreenID: "screen-2")
+        model.currentWebWallpaperID = source.id
+        model.wallpaperKind = .web
+
+        XCTAssertTrue(model.isWebWallpaperActive)
+        XCTAssertEqual(model.resolvedOverridePath(forScreenID: "screen-2"), videoURL.path)
+        XCTAssertFalse(model.isSharedPlayerDisplay("screen-2"))
+        XCTAssertNil(model.resolvedOverridePath(forScreenID: "screen-1"))
+        XCTAssertEqual(model.webSource(forScreenID: "screen-1")?.id, source.id)
+    }
 }

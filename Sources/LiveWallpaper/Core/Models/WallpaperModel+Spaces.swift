@@ -38,8 +38,10 @@ extension WallpaperModel {
     /// writes state that outlives this run (the screen saver's config, assignments made
     /// from "the wallpaper on screen") must read this one.
     func resolvedSavedOverridePath(forScreenID screenID: String) -> String? {
+        // Space 別の壁紙は共有が Web のとき無効(applyActiveSpaceChange も同じ扱い)。
         if spaceWallpaperFeatureEnabled,
            isSpaceWallpaperAvailable,
+           !isWebWallpaperActive,
            let spaceUUID = currentSpaceUUIDByDisplayID[screenID],
            let path = videoBySpaceUUID[spaceUUID],
            FileManager.default.fileExists(atPath: path)
@@ -398,7 +400,11 @@ extension WallpaperModel {
     /// An external wallpaper is left out: assigning it would save a file that is only
     /// lent while its provider runs.
     var currentlyVisiblePathForMainDisplay: String? {
-        resolvedSavedOverridePath(forScreenID: displayIDString(for: NSScreen.main)) ?? currentVideoPath
+        let screenID = displayIDString(for: NSScreen.main)
+        if hasWebOverride(forScreenID: screenID) {
+            return nil
+        }
+        return resolvedSavedOverridePath(forScreenID: screenID) ?? currentVideoPath
     }
 
     /// UI表示用: uuid → 「デスクトップN」の N。

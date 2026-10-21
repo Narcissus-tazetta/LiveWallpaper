@@ -23,6 +23,14 @@ extension WallpaperModel {
         }
     }
 
+    /// いまつながっている画面のどれかに、動画かWebの固定が残っているか。画面が1つに
+    /// 減っても固定は有効なので、スコープ切り替えを隠して解除手段を失わないために使う。
+    var hasPinOnConnectedScreen: Bool {
+        availableDisplayScreens().contains {
+            videoOverrideByScreenID[$0.id] != nil || webOverrideByScreenID[$0.id] != nil
+        }
+    }
+
     func videoOverride(forScreenID screenID: String) -> String? {
         videoOverrideByScreenID[screenID]
     }
@@ -73,6 +81,10 @@ extension WallpaperModel {
             }
         }
         persistVideoOverrides()
+        if isWebWallpaperActive {
+            // 共有が Web のときは、固定の付け外しでウィンドウの中身(動画/Web)が入れ替わる。
+            scheduleWindowRebuild(delay: 0.05)
+        }
         // 共有側の attach ループとオーバーライド側の処理が両方ここで走り、
         // 対象画面のビューに期待されるプレイヤーが付け替わる。
         applySuspensionStateToPlayers()
@@ -127,7 +139,8 @@ extension WallpaperModel {
         }
         persistScreenPlaylists()
 
-        guard autoAssignFirstVideo else {
+        // Web 壁紙を固定した画面には、動画を勝手に割り当てて固定を外さない。
+        guard autoAssignFirstVideo, !hasWebOverride(forScreenID: screenID) else {
             return
         }
         // 現在の割り当て動画が新しいスコープに含まれなければ、先頭の動画へ切り替える。

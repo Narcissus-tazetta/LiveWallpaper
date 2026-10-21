@@ -17,6 +17,7 @@
 "壁紙の表示先" = "Show wallpaper on";
 "メインのみ" = "Main display only";
 "全ディスプレイ" = "All displays";
+"メインのみの設定のため、ほかのディスプレイには壁紙が表示されません。「全ディスプレイ」にすると表示されます" = "Set to Main display only, so other displays show no wallpaper. Choose All displays to show it there.";
 "動画のフィット" = "Video fit";
 "拡大" = "Fill";
 "全体" = "Fit";
@@ -390,7 +391,7 @@
 "ダーク" = "Dark";
 "共通" = "Common";
 "壁紙を選択" = "Choose wallpaper";
-"Web壁紙は共有スコープのみで選択できます" = "Web wallpapers can only be selected for the shared scope";
+"Web壁紙は共有と画面のスコープでのみ選択できます" = "Web wallpapers can only be selected for the shared and display scopes";
 "毎日" = "Every day";
 "適用中" = "Active now";
 "複製" = "Duplicate";

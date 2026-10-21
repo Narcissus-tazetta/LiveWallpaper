@@ -162,35 +162,9 @@ extension WallpaperModel {
                 nextPlayerViews.append(PlayerView(frame: CGRect(origin: .zero, size: screen.frame.size)))
                 continue
             }
-            let playerView: PlayerView = {
-                if let existing = window.contentView as? PlayerView {
-                    return existing
-                }
-                let view = PlayerView(frame: CGRect(origin: .zero, size: screen.frame.size))
-                view.autoresizingMask = [.width, .height]
-                return view
-            }()
-
-            applyWindowOptions(window)
-            window.ignoresMouseEvents = clickThrough
-            if window.frame != screen.frame {
-                window.setFrame(screen.frame, display: true)
-            }
-            applyPlayerPresentation(to: playerView, screen: screen)
-            playerView.setHighDynamicRange(effectiveHDRDisplay)
-            // オーバーライド画面への専用プレイヤーの付け替えは、この後の
-            // applySuspensionStateToPlayers に任せる。
-            if isSharedPlayerDisplay(displayID),
-               playerView.player !== player
-            {
-                playerView.player = player
-            }
-            if window.contentView !== playerView {
-                (window.contentView as? WebPlayerView)?.tearDown()
-                window.backgroundColor = .clear
-                window.isOpaque = false
-                window.contentView = playerView
-            }
+            let playerView = installPlayerView(
+                in: window, screen: screen, displayID: displayID, sharedPlayer: player
+            )
             if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedWindow != nil) {
                 reassertWallpaperOrdering(window)
             }
@@ -218,8 +192,11 @@ extension WallpaperModel {
     }
 
     private func rebuildWebWindows() {
-        // Web壁紙は全画面を置き換えるため、専用プレイヤーは全て解放する。
-        stopAllDedicatedPlayers()
+        // 共有の Web 壁紙に従う画面の専用プレイヤーだけを解放する。動画に固定した画面は
+        // 共有が Web でもその動画を出すため、専用プレイヤーを残す。
+        for screenID in Array(dedicatedSlotsByScreenID.keys) where resolvedOverridePath(forScreenID: screenID) == nil {
+            evictAllDedicatedSlots(forScreenID: screenID)
+        }
         let screens: [NSScreen] = targetScreens()
 
         var reusableByDisplayID: [String: NSWindow] = [:]
@@ -231,13 +208,25 @@ extension WallpaperModel {
         }
 
         var nextWindows: [NSWindow] = []
+        var nextPlayerViews: [PlayerView] = []
         var reusedWindowIDs: Set<ObjectIdentifier> = []
 
         for screen in screens {
             let displayID = displayIDString(for: screen)
             let reusedWindow = reusableByDisplayID[displayID]
-            let window = reusedWindow ?? makeBorderlessWallpaperWindow(for: screen, opaqueBackground: true)
-            installWebView(in: window, screen: screen)
+            let isVideoPinned = resolvedOverridePath(forScreenID: displayID) != nil
+            let window = reusedWindow
+                ?? makeBorderlessWallpaperWindow(for: screen, opaqueBackground: !isVideoPinned)
+            if isVideoPinned {
+                nextPlayerViews.append(
+                    installPlayerView(in: window, screen: screen, displayID: displayID, sharedPlayer: nil)
+                )
+            } else {
+                installWebView(in: window, screen: screen)
+                // playerViews は windows と添字を揃える前提のコードが多いため、ウィンドウに
+                // 載せない空の PlayerView を置く。
+                nextPlayerViews.append(PlayerView(frame: CGRect(origin: .zero, size: screen.frame.size)))
+            }
             if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedWindow != nil) {
                 reassertWallpaperOrdering(window)
             }
@@ -251,14 +240,51 @@ extension WallpaperModel {
         retireObsoleteWindows(obsoleteWindows)
 
         windows = nextWindows
-        playerViews = []
+        playerViews = nextPlayerViews
 
+        pruneDedicatedPlayers(activeDisplayIDs: Set(screens.map { displayIDString(for: $0) }))
         syncSuspendedDisplays(for: screens)
-        applyWebSuspensionState()
+        applySuspensionStateToPlayers()
 
         lastScreenSignatures = screenSignatures(for: screens)
 
         loadWebDisplays()
+    }
+
+    /// 画面のウィンドウに動画用の PlayerView を載せる(あれば再利用)。
+    /// 固定した画面への専用プレイヤーの付け替えは、この後の applySuspensionStateToPlayers に任せる。
+    private func installPlayerView(
+        in window: NSWindow,
+        screen: NSScreen,
+        displayID: String,
+        sharedPlayer: AVQueuePlayer?
+    ) -> PlayerView {
+        let playerView: PlayerView = {
+            if let existing = window.contentView as? PlayerView {
+                return existing
+            }
+            let view = PlayerView(frame: CGRect(origin: .zero, size: screen.frame.size))
+            view.autoresizingMask = [.width, .height]
+            return view
+        }()
+
+        applyWindowOptions(window)
+        window.ignoresMouseEvents = clickThrough
+        if window.frame != screen.frame {
+            window.setFrame(screen.frame, display: true)
+        }
+        applyPlayerPresentation(to: playerView, screen: screen)
+        playerView.setHighDynamicRange(effectiveHDRDisplay)
+        if let sharedPlayer, isSharedPlayerDisplay(displayID), playerView.player !== sharedPlayer {
+            playerView.player = sharedPlayer
+        }
+        if window.contentView !== playerView {
+            (window.contentView as? WebPlayerView)?.tearDown()
+            window.backgroundColor = .clear
+            window.isOpaque = false
+            window.contentView = playerView
+        }
+        return playerView
     }
 
     /// 画面のウィンドウに Web ビューを載せる(あれば再利用)。

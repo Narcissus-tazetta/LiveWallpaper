@@ -17,6 +17,7 @@
 "壁紙の表示先" = "Mostrar el fondo en";
 "メインのみ" = "Solo la pantalla principal";
 "全ディスプレイ" = "Todas las pantallas";
+"メインのみの設定のため、ほかのディスプレイには壁紙が表示されません。「全ディスプレイ」にすると表示されます" = "Está en «Solo la pantalla principal», así que las demás pantallas no muestran el fondo. Elige «Todas las pantallas» para mostrarlo.";
 "動画のフィット" = "Ajuste del vídeo";
 "拡大" = "Rellenar";
 "全体" = "Ajustar";
@@ -390,7 +391,7 @@
 "ダーク" = "Oscuro";
 "共通" = "Común";
 "壁紙を選択" = "Elegir fondo de pantalla";
-"Web壁紙は共有スコープのみで選択できます" = "Los fondos web solo pueden elegirse para el ámbito compartido";
+"Web壁紙は共有と画面のスコープでのみ選択できます" = "Los fondos web solo pueden elegirse para el ámbito compartido y para una pantalla";
 "毎日" = "Todos los días";
 "適用中" = "En uso";
 "複製" = "Duplicar";

@@ -259,7 +259,7 @@ extension WallpaperModel {
     }
 
     private var hasActiveWallpaperPlayback: Bool {
-        isWebWallpaperActive || currentVideoPath != nil
+        hasWebDisplay || currentVideoPath != nil || hasAnyDedicatedOverride
     }
 
     /// The current frontmost app, unless it's this app itself, Finder, or on the

@@ -531,7 +531,7 @@ extension WallpaperModel {
     /// オーバーライド画面の専用プレイヤーの再生/停止をビューへ反映する。
     /// 共有プレイヤー側のフリーズフレーム・deep suspend 機構とは独立して動く。
     func applyDedicatedSuspensionState() {
-        guard hasAnyDedicatedOverride, !isWebWallpaperActive else {
+        guard hasAnyDedicatedOverride else {
             return
         }
         var viewsAwaitingFirstFrame: [PlayerView] = []

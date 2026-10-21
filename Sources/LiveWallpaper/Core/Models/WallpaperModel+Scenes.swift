@@ -948,8 +948,8 @@ extension WallpaperModel {
         }
         for view in playerViews {
             guard let window = view.window, let displayID = displayIDByWindow[ObjectIdentifier(window)],
-                  !isWebWallpaperActive,
-                  let path = resolvedOverridePath(forScreenID: displayID) ?? currentVideoPath,
+                  let path = resolvedOverridePath(forScreenID: displayID)
+                  ?? (isWebWallpaperActive ? nil : currentVideoPath),
                   let document = sceneDocumentsByPath[path]
             else {
                 view.hideScene()

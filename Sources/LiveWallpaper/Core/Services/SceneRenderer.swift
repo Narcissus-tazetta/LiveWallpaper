@@ -1439,11 +1439,18 @@ final class SceneRenderer {
         graphResources = [:]
         for (id, graph) in graphs {
             var resources: [String: MTLTexture] = [:]
+            // A particle sprite's alpha is its soft edge. Dropping it (as other straight images
+            // do) fills the whole quad with opaque black around the glow.
+            let spriteFiles = Set(
+                graph.passes.compactMap { $0.draw?.dynamic }.flatMap(\.materials.values).flatMap { $0 }
+                    .compactMap { graph.images[$0.source] }
+            )
             for file in Set(graph.images.values) {
                 let straight = graph.straightAlphaImages == true
-                let key = "\(straight ? "straight" : "premultiplied"):\(file)"
-                let texture = try graphTextures[key] ?? Self.cachedTexture(url: fileURL(file), variant: "graph-\(straight)") { url in
-                    try Self.decodeRGBA(url: url, device: device, premultiplied: !straight)
+                let alpha: ImageAlpha = !straight ? .premultiplied : spriteFiles.contains(file) ? .straightKept : .straightDropped
+                let key = "\(alpha):\(file)"
+                let texture = try graphTextures[key] ?? Self.cachedTexture(url: fileURL(file), variant: "graph-\(alpha)") { url in
+                    try Self.decodeRGBA(url: url, device: device, alpha: alpha)
                 }
                 retainedGraphTextures[key] = texture
                 resources[file] = texture
@@ -1488,7 +1495,7 @@ final class SceneRenderer {
         flowTextures = flowTextures.filter { flows.contains($0.key) }
         for file in flows where flowTextures[file] == nil {
             flowTextures[file] = try Self.cachedTexture(url: fileURL(file), variant: "flow") { url in
-                try Self.decodeRGBA(url: url, device: device, premultiplied: false)
+                try Self.decodeRGBA(url: url, device: device, alpha: .straightDropped)
             }
         }
     }
@@ -1528,12 +1535,14 @@ final class SceneRenderer {
     /// Decodes into sRGB RGBA8 so the shader knows exactly what it samples, whatever
     /// the file's color space or alpha layout. Flow maps are data: an sRGB file read
     /// into an sRGB context comes back unchanged, and they are never premultiplied.
-    private static func decodeRGBA(url: URL, device: MTLDevice, premultiplied: Bool = true) throws -> MTLTexture {
+    private enum ImageAlpha { case premultiplied, straightDropped, straightKept }
+
+    private static func decodeRGBA(url: URL, device: MTLDevice, alpha mode: ImageAlpha = .premultiplied) throws -> MTLTexture {
         let image = try decodeImage(url: url)
         let width = image.width
         let height = image.height
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
-        let alpha: CGImageAlphaInfo = premultiplied ? .premultipliedLast : .noneSkipLast
+        let alpha: CGImageAlphaInfo = mode == .straightDropped ? .noneSkipLast : .premultipliedLast
         let drew: Bool = bytes.withUnsafeMutableBytes { buffer in
             guard let context = CGContext(
                 data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
@@ -1547,6 +1556,14 @@ final class SceneRenderer {
         }
         guard drew else {
             throw RendererError.imageDecodeFailed(url.lastPathComponent)
+        }
+        if mode == .straightKept {
+            for pixel in stride(from: 0, to: bytes.count, by: 4) where bytes[pixel + 3] != 0 && bytes[pixel + 3] != 255 {
+                let a = Int(bytes[pixel + 3])
+                for channel in 0 ..< 3 {
+                    bytes[pixel + channel] = UInt8(min(255, (Int(bytes[pixel + channel]) * 255 + a / 2) / a))
+                }
+            }
         }
         return try makeTexture(device: device, pixelFormat: .rgba8Unorm, width: width, height: height, bytes: bytes)
     }

@@ -185,15 +185,25 @@ extension WallpaperModel {
                 return true
             }
         case .display:
-            // Web壁紙にはディスプレイ別/Space別の割り当て機構自体が存在しないため、
-            // ここに到達するのは常に video ターゲット(UI側でも制限済み)。
-            guard target.kind == .video, let path = target.videoPath, !path.isEmpty,
-                  FileManager.default.fileExists(atPath: path),
-                  let screenID = scope.identifier
-            else {
+            guard let screenID = scope.identifier else {
                 return false
             }
-            setVideoOverride(path: path, forScreenID: screenID)
+            switch target.kind {
+            case .video:
+                guard let path = target.videoPath, !path.isEmpty,
+                      FileManager.default.fileExists(atPath: path)
+                else {
+                    return false
+                }
+                setVideoOverride(path: path, forScreenID: screenID)
+            case .web:
+                guard let id = target.webWallpaperID,
+                      webWallpaperSources.contains(where: { $0.id == id })
+                else {
+                    return false
+                }
+                setWebOverride(id: id, forScreenID: screenID)
+            }
             return true
         case .space:
             guard target.kind == .video, let path = target.videoPath, !path.isEmpty,
@@ -218,7 +228,12 @@ extension WallpaperModel {
             guard let screenID = scope.identifier else {
                 return
             }
-            setVideoOverride(path: nil, forScreenID: screenID)
+            // 適用したのが Web 壁紙なら、その画面の Web の固定を外す。
+            if lastScheduleAppliedTarget[scope]?.kind == .web {
+                setWebOverride(id: nil, forScreenID: screenID)
+            } else {
+                setVideoOverride(path: nil, forScreenID: screenID)
+            }
         case .space:
             guard let spaceUUID = scope.identifier else {
                 return

@@ -17,6 +17,7 @@
 "壁紙の表示先" = "Hiển thị hình nền trên";
 "メインのみ" = "Chỉ màn hình chính";
 "全ディスプレイ" = "Tất cả màn hình";
+"メインのみの設定のため、ほかのディスプレイには壁紙が表示されません。「全ディスプレイ」にすると表示されます" = "Đang chọn “Chỉ màn hình chính” nên các màn hình khác không hiển thị hình nền. Chọn “Tất cả màn hình” để hiển thị.";
 "動画のフィット" = "Khớp video";
 "拡大" = "Lấp đầy";
 "全体" = "Vừa khít";
@@ -390,7 +391,7 @@
 "ダーク" = "Tối";
 "共通" = "Chung";
 "壁紙を選択" = "Chọn hình nền";
-"Web壁紙は共有スコープのみで選択できます" = "Chỉ có thể chọn hình nền web cho phạm vi dùng chung";
+"Web壁紙は共有と画面のスコープでのみ選択できます" = "Chỉ có thể chọn hình nền web cho phạm vi dùng chung và phạm vi màn hình";
 "毎日" = "Hằng ngày";
 "適用中" = "Đang áp dụng";
 "複製" = "Nhân bản";

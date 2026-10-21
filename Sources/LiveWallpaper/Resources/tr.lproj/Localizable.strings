@@ -17,6 +17,7 @@
 "壁紙の表示先" = "Duvar kâğıdının gösterileceği yer";
 "メインのみ" = "Yalnızca ana ekran";
 "全ディスプレイ" = "Tüm ekranlar";
+"メインのみの設定のため、ほかのディスプレイには壁紙が表示されません。「全ディスプレイ」にすると表示されます" = "“Yalnızca ana ekran” seçili olduğundan diğer ekranlarda duvar kâğıdı görünmez. Görünmesi için “Tüm ekranlar”ı seçin.";
 "動画のフィット" = "Video sığdırma";
 "拡大" = "Doldur";
 "全体" = "Sığdır";
@@ -390,7 +391,7 @@
 "ダーク" = "Koyu";
 "共通" = "Ortak";
 "壁紙を選択" = "Duvar Kâğıdı Seç";
-"Web壁紙は共有スコープのみで選択できます" = "Web duvar kâğıtları yalnızca paylaşılan kapsam için seçilebilir";
+"Web壁紙は共有と画面のスコープでのみ選択できます" = "Web duvar kâğıtları yalnızca paylaşılan kapsam ve ekran kapsamı için seçilebilir";
 "毎日" = "Her gün";
 "適用中" = "Etkin";
 "複製" = "Çoğalt";

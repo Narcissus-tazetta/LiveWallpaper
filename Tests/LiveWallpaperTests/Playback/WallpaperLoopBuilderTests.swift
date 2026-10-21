@@ -214,8 +214,9 @@ final class WallpaperLoopBuilderTests: XCTestCase {
         let dir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/LiveWallpaper/Videos")
         let files =
-            (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil))
-                ?? []
+            (try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+            )) ?? []
         return files.first { ["mp4", "mov"].contains($0.pathExtension.lowercased()) }
     }
 

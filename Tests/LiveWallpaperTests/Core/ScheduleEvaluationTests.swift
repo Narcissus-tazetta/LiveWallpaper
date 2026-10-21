@@ -64,6 +64,29 @@ final class ScheduleEvaluationTests: XCTestCase {
         )
     }
 
+    func testDisplayScopedRuleCanPinAWebWallpaperAndReleasesIt() {
+        let model = WallpaperModel()
+        let source = WebWallpaperSource(url: URL(string: "https://example.com/a")!)
+        model.webWallpaperFeatureEnabled = true
+        model.webWallpaperSources = [source]
+        model.scheduleAppearanceProvider = { .light }
+        let scope = ScheduleScope(kind: .display, identifier: "screen-2")
+        let rule = ScheduleRule(
+            id: UUID(), name: "r", isEnabled: true, origin: .advanced,
+            weekdays: Set(1 ... 7), timeRange: nil, appearance: .any,
+            scope: scope, target: .web(source.id)
+        )
+        model.scheduleRules = [rule]
+
+        model.scheduleNowProvider = { self.date(2026, 7, 13, 12, 0) }
+        model.evaluateSchedule(trigger: .ruleListChanged)
+        XCTAssertEqual(model.webOverrideByScreenID["screen-2"], source.id)
+
+        model.scheduleRules = []
+        model.evaluateSchedule(trigger: .ruleListChanged)
+        XCTAssertNil(model.webOverrideByScreenID["screen-2"])
+    }
+
     private func range(_ sh: Int, _ sm: Int, _ eh: Int, _ em: Int) -> ScheduleTimeRange {
         ScheduleTimeRange(
             start: ScheduleTimeOfDay(hour: sh, minute: sm),

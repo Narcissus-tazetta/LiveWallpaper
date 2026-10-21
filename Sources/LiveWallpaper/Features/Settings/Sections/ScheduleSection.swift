@@ -316,9 +316,9 @@ extension SettingsView {
                 scheduleTargetPickerButton(ruleID: id, target: rule.target)
             }
 
-            if rule.scope != .shared, rule.target.kind == .web {
+            if rule.scope.kind == .space, rule.target.kind == .web {
                 settingsFootnote(
-                    model.localizedString("Web壁紙は共有スコープのみで選択できます"), color: .orange
+                    model.localizedString("Web壁紙は共有と画面のスコープでのみ選択できます"), color: .orange
                 )
             }
 
@@ -581,9 +581,9 @@ extension SettingsView {
             set: { newScope in
                 var rule = ruleBinding.wrappedValue
                 rule.scope = newScope
-                // Web壁紙には共有スコープ以外の割り当て機構が存在しないため、
-                // スコープを共有以外に変えたらターゲットを一旦動画へ戻す。
-                if newScope != .shared, rule.target.kind == .web {
+                // Web壁紙は Space 別には割り当てられないため、スコープを Space に
+                // 変えたらターゲットを一旦動画へ戻す。
+                if newScope.kind == .space, rule.target.kind == .web {
                     rule.target = .video(model.libraryVideoPaths.first ?? "")
                 }
                 model.updateScheduleRule(rule)
@@ -741,7 +741,7 @@ extension SettingsView {
     @ViewBuilder
     private func scheduleTargetPickerPopover(ruleID: UUID) -> some View {
         if let rule = model.scheduleRules.first(where: { $0.id == ruleID }) {
-            let allowsWeb = rule.scope == .shared
+            let allowsWeb = rule.scope.kind != .space
             let cardWidth: CGFloat = 120
             if model.libraryVideoPaths.isEmpty, !allowsWeb || model.webWallpaperSources.isEmpty {
                 Text(model.localizedString("先に上の一覧から動画を追加してください"))

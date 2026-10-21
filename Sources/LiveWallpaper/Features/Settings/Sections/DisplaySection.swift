@@ -64,6 +64,15 @@ extension SettingsView {
         selection: displayModeBinding
       )
 
+      if model.displayMode == .mainOnly, model.availableDisplayScreens().count > 1 {
+        Label(
+          model.localizedString("メインのみの設定のため、ほかのディスプレイには壁紙が表示されません。「全ディスプレイ」にすると表示されます"),
+          systemImage: "exclamationmark.triangle.fill"
+        )
+        .font(.caption)
+        .foregroundColor(.orange)
+      }
+
       settingsMenuRow(
         title: model.localizedString("動画のフィット"),
         options: [
@@ -298,7 +307,9 @@ extension SettingsView {
           }
         }
 
-        if model.availableDisplayScreens().count > 1 {
+        // 画面が1つに減っても、除外した画面は自動停止されないままなので、解除できるよう残す。
+        let screens = model.availableDisplayScreens()
+        if screens.count > 1 || screens.contains(where: { model.isSuspendDisabled(forScreenID: $0.id) }) {
           Divider().opacity(0.35)
           displaySuspendExclusionContent
         }
