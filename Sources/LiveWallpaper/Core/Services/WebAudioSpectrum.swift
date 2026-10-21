@@ -84,7 +84,7 @@ struct SpectrumLoudness {
     private static let silenceHold: Float = 0.1
     private static let referenceLevel: Float = 0.002
     private static let maxInputGain: Float = 100
-    private static let levelHalfLife: Float = 4
+    private static let levelHalfLife: Float = 1
     private var isSilent = true
     private var belowReleaseDuration: Float = 0
     private var level: Float = 0
@@ -95,6 +95,7 @@ struct SpectrumLoudness {
     /// `raw` is 64 left bands then 64 right bands; `elapsed` is the time since the last call.
     mutating func process(_ raw: [Float], elapsed: Float) -> [Float] {
         let dt = min(elapsed, 1)
+        let wasSilent = isSilent
         let loudest = raw.max()!
         // Attack is instant so a loud onset after a quiet passage is never over-amplified.
         level = max(loudest, level * pow(0.5, dt / Self.levelHalfLife))
@@ -117,7 +118,10 @@ struct SpectrumLoudness {
         // its own tiny peak.
         for group in 0 ..< 16 { groupMax[group] = max(groupMax[group], boostedLoudest * 0.333) }
 
-        if peaks[0] <= Self.silence, !isSilent {
+        // Only on the silent-to-sound edge, unlike the original: a quiet moment mid-song can
+        // also drop the low group's peak this far, and resetting there blanks the bars for
+        // about 2 seconds.
+        if wasSilent, !isSilent {
             peaks = [Float](repeating: 1, count: 16)
         }
         for group in 0 ..< 16 {

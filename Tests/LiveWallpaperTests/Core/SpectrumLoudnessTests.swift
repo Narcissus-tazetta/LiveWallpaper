@@ -35,6 +35,23 @@ final class SpectrumLoudnessTests: XCTestCase {
         XCTAssertEqual(values[74], 0.05 / (0.5 * 0.333), accuracy: 0.05)
     }
 
+    func testQuietMomentMidSongDoesNotBlankTheFollowingBars() {
+        var loudness = SpectrumLoudness()
+        for _ in 0 ..< 120 { _ = loudness.process(spectrum(band: 10, level: 0.02), elapsed: 1.0 / 30) }
+        for _ in 0 ..< 10 { _ = loudness.process(spectrum(band: 10, level: 0.00015), elapsed: 1.0 / 30) }
+        var values = [Float]()
+        for _ in 0 ..< 5 { values = loudness.process(spectrum(band: 10, level: 0.02), elapsed: 1.0 / 30) }
+        XCTAssertGreaterThan(values[10], 0.8)
+    }
+
+    func testBarsRecoverSoonAfterTheVolumeIsLowered() {
+        var loudness = SpectrumLoudness()
+        for _ in 0 ..< 120 { _ = loudness.process(spectrum(band: 10, level: 0.004), elapsed: 1.0 / 30) }
+        var values = [Float]()
+        for _ in 0 ..< 90 { values = loudness.process(spectrum(band: 10, level: 0.0004), elapsed: 1.0 / 30) }
+        XCTAssertGreaterThan(values[10], 0.8)
+    }
+
     func testSilenceIsExactlyZero() {
         let values = settle([Float](repeating: 0.00005, count: 128))
         XCTAssertTrue(values.allSatisfy { $0 == 0 })
