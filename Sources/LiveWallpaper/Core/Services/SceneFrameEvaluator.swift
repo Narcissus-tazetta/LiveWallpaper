@@ -44,7 +44,11 @@ final class SceneFrameEvaluator {
     private static let maximumHeldFrames = 30
     private var clockOrigin: Date?
     private struct LayerTemplate {
-        var base: [String: Any]
+        /// The target's fields that only change with the document, as object members.
+        var base: SceneScriptInput
+        var baseCount: Int
+        /// Why the fields cannot be given to a script (a value JSON cannot hold).
+        var invalid: Error?
         var layerOpacity: Double
     }
     private var cachedLayers: [SceneLayer] = []
@@ -100,7 +104,7 @@ final class SceneFrameEvaluator {
         var rigPlayback: [UUID: [SceneSkeleton.Playback]] = [:]
         var order: [UUID: Int] = [:]
         var result = base
-        var targetInputs: [UUID: [String: Any]] = [:]
+        var targetInputs: [UUID: SceneScriptInput] = [:]
         var warnings: [SceneScriptIssue] = []
         var meshes: [SceneMeshFrame] = []
         for script in document.scripts where script.canRun && !script.targetLayerIDs(in: document.layers).isEmpty {
@@ -110,51 +114,103 @@ final class SceneFrameEvaluator {
             }
             do {
                 let scriptLayers = try targetLayers(for: script, in: document.layers)
-                let targets: [[String: Any]] = scriptLayers.map { layer in
-                    if let cached = targetInputs[layer.id] { return cached }
+                var context = SceneScriptInput()
+                let contextPosition = context.beginObject()
+                var contextCount = 0
+                func member(_ name: String) {
+                    context.key(name)
+                    contextCount += 1
+                }
+                member("targets")
+                let targetsPosition = context.beginArray()
+                for layer in scriptLayers {
+                    if let cached = targetInputs[layer.id] {
+                        context.append(cached)
+                        continue
+                    }
                     let evaluated = base[layer.id]!
                     let template = cachedTemplates[layer.id]!
-                    var value = template.base
-                    value["transform"] = Self.transformInput(evaluated.transform)
-                    value["opacity"] = template.layerOpacity * evaluated.opacity
-                    value["values"] = Self.linkValuesInput(evaluated.color)
+                    if let invalid = template.invalid { throw invalid }
+                    var value = SceneScriptInput()
+                    let position = value.beginObject()
+                    value.append(template.base)
+                    value.key("transform")
+                    try Self.transformInput(evaluated.transform, into: &value)
+                    value.key("opacity")
+                    try value.number(template.layerOpacity * evaluated.opacity)
+                    value.key("values")
+                    try Self.linkValuesInput(evaluated.color, into: &value)
+                    value.end(position, count: template.baseCount + 3)
                     targetInputs[layer.id] = value
-                    return value
+                    context.append(value)
                 }
-                var context: [String: Any] = [
-                    "targets": targets, "params": script.params, "loopSeconds": document.loopSeconds,
-                    "canvas": ["width": document.canvasWidth, "height": document.canvasHeight, "aspectRatio": document.aspectRatio]
-                ]
+                context.end(targetsPosition, count: scriptLayers.count)
+                member("params")
+                try context.value(script.params)
+                member("loopSeconds")
+                try context.number(Double(document.loopSeconds))
+                member("canvas")
+                let canvasPosition = context.beginObject()
+                context.key("width")
+                try context.number(Double(document.canvasWidth))
+                context.key("height")
+                try context.number(Double(document.canvasHeight))
+                context.key("aspectRatio")
+                try context.number(document.aspectRatio)
+                context.end(canvasPosition, count: 3)
                 var missing: [String] = []
                 if script.usesTime {
-                    context["elapsedTime"] = input.time
-                    context["time"] = normalizedPhase * Double(document.loopSeconds)
-                    context["phase"] = normalizedPhase
+                    member("elapsedTime")
+                    try context.number(input.time)
+                    member("time")
+                    try context.number(normalizedPhase * Double(document.loopSeconds))
+                    member("phase")
+                    try context.number(normalizedPhase)
                 } else { missing += ["time", "phase", "elapsedTime"] }
                 if script.usesTimeOfDay {
-                    context["timeOfDay"] = timeOfDay.rawValue
+                    member("timeOfDay")
+                    context.string(timeOfDay.rawValue)
                     let now = clock(input)
-                    context["wallClock"] = ["epochMilliseconds": (now.timeIntervalSince1970 * 1000).rounded(),
-                                            "timeZoneOffsetMinutes": TimeZone.current.secondsFromGMT(for: now) / 60]
+                    member("wallClock")
+                    let position = context.beginObject()
+                    context.key("epochMilliseconds")
+                    try context.number((now.timeIntervalSince1970 * 1000).rounded())
+                    context.key("timeZoneOffsetMinutes")
+                    try context.number(Double(TimeZone.current.secondsFromGMT(for: now) / 60))
+                    context.end(position, count: 2)
                 } else { missing += ["timeOfDay", "wallClock"] }
                 if script.usesCursor {
-                    context["cursor"] = ["x": input.parallax.x, "y": input.parallax.y]
-                    context["cursorActive"] = input.cursor != nil
-                    context["pointer"] = input.cursor.map { ["x": $0.x, "y": $0.y] } ?? NSNull()
-                    context["pointerPresses"] = input.pointerPresses.map {
-                        ["isDown": $0.isDown, "x": $0.position.x, "y": $0.position.y] as [String: Any]
+                    member("cursor")
+                    try Self.pointInput(input.parallax, into: &context)
+                    member("cursorActive")
+                    context.bool(input.cursor != nil)
+                    member("pointer")
+                    if let cursor = input.cursor { try Self.pointInput(cursor, into: &context) } else { context.null() }
+                    member("pointerPresses")
+                    let pressesPosition = context.beginArray()
+                    for press in input.pointerPresses {
+                        let position = context.beginObject()
+                        context.key("isDown")
+                        context.bool(press.isDown)
+                        context.key("x")
+                        try context.number(press.position.x)
+                        context.key("y")
+                        try context.number(press.position.y)
+                        context.end(position, count: 3)
                     }
+                    context.end(pressesPosition, count: input.pointerPresses.count)
                 } else { missing += ["cursor", "cursorActive", "pointer", "pointerPresses"] }
                 if script.usesMedia {
-                    context["media"] = Self.mediaInput(input.media)
+                    member("media")
+                    try context.value(Self.mediaInput(input.media))
                 } else { missing.append("media") }
-                context["_missing"] = missing
-                var data = try JSONSerialization.data(withJSONObject: context)
-                data.append(0)
+                member("_missing")
+                try context.value(missing)
+                context.end(contextPosition, count: contextCount)
                 let output: SceneScriptOutput
                 do {
                     output = try runtime.evaluate(
-                        script, input: data, elapsedTime: input.time, layers: document.layers, rigs: document.rigs, perScript: budget.perScript, deadline: deadline
+                        script, input: context, elapsedTime: input.time, layers: document.layers, rigs: document.rigs, perScript: budget.perScript, deadline: deadline
                     )
                     consecutiveTimeouts[script.id] = nil
                     lastOutputs[script.id] = output
@@ -259,7 +315,7 @@ final class SceneFrameEvaluator {
                 "depthAutoCycles": layer.depthAutoCycles,
                 "cursorMask": layer.cursorMask.map(Self.cursorMaskInput) ?? NSNull()
             ]
-            let base: [String: Any] = [
+            let fields: [String: Any] = [
                 "id": layer.id.uuidString,
                 "name": layer.name,
                 "kind": layer.kind.rawValue,
@@ -270,7 +326,17 @@ final class SceneFrameEvaluator {
                 "rigs": rigs,
                 "appearance": appearance
             ]
-            cachedTemplates[layer.id] = LayerTemplate(base: base, layerOpacity: layer.opacity)
+            var base = SceneScriptInput()
+            var invalid: Error?
+            do {
+                for (name, value) in fields {
+                    base.key(name)
+                    try base.value(value)
+                }
+            } catch {
+                invalid = error
+            }
+            cachedTemplates[layer.id] = LayerTemplate(base: base, baseCount: fields.count, invalid: invalid, layerOpacity: layer.opacity)
         }
     }
 
@@ -285,34 +351,38 @@ final class SceneFrameEvaluator {
         return result
     }
 
-    private static func transformInput(_ transform: SceneTransform) -> [String: Any] {
-        var dict: [String: Any] = [
-            "offsetX": transform.offsetX,
-            "offsetY": transform.offsetY,
-            "scale": transform.scale,
-            "rotation": transform.rotation
-        ]
-        if let scaleY = transform.scaleY {
-            dict["scaleY"] = scaleY
+    private static func numbers(_ members: KeyValuePairs<String, Double>, optional: (String, Double?), into input: inout SceneScriptInput) throws {
+        let position = input.beginObject()
+        for (name, value) in members {
+            input.key(name)
+            try input.number(value)
         }
-        return dict
+        if let value = optional.1 {
+            input.key(optional.0)
+            try input.number(value)
+        }
+        input.end(position, count: members.count + (optional.1 == nil ? 0 : 1))
     }
 
-    private static func linkValuesInput(_ values: SceneLinkValues) -> [String: Any] {
-        var dict: [String: Any] = [
-            "offsetX": values.offsetX,
-            "offsetY": values.offsetY,
-            "rotation": values.rotation,
-            "scale": values.scale,
-            "opacity": values.opacity,
-            "brightness": values.brightness,
-            "saturation": values.saturation,
-            "warmth": values.warmth
-        ]
-        if let scaleY = values.scaleY {
-            dict["scaleY"] = scaleY
-        }
-        return dict
+    private static func transformInput(_ transform: SceneTransform, into input: inout SceneScriptInput) throws {
+        try numbers(["offsetX": transform.offsetX, "offsetY": transform.offsetY, "scale": transform.scale,
+                     "rotation": transform.rotation], optional: ("scaleY", transform.scaleY), into: &input)
+    }
+
+    private static func linkValuesInput(_ values: SceneLinkValues, into input: inout SceneScriptInput) throws {
+        try numbers(["offsetX": values.offsetX, "offsetY": values.offsetY, "rotation": values.rotation,
+                     "scale": values.scale, "opacity": values.opacity, "brightness": values.brightness,
+                     "saturation": values.saturation, "warmth": values.warmth],
+                    optional: ("scaleY", values.scaleY), into: &input)
+    }
+
+    private static func pointInput(_ point: SIMD2<Float>, into input: inout SceneScriptInput) throws {
+        let position = input.beginObject()
+        input.key("x")
+        try input.number(point.x)
+        input.key("y")
+        try input.number(point.y)
+        input.end(position, count: 2)
     }
 
     private static func colorInput(_ color: RGBAColor) -> [String: Any] {

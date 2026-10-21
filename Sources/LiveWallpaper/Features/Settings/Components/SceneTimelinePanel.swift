@@ -119,7 +119,7 @@ extension SettingsView {
             .help(model.localizedString("ループの終わりの 2 秒前から再生して、先頭へのつながりを確かめます"))
             .accessibilityLabel(model.localizedString("つなぎ目を確かめる"))
 
-            TimelineView(.animation(minimumInterval: 1.0 / 20, paused: !isPlaying)) { _ in
+            TimelineView(.animation(minimumInterval: 1.0 / 20, paused: !isPlaying || !scenePreviewController.isWindowVisible)) { _ in
                 let raw = fixedTime ?? scenePreviewController.time
                 let time = (raw.truncatingRemainder(dividingBy: loop) + loop).truncatingRemainder(dividingBy: loop)
                 HStack(spacing: 8) {

@@ -12,6 +12,8 @@ final class ScenePreviewController: ObservableObject {
     /// Media time at which the loop started, while playing.
     private var anchor = CACurrentMediaTime()
     @Published private(set) var pausedTime: Double = 0
+    /// Whether the preview's window can be seen; the playhead stops redrawing while not.
+    @Published private(set) var isWindowVisible = true
 
     @Published private(set) var zoom = 1.0
     /// Canvas UV at the middle of the preview.
@@ -37,6 +39,11 @@ final class ScenePreviewController: ObservableObject {
     func pause() {
         pausedTime = time
         isPlaying = false
+    }
+
+    func setWindowVisible(_ visible: Bool) {
+        guard isWindowVisible != visible else { return }
+        isWindowVisible = visible
     }
 
     func seek(to seconds: Double) {

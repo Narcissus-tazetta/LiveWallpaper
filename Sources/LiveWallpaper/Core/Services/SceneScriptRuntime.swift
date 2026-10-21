@@ -10,6 +10,9 @@ final class SceneScriptRuntime {
         var hasStarted = false
         let pointer: OpaquePointer
         var memoryBytes: Int
+        /// Set after a run instead of measuring: the measurement walks the whole heap
+        /// and only matters once another script needs the total.
+        var memoryIsStale = false
     }
     static let maximumMemoryBytes = 128 * 1024 * 1024
     /// The first run of a module bundle also loads its modules and runs every init,
@@ -64,7 +67,7 @@ final class SceneScriptRuntime {
             throw issue(String(cString: error), script: script)
         }
         let memory = lwjs_memory_usage(pointer!)
-        guard programs.values.reduce(memory, { $0 + $1.memoryBytes }) <= Self.maximumMemoryBytes else {
+        guard programs.keys.reduce(memory, { $0 + memoryBytes(of: $1) }) <= Self.maximumMemoryBytes else {
             destroy(pointer!, id: script.id, reason: "memory limit")
             throw SceneScriptIssue(scriptID: script.id, name: script.name, message: "Combined script memory limit exceeded (128 MiB)")
         }
@@ -73,40 +76,26 @@ final class SceneScriptRuntime {
 
     /// Stops the script after `perScript` seconds, or at `deadline` when that comes first.
     func evaluate(
-        _ script: SceneScript, input: Data, elapsedTime: Double? = nil, layers: [SceneLayer], rigs: [UUID: SceneSkeleton] = [:], perScript: TimeInterval, deadline: TimeInterval
+        _ script: SceneScript, input: SceneScriptInput, elapsedTime: Double, layers: [SceneLayer], rigs: [UUID: SceneSkeleton] = [:], perScript: TimeInterval, deadline: TimeInterval
     ) throws -> SceneScriptOutput {
         do {
             if script.modules != nil {
-                let time = try elapsedTime ?? ((JSONSerialization.jsonObject(with: input) as? [String: Any])?["elapsedTime"] as? Double)
-                if let time {
-                    if let previous = programs[script.id]?.lastTime, time < previous {
-                        destroy(programs.removeValue(forKey: script.id)!.pointer, id: script.id,
-                                reason: "time went backwards", detail: "previous=\(previous) now=\(time)")
-                        try prepare(script)
-                    }
-                    programs[script.id]!.lastTime = time
+                if let previous = programs[script.id]?.lastTime, elapsedTime < previous {
+                    destroy(programs.removeValue(forKey: script.id)!.pointer, id: script.id,
+                            reason: "time went backwards", detail: "previous=\(previous) now=\(elapsedTime)")
+                    try prepare(script)
                 }
+                programs[script.id]!.lastTime = elapsedTime
             }
             let starting = script.modules != nil && !programs[script.id]!.hasStarted
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
             guard remaining > 0 || starting else { throw failure("Frame execution time limit exceeded") }
             let budget = starting ? max(min(remaining, perScript), Self.moduleStartSeconds) : min(remaining, perScript)
             var error: UnsafeMutablePointer<CChar>?
-            let otherMemory = programs.filter { $0.key != script.id }.values.reduce(0) { $0 + $1.memoryBytes }
+            let otherMemory = programs.keys.filter { $0 != script.id }.reduce(0) { $0 + memoryBytes(of: $1) }
             lwjs_set_memory_limit(programs[script.id]!.pointer, min(16 * 1024 * 1024, Self.maximumMemoryBytes - otherMemory))
-            let result: UnsafeMutablePointer<CChar>?
-            if input.last == 0 {
-                result = input.withUnsafeBytes { raw in
-                    guard let base = raw.baseAddress else { return nil }
-                    return lwjs_evaluate(programs[script.id]!.pointer, base.assumingMemoryBound(to: CChar.self), budget, &error)
-                }
-            } else {
-                var nullTerminated = input
-                nullTerminated.append(0)
-                result = nullTerminated.withUnsafeBytes { raw in
-                    guard let base = raw.baseAddress else { return nil }
-                    return lwjs_evaluate(programs[script.id]!.pointer, base.assumingMemoryBound(to: CChar.self), budget, &error)
-                }
+            let result = input.bytes.withUnsafeBufferPointer {
+                lwjs_evaluate(programs[script.id]!.pointer, $0.baseAddress!, budget, &error)
             }
             programs[script.id]?.hasStarted = true
             if let error {
@@ -127,7 +116,7 @@ final class SceneScriptRuntime {
             }
             defer { lwjs_free_string(result) }
             logs[script.id] = String(cString: lwjs_logs(programs[script.id]!.pointer))
-            programs[script.id]!.memoryBytes = lwjs_memory_usage(programs[script.id]!.pointer)
+            programs[script.id]!.memoryIsStale = true
             let outputLength = strlen(result!)
             let outputData = Data(bytesNoCopy: result!, count: outputLength, deallocator: .none)
             var output = try JSONSerialization.jsonObject(with: outputData)
@@ -154,6 +143,14 @@ final class SceneScriptRuntime {
         } catch {
             throw issue(error.localizedDescription, script: script)
         }
+    }
+
+    private func memoryBytes(of id: UUID) -> Int {
+        if programs[id]!.memoryIsStale {
+            programs[id]!.memoryBytes = lwjs_memory_usage(programs[id]!.pointer)
+            programs[id]!.memoryIsStale = false
+        }
+        return programs[id]!.memoryBytes
     }
 
     private func issue(_ message: String, script: SceneScript) -> SceneScriptIssue {
@@ -183,7 +180,13 @@ final class SceneScriptRuntime {
     }
 
     private static func keys(_ object: [String: Any], allowed: Set<String>, path: String) throws {
-        if let unknown = Set(object.keys).subtracting(allowed).sorted().first {
+        // The first unknown key in sorted order, without building sets for the usual
+        // case of none.
+        var unknown: String?
+        for key in object.keys where !allowed.contains(key) {
+            if unknown.map({ key < $0 }) ?? true { unknown = key }
+        }
+        if let unknown {
             throw failure("\(path).\(unknown): unknown field")
         }
     }
@@ -229,6 +232,65 @@ final class SceneScriptRuntime {
 
     private static func decode<T: Decodable>(_ type: T.Type, _ value: [String: Any]) throws -> T {
         try JSONDecoder().decode(type, from: JSONSerialization.data(withJSONObject: value))
+    }
+
+    /// Built once: readOutput runs for every target of every frame.
+    private enum OutputKeys {
+        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text"]
+        static let appearance: Set = ["isVisible", "tint", "blendMode", "parallaxDepth", "depthStrength", "depthFollowsCursor",
+                                      "depthAutoMotion", "depthAutoCycles", "cursorMask", "clearCursorMask"]
+        static let appearanceRanges: [String: ClosedRange<Double>] = [
+            "parallaxDepth": 0 ... 1, "depthStrength": 0 ... 1, "depthAutoMotion": 0 ... 1, "depthAutoCycles": 1 ... 12
+        ]
+        static let blendModes: [String: Set<String>] = ["blendMode": Set(SceneBlendMode.allCases.map(\.rawValue))]
+        static let valueRanges = linkRanges(scale: 0.05 ... 16)
+        static let moduleValueRanges = linkRanges(scale: -64 ... 64)
+        static let values = Set(valueRanges.keys)
+
+        private static func linkRanges(scale: ClosedRange<Double>) -> [String: ClosedRange<Double>] {
+            [
+                "offsetX": -4 ... 4, "offsetY": -4 ... 4, "rotation": -3600 ... 3600,
+                "scale": scale, "scaleY": scale, "opacity": 0 ... 1, "brightness": -1 ... 1,
+                "saturation": 0 ... 4, "warmth": -1 ... 1
+            ]
+        }
+    }
+
+    /// Appearance fields that need no nested decoding, read without the JSON round
+    /// trip; tint and cursorMask keep JSONDecoder's handling of missing members.
+    private static func appearanceValues(_ appearance: [String: Any]) throws -> SceneScriptAppearanceValues {
+        guard appearance["tint"] == nil, appearance["cursorMask"] == nil else {
+            return try decode(SceneScriptAppearanceValues.self, appearance)
+        }
+        func number(_ key: String) -> NSNumber? { appearance[key] as? NSNumber }
+        var result = SceneScriptAppearanceValues()
+        result.isVisible = number("isVisible")?.boolValue
+        result.blendMode = (appearance["blendMode"] as? String).flatMap(SceneBlendMode.init(rawValue:))
+        result.parallaxDepth = number("parallaxDepth")?.doubleValue
+        result.depthStrength = number("depthStrength")?.doubleValue
+        result.depthFollowsCursor = number("depthFollowsCursor")?.boolValue
+        result.depthAutoMotion = number("depthAutoMotion")?.doubleValue
+        result.depthAutoCycles = number("depthAutoCycles")?.intValue
+        result.clearCursorMask = number("clearCursorMask")?.boolValue
+        return result
+    }
+
+    /// What decode(SceneLinkValues.self, values) gives for values already checked to
+    /// be finite numbers, without the JSON round trip: most targets send values every
+    /// frame.
+    private static func linkValues(_ values: [String: Any]) -> SceneLinkValues {
+        func number(_ key: String) -> Double? { (values[key] as? NSNumber)?.doubleValue }
+        var result = SceneLinkValues()
+        result.offsetX = number("offsetX") ?? 0
+        result.offsetY = number("offsetY") ?? 0
+        result.rotation = number("rotation") ?? 0
+        result.scale = number("scale") ?? 1
+        result.scaleY = number("scaleY")
+        result.opacity = number("opacity") ?? 1
+        result.brightness = number("brightness") ?? 0
+        result.saturation = number("saturation") ?? 1
+        result.warmth = number("warmth") ?? 0
+        return result
     }
 
     static let maximumMeshFloats = 8_000_000
@@ -295,11 +357,12 @@ final class SceneScriptRuntime {
         }
         var result: [UUID: SceneScriptAdjustment] = [:]
         let targets = Set(script.targetLayerIDs(in: layers))
+        let layersByID = Dictionary(layers.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for entry in entries {
             let item = try object(entry, path: "output")
-            try keys(item, allowed: ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text"], path: "output")
+            try keys(item, allowed: OutputKeys.item, path: "output")
             guard let text = item["id"] as? String, let id = UUID(uuidString: text), targets.contains(id),
-                  let layer = layers.first(where: { $0.id == id }), result[id] == nil
+                  let layer = layersByID[id], result[id] == nil
             else { throw failure("output.id: expected a unique ID from context.targets") }
             var adjustment = SceneScriptAdjustment()
             if item["order"] != nil {
@@ -339,11 +402,11 @@ final class SceneScriptRuntime {
             }
             if let raw = item["appearance"] {
                 let appearance = try object(raw, path: "appearance")
-                try keys(appearance, allowed: ["isVisible", "tint", "blendMode", "parallaxDepth", "depthStrength", "depthFollowsCursor", "depthAutoMotion", "depthAutoCycles", "cursorMask", "clearCursorMask"], path: "appearance")
-                try numbers(appearance, ranges: ["parallaxDepth": 0 ... 1, "depthStrength": 0 ... 1, "depthAutoMotion": 0 ... 1, "depthAutoCycles": 1 ... 12], path: "appearance")
+                try keys(appearance, allowed: OutputKeys.appearance, path: "appearance")
+                try numbers(appearance, ranges: OutputKeys.appearanceRanges, path: "appearance")
                 try integers(appearance, names: ["depthAutoCycles"], path: "appearance")
                 try booleans(appearance, names: ["isVisible", "depthFollowsCursor", "clearCursorMask"], path: "appearance")
-                try choices(appearance, values: ["blendMode": Set(SceneBlendMode.allCases.map(\.rawValue))], path: "appearance")
+                try choices(appearance, values: OutputKeys.blendModes, path: "appearance")
                 if let rawTint = appearance["tint"] {
                     let tint = try object(rawTint, path: "appearance.tint")
                     try keys(tint, allowed: ["red", "green", "blue", "alpha"], path: "appearance.tint")
@@ -356,19 +419,14 @@ final class SceneScriptRuntime {
                     try choices(mask, values: ["mode": Set(SceneCursorMaskMode.allCases.map(\.rawValue))], path: "appearance.cursorMask")
                     guard appearance["clearCursorMask"] as? Bool != true else { throw failure("appearance: cannot set and clear cursorMask together") }
                 }
-                adjustment.appearance = try decode(SceneScriptAppearanceValues.self, appearance)
+                adjustment.appearance = try appearanceValues(appearance)
             }
             if let raw = item["values"] {
                 let values = try object(raw, path: "values")
-                let scaleRange: ClosedRange<Double> = script.modules != nil ? (-64 ... 64) : (0.05 ... 16)
-                let ranges: [String: ClosedRange<Double>] = [
-                    "offsetX": -4 ... 4, "offsetY": -4 ... 4, "rotation": -3600 ... 3600,
-                    "scale": scaleRange, "scaleY": scaleRange, "opacity": 0 ... 1, "brightness": -1 ... 1,
-                    "saturation": 0 ... 4, "warmth": -1 ... 1
-                ]
-                try keys(values, allowed: Set(ranges.keys), path: "values")
+                let ranges = script.modules != nil ? OutputKeys.moduleValueRanges : OutputKeys.valueRanges
+                try keys(values, allowed: OutputKeys.values, path: "values")
                 try numbers(values, ranges: ranges, path: "values")
-                adjustment.values = try decode(SceneLinkValues.self, values)
+                adjustment.values = linkValues(values)
             }
             if let raw = item["effects"] {
                 guard let effects = raw as? [Any], effects.count <= 16 else { throw failure("effects: expected at most 16 entries") }

@@ -5,7 +5,8 @@
 typedef struct LWJSProgram LWJSProgram;
 LWJSProgram *lwjs_compile(const char *source, char **error);
 LWJSProgram *lwjs_compile_modules(const char *source, const char *modules, char **error);
-char *lwjs_evaluate(LWJSProgram *program, const char *input, double budget_seconds, char **error);
+/* `input` is the tagged value tree SceneScriptInput writes. */
+char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_seconds, char **error);
 const char *lwjs_logs(LWJSProgram *program);
 /* The meshes emitted by the last evaluation, valid until the next one. */
 const uint8_t *lwjs_meshes(LWJSProgram *program, size_t *length);

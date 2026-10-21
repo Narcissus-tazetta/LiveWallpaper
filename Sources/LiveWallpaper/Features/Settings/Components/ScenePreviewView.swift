@@ -487,12 +487,14 @@ final class ScenePreviewNSView: NSView {
         occlusionObserver = window.map { window in
             NotificationCenter.default.addObserver(
                 forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
-            ) { [weak self] _ in
+            ) { [weak self, weak window] _ in
                 MainActor.assumeIsolated {
                     self?.sceneLayer?.clockDidChange()
+                    self?.controller?.setWindowVisible(window?.occlusionState.contains(.visible) ?? false)
                 }
             }
         }
+        controller?.setWindowVisible(window?.occlusionState.contains(.visible) ?? false)
         if window == nil {
             sceneLayer?.suspend()
         } else {

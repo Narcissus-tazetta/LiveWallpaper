@@ -447,7 +447,11 @@ final class SceneRenderer {
                     }
                     encoder.setRenderPipelineState(fetch)
                     for item in prepared {
+                        guard let scissor = Self.scissor(for: item.uniforms, width: target.width, height: target.height) else {
+                            continue
+                        }
                         var uniforms = item.uniforms
+                        encoder.setScissorRect(scissor)
                         encoder.setFragmentTexture(item.layerTexture, index: 1)
                         encoder.setFragmentTexture(item.depth ?? whiteMask, index: 2)
                         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<LayerUniforms>.stride, index: 0)
@@ -509,6 +513,44 @@ final class SceneRenderer {
         try compositePass(
             commandBuffer: commandBuffer, destination: target, base: source,
             layerTexture: blackTexture, uniforms: Self.passThroughUniforms
+        )
+    }
+
+    /// The target pixels a layer can change. Outside its picture (pushed out by the
+    /// depth shift at most) the composite returns the pixel below unchanged, so
+    /// drawing only here gives the same image. nil when it covers nothing.
+    private static func scissor(for u: LayerUniforms, width: Int, height: Int) -> MTLScissorRect? {
+        let whole = MTLScissorRect(x: 0, y: 0, width: width, height: height)
+        let det = u.placementColumn0.x * u.placementColumn1.y - u.placementColumn1.x * u.placementColumn0.y
+        guard det != 0, u.uvScale.x != 0, u.uvScale.y != 0, u.viewSize.x != 0, u.viewSize.y != 0 else {
+            return whole
+        }
+        let reach = u.hasDepth != 0 ? abs(u.depthShift) : .zero
+        var low = SIMD2<Float>(repeating: .infinity), high = SIMD2<Float>(repeating: -.infinity)
+        for corner in [SIMD2<Float>(0, 0), SIMD2(1, 0), SIMD2(0, 1), SIMD2(1, 1)] {
+            let layerUV = corner * (1 + 2 * reach) - reach
+            let placed = (layerUV - 0.5 - u.uvOffset) / u.uvScale
+            let relative = SIMD2(
+                u.placementColumn1.y * placed.x - u.placementColumn1.x * placed.y,
+                -u.placementColumn0.y * placed.x + u.placementColumn0.x * placed.y
+            ) / det
+            let targetUV = (relative + 0.5 + u.placementOffset - u.viewOrigin) / u.viewSize
+            low = simd_min(low, targetUV)
+            high = simd_max(high, targetUV)
+        }
+        guard low.x.isFinite, low.y.isFinite, high.x.isFinite, high.y.isFinite else {
+            return whole
+        }
+        // Two pixels of slack for the GPU's own rounding of the same mapping.
+        let size = SIMD2(Float(width), Float(height))
+        let minPixel = simd_max((low * size).rounded(.down) - 2, .zero)
+        let maxPixel = simd_min((high * size).rounded(.up) + 2, size)
+        guard maxPixel.x > minPixel.x, maxPixel.y > minPixel.y else {
+            return nil
+        }
+        return MTLScissorRect(
+            x: Int(minPixel.x), y: Int(minPixel.y),
+            width: Int(maxPixel.x - minPixel.x), height: Int(maxPixel.y - minPixel.y)
         )
     }
 

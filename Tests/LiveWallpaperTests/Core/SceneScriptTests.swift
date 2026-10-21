@@ -226,6 +226,15 @@ final class SceneScriptTests: XCTestCase {
         XCTAssertThrowsError(try SceneFrameEvaluator(budget: .offline).evaluate(scene("function update(c){while(true){}}"), input: .rest, timeOfDay: .day))
     }
 
+    func testScriptsReadNonASCIIKeysAndExactNumbers() throws {
+        var document = scene("""
+        function update(c){return [{id:c.targets[0].id,values:{offsetX:c.params['速さ'] + (c.params.speed === 0.1 ? 0 : 1)}}]}
+        """)
+        document.scripts[0].params = ["速さ": 0.0021054233122316966, "speed": 0.1]
+        let frame = try SceneFrameEvaluator().evaluate(document, input: .rest, timeOfDay: .day)
+        XCTAssertEqual(frame.layers[document.layers[0].id]!.transform.offsetX, 0.0021054233122316966)
+    }
+
     func testFractionsInWholeNumberFieldsNameTheField() {
         var document = scene("function update(c){return [{id:c.targets[0].id,particles:{count:100.5}}]}")
         document.layers[0].particles = SceneParticles(preset: .snow)

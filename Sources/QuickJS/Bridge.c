@@ -318,7 +318,73 @@ LWJSProgram *lwjs_compile_modules(const char *source, const char *modules, char 
     return program;
 }
 
-char *lwjs_evaluate(LWJSProgram *program, const char *input, double budget_seconds, char **error) {
+/* Builds the update(context) argument from the tagged input the app writes (see
+ * SceneScriptInput.swift), creating values the way JSON.parse would. */
+static JSValue decode_input(JSContext *context, const uint8_t **cursor, int depth) {
+    if (depth > 512) return JS_ThrowRangeError(context, "Input is too deeply nested");
+    const uint8_t *p = *cursor;
+    uint8_t tag = *p++;
+    uint32_t count = 0;
+    JSValue value;
+    if (tag >= 4) { memcpy(&count, p, 4); p += 4; }
+    switch (tag) {
+    case 0: value = JS_NULL; break;
+    case 1: value = JS_FALSE; break;
+    case 2: value = JS_TRUE; break;
+    case 3: {
+        double number;
+        memcpy(&number, p, 8);
+        p += 8;
+        value = JS_NewNumber(context, number);
+        break;
+    }
+    case 4:
+        value = JS_NewStringLen(context, (const char *)p, count);
+        p += count;
+        break;
+    case 5:
+        value = JS_NewArray(context);
+        for (uint32_t i = 0; i < count && !JS_IsException(value); i++) {
+            JSValue element = decode_input(context, &p, depth + 1);
+            if (JS_IsException(element) || JS_DefinePropertyValueUint32(context, value, i, element, JS_PROP_C_W_E) < 0) {
+                JS_FreeValue(context, value);
+                value = JS_EXCEPTION;
+            }
+        }
+        break;
+    default:
+        value = JS_NewObject(context);
+        for (uint32_t i = 0; i < count && !JS_IsException(value); i++) {
+            uint32_t length;
+            memcpy(&length, p, 4);
+            p += 4;
+            int ascii = 1;
+            for (uint32_t k = 0; k < length; k++) ascii &= p[k] < 0x80;
+            JSAtom key;
+            // JS_NewAtomLen matches existing atoms byte by byte as Latin-1, which
+            // finds the wrong atom for UTF-8 keys; JSON.parse goes through a string.
+            if (ascii) {
+                key = JS_NewAtomLen(context, (const char *)p, length);
+            } else {
+                JSValue name = JS_NewStringLen(context, (const char *)p, length);
+                key = JS_IsException(name) ? JS_ATOM_NULL : JS_ValueToAtom(context, name);
+                JS_FreeValue(context, name);
+            }
+            p += length;
+            JSValue element = key == JS_ATOM_NULL ? JS_EXCEPTION : decode_input(context, &p, depth + 1);
+            if (JS_IsException(element) || JS_DefinePropertyValue(context, value, key, element, JS_PROP_C_W_E) < 0) {
+                JS_FreeValue(context, value);
+                value = JS_EXCEPTION;
+            }
+            if (key != JS_ATOM_NULL) JS_FreeAtom(context, key);
+        }
+        break;
+    }
+    *cursor = p;
+    return value;
+}
+
+char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_seconds, char **error) {
     *error = NULL;
     program->deadline = now() + budget_seconds;
     program->timed_out = 0;
@@ -372,7 +438,8 @@ char *lwjs_evaluate(LWJSProgram *program, const char *input, double budget_secon
     JS_FreeValue(context, result);
     JSValue global = program->module_context ? JS_DupValue(context, program->module_namespace) : JS_GetGlobalObject(context);
     JSValue function = JS_GetPropertyStr(context, global, "update");
-    JSValue argument = JS_ParseJSON(context, input, strlen(input), "input.json");
+    const uint8_t *cursor = input;
+    JSValue argument = decode_input(context, &cursor, 0);
     if (!JS_IsException(argument)) {
         const char *guard_source =
             "c => { for (const key of c._missing || []) Object.defineProperty(c, key,"
