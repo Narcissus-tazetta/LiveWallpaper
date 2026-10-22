@@ -1,11 +1,43 @@
 import Foundation
 
+/// The renderer selects the formula by position, so new cases go at the end. The
+/// layer's colour blends with what is below, weighted by its alpha, except `minimum`
+/// and `maximum`, which take effect over the whole picture, transparent parts included.
 enum SceneBlendMode: String, Codable, CaseIterable {
     case normal
     case multiply
     case screen
     case overlay
     case add
+    case darken
+    case colorBurn
+    case subtract
+    case minimum
+    case lighten
+    case colorDodge
+    case maximum
+    case softLight
+    case hardLight
+    case vividLight
+    case linearLight
+    case pinLight
+    case hardMix
+    case difference
+    case exclusion
+    case reflect
+    case glow
+    case phoenix
+    case average
+    case negation
+    case hue
+    case saturation
+    case color
+    case luminosity
+    case tint
+    /// Below plus the colour times alpha, not clamped.
+    case plus
+    /// Below plus below times the colour.
+    case brighten
 }
 
 /// Cuts the layer around the cursor (X-ray): `hide` makes a hole that shows the
@@ -690,8 +722,11 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var opacity: Double = 1
     var tint = RGBAColor(red: 1, green: 1, blue: 1, alpha: 1)
     var blendMode: SceneBlendMode = .normal
-    /// 0 keeps the layer still; 1 moves it the most with the cursor.
+    /// 0 keeps the layer still; 1 moves it the most with the cursor. Imported scenes
+    /// may go past 1 or below 0 (moving with the cursor).
     var parallaxDepth: Double = 0
+    /// The depth across the y axis when it differs from x.
+    var parallaxDepthY: Double?
     var cursorMask: SceneCursorMask?
     /// Applied in order, before the layer is composited.
     var effects: [SceneEffect] = []
@@ -759,6 +794,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         tint = (try? container.decode(RGBAColor.self, forKey: .tint)) ?? RGBAColor(red: 1, green: 1, blue: 1, alpha: 1)
         blendMode = (try? container.decode(SceneBlendMode.self, forKey: .blendMode)) ?? .normal
         parallaxDepth = (try? container.decode(Double.self, forKey: .parallaxDepth)) ?? 0
+        parallaxDepthY = try? container.decodeIfPresent(Double.self, forKey: .parallaxDepthY)
         cursorMask = try? container.decodeIfPresent(SceneCursorMask.self, forKey: .cursorMask)
         // An effect this version does not know is dropped rather than failing the scene.
         effects = ((try? container.decode([FailableDecodable<SceneEffect>].self, forKey: .effects)) ?? [])
@@ -873,6 +909,19 @@ struct SceneDocument: Codable, Equatable {
     /// Drawn live on real time on the desktop rather than as the baked loop, so its
     /// real-time effects keep their exact speed. Set by scenes that use them.
     var runsInRealTime = false
+    /// The colour under every layer (RGB, 0...1); black when absent.
+    var backgroundColor: [Double]?
+    /// Layers are blended in half floats, so colours above white survive until the end.
+    var highDynamicRange = false
+    /// Runs over the finished canvas (`input`) before it is shown, such as a glow.
+    var finishing: SceneRenderGraph?
+    /// How far a layer of depth 1 moves, as a fraction of the canvas, with the cursor at
+    /// an edge; the renderer's own amount when absent.
+    var parallaxTravel: Double?
+    /// The share of the remaining way the parallax follows the cursor per second
+    /// (capped at all of it per frame); the screen's own easing when absent.
+    var parallaxResponse: Double?
+    var cameraShake: SceneCameraShake?
 
     init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer]) {
         self.canvasWidth = canvasWidth
@@ -898,6 +947,18 @@ struct SceneDocument: Codable, Equatable {
         }
         links = ((try? container.decode([FailableDecodable<SceneLink>].self, forKey: .links)) ?? []).compactMap(\.value)
         runsInRealTime = (try? container.decode(Bool.self, forKey: .runsInRealTime)) ?? false
+        backgroundColor = try container.decodeIfPresent([Double].self, forKey: .backgroundColor)
+        guard backgroundColor.map({ $0.count == 3 && $0.allSatisfy(\.isFinite) }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .backgroundColor, in: container, debugDescription: "Background needs three finite components")
+        }
+        highDynamicRange = try container.decodeIfPresent(Bool.self, forKey: .highDynamicRange) ?? false
+        finishing = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .finishing)
+        parallaxTravel = try container.decodeIfPresent(Double.self, forKey: .parallaxTravel)
+        parallaxResponse = try container.decodeIfPresent(Double.self, forKey: .parallaxResponse)
+        cameraShake = try container.decodeIfPresent(SceneCameraShake.self, forKey: .cameraShake)
+        guard [parallaxTravel, parallaxResponse].allSatisfy({ $0?.isFinite ?? true }) else {
+            throw DecodingError.dataCorruptedError(forKey: .parallaxTravel, in: container, debugDescription: "Parallax values must be finite")
+        }
         scripts = try container.decodeIfPresent([SceneScript].self, forKey: .scripts) ?? []
         guard scripts.count <= SceneScript.maximumCount, Set(scripts.map(\.id)).count == scripts.count else {
             throw DecodingError.dataCorruptedError(forKey: .scripts, in: container, debugDescription: "Too many scripts or duplicate script IDs")
@@ -905,7 +966,7 @@ struct SceneDocument: Codable, Equatable {
     }
 
     var isAnimated: Bool {
-        layers.contains(where: \.isAnimated) || scripts.contains { $0.canRun && $0.usesTime }
+        layers.contains(where: \.isAnimated) || scripts.contains { $0.canRun && $0.usesTime } || cameraShake != nil
     }
 
     var aspectRatio: Double {
@@ -935,6 +996,31 @@ struct SceneDocument: Codable, Equatable {
     }
 
     var hasUnapprovedScripts: Bool { scripts.contains { $0.isEnabled && !$0.canRun } }
+}
+
+/// The whole canvas drifts on a smooth path, as a handheld camera would.
+struct SceneCameraShake: Codable, Equatable {
+    /// The path runs at speed² radians per second.
+    var speed: Double
+    /// Pixels of the canvas height per 100, at the path's full reach.
+    var amplitude: Double
+    /// Bends the path's reach: its length is raised to roughness³.
+    var roughness: Double
+
+    /// How far the view moves at `time` seconds, in canvas heights (+y down).
+    func offset(at time: Double) -> SIMD2<Double> {
+        let t = speed * speed * time
+        var x = cos(t), y = sin(1.333 * t)
+        let exponent = roughness * roughness * roughness
+        let length = (x * x + y * y).squareRoot()
+        if exponent > 0.001, exponent != 1, length > 0 {
+            let reach = pow(length, exponent) / length
+            x *= reach
+            y *= reach
+        }
+        // The view moving up shows the canvas lower on the screen.
+        return SIMD2(x, -y) * amplitude * 0.01
+    }
 }
 
 /// Decodes to nil instead of failing the whole array.

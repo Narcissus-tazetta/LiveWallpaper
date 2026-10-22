@@ -122,6 +122,17 @@ final class SceneRenderer {
         let particlesAdd: MTLRenderPipelineState
         /// Single-pass compositing; nil where the GPU cannot read its framebuffer.
         let compositeFetch: MTLRenderPipelineState?
+        /// The same two for a high-dynamic-range canvas (half floats).
+        let compositeWide: MTLRenderPipelineState
+        let compositeFetchWide: MTLRenderPipelineState?
+
+        func composite(for format: MTLPixelFormat) -> MTLRenderPipelineState {
+            format == .rgba16Float ? compositeWide : composite
+        }
+
+        func compositeFetch(for format: MTLPixelFormat) -> MTLRenderPipelineState? {
+            format == .rgba16Float ? compositeFetchWide : compositeFetch
+        }
     }
 
     private static let pipelineLock = NSLock()
@@ -179,6 +190,31 @@ final class SceneRenderer {
     private var captureTargets: [UUID: MTLTexture] = [:]
     private var particleTargets: [UUID: MTLTexture] = [:]
     private var accumulation: [MTLTexture] = []
+    private var finishingCanvas: MTLTexture?
+    private var finishingRenderer: SceneRenderGraphRenderer?
+    private var finishingImages: [String: MTLTexture] = [:]
+    private var solidBackground: MTLTexture?
+
+    private var backgroundClearColor: MTLClearColor {
+        let color = document.backgroundColor ?? [0, 0, 0]
+        return MTLClearColor(red: color[0], green: color[1], blue: color[2], alpha: 1)
+    }
+
+    private func finishingImage(_ file: String) throws -> MTLTexture {
+        let alpha: ImageAlpha = document.finishing?.straightAlphaImages == true ? .straightDropped : .premultiplied
+        return try Self.cachedTexture(url: fileURL(file), variant: "rgba-\(alpha)") { url in
+            try Self.decodeRGBA(url: url, device: device, alpha: alpha)
+        }
+    }
+
+    /// The canvas before any layer: the background colour, as a texture to draw over.
+    private func backgroundTexture() throws -> MTLTexture {
+        guard let color = document.backgroundColor else { return blackTexture }
+        if let solidBackground { return solidBackground }
+        let bytes = color.map { UInt8((min(max($0, 0), 1) * 255).rounded()) } + [255]
+        solidBackground = try Self.makeSolidTexture(device: device, pixelFormat: .rgba8Unorm, bytes: bytes)
+        return solidBackground!
+    }
     private let blackTexture: MTLTexture
     private let whiteMask: MTLTexture
     private let stillFlow: MTLTexture
@@ -286,6 +322,23 @@ final class SceneRenderer {
         return (placed - 0.5) * layerUVScale(for: layer) + 0.5
     }
 
+    private func readsBackground(_ layer: SceneLayer) -> Bool {
+        if graphRenderers[layer.id]?.graph.readsBackground == true { return true }
+        return layer.activeEffects.contains { graphRenderers[$0.id]?.graph.readsBackground == true }
+    }
+
+    /// Canvas UV → layer UV as an affine matrix, for effects that place the cursor on
+    /// their layer; identity for layers drawn over the whole canvas.
+    private func layerFromCanvas(_ layer: SceneLayer) -> simd_float3x3 {
+        guard !layer.capturesCanvas, let origin = layerUV(canvasUV: .zero, layerID: layer.id),
+              let right = layerUV(canvasUV: SIMD2(1, 0), layerID: layer.id),
+              let down = layerUV(canvasUV: SIMD2(0, 1), layerID: layer.id)
+        else { return matrix_identity_float3x3 }
+        return simd_float3x3(columns: (
+            SIMD3(right - origin, 0), SIMD3(down - origin, 0), SIMD3(origin, 1)
+        ))
+    }
+
     /// Layer UV → canvas UV, the inverse of layerUV(canvasUV:layerID:); for markers
     /// drawn over the preview.
     func canvasUV(layerUV: SIMD2<Float>, layerID: UUID) -> SIMD2<Float>? {
@@ -336,6 +389,45 @@ final class SceneRenderer {
 
     /// Encodes the scene into `target` (bgra8Unorm, renderTarget usage).
     func encode(into target: MTLTexture, commandBuffer: MTLCommandBuffer, input: SceneFrameInput, frame: SceneEvaluatedFrame? = nil) throws {
+        guard document.highDynamicRange || document.finishing != nil else {
+            return try composite(into: target, commandBuffer: commandBuffer, input: input, frame: frame)
+        }
+        // The layers go onto a canvas of their own first, wide when the scene is, then
+        // through the finishing passes; the copy to the target clamps to its range.
+        let format: MTLPixelFormat = document.highDynamicRange ? .rgba16Float : .bgra8Unorm
+        if finishingCanvas?.width != target.width || finishingCanvas?.height != target.height
+            || finishingCanvas?.pixelFormat != format
+        {
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: format, width: target.width, height: target.height, mipmapped: false
+            )
+            descriptor.usage = [.renderTarget, .shaderRead]
+            descriptor.storageMode = .private
+            guard let canvas = device.makeTexture(descriptor: descriptor) else { throw RendererError.textureAllocationFailed }
+            finishingCanvas = canvas
+        }
+        let canvas = finishingCanvas!
+        try composite(into: canvas, commandBuffer: commandBuffer, input: input, frame: frame)
+        var finished = canvas
+        if let finishing = document.finishing {
+            if finishingRenderer?.graph != finishing {
+                finishingRenderer = try SceneRenderGraphRenderer(graph: finishing, device: device, pool: graphTexturePool)
+                finishingImages = try finishing.images.values.reduce(into: [:]) { result, file in
+                    result[file] = try finishingImage(file)
+                }
+            }
+            finished = try finishingRenderer!.encode(
+                input: canvas, images: finishingImages, time: input.time, cursor: input.cursor, audio: input.audio,
+                commandBuffer: commandBuffer
+            )
+        }
+        try compositePass(
+            commandBuffer: commandBuffer, destination: target, base: finished,
+            layerTexture: blackTexture, uniforms: Self.passThroughUniforms
+        )
+    }
+
+    private func composite(into target: MTLTexture, commandBuffer: MTLCommandBuffer, input: SceneFrameInput, frame: SceneEvaluatedFrame?) throws {
         usedEffectScratchSizes.removeAll(keepingCapacity: true)
         defer {
             graphTexturePool.endFrame()
@@ -377,7 +469,7 @@ final class SceneRenderer {
                 (lastPlacements[layer.id] == nil || lastInversePlacements[layer.id] != nil) &&
                 (layer.capturesCanvas || (layer.kind == .particles ? layer.particles != nil : picture(for: layer) != nil))
         }
-        if allowsSinglePassComposite, let fetch = pipeline.compositeFetch {
+        if allowsSinglePassComposite, let fetch = pipeline.compositeFetch(for: target.pixelFormat) {
             enum Segment {
                 case batch([SceneLayer])
                 case capture(SceneLayer)
@@ -385,7 +477,9 @@ final class SceneRenderer {
             var segments: [Segment] = []
             var currentBatch: [SceneLayer] = []
             for layer in visible {
-                if layer.capturesCanvas {
+                // A layer whose effects read what lies below it needs the canvas drawn
+                // up to it, as a canvas-capturing layer does.
+                if layer.capturesCanvas || readsBackground(layer) {
                     if !currentBatch.isEmpty {
                         segments.append(.batch(currentBatch))
                         currentBatch.removeAll()
@@ -399,7 +493,7 @@ final class SceneRenderer {
                 segments.append(.batch(currentBatch))
             }
 
-            try ensureAccumulation(width: target.width, height: target.height)
+            try ensureAccumulation(width: target.width, height: target.height, format: target.pixelFormat)
             var source: MTLTexture? = nil
             var nextIndex = 0
 
@@ -440,7 +534,7 @@ final class SceneRenderer {
                     pass.colorAttachments[0].texture = destination
                     if source == nil {
                         pass.colorAttachments[0].loadAction = .clear
-                        pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+                        pass.colorAttachments[0].clearColor = backgroundClearColor
                     } else {
                         pass.colorAttachments[0].loadAction = .load
                     }
@@ -467,7 +561,7 @@ final class SceneRenderer {
                 case .capture(let layer):
                     let drawn = evaluated.layers[layer.id]!
                     let uniforms = compositeUniforms(for: drawn.layer, drawn: drawn, input: input, targetSize: targetSize)
-                    let base = source ?? blackTexture
+                    let base = try source ?? backgroundTexture()
                     let layerTexture = try applyEffects(
                         to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize,
                         canvasSource: base, compositeUniforms: uniforms
@@ -485,7 +579,7 @@ final class SceneRenderer {
                 let pass = MTLRenderPassDescriptor()
                 pass.colorAttachments[0].texture = target
                 pass.colorAttachments[0].loadAction = .clear
-                pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+                pass.colorAttachments[0].clearColor = backgroundClearColor
                 pass.colorAttachments[0].storeAction = .store
                 guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
                     throw RendererError.textureAllocationFailed
@@ -495,8 +589,8 @@ final class SceneRenderer {
             return
         }
 
-        try ensureAccumulation(width: target.width, height: target.height)
-        var source = blackTexture
+        try ensureAccumulation(width: target.width, height: target.height, format: target.pixelFormat)
+        var source = try backgroundTexture()
         var nextIndex = 0
         for layer in visible {
             let drawn = evaluated.layers[layer.id]!
@@ -835,6 +929,9 @@ final class SceneRenderer {
         if let graph = graphRenderers[layer.id] {
             source = try graph.encode(input: source, images: graphResources[layer.id]!, time: input.time,
                                       cursor: input.cursor, audio: input.audio, meshes: lastFrame?.meshes ?? [],
+                                      layerFromCanvas: graph.usesLayerPlacement ? layerFromCanvas(layer) : matrix_identity_float3x3,
+                                      pointerPresses: input.pointerPresses, parallax: input.parallax,
+                                      background: canvasSource ?? blackTexture,
                                       commandBuffer: commandBuffer)
         }
         var effects = layer.activeEffects
@@ -868,7 +965,11 @@ final class SceneRenderer {
             if let graph = graphRenderers[effect.id] {
                 current = try graph.encode(input: current, images: graphResources[effect.id]!, time: input.time,
                                            cursor: input.cursor, values: effect.values, audio: input.audio,
-                                           meshes: lastFrame?.meshes ?? [], commandBuffer: commandBuffer)
+                                           meshes: lastFrame?.meshes ?? [],
+                                           layerFromCanvas: graph.usesLayerPlacement ? layerFromCanvas(layer) : matrix_identity_float3x3,
+                                      pointerPresses: input.pointerPresses, parallax: input.parallax,
+                                      background: canvasSource ?? blackTexture,
+                                           commandBuffer: commandBuffer)
                 continue
             }
             let isLayerTarget = startsWithLayerTarget ? (standardIndex % 2 == 0) : (standardIndex % 2 != 0)
@@ -1156,7 +1257,7 @@ final class SceneRenderer {
             throw RendererError.textureAllocationFailed
         }
         var uniforms = uniforms
-        encoder.setRenderPipelineState(pipeline.composite)
+        encoder.setRenderPipelineState(pipeline.composite(for: destination.pixelFormat))
         encoder.setFragmentTexture(base, index: 0)
         encoder.setFragmentTexture(layerTexture, index: 1)
         encoder.setFragmentTexture(depth ?? whiteMask, index: 2)
@@ -1223,8 +1324,28 @@ final class SceneRenderer {
     /// How far the layer can move each way, as a fraction of the canvas: the cursor
     /// parallax, and the depth shift (nearest and farthest pixels move half of it).
     private func parallaxTravel(for layer: SceneLayer) -> Float {
+        // A scene that sets its own travel draws layers at their size and lets edges
+        // show, as the scenes it is made for expect.
+        guard document.parallaxTravel == nil else { return depthTravel(for: layer) }
         let cursorTravel = Float(min(max(layer.parallaxDepth, 0), 1)) * Self.maxParallaxTravel
         return max(cursorTravel, depthTravel(for: layer))
+    }
+
+    /// The canvas fraction the cursor parallax and the camera shake move the layer by.
+    private func viewShift(for layer: SceneLayer, input: SceneFrameInput) -> SIMD2<Float> {
+        var shift: SIMD2<Float> = .zero
+        if let travel = document.parallaxTravel {
+            let depth = SIMD2(layer.parallaxDepth, layer.parallaxDepthY ?? layer.parallaxDepth)
+                .clamped(lowerBound: SIMD2(repeating: -10), upperBound: SIMD2(repeating: 10))
+            shift = input.parallax * SIMD2<Float>(depth) * Float(travel)
+        } else {
+            shift = input.parallax * Float(min(max(layer.parallaxDepth, 0), 1)) * Self.maxParallaxTravel
+        }
+        if let shake = document.cameraShake {
+            let offset = shake.offset(at: input.time)
+            shift += SIMD2(Float(offset.x / document.aspectRatio), Float(offset.y))
+        }
+        return shift
     }
 
     private func depthTravel(for layer: SceneLayer) -> Float {
@@ -1316,8 +1437,8 @@ final class SceneRenderer {
             return SIMD2(direction.x, direction.y)
         }
         // The travel is a fraction of the canvas, converted into layer UV units.
-        let cursorTravel = Float(min(max(layer.parallaxDepth, 0), 1)) * Self.maxParallaxTravel
-        let offset = cursorTravel > 0 ? layerDirection(input.parallax * cursorTravel) : .zero
+        let shift = viewShift(for: layer, input: input)
+        let offset = shift != .zero ? layerDirection(shift) : .zero
         var depthView = layer.depthFollowsCursor ? input.parallax : .zero
         if layer.depthAutoMotion > 0 {
             // A circle repeats every turn, so the drift loops.
@@ -1438,12 +1559,12 @@ final class SceneRenderer {
 
     // MARK: - Resources
 
-    private func ensureAccumulation(width: Int, height: Int) throws {
-        if let first = accumulation.first, first.width == width, first.height == height {
+    private func ensureAccumulation(width: Int, height: Int, format: MTLPixelFormat) throws {
+        if let first = accumulation.first, first.width == width, first.height == height, first.pixelFormat == format {
             return
         }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false
+            pixelFormat: format, width: width, height: height, mipmapped: false
         )
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .private
@@ -1736,6 +1857,7 @@ final class SceneRenderer {
             return try device.makeRenderPipelineState(descriptor: descriptor)
         }
         var compositeFetch: MTLRenderPipelineState?
+        var compositeFetchWide: MTLRenderPipelineState?
         if device.supportsFamily(.apple1) {
             let fetchLibrary = try device.makeLibrary(source: fetchShaderSource, options: nil)
             let descriptor = MTLRenderPipelineDescriptor()
@@ -1743,6 +1865,8 @@ final class SceneRenderer {
             descriptor.fragmentFunction = fetchLibrary.makeFunction(name: "scene_composite_fetch")
             descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
             compositeFetch = try device.makeRenderPipelineState(descriptor: descriptor)
+            descriptor.colorAttachments[0].pixelFormat = .rgba16Float
+            compositeFetchWide = try device.makeRenderPipelineState(descriptor: descriptor)
         }
         let pipeline = try Pipeline(
             device: device, queue: queue,
@@ -1751,7 +1875,9 @@ final class SceneRenderer {
             effect: state(fragment: "scene_effect", format: .rgba8Unorm),
             particlesOver: state(vertex: "particle_vertex", fragment: "particle_fragment", format: .rgba8Unorm, additive: false),
             particlesAdd: state(vertex: "particle_vertex", fragment: "particle_fragment", format: .rgba8Unorm, additive: true),
-            compositeFetch: compositeFetch
+            compositeFetch: compositeFetch,
+            compositeWide: state(fragment: "scene_composite", format: .rgba16Float),
+            compositeFetchWide: compositeFetchWide
         )
         sharedPipeline = pipeline
         return pipeline
@@ -1819,12 +1945,83 @@ final class SceneRenderer {
         float tintBlue;
     };
 
+    float3 rgbToHSL(float3 c) {
+        float low = min(min(c.r, c.g), c.b), high = max(max(c.r, c.g), c.b), delta = high - low;
+        float3 hsl = float3(0.0, 0.0, (high + low) / 2.0);
+        if (delta == 0.0) { return hsl; }
+        hsl.y = hsl.z < 0.5 ? delta / (high + low) : delta / (2.0 - high - low);
+        float3 d = (((high - c) / 6.0) + (delta / 2.0)) / delta;
+        if (c.r == high) { hsl.x = d.b - d.g; }
+        else if (c.g == high) { hsl.x = (1.0 / 3.0) + d.r - d.b; }
+        else { hsl.x = (2.0 / 3.0) + d.g - d.r; }
+        hsl.x = hsl.x < 0.0 ? hsl.x + 1.0 : (hsl.x > 1.0 ? hsl.x - 1.0 : hsl.x);
+        return hsl;
+    }
+
+    float hueToRGB(float f1, float f2, float hue) {
+        hue = hue < 0.0 ? hue + 1.0 : (hue > 1.0 ? hue - 1.0 : hue);
+        if (6.0 * hue < 1.0) { return f1 + (f2 - f1) * 6.0 * hue; }
+        if (2.0 * hue < 1.0) { return f2; }
+        if (3.0 * hue < 2.0) { return f1 + (f2 - f1) * ((2.0 / 3.0) - hue) * 6.0; }
+        return f1;
+    }
+
+    float3 hslToRGB(float3 hsl) {
+        if (hsl.y == 0.0) { return float3(hsl.z); }
+        float f2 = hsl.z < 0.5 ? hsl.z * (1.0 + hsl.y) : (hsl.z + hsl.y) - (hsl.y * hsl.z);
+        float f1 = 2.0 * hsl.z - f2;
+        return float3(hueToRGB(f1, f2, hsl.x + 1.0 / 3.0), hueToRGB(f1, f2, hsl.x), hueToRGB(f1, f2, hsl.x - 1.0 / 3.0));
+    }
+
+    float3 overlayBlend(float3 b, float3 s) { return select(1.0 - 2.0 * (1.0 - b) * (1.0 - s), 2.0 * b * s, b < 0.5); }
+    float colorDodgeF(float b, float s) { return s == 1.0 ? s : min(b / (1.0 - s), 1.0); }
+    float colorBurnF(float b, float s) { return s == 0.0 ? s : max(1.0 - (1.0 - b) / s, 0.0); }
+    float vividLightF(float b, float s) { return s < 0.5 ? colorBurnF(b, 2.0 * s) : colorDodgeF(b, 2.0 * (s - 0.5)); }
+    float reflectF(float b, float s) { return s == 1.0 ? s : min(b * b / (1.0 - s), 1.0); }
+    float3 perChannel(int mode, float3 b, float3 s) {
+        float3 r;
+        for (int i = 0; i < 3; i++) {
+            float x = b[i], y = s[i];
+            switch (mode) {
+            case 6: r[i] = colorBurnF(x, y); break;
+            case 10: r[i] = colorDodgeF(x, y); break;
+            case 12: r[i] = y < 0.5 ? 2.0 * x * y + x * x * (1.0 - 2.0 * y) : sqrt(x) * (2.0 * y - 1.0) + 2.0 * x * (1.0 - y); break;
+            case 14: r[i] = vividLightF(x, y); break;
+            case 15: r[i] = y < 0.5 ? max(x + 2.0 * y - 1.0, 0.0) : x + 2.0 * (y - 0.5); break;
+            case 16: r[i] = y < 0.5 ? min(2.0 * y, x) : max(2.0 * (y - 0.5), x); break;
+            case 17: r[i] = vividLightF(x, y) < 0.5 ? 0.0 : 1.0; break;
+            case 20: r[i] = reflectF(x, y); break;
+            default: r[i] = reflectF(y, x); break;
+            }
+        }
+        return r;
+    }
+    /// The blended colour that the layer's alpha then mixes in, by SceneBlendMode position.
     float3 blend(int mode, float3 b, float3 s) {
         switch (mode) {
         case 1: return b * s;
         case 2: return 1.0 - (1.0 - b) * (1.0 - s);
-        case 3: return select(1.0 - 2.0 * (1.0 - b) * (1.0 - s), 2.0 * b * s, b < 0.5);
+        case 3: return overlayBlend(b, s);
         case 4: return min(b + s, 1.0);
+        case 5: return min(s, b);
+        case 7: return max(b + s - 1.0, 0.0);
+        case 8: return min(b, s);
+        case 9: return max(s, b);
+        case 11: return max(b, s);
+        case 13: return overlayBlend(s, b);
+        case 18: return abs(b - s);
+        case 19: return b + s - 2.0 * b * s;
+        case 22: return min(b, s) - max(b, s) + 1.0;
+        case 23: return (b + s) / 2.0;
+        case 24: return 1.0 - abs(1.0 - b - s);
+        case 25: { float3 l = rgbToHSL(b); return hslToRGB(float3(rgbToHSL(s).x, l.y, l.z)); }
+        case 26: { float3 l = rgbToHSL(b); return hslToRGB(float3(l.x, rgbToHSL(s).y, l.z)); }
+        case 27: { float3 l = rgbToHSL(s); return hslToRGB(float3(l.x, l.y, rgbToHSL(b).z)); }
+        case 28: { float3 l = rgbToHSL(b); return hslToRGB(float3(l.x, l.y, rgbToHSL(s).z)); }
+        case 29: return max(b.x, max(b.y, b.z)) * s;
+        case 30: return b + s;
+        case 31: return b + b * s;
+        case 6: case 10: case 12: case 14: case 15: case 16: case 17: case 20: case 21: return perChannel(mode, b, s);
         default: return s;
         }
     }
@@ -1864,6 +2061,12 @@ final class SceneRenderer {
             layerUV = layerUV - u.depthShift * hitT;
         }
         float4 src = sampleInside(layer, s, layerUV);
+        // minimum and maximum ignore alpha across the picture; elsewhere nothing changes.
+        if (u.blendMode == 8 || u.blendMode == 11) {
+            bool inside = all(layerUV >= 0.0) && all(layerUV <= 1.0);
+            float3 straight = src.a > 0.0 ? src.rgb / src.a : float3(0.0);
+            return inside ? blend(u.blendMode, below, straight) : below;
+        }
         float alpha = src.a * u.opacity;
         float3 color = src.a > 0.0 ? src.rgb / src.a : float3(0.0);
         // Skipped when unchanged, so layers without links draw exactly as before.
@@ -2027,34 +2230,6 @@ final class SceneRenderer {
         cosines = pow(abs(cosines), float4(v[10])) * sign(cosines);
         float2 offset = float2(axes.x * dot(sines, float4(amplitude)), axes.y * dot(cosines, float4(amplitude)));
         return src.sample(s, uv + offset);
-    }
-
-    float3 rgbToHSL(float3 c) {
-        float low = min(min(c.r, c.g), c.b), high = max(max(c.r, c.g), c.b), delta = high - low;
-        float3 hsl = float3(0.0, 0.0, (high + low) / 2.0);
-        if (delta == 0.0) { return hsl; }
-        hsl.y = hsl.z < 0.5 ? delta / (high + low) : delta / (2.0 - high - low);
-        float3 d = (((high - c) / 6.0) + (delta / 2.0)) / delta;
-        if (c.r == high) { hsl.x = d.b - d.g; }
-        else if (c.g == high) { hsl.x = (1.0 / 3.0) + d.r - d.b; }
-        else { hsl.x = (2.0 / 3.0) + d.g - d.r; }
-        hsl.x = hsl.x < 0.0 ? hsl.x + 1.0 : (hsl.x > 1.0 ? hsl.x - 1.0 : hsl.x);
-        return hsl;
-    }
-
-    float hueToRGB(float f1, float f2, float hue) {
-        hue = hue < 0.0 ? hue + 1.0 : (hue > 1.0 ? hue - 1.0 : hue);
-        if (6.0 * hue < 1.0) { return f1 + (f2 - f1) * 6.0 * hue; }
-        if (2.0 * hue < 1.0) { return f2; }
-        if (3.0 * hue < 2.0) { return f1 + (f2 - f1) * ((2.0 / 3.0) - hue) * 6.0; }
-        return f1;
-    }
-
-    float3 hslToRGB(float3 hsl) {
-        if (hsl.y == 0.0) { return float3(hsl.z); }
-        float f2 = hsl.z < 0.5 ? hsl.z * (1.0 + hsl.y) : (hsl.z + hsl.y) - (hsl.y * hsl.z);
-        float f1 = 2.0 * hsl.z - f2;
-        return float3(hueToRGB(f1, f2, hsl.x + 1.0 / 3.0), hueToRGB(f1, f2, hsl.x), hueToRGB(f1, f2, hsl.x - 1.0 / 3.0));
     }
 
     float overlayChannel(float a, float b) { return a < 0.5 ? 2.0 * a * b : 1.0 - 2.0 * (1.0 - a) * (1.0 - b); }

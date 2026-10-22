@@ -640,7 +640,7 @@ final class SceneMetalLayer: CAMetalLayer {
         let dt = now - lastStep
         lastStep = now
         if isEasing {
-            let k = Float(1 - exp(-dt / Self.parallaxTimeConstant))
+            let k = Float(renderer?.document.parallaxResponse.map { min($0 * dt, 1) } ?? 1 - exp(-dt / Self.parallaxTimeConstant))
             let delta = target.parallax - current.parallax
             if abs(delta.x) < 0.001, abs(delta.y) < 0.001 {
                 current.parallax = target.parallax

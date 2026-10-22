@@ -1,5 +1,6 @@
 import Foundation
 import Metal
+import simd
 
 final class SceneRenderGraphRenderer {
     struct GraphError: LocalizedError {
@@ -61,6 +62,8 @@ final class SceneRenderGraphRenderer {
     }
 
     let graph: SceneRenderGraph
+    /// Whether encode needs the layer's placement; working it out costs a little per frame.
+    let usesLayerPlacement: Bool
     private let device: MTLDevice
     private let pool: SceneTexturePool?
     /// Targets that every frame starts by overwriting completely and that are not the output,
@@ -70,9 +73,38 @@ final class SceneRenderGraphRenderer {
     private var draws: [Int: CompiledDraw] = [:]
     private var targets: [String: MTLTexture] = [:]
     private var size: SIMD2<Int>?
+    private var lastPointer: SIMD2<Float>?
+    private var lastTime: Double?
+    private var pointerHeld = false
+    private var frame = FrameValues()
+
+    private struct FrameValues {
+        var pointer = SIMD2<Float>.zero
+        var previousPointer = SIMD2<Float>.zero
+        var layerFromCanvas = matrix_identity_float4x4
+        var canvasFromLayer = matrix_identity_float4x4
+        var screenFromLayer = matrix_identity_float4x4
+        var frameTime: Float = 0
+        var pointerHeld = false
+        var parallax = SIMD2<Float>.zero
+    }
+
+    /// `uv` (canvas UV → layer UV, origin top-left) as the same map between clip spaces
+    /// with y up, the form the original shaders multiply a pointer by.
+    static func clipSpace(_ uv: simd_float3x3) -> simd_float4x4 {
+        let toClip = simd_float3x3(columns: (SIMD3(2, 0, 0), SIMD3(0, -2, 0), SIMD3(-1, 1, 1)))
+        let m = toClip * uv * toClip.inverse
+        return simd_float4x4(columns: (
+            SIMD4(m.columns.0.x, m.columns.0.y, 0, 0),
+            SIMD4(m.columns.1.x, m.columns.1.y, 0, 0),
+            SIMD4(0, 0, 1, 0),
+            SIMD4(m.columns.2.x, m.columns.2.y, 0, 1)
+        ))
+    }
 
     init(graph: SceneRenderGraph, device: MTLDevice, rigs: SceneSkeletonRegistry? = nil, pool: SceneTexturePool? = nil) throws {
         self.graph = graph
+        self.usesLayerPlacement = graph.uses(.layerFromCanvas) || graph.uses(.canvasFromLayer) || graph.uses(.screenFromLayer)
         self.device = device
         self.pool = pool
         let transient = pool == nil ? [] : graph.transientTargetNames()
@@ -91,6 +123,9 @@ final class SceneRenderGraphRenderer {
             descriptor.fragmentFunction = fragmentFunction
             descriptor.colorAttachments[0]
                 .pixelFormat = pixelFormat(graph.targets.first { $0.name == pass.target }!.format)
+            if draw.writesAlpha == false {
+                descriptor.colorAttachments[0].writeMask = [.red, .green, .blue]
+            }
             if let blend = draw.blend {
                 let attachment = descriptor.colorAttachments[0]!
                 attachment.isBlendingEnabled = true
@@ -185,8 +220,22 @@ final class SceneRenderGraphRenderer {
     }
 
     private func targetDescriptor(_ target: SceneRenderGraph.Target, input: MTLTexture) throws -> MTLTextureDescriptor {
-        let width = Double(input.width) * target.scale
-        let height = Double(input.height) * target.scale
+        var width = Double(target.width ?? input.width)
+        var height = Double(target.height ?? input.height)
+        if let fit = target.fit.map(Double.init) {
+            // Truncated like the sizes it is meant to match.
+            if width >= height {
+                let side = min(fit, width)
+                height = (height / width * side).rounded(.towardZero)
+                width = side
+            } else {
+                let side = min(fit, height)
+                width = (width / height * side).rounded(.towardZero)
+                height = side
+            }
+        }
+        width *= target.scale
+        height *= target.scale
         guard width >= 1, height >= 1, width < Double(Int.max), height < Double(Int.max)
         else {
             throw GraphError(detail: "invalid size for target \(target.name)")
@@ -207,8 +256,25 @@ final class SceneRenderGraphRenderer {
         values: [String: Double] = [:],
         audio: SceneAudioSpectrum? = nil,
         meshes: [SceneMeshFrame] = [],
+        layerFromCanvas: simd_float3x3 = matrix_identity_float3x3,
+        pointerPresses: [ScenePointerPress] = [],
+        parallax: SIMD2<Float> = .zero,
+        background: MTLTexture? = nil,
         commandBuffer: MTLCommandBuffer
     ) throws -> MTLTexture {
+        let pointer = cursor ?? lastPointer ?? SIMD2(0.5, 0.5)
+        if let last = pointerPresses.last { pointerHeld = last.isDown }
+        let clip = Self.clipSpace(layerFromCanvas)
+        // A paused or restarted clock gives no step rather than a negative one.
+        let step = lastTime.map { min(max(time - $0, 0), 1) } ?? 0
+        frame = FrameValues(
+            pointer: pointer, previousPointer: lastPointer ?? pointer,
+            layerFromCanvas: clip, canvasFromLayer: clip.inverse,
+            screenFromLayer: simd_float4x4(diagonal: SIMD4(1, -1, 1, 1)) * clip.inverse, frameTime: Float(step),
+            pointerHeld: pointerHeld, parallax: (parallax + 1) / 2
+        )
+        lastPointer = pointer
+        lastTime = time
         let newSize = SIMD2(input.width, input.height)
         if newSize != size {
             targets.removeAll()
@@ -222,7 +288,8 @@ final class SceneRenderGraphRenderer {
                 let clear = MTLRenderPassDescriptor()
                 clear.colorAttachments[0].texture = texture
                 clear.colorAttachments[0].loadAction = .clear
-                clear.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
+                let color = target.clearColor ?? [0, 0, 0, 0]
+                clear.colorAttachments[0].clearColor = MTLClearColorMake(color[0], color[1], color[2], color[3])
                 clear.colorAttachments[0].storeAction = .store
                 guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: clear) else {
                     throw GraphError(detail: "target \(target.name) clear failed")
@@ -243,6 +310,10 @@ final class SceneRenderGraphRenderer {
             resources[target.name] = texture
         }
         resources["input"] = input
+        if graph.readsBackground {
+            guard let background else { throw GraphError(detail: "the graph reads the background but none was given") }
+            resources[SceneRenderGraph.background] = background
+        }
         for (name, file) in graph.images {
             guard let image = images[file]
             else { throw GraphError(detail: "image \(file) is missing") }
@@ -282,6 +353,18 @@ final class SceneRenderGraphRenderer {
                         destinationOrigin: MTLOrigin()
                     )
                     encoder.endEncoding()
+                case .swap:
+                    endActiveEncoder()
+                    let source = resources[pass.source!]!
+                    guard source.width == target.width, source.height == target.height,
+                          source.pixelFormat == target.pixelFormat
+                    else {
+                        throw GraphError(detail: "swap pass \(index) requires matching size and format")
+                    }
+                    resources[pass.source!] = target
+                    resources[pass.target] = source
+                    targets[pass.source!] = target
+                    targets[pass.target] = source
                 case .draw:
                     let draw = pass.draw!, compiled = draws[index]!
                     // A pass that adds to its target and has nothing to add costs a full
@@ -573,6 +656,23 @@ final class SceneRenderGraphRenderer {
             switch update.value {
             case .time: values = [Float(time)]
             case .cursor: values = [cursor?.x ?? 0, cursor?.y ?? 0]
+            case .pointer: values = [frame.pointer.x, frame.pointer.y]
+            case .previousPointer: values = [frame.previousPointer.x, frame.previousPointer.y]
+            case .layerFromCanvas, .canvasFromLayer, .screenFromLayer:
+                var matrix = switch update.value {
+                case .layerFromCanvas: frame.layerFromCanvas
+                case .canvasFromLayer: frame.canvasFromLayer
+                default: frame.screenFromLayer
+                }
+                withUnsafeBytes(of: &matrix) { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
+                continue
+            case .texelSize, .texelOffsets:
+                let texture = resources[update.texture!]!
+                let x = 1 / Float(texture.width), y = 1 / Float(texture.height)
+                values = update.value == .texelSize ? [x, y] : [x, y, -x, -y]
+            case .frameTime: values = [frame.frameTime]
+            case .pointerState: values = [0, 0, frame.pointerHeld ? 1 : 0, 0]
+            case .parallaxPosition: values = [frame.parallax.x, frame.parallax.y]
             case .textureSize:
                 let texture = resources[update.texture!]!
                 values = [
@@ -632,7 +732,7 @@ final class SceneRenderGraphRenderer {
         func require(_ condition: Bool, _ message: String) throws {
             if !condition { throw GraphError(detail: message) }
         }
-        let names = graph.targets.map(\.name) + Array(graph.images.keys) + ["input"]
+        let names = graph.targets.map(\.name) + Array(graph.images.keys) + ["input", SceneRenderGraph.background]
         try require(Set(names).count == names.count, "resource names must be unique")
         let resources = Set(names), targets = Set(graph.targets.map(\.name))
         try require(resources.contains(graph.output), "unknown output \(graph.output)")
@@ -645,6 +745,14 @@ final class SceneRenderGraphRenderer {
         }
         for target in graph.targets {
             try require(target.scale.isFinite && target.scale > 0, "invalid target scale")
+            try require(
+                [target.width, target.height, target.fit].allSatisfy { $0.map { (1 ... 8192).contains($0) } ?? true },
+                "invalid target size"
+            )
+            try require(
+                target.clearColor.map { $0.count == 4 && $0.allSatisfy(\.isFinite) } ?? true,
+                "invalid target clear colour"
+            )
         }
         for (index, pass) in graph.passes.enumerated() {
             try require(targets.contains(pass.target), "pass \(index) has an unknown target")
@@ -659,6 +767,15 @@ final class SceneRenderGraphRenderer {
                     "copy pass \(index) has an unknown source"
                 )
                 try require(pass.source != pass.target, "copy pass \(index) aliases its target")
+            case .swap:
+                try require(
+                    pass.draw == nil && pass.source.map { targets.contains($0) && $0 != pass.target } == true,
+                    "swap pass \(index) needs two different targets"
+                )
+                try require(
+                    pass.target != graph.output && pass.source != graph.output,
+                    "swap pass \(index) cannot move the output"
+                )
             case .draw:
                 try require(
                     pass.draw != nil && pass.source == nil,
@@ -779,7 +896,12 @@ final class SceneRenderGraphRenderer {
                 let bytes: Int
                 switch update.value {
                 case .time: bytes = 4
-                case .cursor: bytes = 8
+                case .cursor, .pointer, .previousPointer: bytes = 8
+                case .layerFromCanvas, .canvasFromLayer, .screenFromLayer: bytes = 64
+                case .frameTime: bytes = 4
+                case .pointerState: bytes = 16
+                case .parallaxPosition, .texelSize: bytes = 8
+                case .texelOffsets: bytes = 16
                 case .textureSize: bytes = 16
                 case .boneMatrices, .boneOpacity:
                     let count = (draw.skeleton ?? draw.skeletonID.flatMap { rigs.skeletons[$0] })?
@@ -813,7 +935,7 @@ final class SceneRenderGraphRenderer {
                     update.offset >= 0 && update.offset <= stage.uniforms.count - bytes,
                     "uniform update is outside its buffer"
                 )
-                if update.value == .textureSize {
+                if [.textureSize, .texelSize, .texelOffsets].contains(update.value) {
                     try require(
                         update.texture.map { resources.contains($0) || ($0.hasPrefix("slot:") && draw.dynamic != nil) } == true,
                         "uniform references an unknown texture"
@@ -828,6 +950,7 @@ final class SceneRenderGraphRenderer {
         case .rgba8: .rgba8Unorm
         case .rgba16Float: .rgba16Float
         case .r8: .r8Unorm
+        case .r16Float: .r16Float
         case .rg16Float: .rg16Float
         }
     }
@@ -904,6 +1027,8 @@ extension SceneRenderGraph {
         for pass in passes {
             var reads: [String] = []
             if let source = pass.source { reads.append(source) }
+            // Swapped targets carry content from earlier frames under each other's name.
+            if pass.operation == .swap { reads.append(pass.target) }
             if let draw = pass.draw {
                 reads += draw.textures.map(\.source)
                 reads += (draw.commands ?? []).flatMap { ($0.textures ?? []).map(\.source) }
