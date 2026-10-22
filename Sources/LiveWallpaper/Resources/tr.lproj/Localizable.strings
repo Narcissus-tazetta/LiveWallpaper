@@ -1205,3 +1205,12 @@
 "許可しない" = "İzin Verme";
 
 "外部からインポートした壁紙はStoreに共有できません" = "Harici kaynaklardan içe aktarılan duvar kağıtları Store'da paylaşılamaz.";
+
+"許可しても動かない場合" = "İzin verince bir şey değişmezse";
+"更新のあとなどに、許可がオンのままでも効かなくなることがあります。次の手順で許可を作り直してください。" = "Bir güncellemeden sonra izin açık kalsa da çalışmayı bırakabilir. İzni şu adımlarla yeniden oluşturun.";
+"システム設定の「プライバシーとセキュリティ」で、この項目を開く" = "Sistem Ayarları’nda Gizlilik ve Güvenlik altında bu öğeyi açın";
+"一覧の LiveWallpaper のスイッチをオフにする" = "Listede LiveWallpaper’ı kapatın";
+"LiveWallpaper を選び、一覧の下の「−」を押して削除する(パスワードか Touch ID が必要)" = "LiveWallpaper’ı seçip listenin altındaki − düğmesiyle kaldırın (parola veya Touch ID gerekir)";
+"「+」を押し、アプリケーションから LiveWallpaper を選んで追加し、スイッチをオンにする" = "+ düğmesine tıklayın, Uygulamalar’dan LiveWallpaper’ı seçerek ekleyin ve açın";
+"LiveWallpaper を再起動する" = "LiveWallpaper’ı yeniden başlatın";
+"アプリを再起動" = "Uygulamayı Yeniden Başlat";

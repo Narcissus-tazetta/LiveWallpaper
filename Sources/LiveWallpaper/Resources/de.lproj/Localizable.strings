@@ -1205,3 +1205,12 @@
 "許可しない" = "Nicht erlauben";
 
 "外部からインポートした壁紙はStoreに共有できません" = "Aus externen Quellen importierte Hintergrundbilder können nicht im Store geteilt werden.";
+
+"許可しても動かない場合" = "Wenn das Erlauben nichts ändert";
+"更新のあとなどに、許可がオンのままでも効かなくなることがあります。次の手順で許可を作り直してください。" = "Nach einem Update kann eine Berechtigung aktiviert bleiben, aber nicht mehr funktionieren. Erstelle sie mit diesen Schritten neu.";
+"システム設定の「プライバシーとセキュリティ」で、この項目を開く" = "Öffne diesen Eintrag in den Systemeinstellungen unter „Datenschutz & Sicherheit“";
+"一覧の LiveWallpaper のスイッチをオフにする" = "Deaktiviere LiveWallpaper in der Liste";
+"LiveWallpaper を選び、一覧の下の「−」を押して削除する(パスワードか Touch ID が必要)" = "Wähle LiveWallpaper aus und klicke unter der Liste auf −, um es zu entfernen (Passwort oder Touch ID erforderlich)";
+"「+」を押し、アプリケーションから LiveWallpaper を選んで追加し、スイッチをオンにする" = "Klicke auf +, wähle LiveWallpaper im Ordner „Programme“ aus, um es hinzuzufügen, und aktiviere es";
+"LiveWallpaper を再起動する" = "Starte LiveWallpaper neu";
+"アプリを再起動" = "App neu starten";

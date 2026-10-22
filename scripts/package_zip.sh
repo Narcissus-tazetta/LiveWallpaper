@@ -8,9 +8,19 @@ BUILD_NUMBER="${2:-}"
 SPARKLE_APPCAST_URL="${SPARKLE_APPCAST_URL:-https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml}"
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-}"
 ARCH_MODE="${ARCH_MODE:-universal}"
-# 既定はad-hoc署名。手元の証明書で署名したい場合は
-# CODESIGN_IDENTITY="Apple Development: ..." のように上書きする。
-CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
+# 署名IDは更新を跨いで同じにする。ad-hoc署名はビルドごとにハッシュが変わり、
+# アクセシビリティ等のプライバシー許可が更新のたびに外れる。
+# 自己署名証明書 "LiveWallpaper Release" が無い環境ではad-hocに落とす。
+# 上書きするときは CODESIGN_IDENTITY="Apple Development: ..." のように指定する。
+RELEASE_IDENTITY="LiveWallpaper Release"
+if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
+  if security find-identity -p codesigning | grep -q "\"$RELEASE_IDENTITY\""; then
+    CODESIGN_IDENTITY="$RELEASE_IDENTITY"
+  else
+    CODESIGN_IDENTITY="-"
+    echo "warning: '$RELEASE_IDENTITY' not found in keychain; signing ad-hoc (users must re-grant privacy permissions after updating)" >&2
+  fi
+fi
 CREATE_DMG="${CREATE_DMG:-true}"
 CREATE_DMG_COMMAND="${CREATE_DMG_COMMAND:-create-dmg}"
 

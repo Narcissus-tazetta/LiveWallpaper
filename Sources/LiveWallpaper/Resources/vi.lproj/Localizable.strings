@@ -1205,3 +1205,12 @@
 "許可しない" = "Không cho phép";
 
 "外部からインポートした壁紙はStoreに共有できません" = "Hình nền được nhập từ nguồn bên ngoài không thể chia sẻ lên Store.";
+
+"許可しても動かない場合" = "Khi cho phép mà không có tác dụng";
+"更新のあとなどに、許可がオンのままでも効かなくなることがあります。次の手順で許可を作り直してください。" = "Sau khi cập nhật, quyền có thể vẫn bật nhưng không còn hoạt động. Hãy tạo lại quyền theo các bước sau.";
+"システム設定の「プライバシーとセキュリティ」で、この項目を開く" = "Mở mục này trong Cài đặt Hệ thống, phần Quyền riêng tư & Bảo mật";
+"一覧の LiveWallpaper のスイッチをオフにする" = "Tắt LiveWallpaper trong danh sách";
+"LiveWallpaper を選び、一覧の下の「−」を押して削除する(パスワードか Touch ID が必要)" = "Chọn LiveWallpaper rồi bấm − bên dưới danh sách để xóa (cần mật khẩu hoặc Touch ID)";
+"「+」を押し、アプリケーションから LiveWallpaper を選んで追加し、スイッチをオンにする" = "Bấm +, chọn LiveWallpaper trong Ứng dụng để thêm, rồi bật lại";
+"LiveWallpaper を再起動する" = "Khởi động lại LiveWallpaper";
+"アプリを再起動" = "Khởi động lại ứng dụng";

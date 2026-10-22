@@ -25,6 +25,7 @@ extension SettingsView {
         Text(model.localizedString("アクセシビリティの許可が必要です。システム設定のプライバシーとセキュリティで許可してください。"))
           .font(.caption)
           .foregroundStyle(.secondary)
+        PermissionRepairHelp(model: model)
       }
       Toggle(model.localizedString("ログイン時に自動起動する"), isOn: launchAtLoginBinding)
       Toggle(model.localizedString("音声を再生する"), isOn: audioEnabledBinding)

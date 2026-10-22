@@ -17,7 +17,43 @@ struct IntegrationFailureNote: View {
                 }
                 Button(model.localizedString("再試行")) { LocalWebIntegration.shared.retry() }
             }
+            // The Automation pane has no "−" to remove an entry, so the steps only fit the others.
+            if privacy != "Privacy_Automation" {
+                PermissionRepairHelp(model: model)
+            }
         }
+    }
+}
+
+/// How to recreate a privacy entry that is switched on but refused.
+///
+/// An update that changes the app's code signature leaves the old entry in System Settings
+/// still on, while macOS treats the new build as a different app.
+struct PermissionRepairHelp: View {
+    @ObservedObject var model: WallpaperModel
+    @State private var isExpanded = false
+
+    private static let steps = [
+        "システム設定の「プライバシーとセキュリティ」で、この項目を開く",
+        "一覧の LiveWallpaper のスイッチをオフにする",
+        "LiveWallpaper を選び、一覧の下の「−」を押して削除する(パスワードか Touch ID が必要)",
+        "「+」を押し、アプリケーションから LiveWallpaper を選んで追加し、スイッチをオンにする",
+        "LiveWallpaper を再起動する",
+    ]
+
+    var body: some View {
+        DisclosureGroup(model.localizedString("許可しても動かない場合"), isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.localizedString("更新のあとなどに、許可がオンのままでも効かなくなることがあります。次の手順で許可を作り直してください。"))
+                ForEach(Array(Self.steps.enumerated()), id: \.offset) { index, step in
+                    Text("\(index + 1). " + model.localizedString(step))
+                }
+                Button(model.localizedString("アプリを再起動")) { AppRelaunch.perform() }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 4)
+        }
+        .font(.caption)
     }
 }
 

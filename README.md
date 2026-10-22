@@ -44,6 +44,20 @@ If that happens:
 3. Click **Open Anyway** and confirm with your password
 4. If needed, open the app again from Applications
 
+### If a permission stops working after an update
+
+Only needed once, when updating from a version before 1.4.1. Those versions used a different code signature, so macOS keeps showing LiveWallpaper as allowed while it actually refuses it. Typical signs: "Screen & System Audio Recording" is on but the system-audio wallpaper reports that capture was denied, or clicking buttons in a web wallpaper does nothing. Later updates keep your permissions.
+
+Do this for **Screen & System Audio Recording** and for **Accessibility** (and **Full Disk Access** if you use Focus mode switching):
+
+1. Open **System Settings** → **Privacy & Security** and open the permission in question.
+2. Find **LiveWallpaper** in the list and switch it **off**.
+3. Select **LiveWallpaper** and click **−** below the list to remove it. Confirm with your password or Touch ID.
+4. Click **+**, pick LiveWallpaper from Applications to add it, and switch it **on**.
+5. Restart LiveWallpaper.
+
+The same steps are shown in the app, under **If allowing it changes nothing**, wherever a permission problem is reported.
+
 ## Features
 
 - **Video wallpaper**: Use local video files such as mp4 and mov as your wallpaper.
@@ -207,12 +221,12 @@ swift test
 ```
 
 ```bash
-# Create distributable .app / .zip / .dmg (ad-hoc signing only)
+# Create distributable .app / .zip / .dmg (signed with the self-signed "LiveWallpaper Release" identity, ad-hoc if absent)
 # The build number is derived from the version automatically; omit it.
 ./scripts/package_zip.sh 1.0.0
 ```
 
-Distribution uses ad-hoc signing only; Apple notarization and Developer ID signing are not used. Sparkle appcast signing (Ed25519) is handled separately via `scripts/sign_zip.py`.
+Distribution is signed with a self-signed certificate ("LiveWallpaper Release") so privacy permissions such as Accessibility survive updates; without it the script falls back to ad-hoc signing. Apple notarization and Developer ID signing are not used. Sparkle appcast signing (Ed25519) is handled separately via `scripts/sign_zip.py`.
 
 The Store backend lives in [`store-worker/`](store-worker) — a Cloudflare Worker (TypeScript) with its own `bun install` / `bun run test` / `bun run deploy` workflow.
 

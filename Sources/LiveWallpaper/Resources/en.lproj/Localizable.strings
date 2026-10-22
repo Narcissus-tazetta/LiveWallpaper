@@ -1205,3 +1205,12 @@
 "許可しない" = "Don’t Allow";
 
 "外部からインポートした壁紙はStoreに共有できません" = "Wallpapers imported from external sources cannot be shared to the Store.";
+
+"許可しても動かない場合" = "If allowing it changes nothing";
+"更新のあとなどに、許可がオンのままでも効かなくなることがあります。次の手順で許可を作り直してください。" = "After an update, a permission can stay switched on but stop working. Re-create it with these steps.";
+"システム設定の「プライバシーとセキュリティ」で、この項目を開く" = "Open this item in System Settings under Privacy & Security";
+"一覧の LiveWallpaper のスイッチをオフにする" = "Switch LiveWallpaper off in the list";
+"LiveWallpaper を選び、一覧の下の「−」を押して削除する(パスワードか Touch ID が必要)" = "Select LiveWallpaper and click − below the list to remove it (requires your password or Touch ID)";
+"「+」を押し、アプリケーションから LiveWallpaper を選んで追加し、スイッチをオンにする" = "Click +, choose LiveWallpaper from Applications to add it, and switch it on";
+"LiveWallpaper を再起動する" = "Restart LiveWallpaper";
+"アプリを再起動" = "Restart App";
