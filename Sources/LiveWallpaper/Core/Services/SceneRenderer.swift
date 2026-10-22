@@ -143,6 +143,7 @@ final class SceneRenderer {
 
     private let pipeline: Pipeline
     private var graphRenderers: [UUID: SceneRenderGraphRenderer] = [:]
+    private let graphTexturePool = SceneTexturePool()
     private var graphTextures: [String: MTLTexture] = [:]
     private var graphResources: [UUID: [String: MTLTexture]] = [:]
     private var rigs: SceneSkeletonRegistry?
@@ -337,6 +338,7 @@ final class SceneRenderer {
     func encode(into target: MTLTexture, commandBuffer: MTLCommandBuffer, input: SceneFrameInput, frame: SceneEvaluatedFrame? = nil) throws {
         usedEffectScratchSizes.removeAll(keepingCapacity: true)
         defer {
+            graphTexturePool.endFrame()
             if effectScratchTargets.count != usedEffectScratchSizes.count {
                 effectScratchTargets = effectScratchTargets.filter { usedEffectScratchSizes.contains($0.key) }
             }
@@ -1476,7 +1478,7 @@ final class SceneRenderer {
         }
         graphRenderers = graphRenderers.filter { graphs[$0.key] != nil }
         for (id, graph) in graphs where graphRenderers[id]?.graph != graph {
-            graphRenderers[id] = try SceneRenderGraphRenderer(graph: graph, device: device, rigs: rigs)
+            graphRenderers[id] = try SceneRenderGraphRenderer(graph: graph, device: device, rigs: rigs, pool: graphTexturePool)
         }
         var retainedGraphTextures: [String: MTLTexture] = [:]
         graphResources = [:]
