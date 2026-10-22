@@ -1,4 +1,5 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 import ImageIO
 import Metal
@@ -142,6 +143,7 @@ final class SceneRenderer {
 
     private let pipeline: Pipeline
     private var graphRenderers: [UUID: SceneRenderGraphRenderer] = [:]
+    private let graphTexturePool = SceneTexturePool()
     private var graphTextures: [String: MTLTexture] = [:]
     private var graphResources: [UUID: [String: MTLTexture]] = [:]
     private var rigs: SceneSkeletonRegistry?
@@ -336,6 +338,7 @@ final class SceneRenderer {
     func encode(into target: MTLTexture, commandBuffer: MTLCommandBuffer, input: SceneFrameInput, frame: SceneEvaluatedFrame? = nil) throws {
         usedEffectScratchSizes.removeAll(keepingCapacity: true)
         defer {
+            graphTexturePool.endFrame()
             if effectScratchTargets.count != usedEffectScratchSizes.count {
                 effectScratchTargets = effectScratchTargets.filter { usedEffectScratchSizes.contains($0.key) }
             }
@@ -1475,7 +1478,7 @@ final class SceneRenderer {
         }
         graphRenderers = graphRenderers.filter { graphs[$0.key] != nil }
         for (id, graph) in graphs where graphRenderers[id]?.graph != graph {
-            graphRenderers[id] = try SceneRenderGraphRenderer(graph: graph, device: device, rigs: rigs)
+            graphRenderers[id] = try SceneRenderGraphRenderer(graph: graph, device: device, rigs: rigs, pool: graphTexturePool)
         }
         var retainedGraphTextures: [String: MTLTexture] = [:]
         graphResources = [:]
@@ -1491,7 +1494,7 @@ final class SceneRenderer {
                 let straight = graph.straightAlphaImages == true
                 let alpha: ImageAlpha = !straight ? .premultiplied : spriteFiles.contains(file) ? .straightKept : .straightDropped
                 let key = "\(alpha):\(file)"
-                let texture = try graphTextures[key] ?? Self.cachedTexture(url: fileURL(file), variant: "graph-\(alpha)") { url in
+                let texture = try graphTextures[key] ?? Self.cachedTexture(url: fileURL(file), variant: "rgba-\(alpha)") { url in
                     try Self.decodeRGBA(url: url, device: device, alpha: alpha)
                 }
                 retainedGraphTextures[key] = texture
@@ -1513,7 +1516,7 @@ final class SceneRenderer {
         let images = Set(document.layers.filter { $0.kind == .image && !$0.imageFile.isEmpty }.map(\.imageFile))
         textures = textures.filter { images.contains($0.key) }
         for file in images where textures[file] == nil {
-            textures[file] = try Self.cachedTexture(url: fileURL(file), variant: "rgba") { url in
+            textures[file] = try Self.cachedTexture(url: fileURL(file), variant: "rgba-\(ImageAlpha.premultiplied)") { url in
                 try Self.decodeRGBA(url: url, device: device)
             }
         }
@@ -1536,26 +1539,23 @@ final class SceneRenderer {
         )
         flowTextures = flowTextures.filter { flows.contains($0.key) }
         for file in flows where flowTextures[file] == nil {
-            flowTextures[file] = try Self.cachedTexture(url: fileURL(file), variant: "flow") { url in
+            flowTextures[file] = try Self.cachedTexture(url: fileURL(file), variant: "rgba-\(ImageAlpha.straightDropped)") { url in
                 try Self.decodeRGBA(url: url, device: device, alpha: .straightDropped)
             }
         }
     }
 
-    /// Keyed by the file's identity too: an imported package can replace a scene
-    /// folder with files of the same names.
+    /// Keyed by the file's content, not its name: scenes ship the same image under several
+    /// names (and layers and graphs reference it separately), and each copy would otherwise
+    /// hold its own decoded texture. The variant is the decode mode, so only textures that
+    /// decode identically are shared. Content also covers an imported package replacing a
+    /// scene folder with files of the same names.
     private static func cachedTexture(
         url: URL,
         variant: String,
         decode: (URL) throws -> MTLTexture
     ) throws -> MTLTexture {
-        let values = try url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-        let key = [
-            variant,
-            url.standardizedFileURL.path,
-            String(values.contentModificationDate?.timeIntervalSinceReferenceDate ?? 0),
-            String(values.fileSize ?? 0)
-        ].joined(separator: "|")
+        let key = try variant + "|" + contentDigest(of: url)
         textureCacheLock.lock()
         let cached = textureCache[key]?.texture
         textureCacheLock.unlock()
@@ -1568,6 +1568,31 @@ final class SceneRenderer {
         textureCache[key] = TextureCacheEntry(texture)
         textureCacheLock.unlock()
         return texture
+    }
+
+    private static let digestLock = NSLock()
+    private nonisolated(unsafe) static var digests: [String: String] = [:]
+
+    /// Hashing reads the whole file, so the result is remembered per file identity.
+    private static func contentDigest(of url: URL) throws -> String {
+        let values = try url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+        let identity = [
+            url.standardizedFileURL.path,
+            String(values.contentModificationDate?.timeIntervalSinceReferenceDate ?? 0),
+            String(values.fileSize ?? 0)
+        ].joined(separator: "|")
+        digestLock.lock()
+        let known = digests[identity]
+        digestLock.unlock()
+        if let known {
+            return known
+        }
+        let digest = try SHA256.hash(data: Data(contentsOf: url, options: .mappedIfSafe))
+            .map { String(format: "%02x", $0) }.joined()
+        digestLock.lock()
+        digests[identity] = digest
+        digestLock.unlock()
+        return digest
     }
 
     private func fileURL(_ name: String) -> URL {

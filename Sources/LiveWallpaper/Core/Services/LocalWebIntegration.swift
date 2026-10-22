@@ -95,6 +95,12 @@ final class LocalWebIntegration: ObservableObject {
         }
     }
 
+    /// Reading every running app's bundle identifier blocks the caller for a while;
+    /// a nonisolated async function runs off the main actor.
+    private nonisolated static func runningBundleIdentifiers() async -> Set<String> {
+        Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+    }
+
     private func reconcileMedia() {
         let needsMedia = subscriptions.values.contains { $0.media }
         if needsMedia, mediaTask == nil, mediaError == nil {
@@ -102,8 +108,7 @@ final class LocalWebIntegration: ObservableObject {
                 guard let self else { return }
                 do {
                     while !Task.isCancelled {
-                        let running = Set(NSWorkspace.shared.runningApplications
-                            .compactMap(\.bundleIdentifier))
+                        let running = await Self.runningBundleIdentifiers()
                         let snapshot = try await reader.read(runningIDs: running)
                         try Task.checkCancellation()
                         lastMedia = snapshot

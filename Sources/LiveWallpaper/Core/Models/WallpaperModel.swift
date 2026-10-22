@@ -160,8 +160,13 @@ final class WallpaperModel: ObservableObject {
     @Published var sceneDocumentsByPath: [String: SceneDocument] = [:]
     /// Scenes whose baked video is being rewritten.
     @Published var scenesBaking: Set<String> = []
-    /// 0...1 while an animated scene's loop is being written.
-    @Published var sceneBakeProgress: [String: Double] = [:]
+    /// 0...1 while an animated scene's loop is being written. Held in its own object: it changes
+    /// about once a second for minutes, and publishing it here would redraw the whole settings window.
+    let sceneBakeProgressStore = SceneBakeProgress()
+    var sceneBakeProgress: [String: Double] {
+        get { sceneBakeProgressStore.values }
+        set { sceneBakeProgressStore.values = newValue }
+    }
     /// Scenes whose baked video does not show the latest edit yet (pending or failed).
     var sceneStaleVideoPaths: Set<String> = []
     @Published var sceneErrorMessage: String?

@@ -62,14 +62,21 @@ final class SceneRenderGraphRenderer {
 
     let graph: SceneRenderGraph
     private let device: MTLDevice
+    private let pool: SceneTexturePool?
+    /// Targets that every frame starts by overwriting completely and that are not the output,
+    /// so no content survives between frames and they can be lent out for the encode only.
+    private let transientTargets: [SceneRenderGraph.Target]
     private let rigs: SceneSkeletonRegistry
     private var draws: [Int: CompiledDraw] = [:]
     private var targets: [String: MTLTexture] = [:]
     private var size: SIMD2<Int>?
 
-    init(graph: SceneRenderGraph, device: MTLDevice, rigs: SceneSkeletonRegistry? = nil) throws {
+    init(graph: SceneRenderGraph, device: MTLDevice, rigs: SceneSkeletonRegistry? = nil, pool: SceneTexturePool? = nil) throws {
         self.graph = graph
         self.device = device
+        self.pool = pool
+        let transient = pool == nil ? [] : graph.transientTargetNames()
+        self.transientTargets = graph.targets.filter { transient.contains($0.name) }
         self.rigs = try rigs ?? SceneSkeletonRegistry()
         try validate()
         for (index, pass) in graph.passes.enumerated() {
@@ -177,6 +184,21 @@ final class SceneRenderGraphRenderer {
         return try draw.skeleton.map(SceneSkeletonEvaluator.init)
     }
 
+    private func targetDescriptor(_ target: SceneRenderGraph.Target, input: MTLTexture) throws -> MTLTextureDescriptor {
+        let width = Double(input.width) * target.scale
+        let height = Double(input.height) * target.scale
+        guard width >= 1, height >= 1, width < Double(Int.max), height < Double(Int.max)
+        else {
+            throw GraphError(detail: "invalid size for target \(target.name)")
+        }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: pixelFormat(target.format), width: Int(width), height: Int(height), mipmapped: false
+        )
+        descriptor.storageMode = .private
+        descriptor.usage = [.renderTarget, .shaderRead]
+        return descriptor
+    }
+
     func encode(
         input: MTLTexture,
         images: [String: MTLTexture],
@@ -190,20 +212,8 @@ final class SceneRenderGraphRenderer {
         let newSize = SIMD2(input.width, input.height)
         if newSize != size {
             targets.removeAll()
-            for target in graph.targets {
-                let width = Double(input.width) * target.scale
-                let height = Double(input.height) * target.scale
-                guard width >= 1, height >= 1, width < Double(Int.max),
-                      height < Double(Int.max)
-                else {
-                    throw GraphError(detail: "invalid size for target \(target.name)")
-                }
-                let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-                    pixelFormat: pixelFormat(target.format), width: Int(width), height: Int(height),
-                    mipmapped: false
-                )
-                descriptor.storageMode = .private
-                descriptor.usage = [.renderTarget, .shaderRead]
+            for target in graph.targets where !transientTargets.contains(where: { $0.name == target.name }) {
+                let descriptor = try targetDescriptor(target, input: input)
                 guard let texture = device.makeTexture(descriptor: descriptor) else {
                     throw GraphError(detail: "target \(target.name) allocation failed")
                 }
@@ -222,6 +232,16 @@ final class SceneRenderGraphRenderer {
             size = newSize
         }
         var resources = targets
+        var borrowed: [MTLTexture] = []
+        defer { borrowed.forEach { pool?.release($0) } }
+        for target in transientTargets {
+            let descriptor = try targetDescriptor(target, input: input)
+            guard let texture = pool?.acquire(descriptor, device: device) else {
+                throw GraphError(detail: "target \(target.name) allocation failed")
+            }
+            borrowed.append(texture)
+            resources[target.name] = texture
+        }
         resources["input"] = input
         for (name, file) in graph.images {
             guard let image = images[file]
@@ -829,5 +849,73 @@ final class SceneRenderGraphRenderer {
         case .float4: .float4
         case .uint4: .uint4
         }
+    }
+}
+
+
+/// Render targets lent for the length of one graph encode. Metal tracks hazards between
+/// encoders, so a texture written by one graph can be handed to the next in command order.
+final class SceneTexturePool {
+    private struct Key: Hashable {
+        var width: Int
+        var height: Int
+        var format: MTLPixelFormat
+    }
+
+    private var free: [Key: [MTLTexture]] = [:]
+    private var outstanding: [Key: Int] = [:]
+    private var peak: [Key: Int] = [:]
+
+    func acquire(_ descriptor: MTLTextureDescriptor, device: MTLDevice) -> MTLTexture? {
+        let key = Key(width: descriptor.width, height: descriptor.height, format: descriptor.pixelFormat)
+        let count = (outstanding[key] ?? 0) + 1
+        outstanding[key] = count
+        peak[key] = max(peak[key] ?? 0, count)
+        if let texture = free[key]?.popLast() {
+            return texture
+        }
+        return device.makeTexture(descriptor: descriptor)
+    }
+
+    func release(_ texture: MTLTexture) {
+        let key = Key(width: texture.width, height: texture.height, format: texture.pixelFormat)
+        outstanding[key, default: 1] -= 1
+        free[key, default: []].append(texture)
+    }
+
+    /// Keeps only as many textures as the frame just encoded needed at once, so sizes and
+    /// counts that a changed scene or screen no longer asks for are freed.
+    func endFrame() {
+        free = free.reduce(into: [:]) { result, entry in
+            let kept = Array(entry.value.prefix(peak[entry.key] ?? 0))
+            if !kept.isEmpty { result[entry.key] = kept }
+        }
+        peak.removeAll(keepingCapacity: true)
+    }
+}
+
+extension SceneRenderGraph {
+    /// Targets whose first use in every frame is a complete overwrite (a copy, or a draw that
+    /// clears) and which the frame does not hand on. A target read first, or drawn onto
+    /// without clearing, carries the previous frame's content and is not among them.
+    func transientTargetNames() -> Set<String> {
+        let targetNames = Set(targets.map(\.name))
+        var decided: [String: Bool] = [:]
+        for pass in passes {
+            var reads: [String] = []
+            if let source = pass.source { reads.append(source) }
+            if let draw = pass.draw {
+                reads += draw.textures.map(\.source)
+                reads += (draw.commands ?? []).flatMap { ($0.textures ?? []).map(\.source) }
+                reads += (draw.dynamic?.materials.values.flatMap { $0 } ?? []).map(\.source)
+            }
+            for name in reads where targetNames.contains(name) && decided[name] == nil {
+                decided[name] = false
+            }
+            if decided[pass.target] == nil {
+                decided[pass.target] = pass.operation == .copy || pass.draw?.clears != false
+            }
+        }
+        return Set(decided.filter { $0.value }.keys).subtracting([output])
     }
 }

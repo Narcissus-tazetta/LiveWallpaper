@@ -230,6 +230,45 @@ final class SceneRenderGraphTests: XCTestCase {
         }
     }
 
+    private func historyThroughIntermediateGraph() -> SceneRenderGraph {
+        var base = graph(fragment: """
+        #include <metal_stdlib>
+        using namespace metal;
+        fragment float4 fragmentMain(float4 p [[position]], texture2d<float> image [[texture(0)]], texture2d<float> history [[texture(1)]]) {
+            return image.read(uint2(p.xy)) + history.read(uint2(p.xy)) * 0.5;
+        }
+        """, history: true)
+        // work -> history stays as it is; a second draw reads the intermediate into the output.
+        var second = base.passes[0].draw!
+        second.textures = [.init(index: 0, source: "work"), .init(index: 1, source: "input")]
+        base.targets.append(.init(name: "result"))
+        base.passes.append(.init(operation: .draw, target: "result", draw: second))
+        base.output = "result"
+        return base
+    }
+
+    func testOnlyTargetsOverwrittenEachFrameAreLentOut() {
+        let transient = historyThroughIntermediateGraph().transientTargetNames()
+        XCTAssertEqual(transient, ["work"])
+    }
+
+    func testLentTargetsDoNotChangeFramesThatDependOnHistory() throws {
+        let device = try device()
+        let pool = SceneTexturePool()
+        let graph = historyThroughIntermediateGraph()
+        let plain = try SceneRenderGraphRenderer(graph: graph, device: device)
+        let pooled = try SceneRenderGraphRenderer(graph: graph, device: device, pool: pool)
+        let other = try SceneRenderGraphRenderer(graph: graph, device: device, pool: pool)
+        let texture = try input(device)
+        for frame in 0 ..< 4 {
+            let expected = try render(plain, device: device, input: texture)
+            // The other renderer borrows and dirties the same pooled texture between frames.
+            _ = try render(other, device: device, input: texture)
+            XCTAssertEqual(try render(pooled, device: device, input: texture), expected, "frame \(frame)")
+            pool.endFrame()
+        }
+    }
+
     func testIndexedCommandsKeepTheMaximumMaskCoverage() throws {
         let device = try device()
         func uniforms(_ red: Float) -> Data {

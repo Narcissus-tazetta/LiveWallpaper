@@ -299,17 +299,7 @@ extension SettingsView {
                     }
                     .controlSize(.small)
                 } else if model.scenesBakeRunning.contains(path) {
-                    ProgressView()
-                        .controlSize(.mini)
-                    if let progress = model.sceneBakeProgress[path] {
-                        Text(String(
-                            format: model.localizedString("ロック画面用の動画を書き出し中… %d%%"), locale: model.appLocale,
-                            Int((progress * 100).rounded())
-                        ))
-                        .monospacedDigit()
-                    } else {
-                        Text(model.localizedString("ロック画面用の動画を準備中…"))
-                    }
+                    SceneBakeRunningStatus(model: model, progress: model.sceneBakeProgressStore, path: path)
                 } else if model.scenesBaking.contains(path) {
                     Image(systemName: "clock")
                         .foregroundColor(.secondary)
@@ -802,5 +792,26 @@ struct SceneLayerDropDelegate: DropDelegate {
         }
         move(draggedID)
         return true
+    }
+}
+
+/// Observes the progress alone, so its updates redraw this status and not the settings window.
+private struct SceneBakeRunningStatus: View {
+    let model: WallpaperModel
+    @ObservedObject var progress: SceneBakeProgress
+    let path: String
+
+    var body: some View {
+        ProgressView()
+            .controlSize(.mini)
+        if let value = progress.values[path] {
+            Text(String(
+                format: model.localizedString("ロック画面用の動画を書き出し中… %d%%"), locale: model.appLocale,
+                Int((value * 100).rounded())
+            ))
+            .monospacedDigit()
+        } else {
+            Text(model.localizedString("ロック画面用の動画を準備中…"))
+        }
     }
 }
