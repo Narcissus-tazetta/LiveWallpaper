@@ -73,25 +73,36 @@ extension SettingsView {
                 .foregroundColor(.red)
         } else if !model.isExternalWallpaperReady(wallpaper) {
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    if let progress = model.sceneBakeProgress[wallpaper.path] {
-                        Text(model.localizedString("変換中…"))
-                        Text(progress, format: .percent.precision(.fractionLength(0)))
-                            .monospacedDigit()
-                    } else {
-                        ProgressView().controlSize(.mini)
-                        Text(model.localizedString("準備中…"))
-                    }
-                }
-                if let progress = model.sceneBakeProgress[wallpaper.path] {
-                    ProgressView(value: progress).controlSize(.small)
-                }
+                ExternalScenePreparationProgress(model: model, progress: model.sceneBakeProgressStore, path: wallpaper.path)
                 Text(model.localizedString("バックグラウンドで準備しています。完了すると追加できます。"))
                     .fixedSize(horizontal: false, vertical: true)
             }
             .font(.caption2)
             .foregroundColor(.secondary)
             .accessibilityElement(children: .combine)
+        }
+    }
+}
+
+/// Observes the progress alone, so its updates redraw this row and not the settings window.
+private struct ExternalScenePreparationProgress: View {
+    let model: WallpaperModel
+    @ObservedObject var progress: SceneBakeProgress
+    let path: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if let value = progress.values[path] {
+                Text(model.localizedString("変換中…"))
+                Text(value, format: .percent.precision(.fractionLength(0)))
+                    .monospacedDigit()
+            } else {
+                ProgressView().controlSize(.mini)
+                Text(model.localizedString("準備中…"))
+            }
+        }
+        if let value = progress.values[path] {
+            ProgressView(value: value).controlSize(.small)
         }
     }
 }
