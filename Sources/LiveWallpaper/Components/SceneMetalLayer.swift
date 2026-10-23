@@ -428,6 +428,9 @@ final class SceneMetalLayer: CAMetalLayer {
                 input.pointerPresses = pendingPointerPresses
                 pendingPointerPresses = []
             }
+            if drawableSize.width > 0, drawableSize.height > 0 {
+                input.screenSize = SIMD2(Int(drawableSize.width), Int(drawableSize.height))
+            }
             let requestedTimeOfDay = timeOfDay
             scriptWorker.evaluate(document, input: input, timeOfDay: requestedTimeOfDay) { [weak self] result in
                 guard let self else { return }

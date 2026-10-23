@@ -158,6 +158,15 @@ final class SceneFrameEvaluator {
                 context.key("aspectRatio")
                 try context.number(document.aspectRatio)
                 context.end(canvasPosition, count: 3)
+                member("screen")
+                if let screen = input.screenSize {
+                    let screenPosition = context.beginObject()
+                    context.key("width")
+                    try context.number(Double(screen.x))
+                    context.key("height")
+                    try context.number(Double(screen.y))
+                    context.end(screenPosition, count: 2)
+                } else { context.null() }
                 var missing: [String] = []
                 if script.usesTime {
                     member("elapsedTime")

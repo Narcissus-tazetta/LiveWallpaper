@@ -27,6 +27,8 @@ struct SceneFrameInput: Equatable {
     var media: SceneMediaState?
     /// The system audio, for effects that react to it; nil plays them silent.
     var audio: SceneAudioSpectrum?
+    /// Pixels of the surface drawn on screen, for scripts told when it changes; nil off screen.
+    var screenSize: SIMD2<Int>?
 
     static let rest = SceneFrameInput()
 }
