@@ -937,6 +937,15 @@ extension WallpaperModel {
     /// Shows or hides the live scene on each screen to match what it plays. Called
     /// from refreshCursorEffects, which runs on every change of what screens show.
     ///
+    /// Display numbers can change when screens are reconnected; scripts' per-screen
+    /// values follow the display's UUID instead.
+    static func storageScreen(forDisplayID displayID: String) -> String {
+        guard let number = UInt32(displayID), let uuid = CGDisplayCreateUUIDFromDisplayID(number)?.takeRetainedValue() else {
+            return displayID
+        }
+        return CFUUIDCreateString(nil, uuid) as String
+    }
+
     /// The baked video already shows everything that does not react to the cursor,
     /// at the cost of any other video, so the scene is drawn live only when it reacts
     /// to the cursor or its video is out of date.
@@ -979,7 +988,8 @@ extension WallpaperModel {
                 try view.showScene(
                     document, videoPath: path, freeClock: isStale || document.requiresRealTimePlayback,
                     timeOfDay: document.timeOfDay(at: Date()),
-                    maximumFramesPerSecond: maximumFramesPerSecond
+                    maximumFramesPerSecond: maximumFramesPerSecond,
+                    storageScreen: Self.storageScreen(forDisplayID: displayID)
                 )
                 view.setSceneScriptIssueHandler { [weak self] issues in
                     guard let self, self.sceneScriptIssues[path] != issues else { return }

@@ -74,9 +74,33 @@ final class SceneScriptRuntime {
         programs[script.id] = Program(script: script, pointer: pointer!, memoryBytes: memory)
     }
 
+    /// Reached from Bridge.c's storage(), on the thread running the script.
+    private static let storageHandler: lwjs_storage_handler = { opaque, operation, global, key, keyLength, value, valueLength, result, resultLength in
+        let session = Unmanaged<SceneScriptStorage.Session>.fromOpaque(opaque!).takeUnretainedValue()
+        let name = key.map { Data(bytes: $0, count: keyLength) } ?? Data()
+        let area = session.area(global: global != 0)
+        switch operation {
+        case 0:
+            guard let found = session.store.get(name, in: area) else { return -1 }
+            let buffer = malloc(max(found.count, 1))!
+            found.copyBytes(to: buffer.assumingMemoryBound(to: UInt8.self), count: found.count)
+            result!.pointee = buffer.assumingMemoryBound(to: CChar.self)
+            resultLength!.pointee = found.count
+            return -1
+        case 1:
+            return session.store.set(name, Data(bytes: value!, count: valueLength), in: area) ? 1 : 0
+        case 2:
+            return session.store.delete(name, in: area) ? 1 : 0
+        default:
+            session.store.clear(global == 2 ? [session.area(global: true), session.area(global: false)] : [area])
+            return 1
+        }
+    }
+
     /// Stops the script after `perScript` seconds, or at `deadline` when that comes first.
     func evaluate(
-        _ script: SceneScript, input: SceneScriptInput, elapsedTime: Double, layers: [SceneLayer], rigs: [UUID: SceneSkeleton] = [:], perScript: TimeInterval, deadline: TimeInterval
+        _ script: SceneScript, input: SceneScriptInput, elapsedTime: Double, layers: [SceneLayer], rigs: [UUID: SceneSkeleton] = [:],
+        storage: SceneScriptStorage.Session, perScript: TimeInterval, deadline: TimeInterval
     ) throws -> SceneScriptOutput {
         do {
             if script.modules != nil {
@@ -94,9 +118,12 @@ final class SceneScriptRuntime {
             var error: UnsafeMutablePointer<CChar>?
             let otherMemory = programs.keys.filter { $0 != script.id }.reduce(0) { $0 + memoryBytes(of: $1) }
             lwjs_set_memory_limit(programs[script.id]!.pointer, min(16 * 1024 * 1024, Self.maximumMemoryBytes - otherMemory))
-            let result = input.bytes.withUnsafeBufferPointer {
-                lwjs_evaluate(programs[script.id]!.pointer, $0.baseAddress!, budget, &error)
+            let pointer = programs[script.id]!.pointer
+            lwjs_set_storage(pointer, Self.storageHandler, Unmanaged.passUnretained(storage).toOpaque())
+            let result = withExtendedLifetime(storage) {
+                input.bytes.withUnsafeBufferPointer { lwjs_evaluate(pointer, $0.baseAddress!, budget, &error) }
             }
+            lwjs_set_storage(pointer, nil, nil)
             programs[script.id]?.hasStarted = true
             if let error {
                 defer { lwjs_free_string(error) }

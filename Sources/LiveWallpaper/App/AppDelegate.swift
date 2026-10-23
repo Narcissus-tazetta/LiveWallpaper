@@ -89,6 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A pending bake is picked up at the next launch (restoreScenes), as long as
         // scene.json holds the edit.
         wallpaperModel.flushAllSceneSaves()
+        SceneScriptStorage.shared.flush()
         wallpaperModel.removeScreenSaverBeforeExit()
         wallpaperModel.restoreLockScreenSyncBeforeExit()
     }

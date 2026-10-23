@@ -237,7 +237,7 @@ final class SceneRenderer {
     var timeOfDay: SceneTimeOfDay
     /// Evaluates scripts only off the main thread: for bakes (live drawing evaluates
     /// them on SceneScriptWorker and passes the frame in).
-    private let frameEvaluator = SceneFrameEvaluator(budget: .offline)
+    private lazy var frameEvaluator = SceneFrameEvaluator(budget: .offline, storage: SceneScriptStorage.shared.snapshot(path: videoPath))
     private var lastFrame: SceneEvaluatedFrame?
     var lastDrawnInput: SceneFrameInput? { lastFrame?.input }
 

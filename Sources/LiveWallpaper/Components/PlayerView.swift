@@ -180,7 +180,8 @@ final class PlayerView: NSView {
         videoPath: String,
         freeClock: Bool,
         timeOfDay: SceneTimeOfDay,
-        maximumFramesPerSecond: Float?
+        maximumFramesPerSecond: Float?,
+        storageScreen: String
     ) throws {
         let layer = sceneLayer ?? {
             let layer = SceneMetalLayer()
@@ -206,6 +207,7 @@ final class PlayerView: NSView {
         sceneRunsInRealTime = freeClock && document.requiresRealTimePlayback
         layer.maximumFramesPerSecond = maximumFramesPerSecond
         layer.timeOfDay = timeOfDay
+        layer.storageScreen = storageScreen
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         layer.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2

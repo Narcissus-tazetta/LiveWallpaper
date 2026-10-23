@@ -56,9 +56,13 @@ final class SceneFrameEvaluator {
     private var cachedTemplates: [UUID: LayerTemplate] = [:]
     private var cachedScriptTargets: [UUID: [SceneLayer]] = [:]
 
-    init(budget: Budget = .live, temporaryStopSeconds: TimeInterval = 2) {
+    /// Where scripts' localStorage goes; by default nowhere that outlives this evaluator.
+    var storage: SceneScriptStorage.Session
+
+    init(budget: Budget = .live, temporaryStopSeconds: TimeInterval = 2, storage: SceneScriptStorage.Session = .scratch()) {
         self.budget = budget
         self.temporaryStopSeconds = temporaryStopSeconds
+        self.storage = storage
     }
 
     func evaluate(_ document: SceneDocument, input: SceneFrameInput, timeOfDay: SceneTimeOfDay, failOnError: Bool = true) throws -> SceneEvaluatedFrame {
@@ -219,7 +223,8 @@ final class SceneFrameEvaluator {
                 let output: SceneScriptOutput
                 do {
                     output = try runtime.evaluate(
-                        script, input: context, elapsedTime: input.time, layers: document.layers, rigs: document.rigs, perScript: budget.perScript, deadline: deadline
+                        script, input: context, elapsedTime: input.time, layers: document.layers, rigs: document.rigs, storage: storage,
+                        perScript: budget.perScript, deadline: deadline
                     )
                     consecutiveTimeouts[script.id] = nil
                     lastOutputs[script.id] = output

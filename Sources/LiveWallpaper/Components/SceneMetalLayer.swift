@@ -82,6 +82,12 @@ final class SceneMetalLayer: CAMetalLayer {
     }
     private var artwork: Artwork?
     private var loadingVideos: Set<String> = []
+    /// The screen whose per-screen storage area the scene's scripts use. nil (the
+    /// editor preview, a window on no screen) gives them the global area under both names.
+    var storageScreen: String? {
+        didSet { if storageScreen != oldValue { storage = nil } }
+    }
+    private var storage: SceneScriptStorage.Session?
     var scriptIssueHandler: (([SceneScriptIssue]) -> Void)?
     var scriptLogHandler: (([UUID: String]) -> Void)?
 
@@ -173,6 +179,7 @@ final class SceneMetalLayer: CAMetalLayer {
         if self.videoPath != videoPath {
             scriptWorker = SceneScriptWorker()
             frozenScriptInput = nil
+            storage = nil
         }
         if self.videoPath != videoPath || renderer?.document != document {
             scriptGeneration = UUID()
@@ -432,7 +439,9 @@ final class SceneMetalLayer: CAMetalLayer {
                 input.screenSize = SIMD2(Int(drawableSize.width), Int(drawableSize.height))
             }
             let requestedTimeOfDay = timeOfDay
-            scriptWorker.evaluate(document, input: input, timeOfDay: requestedTimeOfDay) { [weak self] result in
+            let storage = storage ?? SceneScriptStorage.shared.session(path: videoPath!, screen: storageScreen)
+            self.storage = storage
+            scriptWorker.evaluate(document, input: input, timeOfDay: requestedTimeOfDay, storage: storage) { [weak self] result in
                 guard let self else { return }
                 self.isEvaluatingScript = false
                 if self.scriptGeneration == generation, self.renderer?.document == document,

@@ -27,6 +27,8 @@ struct LWJSProgram {
     uint8_t *meshes;
     size_t mesh_length;
     size_t mesh_capacity;
+    lwjs_storage_handler storage;
+    void *storage_opaque;
 };
 
 #define LWJS_MAX_MESH_BYTES (32u * 1024 * 1024)
@@ -177,6 +179,33 @@ static JSValue emit_mesh(JSContext *context, JSValueConst this_value, int count,
     return JS_UNDEFINED;
 }
 
+/* storage(operation, global, key, json): the host's saved values, read and written
+   synchronously so another instance of the scene sees a write in the same frame. */
+static JSValue storage(JSContext *context, JSValueConst this_value, int count, JSValueConst *values) {
+    (void)this_value;
+    LWJSProgram *program = JS_GetContextOpaque(context);
+    if (!program->storage) return JS_ThrowTypeError(context, "This script has no storage");
+    int32_t operation, global;
+    if (count < 3 || JS_ToInt32(context, &operation, values[0]) < 0 || JS_ToInt32(context, &global, values[1]) < 0)
+        return JS_EXCEPTION;
+    size_t key_length = 0, value_length = 0;
+    const char *key = JS_IsString(values[2]) ? JS_ToCStringLen(context, &key_length, values[2]) : NULL;
+    if (JS_IsString(values[2]) && !key) return JS_EXCEPTION;
+    const char *value = count > 3 && JS_IsString(values[3]) ? JS_ToCStringLen(context, &value_length, values[3]) : NULL;
+    char *result = NULL;
+    size_t result_length = 0;
+    int status = program->storage(program->storage_opaque, operation, global, key, key_length, value, value_length,
+                                  &result, &result_length);
+    if (key) JS_FreeCString(context, key);
+    if (value) JS_FreeCString(context, value);
+    if (result) {
+        JSValue text = JS_NewStringLen(context, result, result_length);
+        free(result);
+        return text;
+    }
+    return status < 0 ? JS_UNDEFINED : JS_NewBool(context, status);
+}
+
 static JSContext *new_context(LWJSProgram *program) {
     JSContext *context = JS_NewContextRaw(program->runtime);
     if (!context) return NULL;
@@ -211,6 +240,7 @@ static JSContext *new_context(LWJSProgram *program) {
     JS_SetPropertyStr(context, console, "log", JS_NewCFunction(context, console_log, "log", 1));
     JS_SetPropertyStr(context, global, "console", console);
     JS_SetPropertyStr(context, global, "__lwjs_emitMesh", JS_NewCFunction(context, emit_mesh, "emitMesh", 4));
+    JS_SetPropertyStr(context, global, "__lwjs_storage", JS_NewCFunction(context, storage, "storage", 4));
     JS_FreeValue(context, global);
     return context;
 }
@@ -518,3 +548,7 @@ size_t lwjs_memory_usage(LWJSProgram *program) {
     return (size_t)usage.malloc_size;
 }
 void lwjs_set_memory_limit(LWJSProgram *program, size_t bytes) { JS_SetMemoryLimit(program->runtime, bytes); }
+void lwjs_set_storage(LWJSProgram *program, lwjs_storage_handler handler, void *opaque) {
+    program->storage = handler;
+    program->storage_opaque = opaque;
+}
