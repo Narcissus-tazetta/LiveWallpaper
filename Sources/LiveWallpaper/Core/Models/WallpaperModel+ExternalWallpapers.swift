@@ -15,6 +15,7 @@ extension WallpaperModel {
         }
         externalWallpaperMonitor = monitor
         monitor.start()
+        reconcileImportedExternalWallpapersThumbnails()
     }
 
     var activeExternalWallpaper: ExternalWallpaper? {
@@ -97,6 +98,10 @@ extension WallpaperModel {
             failedExternalWallpaperImportID = id
             return false
         }
+        let sidecarURL = VideoThumbnailGenerator.expectedSidecarURL(for: localURL.path)
+        if let previewSource = Self.resolvePreviewSource(externalID: id, wallpaper: wallpaper) {
+            VideoThumbnailGenerator.saveNormalizedPreview(from: previewSource, to: sidecarURL)
+        }
         // The scene goes in beside the copied video before the library sees it, so
         // the library never holds the video without its scene.
         var scene: SceneDocument?
@@ -117,14 +122,14 @@ extension WallpaperModel {
                 AppLog.externalWallpapers.error(
                     "could not copy the scene of \(id, privacy: .public): \(error.localizedDescription, privacy: .public)"
                 )
-                removeLeftovers(of: [localURL, SceneStore.folderURL(forVideoPath: localURL.path)])
+                removeLeftovers(of: [localURL, sidecarURL, SceneStore.folderURL(forVideoPath: localURL.path)])
                 failedExternalWallpaperImportID = id
                 return false
             }
         }
         guard addVideoPathToLibrary(localURL.path, preferredDisplayName: wallpaper.name) else {
             AppLog.externalWallpapers.error("could not add \(id, privacy: .public) to the library: registration failed")
-            removeLeftovers(of: [localURL, SceneStore.folderURL(forVideoPath: localURL.path)])
+            removeLeftovers(of: [localURL, sidecarURL, SceneStore.folderURL(forVideoPath: localURL.path)])
             failedExternalWallpaperImportID = id
             return false
         }
@@ -206,6 +211,7 @@ extension WallpaperModel {
         for folder in removedWebFolders { localWebWallpaperServer.remove(folder: URL(fileURLWithPath: folder)) }
         externalWallpapers = wallpapers
         reconcileExternalScenes()
+        reconcileImportedExternalWallpapersThumbnails()
     }
 
     private func importExternalWebWallpaper(_ source: WebWallpaperSource, externalID: String) async -> Bool {
@@ -425,5 +431,101 @@ extension WallpaperModel {
                 NSWorkspace.shared.openApplication(at: appURL, configuration: .init(), completionHandler: nil)
             }
         }
+    }
+
+    func reconcileImportedExternalWallpapersThumbnails() {
+        let imported = importedExternalWallpaperPaths
+        guard !imported.isEmpty else { return }
+        let currentExternalWallpapers = externalWallpapers
+        Task.detached(priority: .utility) {
+            Self.performReconcileImportedThumbnails(
+                imported: imported,
+                externalWallpapers: currentExternalWallpapers
+            )
+        }
+    }
+
+    nonisolated static func performReconcileImportedThumbnails(
+        imported: [String: String],
+        externalWallpapers: [ExternalWallpaper]
+    ) {
+        let fileManager = FileManager.default
+        let externalMap = Dictionary(externalWallpapers.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+
+        for (externalID, importedVideoPath) in imported {
+            guard fileManager.fileExists(atPath: importedVideoPath) else {
+                continue
+            }
+            let sidecarURL = VideoThumbnailGenerator.expectedSidecarURL(for: importedVideoPath)
+            if fileManager.fileExists(atPath: sidecarURL.path) {
+                continue
+            }
+
+            guard let previewSource = resolvePreviewSource(
+                externalID: externalID,
+                wallpaper: externalMap[externalID]
+            ) else {
+                continue
+            }
+
+            if VideoThumbnailGenerator.saveNormalizedPreview(from: previewSource, to: sidecarURL) {
+                if let dataURL = DiskThumbnailCache.dataDirectoryURL() {
+                    let cacheFile = dataURL.appendingPathComponent("\(CacheKeyHashing.hashed(importedVideoPath)).jpg")
+                    try? fileManager.removeItem(at: cacheFile)
+                }
+            }
+        }
+    }
+
+    nonisolated static func resolvePreviewSource(
+        externalID: String,
+        wallpaper: ExternalWallpaper?
+    ) -> URL? {
+        let fileManager = FileManager.default
+        if let wallpaper {
+            if let thumb = wallpaper.thumbnailPath, fileManager.fileExists(atPath: thumb) {
+                return URL(fileURLWithPath: thumb)
+            }
+            var candidateDirs: [URL] = []
+            if let sceneFolder = wallpaper.sceneFolderPath {
+                candidateDirs.append(URL(fileURLWithPath: sceneFolder, isDirectory: true))
+            }
+            if !wallpaper.path.isEmpty {
+                candidateDirs.append(URL(fileURLWithPath: wallpaper.path).deletingLastPathComponent())
+            }
+            let previewNames = ["preview.jpg", "preview.gif", "preview.png", "preview.jpeg"]
+            for dir in candidateDirs {
+                for name in previewNames {
+                    let candidate = dir.appendingPathComponent(name)
+                    if fileManager.fileExists(atPath: candidate.path) {
+                        return candidate
+                    }
+                }
+            }
+        }
+
+        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        let weWallpapers = appSupport.appendingPathComponent("we-import/Wallpapers", isDirectory: true)
+        let itemID = externalID.components(separatedBy: "/").last ?? externalID
+        var candidateDirs: [URL] = [
+            weWallpapers.appendingPathComponent("we-\(itemID)", isDirectory: true),
+            weWallpapers.appendingPathComponent(itemID, isDirectory: true)
+        ]
+        if itemID.hasPrefix("we-") {
+            let stripped = String(itemID.dropFirst(3))
+            candidateDirs.append(weWallpapers.appendingPathComponent(stripped, isDirectory: true))
+        }
+        let previewNames = ["preview.jpg", "preview.gif", "preview.png", "preview.jpeg"]
+        for dir in candidateDirs {
+            for name in previewNames {
+                let candidate = dir.appendingPathComponent(name)
+                if fileManager.fileExists(atPath: candidate.path) {
+                    return candidate
+                }
+            }
+        }
+        return nil
     }
 }

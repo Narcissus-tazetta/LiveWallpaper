@@ -1,15 +1,69 @@
 import AVFoundation
 import AppKit
+import ImageIO
 import QuickLookThumbnailing
+import UniformTypeIdentifiers
 
 /// QLThumbnailGenerator → AVAssetImageGenerator フォールバックの共通ロジック。
 /// `DiskThumbnailCache`(ローカル動画一覧のプレビュー用キャッシュ)と
 /// `StoreClient`(Store投稿時のサムネイル生成)の両方から利用される。
 enum VideoThumbnailGenerator {
+  nonisolated static func expectedSidecarURL(for videoPath: String) -> URL {
+    URL(fileURLWithPath: videoPath).deletingPathExtension().appendingPathExtension("preview.jpg")
+  }
+
+  nonisolated static func sidecarURL(for videoPath: String) -> URL? {
+    let candidate = expectedSidecarURL(for: videoPath)
+    return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
+  }
+
+  @discardableResult
+  nonisolated static func saveNormalizedPreview(from sourceURL: URL, to destinationURL: URL) -> Bool {
+    guard let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil) else {
+      return false
+    }
+    let count = CGImageSourceGetCount(source)
+    guard count > 0 else {
+      return false
+    }
+    // フェードインで第0フレームが黒画面になるアニメーションGIFに対応するため中央フレームを採用
+    let targetIndex = count / 2
+    let thumbnailOptions: [CFString: Any] = [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceThumbnailMaxPixelSize: 480
+    ]
+    guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, targetIndex, thumbnailOptions as CFDictionary) else {
+      return false
+    }
+    let mutableData = NSMutableData()
+    guard let destination = CGImageDestinationCreateWithData(mutableData as CFMutableData, UTType.jpeg.identifier as CFString, 1, nil) else {
+      return false
+    }
+    let destinationOptions: [CFString: Any] = [
+      kCGImageDestinationLossyCompressionQuality: 0.82
+    ]
+    CGImageDestinationAddImage(destination, cgImage, destinationOptions as CFDictionary)
+    guard CGImageDestinationFinalize(destination) else {
+      return false
+    }
+    do {
+      try (mutableData as Data).write(to: destinationURL, options: .atomic)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   static func generateBestThumbnail(
     path: String,
     size: CGSize = CGSize(width: 480, height: 270)
   ) async -> NSImage? {
+    if let sidecar = sidecarURL(for: path),
+       let image = NSImage(contentsOf: sidecar) {
+      return image
+    }
+
     let url = URL(fileURLWithPath: path)
     let request = QLThumbnailGenerator.Request(
       fileAt: url,
@@ -42,6 +96,11 @@ enum VideoThumbnailGenerator {
   }
 
   nonisolated static func generateFallbackThumbnail(path: String) -> NSImage? {
+    if let sidecar = sidecarURL(for: path),
+       let image = NSImage(contentsOf: sidecar) {
+      return image
+    }
+
     let asset = AVURLAsset(url: URL(fileURLWithPath: path))
     let generator = AVAssetImageGenerator(asset: asset)
     generator.appliesPreferredTrackTransform = true

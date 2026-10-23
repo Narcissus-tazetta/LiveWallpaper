@@ -1,6 +1,6 @@
 import Foundation
 
-struct WebWallpaperSource: Codable, Identifiable, Equatable {
+struct WebWallpaperSource: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     var url: URL
     var displayName: String

@@ -267,7 +267,12 @@ final class DiskThumbnailCache: ObservableObject {
         switch result {
         case .data(let data):
           guard let image = NSImage(data: data) else {
+            let visibleCount = self.visibleRefCounts[path]
             self.removeEntry(path)
+            if let visibleCount, visibleCount > 0 {
+              self.visibleRefCounts[path] = visibleCount
+              self.request(path: path)
+            }
             return
           }
           self.inMemoryImages[path] = image
@@ -275,7 +280,12 @@ final class DiskThumbnailCache: ObservableObject {
           self.trimInMemoryIfNeeded()
           self.bumpRevision()
         case .invalidSource, .missingData:
+          let visibleCount = self.visibleRefCounts[path]
           self.removeEntry(path)
+          if let visibleCount, visibleCount > 0 {
+            self.visibleRefCounts[path] = visibleCount
+            self.request(path: path)
+          }
         }
       }
     }

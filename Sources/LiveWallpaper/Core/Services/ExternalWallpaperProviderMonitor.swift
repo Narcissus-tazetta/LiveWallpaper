@@ -3,7 +3,7 @@ import Foundation
 
 /// A wallpaper another running app offers. It exists only while that app runs and is
 /// never saved.
-struct ExternalWallpaper: Identifiable, Equatable {
+struct ExternalWallpaper: Identifiable, Equatable, Sendable {
     /// Unique across providers: "<manifest file name>/<item id>".
     let id: String
     let providerName: String

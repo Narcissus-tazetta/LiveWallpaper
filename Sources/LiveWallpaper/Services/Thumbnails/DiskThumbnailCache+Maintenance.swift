@@ -15,6 +15,17 @@ extension DiskThumbnailCache {
     guard SourceValidityCheck.isValid(path: sourcePath, entry: entry) else {
       return .invalidSource
     }
+    if let sidecarURL = VideoThumbnailGenerator.sidecarURL(for: sourcePath) {
+      let fileManager = FileManager.default
+      if let sidecarAttrs = try? fileManager.attributesOfItem(atPath: sidecarURL.path),
+         let sidecarDate = sidecarAttrs[.modificationDate] as? Date,
+         let cacheAttrs = try? fileManager.attributesOfItem(atPath: fileURL.path),
+         let cacheDate = cacheAttrs[.modificationDate] as? Date {
+        if cacheDate < sidecarDate {
+          return .invalidSource
+        }
+      }
+    }
     guard let data = try? Data(contentsOf: fileURL) else {
       return .missingData
     }
