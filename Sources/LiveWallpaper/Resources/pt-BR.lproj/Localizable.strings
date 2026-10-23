@@ -860,6 +860,8 @@
 "被写体を切り抜く" = "Recortar Objeto";
 "追加を終える" = "Concluir Adição";
 "配置を元に戻す" = "Redefinir Disposição";
+"読み込んだ動きで動きます。動きを外すと、最初の姿勢で止まり、配置を変えられるようになります。" = "Esta camada segue o movimento com que foi importada. Remova o movimento para mantê-la na primeira pose e alterar sua disposição.";
+"動きを外す" = "Remover Movimento";
 "雨" = "Chuva";
 "パッケージに不正なファイル参照が含まれています: %@" = "O pacote contém uma referência de arquivo inválida: %@";
 "切り抜ける被写体が見つかりませんでした。" = "Nenhum objeto para recortar foi encontrado.";

@@ -598,6 +598,79 @@ struct SceneKeyframe: Codable, Equatable, Identifiable {
     }
 }
 
+/// A movement recorded from another format: poses at times since the scene started,
+/// followed in straight lines. Past the last pose it plays on from `loopStart`, or
+/// rests on the last pose when there is none. It replaces the layer's placement,
+/// keyframes and opacity factor.
+struct SceneMotion: Codable, Equatable {
+    struct Sample: Codable, Equatable {
+        /// Seconds since the scene started.
+        var time: Double
+        var transform: SceneTransform
+        var opacity: Double = 1
+
+        init(time: Double, transform: SceneTransform, opacity: Double = 1) {
+            self.time = time
+            self.transform = transform
+            self.opacity = opacity
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            time = try container.decode(Double.self, forKey: .time)
+            transform = (try? container.decode(SceneTransform.self, forKey: .transform)) ?? .identity
+            opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
+        }
+    }
+
+    /// In time order.
+    var samples: [Sample]
+    var loopStart: Double?
+
+    var duration: Double {
+        samples.last?.time ?? 0
+    }
+
+    func pose(at time: Double) -> (transform: SceneTransform, opacity: Double) {
+        guard let first = samples.first, let last = samples.last else {
+            return (.identity, 1)
+        }
+        var t = max(time, 0)
+        if t > last.time {
+            guard let loopStart, last.time - loopStart > 1e-9 else {
+                return (last.transform, last.opacity)
+            }
+            t = loopStart + (t - loopStart).truncatingRemainder(dividingBy: last.time - loopStart)
+        }
+        if t <= first.time {
+            return (first.transform, first.opacity)
+        }
+        // The last sample at or before t.
+        var low = 0
+        var high = samples.count - 1
+        while low < high {
+            let mid = (low + high + 1) / 2
+            if samples[mid].time <= t { low = mid } else { high = mid - 1 }
+        }
+        guard low + 1 < samples.count else {
+            return (last.transform, last.opacity)
+        }
+        let a = samples[low], b = samples[low + 1]
+        let span = b.time - a.time
+        let f = span > 1e-12 ? (t - a.time) / span : 1
+        func mix(_ x: Double, _ y: Double) -> Double { x + (y - x) * f }
+        var transform = SceneTransform()
+        transform.offsetX = mix(a.transform.offsetX, b.transform.offsetX)
+        transform.offsetY = mix(a.transform.offsetY, b.transform.offsetY)
+        transform.scale = mix(a.transform.scale, b.transform.scale)
+        if a.transform.scaleY != nil || b.transform.scaleY != nil {
+            transform.scaleY = mix(a.transform.scaleY ?? a.transform.scale, b.transform.scaleY ?? b.transform.scale)
+        }
+        transform.rotation = mix(a.transform.rotation, b.transform.rotation)
+        return (transform, mix(a.opacity, b.opacity))
+    }
+}
+
 enum SceneLayerKind: String, Codable {
     case image
     case particles
@@ -746,6 +819,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var depthAutoCycles = 1
     var transform = SceneTransform()
     var keyframes: [SceneKeyframe] = []
+    var motion: SceneMotion?
 
     init(name: String, imageFile: String) {
         self.name = name
@@ -788,6 +862,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         depthAutoCycles = (try? container.decode(Int.self, forKey: .depthAutoCycles)) ?? 1
         transform = (try? container.decode(SceneTransform.self, forKey: .transform)) ?? .identity
         keyframes = (try? container.decode([SceneKeyframe].self, forKey: .keyframes)) ?? []
+        motion = try? container.decodeIfPresent(SceneMotion.self, forKey: .motion)
         isVisible = (try? container.decode(Bool.self, forKey: .isVisible)) ?? true
         isLocked = (try? container.decode(Bool.self, forKey: .isLocked)) ?? false
         opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
@@ -846,7 +921,16 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         keyframes.count >= 2
     }
 
-    /// Placement and opacity factor at `phase` (0..<1 of the loop).
+    /// Placement and opacity factor at `phase` (0..<1 of the loop), or for a recorded
+    /// motion at `time` seconds since the scene started.
+    func pose(at phase: Double, time: Double) -> (transform: SceneTransform, opacity: Double) {
+        if let motion, !motion.samples.isEmpty {
+            return motion.pose(at: time)
+        }
+        return pose(at: phase)
+    }
+
+    /// Placement and opacity factor at `phase` (0..<1 of the loop), keyframes only.
     func pose(at phase: Double) -> (transform: SceneTransform, opacity: Double) {
         guard isKeyframed else {
             return (transform, 1)
@@ -883,7 +967,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     /// depth's own drift.
     var isAnimated: Bool {
         !activeEffects.isEmpty || (isVisible && kind == .particles && particles != nil)
-            || (isVisible && hasDepth && depthAutoMotion > 0) || (isVisible && isKeyframed)
+            || (isVisible && hasDepth && depthAutoMotion > 0) || (isVisible && (isKeyframed || motion != nil))
             || (isVisible && (renderGraph != nil || placement != nil || videoFile != nil))
     }
 }
@@ -992,6 +1076,8 @@ struct SceneDocument: Codable, Equatable {
     var requiresRealTimePlayback: Bool {
         runsInRealTime || layers.contains { layer in
             layer.activeEffects.contains { $0.kind.runsOnRealTime } || (layer.isVisible && (layer.renderGraph != nil || layer.placement != nil || layer.usesMediaArtwork))
+                // A recorded motion keeps its own period, not the loop's.
+                || (layer.isVisible && layer.motion != nil)
         }
     }
 

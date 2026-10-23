@@ -860,6 +860,8 @@
 "被写体を切り抜く" = "Motiv freistellen";
 "追加を終える" = "Hinzufügen beenden";
 "配置を元に戻す" = "Anordnung zurücksetzen";
+"読み込んだ動きで動きます。動きを外すと、最初の姿勢で止まり、配置を変えられるようになります。" = "Diese Ebene folgt der Bewegung, mit der sie importiert wurde. Entferne die Bewegung, damit sie in ihrer ersten Haltung bleibt und du ihre Anordnung ändern kannst.";
+"動きを外す" = "Bewegung entfernen";
 "雨" = "Regen";
 "パッケージに不正なファイル参照が含まれています: %@" = "Das Paket enthält einen ungültigen Dateiverweis: %@";
 "切り抜ける被写体が見つかりませんでした。" = "Es wurde kein Motiv zum Freistellen gefunden.";

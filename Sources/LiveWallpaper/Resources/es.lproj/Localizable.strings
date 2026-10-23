@@ -860,6 +860,8 @@
 "被写体を切り抜く" = "Recortar sujeto";
 "追加を終える" = "Terminar de añadir";
 "配置を元に戻す" = "Restablecer disposición";
+"読み込んだ動きで動きます。動きを外すと、最初の姿勢で止まり、配置を変えられるようになります。" = "Esta capa sigue el movimiento con el que se importó. Elimina el movimiento para dejarla en su primera pose y cambiar su disposición.";
+"動きを外す" = "Eliminar movimiento";
 "雨" = "Lluvia";
 "パッケージに不正なファイル参照が含まれています: %@" = "El paquete contiene una referencia de archivo no válida: %@";
 "切り抜ける被写体が見つかりませんでした。" = "No se ha encontrado ningún sujeto para recortar.";

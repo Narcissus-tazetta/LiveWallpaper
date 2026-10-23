@@ -860,6 +860,8 @@
 "被写体を切り抜く" = "Tách chủ thể";
 "追加を終える" = "Xong";
 "配置を元に戻す" = "Đặt lại bố cục";
+"読み込んだ動きで動きます。動きを外すと、最初の姿勢で止まり、配置を変えられるようになります。" = "Lớp này chuyển động theo chuyển động được nhập cùng. Xóa chuyển động để giữ lớp ở tư thế đầu tiên và thay đổi bố cục.";
+"動きを外す" = "Xóa chuyển động";
 "雨" = "Mưa";
 "パッケージに不正なファイル参照が含まれています: %@" = "Gói chứa tham chiếu tệp không hợp lệ: %@";
 "切り抜ける被写体が見つかりませんでした。" = "Không tìm thấy chủ thể để tách.";

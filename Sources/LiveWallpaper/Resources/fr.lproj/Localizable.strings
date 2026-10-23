@@ -860,6 +860,8 @@
 "被写体を切り抜く" = "Détourer le sujet";
 "追加を終える" = "Terminer l’ajout";
 "配置を元に戻す" = "Réinitialiser la disposition";
+"読み込んだ動きで動きます。動きを外すと、最初の姿勢で止まり、配置を変えられるようになります。" = "Ce calque suit le mouvement avec lequel il a été importé. Supprimez le mouvement pour le garder dans sa première pose et modifier sa disposition.";
+"動きを外す" = "Supprimer le mouvement";
 "雨" = "Pluie";
 "パッケージに不正なファイル参照が含まれています: %@" = "Le paquet contient une référence de fichier non valide : %@";
 "切り抜ける被写体が見つかりませんでした。" = "Aucun sujet à détourer n’a été trouvé.";

@@ -860,6 +860,8 @@
 "被写体を切り抜く" = "Konuyu Dekupe Et";
 "追加を終える" = "Eklemeyi Bitir";
 "配置を元に戻す" = "Yerleşimi Sıfırla";
+"読み込んだ動きで動きます。動きを外すと、最初の姿勢で止まり、配置を変えられるようになります。" = "Bu katman içe aktarıldığı hareketi izler. Hareketi kaldırırsanız ilk duruşunda kalır ve yerleşimini değiştirebilirsiniz.";
+"動きを外す" = "Hareketi Kaldır";
 "雨" = "Yağmur";
 "パッケージに不正なファイル参照が含まれています: %@" = "Pakette geçersiz bir dosya referansı var: %@";
 "切り抜ける被写体が見つかりませんでした。" = "Dekupe edilecek bir konu bulunamadı.";

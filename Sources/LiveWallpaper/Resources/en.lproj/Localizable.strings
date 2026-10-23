@@ -860,6 +860,8 @@
 "被写体を切り抜く" = "Cut Out Subject";
 "追加を終える" = "Done Adding";
 "配置を元に戻す" = "Reset Layout";
+"読み込んだ動きで動きます。動きを外すと、最初の姿勢で止まり、配置を変えられるようになります。" = "This layer follows the motion it was imported with. Remove the motion to keep it in its first pose and change its layout.";
+"動きを外す" = "Remove Motion";
 "雨" = "Rain";
 "パッケージに不正なファイル参照が含まれています: %@" = "The package contains an invalid file reference: %@";
 "切り抜ける被写体が見つかりませんでした。" = "Couldn’t find a subject to cut out.";

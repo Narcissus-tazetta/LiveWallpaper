@@ -88,7 +88,7 @@ final class SceneFrameEvaluator {
         let normalizedPhase = phase < 0 ? phase + 1 : phase
         var base: [UUID: SceneEvaluatedFrame.Layer] = [:]
         for layer in document.layers {
-            let pose = layer.pose(at: normalizedPhase)
+            let pose = layer.pose(at: normalizedPhase, time: input.time)
             let link = document.linkValues(layerID: layer.id, timeOfDay: timeOfDay,
                                            cursor: SIMD2(Double(input.parallax.x), Double(input.parallax.y)))
             var transform = pose.transform

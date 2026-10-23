@@ -227,6 +227,7 @@ final class SceneRenderer {
     var allowsSinglePassComposite = true
     /// Loop phase of the last encoded frame, for mapping preview clicks.
     private var lastPhase: Double = 0
+    private var lastTime: Double = 0
     private var paintOverride: ScenePaintOverride?
     private var paintOverrideTexture: MTLTexture?
     /// Tints where the painted mask or flow map applies, so weak motion can be seen.
@@ -318,7 +319,7 @@ final class SceneRenderer {
             let point = inverse * SIMD3(canvasUV.x, canvasUV.y, 1)
             return SIMD2(point.x, point.y)
         }
-        let placement = placement(for: placedTransform(layer, currentTransform(layerID: layerID) ?? layer.pose(at: lastPhase).transform))
+        let placement = placement(for: placedTransform(layer, currentTransform(layerID: layerID) ?? layer.pose(at: lastPhase, time: lastTime).transform))
         let relative = canvasUV - 0.5 - placement.offset
         let placed = placement.column0 * relative.x + placement.column1 * relative.y + 0.5
         return (placed - 0.5) * layerUVScale(for: layer) + 0.5
@@ -351,13 +352,13 @@ final class SceneRenderer {
             let point = matrix * SIMD3(layerUV.x, layerUV.y, 1)
             return SIMD2(point.x, point.y)
         }
-        return canvasUV(layerUV: layerUV, layer: layer, transform: currentTransform(layerID: layerID) ?? layer.pose(at: lastPhase).transform)
+        return canvasUV(layerUV: layerUV, layer: layer, transform: currentTransform(layerID: layerID) ?? layer.pose(at: lastPhase, time: lastTime).transform)
     }
 
     /// Where the layer's picture would sit with `transform`, at rest.
     func canvasUV(layerUV: SIMD2<Float>, layer: SceneLayer, transform: SceneTransform) -> SIMD2<Float> {
         if let current = lastPlacements[layer.id] {
-            let previous = currentTransform(layerID: layer.id) ?? layer.pose(at: lastPhase).transform
+            let previous = currentTransform(layerID: layer.id) ?? layer.pose(at: lastPhase, time: lastTime).transform
             let matrix = placementMatrix(transform) * simd_inverse(placementMatrix(previous)) * current
             let point = matrix * SIMD3(layerUV.x, layerUV.y, 1)
             return SIMD2(point.x, point.y)
@@ -377,7 +378,7 @@ final class SceneRenderer {
 
     /// The layer's pose at the frame last drawn.
     func currentTransform(layerID: UUID) -> SceneTransform? {
-        lastFrame?.layers[layerID]?.transform ?? document.layers.first { $0.id == layerID }?.pose(at: lastPhase).transform
+        lastFrame?.layers[layerID]?.transform ?? document.layers.first { $0.id == layerID }?.pose(at: lastPhase, time: lastTime).transform
     }
 
     func currentLayer(layerID: UUID) -> SceneLayer? {
@@ -386,7 +387,7 @@ final class SceneRenderer {
 
     func currentOpacity(layerID: UUID) -> Double? {
         if let drawn = lastFrame?.layers[layerID] { return drawn.layer.opacity * drawn.opacity }
-        return document.layers.first { $0.id == layerID }.map { $0.opacity * $0.pose(at: lastPhase).opacity }
+        return document.layers.first { $0.id == layerID }.map { $0.opacity * $0.pose(at: lastPhase, time: lastTime).opacity }
     }
 
     /// Encodes the scene into `target` (bgra8Unorm, renderTarget usage).
@@ -452,6 +453,7 @@ final class SceneRenderer {
         }
         lastInversePlacements = lastPlacements.compactMapValues(Self.inversePlacement)
         lastPhase = Double(loopPhase(input.time))
+        lastTime = input.time
         let targetSize = SIMD2(Float(target.width), Float(target.height))
         let ordered = document.layers.enumerated().sorted { a, b in
             let left = evaluated.order[a.element.id] ?? a.offset
