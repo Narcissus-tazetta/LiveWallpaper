@@ -16,6 +16,7 @@ extension SettingsView {
             model.currentWebWallpaperID == source.id && model.isWebWallpaperActive
         }
         let isDisplayOverrideAssigned = model.hasLiveWebOverride(forSourceID: source.id)
+        let isHovered = hoveredWebWallpaperID == source.id
         let strokeColor: Color = isActive ? Color.accentColor : .clear
         // Web壁紙はロック画面壁紙の概念を持たないため、ロック画面タブでは
         // 選択(適用)操作のみ無効化する。削除・プレイリスト編集はどちらのタブでも可能。
@@ -56,6 +57,8 @@ extension SettingsView {
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 3)
                                 .background(.ultraThinMaterial, in: Capsule())
+                                // Steps aside for the hover "⋯" button, which takes the same corner.
+                                .padding(.trailing, isHovered ? 28 : 0)
                         }
                     }
                     .padding(.top, 4)
@@ -130,40 +133,84 @@ extension SettingsView {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(strokeColor, lineWidth: strokeColor == .clear ? 0 : 1.5)
         )
-        .contextMenu {
-            Button(model.localizedString("適用")) {
-                model.stopExternalWallpaper()
-                model.selectWebWallpaper(id: source.id)
-            }
-            .disabled(!isSelectable)
-            if model.availableDisplayScreens().count > 1 || model.webOverrideByScreenID.values.contains(source.id) {
-                webDisplayOverrideMenu(sourceID: source.id)
-            }
-            Divider()
-            playlistMembershipMenus(
-                isContained: { model.playlistContainsWebWallpaper($0.id, sourceID: source.id) },
-                add: { playlistID in _ = model.addWebWallpaper(sourceID: source.id, to: playlistID) },
-                remove: { playlistID in
-                    _ = model.removeWebWallpaper(sourceID: source.id, fromPlaylist: playlistID)
-                },
-                addToNewPlaylist: { addWebWallpaperToNewPlaylist(sourceID: source.id) }
-            )
-            Divider()
-            if source.localFolderPath != nil {
-                Button(model.localizedString("作品の設定")) { localWebSettingsSource = source }
-            }
-            Button(model.localizedString("名前を編集")) {
-                startWebWallpaperNameEdit(sourceID: source.id)
-            }
-            Button(role: .destructive) {
-                webThumbnailStore.remove(sourceID: source.id)
-                model.removeWebWallpaper(id: source.id)
-                if webWallpaperNameEdit?.id == source.id {
-                    cancelWebWallpaperNameEdit()
+        .overlay(alignment: .topTrailing) {
+            if isHovered {
+                // Same construction as the video card's "⋯" button; see wallpaperCard for why the
+                // glyph is drawn over a clear Menu label.
+                Menu {
+                    webWallpaperMenuItems(source: source, isSelectable: isSelectable)
+                } label: {
+                    Color.clear
+                        .frame(width: 24, height: 24)
                 }
-            } label: {
-                Text(model.localizedString("削除"))
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 24, height: 24)
+                .background(.black.opacity(0.4), in: Circle())
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .allowsHitTesting(false)
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
+                        .allowsHitTesting(false)
+                )
+                .padding(6)
+                .iconHelp(model.localizedString("その他の操作"))
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.85)))
             }
+        }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isHovered)
+        .onHover { hovering in
+            if hovering {
+                hoveredWebWallpaperID = source.id
+            } else if hoveredWebWallpaperID == source.id {
+                hoveredWebWallpaperID = nil
+            }
+        }
+        .contextMenu {
+            webWallpaperMenuItems(source: source, isSelectable: isSelectable)
+        }
+    }
+
+    @ViewBuilder
+    private func webWallpaperMenuItems(source: WebWallpaperSource, isSelectable: Bool) -> some View {
+        Button(model.localizedString("適用")) {
+            model.stopExternalWallpaper()
+            model.selectWebWallpaper(id: source.id)
+        }
+        .disabled(!isSelectable)
+        if model.availableDisplayScreens().count > 1 || model.webOverrideByScreenID.values.contains(source.id) {
+            webDisplayOverrideMenu(sourceID: source.id)
+        }
+        Divider()
+        playlistMembershipMenus(
+            isContained: { model.playlistContainsWebWallpaper($0.id, sourceID: source.id) },
+            add: { playlistID in _ = model.addWebWallpaper(sourceID: source.id, to: playlistID) },
+            remove: { playlistID in
+                _ = model.removeWebWallpaper(sourceID: source.id, fromPlaylist: playlistID)
+            },
+            addToNewPlaylist: { addWebWallpaperToNewPlaylist(sourceID: source.id) }
+        )
+        Divider()
+        if source.localFolderPath != nil {
+            Button(model.localizedString("作品の設定")) { localWebSettingsSource = source }
+        }
+        Button(model.localizedString("名前を編集")) {
+            startWebWallpaperNameEdit(sourceID: source.id)
+        }
+        Button(role: .destructive) {
+            webThumbnailStore.remove(sourceID: source.id)
+            model.removeWebWallpaper(id: source.id)
+            if webWallpaperNameEdit?.id == source.id {
+                cancelWebWallpaperNameEdit()
+            }
+        } label: {
+            Text(model.localizedString("削除"))
         }
     }
 

@@ -102,6 +102,7 @@ struct SettingsView: View {
     @State var isFocusCardExpanded: Bool = false
     @State var hoveredTab: SettingsTab?
     @State var hoveredWallpaperPath: String?
+    @State var hoveredWebWallpaperID: UUID?
     /// Card whose video is playing on hover. Separate from hoveredWallpaperPath so a quick
     /// pass of the pointer across the grid doesn't spin up a player for every card.
     @State var hoverPreviewPath: String?
