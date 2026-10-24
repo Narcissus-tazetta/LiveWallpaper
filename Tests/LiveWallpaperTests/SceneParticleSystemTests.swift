@@ -182,4 +182,21 @@ final class SceneParticleSystemTests: XCTestCase {
         simulator.apply(.init(events: [.emit(4)]))
         XCTAssertEqual(simulator.instances(aspect: 1).count, 3)
     }
+
+    func testANewLayerFillsTheScreenOnTheFirstFrameAndRises() {
+        let simulator = SceneParticleSimulator(
+            system: .risingLights(canvasWidth: 1920, canvasHeight: 1080, textureFile: nil), seed: 1
+        )
+        let first = simulator.instances(aspect: 1)
+        XCTAssertGreaterThan(first.count, 150)
+        XCTAssertLessThanOrEqual(first.count, 400)
+        // Up to 10 s of sideways drift (15 px/s) and sway (16 px) past the edges.
+        XCTAssertTrue(first.allSatisfy { abs($0.center.x) <= 960 + 15 * 10 + 16 })
+        XCTAssertGreaterThan(first.map { Double($0.center.y) }.max()!, 0, "some have risen past the middle")
+        simulator.apply(.init(events: [.clear, .emit(1)], emitting: false))
+        let born = simulator.instances(aspect: 1).first!.center.y
+        run(simulator, seconds: 1)
+        // The slowest rise is 4% of the height a second.
+        XCTAssertGreaterThan(Double(simulator.instances(aspect: 1).first!.center.y - born), 1080 * 0.04 - 1)
+    }
 }

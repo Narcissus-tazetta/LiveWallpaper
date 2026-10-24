@@ -234,6 +234,10 @@ extension SettingsView {
         }
 
         if let selectedID, let layer = document.layers.first(where: { $0.id == selectedID }) {
+            if layer.particleSystem != nil {
+                Divider()
+                sceneParticleSystemSection(path: path, layer: layer)
+            }
             Divider()
             sceneEffectsSection(path: path, layer: layer)
                 .disabled(layer.isLocked)
@@ -639,6 +643,39 @@ extension SettingsView {
             }
         }
         // Locked means the same in the inspector as on the preview.
+        .disabled(layer.isLocked)
+    }
+
+    private func sceneParticleSystemSection(path: String, layer: SceneLayer) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(model.localizedString("粒子"))
+                .font(.headline)
+            SceneParticleSystemEditor(
+                model: model,
+                path: path,
+                system: Binding(
+                    get: {
+                        model.sceneDocumentsByPath[path]?.layers.first { $0.id == layer.id }?.particleSystem
+                            ?? layer.particleSystem ?? SceneParticleSystem()
+                    },
+                    set: { system in
+                        updateSceneLayer(path: path, id: layer.id) { layer in
+                            // The layer composites additive particles with add, which keeps
+                            // light where their alpha is 0.
+                            if system.blend != layer.particleSystem?.blend {
+                                if system.blend == .add {
+                                    layer.blendMode = .add
+                                } else if layer.blendMode == .add {
+                                    layer.blendMode = .normal
+                                }
+                            }
+                            layer.particleSystem = system
+                        }
+                    }
+                )
+            )
+            .id(layer.id)
+        }
         .disabled(layer.isLocked)
     }
 

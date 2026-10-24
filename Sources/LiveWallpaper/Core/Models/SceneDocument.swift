@@ -837,6 +837,15 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         blendMode = particles.preset.isAdditive ? .add : .normal
     }
 
+    /// Additive particles add their light to what is below.
+    init(name: String, particleSystem: SceneParticleSystem) {
+        self.name = name
+        kind = .particles
+        imageFile = ""
+        self.particleSystem = particleSystem
+        blendMode = particleSystem.blend == .add ? .add : .normal
+    }
+
     init(name: String, text: SceneText) {
         self.name = name
         kind = .text

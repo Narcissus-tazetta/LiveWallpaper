@@ -428,6 +428,34 @@ struct SceneParticleSystem: Codable, Equatable {
         ([max(initial.lifetime.min, initial.lifetime.max)] + children.map(\.system.value.longestLifetime)).max() ?? 0
     }
 
+    /// What a new layer starts as: soft lights born along the bottom edge that drift
+    /// up and sway, already filling the screen on the first frame.
+    static func risingLights(canvasWidth: Double, canvasHeight: Double, textureFile: String?) -> SceneParticleSystem {
+        var system = SceneParticleSystem()
+        system.maxCount = 400
+        system.startTime = 10
+        system.textureFile = textureFile
+        system.blend = .add
+        system.emitters = [Emitter(
+            shape: .box,
+            origin: [0, -canvasHeight / 2, 0],
+            distanceMax: [canvasWidth / 2, 0, 0],
+            rate: 30
+        )]
+        system.initial.lifetime = Range(6, 10)
+        system.initial.size = Range(6, 24)
+        system.initial.alpha = Range(0.3, 1)
+        system.initial.colorMin = [1, 0.85, 0.6]
+        system.initial.colorMax = [1, 1, 1]
+        system.initial.velocity = VectorRange([-15, canvasHeight * 0.04, 0], [15, canvasHeight * 0.1, 0])
+        system.behaviors = [
+            .movement(gravity: [0, 0, 0], drag: 0),
+            .alphaFade(fadeIn: 0.15, fadeOut: 0.6),
+            .oscillatePosition(Oscillation(frequency: Range(0.3, 1), amplitude: Range(4, 16), phase: Range(0, 2 * .pi), mask: [1, 0, 0])),
+        ]
+        return system
+    }
+
     var usesPointer: Bool {
         controlPoints.contains { $0.anchor == .pointer } || children.contains { $0.system.value.usesPointer }
     }

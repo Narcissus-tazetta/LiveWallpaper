@@ -402,6 +402,78 @@ extension WallpaperModel {
         return layer.id
     }
 
+    /// Adds a simulated particle layer that starts as soft lights rising from the
+    /// bottom, drawn with a generated round sprite.
+    func addSceneParticleSystemLayer(name: String, path: String) -> UUID? {
+        guard var document = sceneDocumentsByPath[path] else {
+            return nil
+        }
+        let texture: String
+        do {
+            texture = try SceneStore.writeImage(Self.softDotImage(), prefix: "particle", videoPath: path)
+        } catch {
+            sceneErrorMessage = error.localizedDescription
+            AppLog.windowRefresh.error("writing particle sprite failed: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+        let system = SceneParticleSystem.risingLights(
+            canvasWidth: Double(document.canvasWidth),
+            canvasHeight: Double(document.canvasHeight),
+            textureFile: texture
+        )
+        let layer = SceneLayer(name: name, particleSystem: system)
+        document.layers.append(layer)
+        updateScene(document, path: path, coalescing: false)
+        return layer.id
+    }
+
+    /// Copies an image into the scene folder for a particle system and hands its file
+    /// name to `apply`, which must make the scene name it before anything else edits it.
+    func importSceneParticleImage(from imageURL: URL, path: String, apply: (String) -> Void) async {
+        let stagingVideoPath = Self.sceneStagingVideoPath()
+        let stagingFolder = SceneStore.folderURL(forVideoPath: stagingVideoPath)
+        defer {
+            removeLeftovers(of: [stagingFolder])
+        }
+        do {
+            let layer = try await Task.detached(priority: .userInitiated) {
+                try SceneStore.importImage(at: imageURL, videoPath: stagingVideoPath).0
+            }.value
+            guard sceneDocumentsByPath[path] != nil else {
+                return
+            }
+            try adoptStagedSceneFile(layer.imageFile, from: stagingFolder, path: path)
+            apply(layer.imageFile)
+        } catch {
+            sceneErrorMessage = error.localizedDescription
+            AppLog.windowRefresh.error("importing particle image failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// White, fading from opaque at the centre to clear at the edge.
+    private static func softDotImage() throws -> CGImage {
+        let size = 64
+        guard let context = CGContext(
+            data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ),
+            let gradient = CGGradient(
+                colorsSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+                colors: [CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1), CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0)] as CFArray,
+                locations: [0, 1]
+            )
+        else {
+            throw SceneStore.StoreError.unreadableImage("particle sprite")
+        }
+        let center = CGPoint(x: Double(size) / 2, y: Double(size) / 2)
+        context.drawRadialGradient(gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: Double(size) / 2, options: [])
+        guard let image = context.makeImage() else {
+            throw SceneStore.StoreError.unreadableImage("particle sprite")
+        }
+        return image
+    }
+
     // MARK: - AI
 
     /// Splits the layer into its subject (a new layer above) and the background with
