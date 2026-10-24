@@ -808,6 +808,16 @@ final class SceneRenderer {
                 prepared.append(.plane(picture, drawn, space))
             }
         }
+        var views = views
+        if let lights = document.camera?.shadowLights, !lights.isEmpty {
+            let casters = prepared.compactMap { item -> SceneModelLayerFrame? in
+                if case let .model(model) = item { return model }
+                return nil
+            }
+            let shadows = try modelRenderer!.renderShadows(lights: lights, casters: casters, commandBuffer: commandBuffer)
+            views.flat.shadows = shadows
+            views.perspective.shadows = shadows
+        }
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = target
         pass.colorAttachments[0].loadAction = .clear

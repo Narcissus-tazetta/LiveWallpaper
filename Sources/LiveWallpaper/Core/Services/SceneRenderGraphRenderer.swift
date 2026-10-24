@@ -99,6 +99,7 @@ final class SceneRenderGraphRenderer {
         var eye: SIMD3<Float>
         var ambient: SIMD3<Float>
         var skylight: SIMD3<Float>
+        var shadowMatrices: [simd_float4x4] = []
     }
 
     /// `uv` (canvas UV → layer UV, origin top-left) as the same map between clip spaces
@@ -753,6 +754,12 @@ final class SceneRenderGraphRenderer {
                 }
                 padded.withUnsafeBytes { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
                 continue
+            case .shadowMatrix:
+                // Without a shadow map the matrix stays zero and the lookup falls outside it.
+                guard let model, let index = update.key.flatMap(Int.init), model.shadowMatrices.indices.contains(index) else { continue }
+                var matrix = model.shadowMatrices[index]
+                withUnsafeBytes(of: &matrix) { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
+                continue
             case .layerAlpha: values = [model?.alpha ?? 1]
             case .layerColor: values = model.map { [$0.color.x, $0.color.y, $0.color.z] } ?? [1, 1, 1]
             case .eyePosition, .ambientColor, .skylightColor:
@@ -955,7 +962,7 @@ final class SceneRenderGraphRenderer {
                 case .texelOffsets: bytes = 16
                 case .textureSize: bytes = 16
                 case .modelViewProjection, .model, .normalModel, .viewProjection, .layerAlpha, .layerColor, .eyePosition,
-                     .ambientColor, .skylightColor:
+                     .ambientColor, .skylightColor, .shadowMatrix:
                     throw GraphError(detail: "model layer values outside a model layer")
                 case .boneMatrices, .boneOpacity:
                     let count = (draw.skeleton ?? draw.skeletonID.flatMap { rigs.skeletons[$0] })?

@@ -42,13 +42,14 @@ struct SceneRenderGraph: Codable, Equatable {
         /// For a model layer a script made: `modelViewProjection` takes its vertices to
         /// clip space, `model` to scene pixels and `viewProjection` scene pixels to clip
         /// space; `layerAlpha` and `layerColor` are the layer's own; `eyePosition` is the
-        /// camera's and `ambientColor` and `skylightColor` the scene's light all round.
+        /// camera's and `ambientColor` and `skylightColor` the scene's light all round;
+        /// `shadowMatrix` takes scene pixels to the clip space of the shadow map `key`.
         enum Value: String, Codable {
             case time, cursor, textureSize, boneMatrices, boneOpacity, effectValue, audioSpectrum
             case pointer, previousPointer, layerFromCanvas, canvasFromLayer, screenFromLayer, frameTime, pointerState
             case parallaxPosition, texelSize, texelOffsets
             case modelViewProjection, model, normalModel, viewProjection, layerAlpha, layerColor
-            case eyePosition, ambientColor, skylightColor
+            case eyePosition, ambientColor, skylightColor, shadowMatrix
         }
         var offset: Int
         var value: Value

@@ -1079,10 +1079,31 @@ struct SceneCamera: Codable, Equatable {
     var farZ: Double
     var ambientColor: [Double]
     var skylightColor: [Double]
+    /// The lights that cast a shadow, in the order of the shadow maps materials read.
+    var shadowLights: [SceneShadowLight]?
 
     var isValid: Bool {
         [eye, center, up, ambientColor, skylightColor].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
             && [fov, nearZ, farZ].allSatisfy(\.isFinite)
+            && (shadowLights ?? []).allSatisfy(\.isValid)
+    }
+}
+
+/// A light whose shadow the scene draws.
+struct SceneShadowLight: Codable, Equatable {
+    enum Kind: String, Codable { case point, spot, directional }
+    var kind: Kind
+    var origin: [Double]
+    /// Where the light shines.
+    var axis: [Double]
+    /// Half angle of a spot's cone, in degrees.
+    var outerCone: Double
+    /// How far from the camera a directional light's shadow reaches.
+    var cascadeDistance: Double
+
+    var isValid: Bool {
+        origin.count == 3 && axis.count == 3 && (origin + axis + [outerCone, cascadeDistance]).allSatisfy(\.isFinite)
+            && axis.contains { $0 != 0 } && (0 ..< 90).contains(outerCone)
     }
 }
 

@@ -25,7 +25,8 @@ final class SceneModelRenderer {
     }
 
     let materials: [SceneMeshMaterial?]
-    private let device: MTLDevice
+    let device: MTLDevice
+    let shadowState = ShadowState()
     private var compiled: [Int: Material] = [:]
     private var pipelines: [PipelineKey: MTLRenderPipelineState] = [:]
     private var depthStates: [Int: MTLDepthStencilState] = [:]
@@ -73,17 +74,24 @@ final class SceneModelRenderer {
         Set(materials.compactMap { $0 }.flatMap(\.images.values))
     }
 
+    /// The shadow map a texture source names (`_shadow0`...).
+    private static func shadowSlot(_ source: String) -> Int? {
+        source.hasPrefix("_shadow") ? Int(source.dropFirst(7)) : nil
+    }
+
     private static func validate(_ material: SceneMeshMaterial) throws {
         let draw = material.draw
         guard draw.dynamic == nil, draw.skeleton == nil, draw.skeletonID == nil, draw.commands == nil,
               !draw.attributes.isEmpty, draw.attributes.allSatisfy({ $0.semantic != nil }),
               Set(draw.attributes.map(\.location)).count == draw.attributes.count,
-              draw.textures.allSatisfy({ (0 ..< 16).contains($0.index) && material.images[$0.source] != nil })
+              draw.textures.allSatisfy({
+                  (0 ..< 16).contains($0.index) && (material.images[$0.source] != nil || shadowSlot($0.source) != nil)
+              })
         else { throw ModelError(detail: "material \(material.path) is invalid") }
         for stage in [draw.vertex, draw.fragment] {
             for update in stage.updates {
                 let bytes: Int = switch update.value {
-                case .modelViewProjection, .model, .viewProjection: 64
+                case .modelViewProjection, .model, .viewProjection, .shadowMatrix: 64
                 case .layerAlpha, .time, .frameTime: 4
                 case .normalModel: 48
                 case .layerColor, .eyePosition, .ambientColor, .skylightColor: 12
@@ -174,6 +182,14 @@ final class SceneModelRenderer {
         var eye: SIMD3<Float>
         var ambient: SIMD3<Float>
         var skylight: SIMD3<Float>
+        var shadows: Shadows?
+    }
+
+    /// The shadow maps of a frame, one per light that casts, and the matrices that take
+    /// scene pixels to their clip spaces.
+    struct Shadows {
+        var textures: [MTLTexture]
+        var matrices: [simd_float4x4]
     }
 
     private func depthState(test: Bool, write: Bool) -> MTLDepthStencilState {
@@ -196,7 +212,8 @@ final class SceneModelRenderer {
     ) throws {
         let values = SceneRenderGraphRenderer.ModelValues(
             modelViewProjection: view.viewProjection * layer.world, model: layer.world, viewProjection: view.viewProjection,
-            alpha: layer.alpha, color: layer.color, eye: view.eye, ambient: view.ambient, skylight: view.skylight
+            alpha: layer.alpha, color: layer.color, eye: view.eye, ambient: view.ambient, skylight: view.skylight,
+            shadowMatrices: view.shadows?.matrices ?? []
         )
         for shape in layer.shapes {
             guard let index = shape.material, let material = compiled[index], !shape.vertices.isEmpty else { continue }
@@ -241,7 +258,13 @@ final class SceneModelRenderer {
                 }
             }
             for (binding, sampler) in zip(draw.textures, material.samplers) {
-                let texture = resources[binding.source]!
+                let texture: MTLTexture
+                if let slot = Self.shadowSlot(binding.source) {
+                    // Light reaches everywhere when the frame holds no shadow map.
+                    if let mapped = view.shadows?.textures[slot] { texture = mapped } else { texture = try openShadow() }
+                } else {
+                    texture = resources[binding.source]!
+                }
                 encoder.setVertexTexture(texture, index: binding.index)
                 encoder.setFragmentTexture(texture, index: binding.index)
                 encoder.setVertexSamplerState(sampler, index: binding.index)
