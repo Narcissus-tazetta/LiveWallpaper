@@ -220,6 +220,19 @@ final class SceneFrameEvaluator {
                     member("media")
                     try context.value(Self.mediaInput(input.media))
                 } else { missing.append("media") }
+                if script.usesAudio {
+                    member("audio")
+                    if let audio = input.audio {
+                        let position = context.beginObject()
+                        for (name, values) in [("left", audio.left), ("right", audio.right)] {
+                            context.key(name)
+                            let array = context.beginArray()
+                            for value in values { try context.number(value) }
+                            context.end(array, count: values.count)
+                        }
+                        context.end(position, count: 2)
+                    } else { context.null() }
+                } else { missing.append("audio") }
                 member("_missing")
                 try context.value(missing)
                 context.end(contextPosition, count: contextCount)

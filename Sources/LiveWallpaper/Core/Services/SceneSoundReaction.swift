@@ -26,6 +26,6 @@ extension SceneDocument {
     var usesAudio: Bool {
         layers.contains { layer in
             layer.renderGraph?.usesAudio == true || layer.effects.contains { $0.renderGraph?.usesAudio == true }
-        }
+        } || scripts.contains(where: \.usesAudio)
     }
 }

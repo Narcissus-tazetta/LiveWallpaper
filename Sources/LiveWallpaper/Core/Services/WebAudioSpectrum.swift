@@ -156,14 +156,19 @@ final class WebSystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate, @
     private let queue = DispatchQueue(label: "LiveWallpaper.webSpectrum", qos: .userInitiated)
     @MainActor private var stream: SCStream?
     private let spectrum = WebAudioSpectrum()
+    /// Created for the stream's sample rate, which sizes its transform.
+    private var sceneAnalyzer: SceneAudioAnalyzer?
     let onSpectrum: @Sendable ([Float]) -> Void
+    let onSceneSpectrum: @Sendable ([Float]) -> Void
     let onFailure: @Sendable (Error) -> Void
 
     init(
         onSpectrum: @escaping @Sendable ([Float]) -> Void,
+        onSceneSpectrum: @escaping @Sendable ([Float]) -> Void,
         onFailure: @escaping @Sendable (Error) -> Void
     ) {
         self.onSpectrum = onSpectrum
+        self.onSceneSpectrum = onSceneSpectrum
         self.onFailure = onFailure
     }
 
@@ -223,14 +228,21 @@ final class WebSystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate, @
                 let left = data.assumingMemoryBound(to: Float.self)
                 let right = channels < 2 ? left : nonInterleaved
                     ? buffers[1].mData!.assumingMemoryBound(to: Float.self) : left.advanced(by: 1)
+                let sampleRate = description.pointee.mSampleRate
                 if let values = spectrum.append(
                     left: left,
                     right: right,
                     frames: sampleBuffer.numSamples,
                     stride: stride,
-                    sampleRate: description.pointee.mSampleRate
+                    sampleRate: sampleRate
                 ) {
                     onSpectrum(values)
+                }
+                if sceneAnalyzer?.sampleRate != sampleRate {
+                    sceneAnalyzer = SceneAudioAnalyzer(sampleRate: sampleRate)
+                }
+                if let values = sceneAnalyzer!.append(left: left, right: right, frames: sampleBuffer.numSamples, stride: stride) {
+                    onSceneSpectrum(values)
                 }
             }
         } catch { onFailure(error) }

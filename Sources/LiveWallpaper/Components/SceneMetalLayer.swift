@@ -263,14 +263,14 @@ final class SceneMetalLayer: CAMetalLayer {
         if !wantsSpectrum { setAudio(nil) }
         MainActor.assumeIsolated {
             LocalWebIntegration.shared.update(id: mediaSubscriptionID, subscription: wantsMedia || wantsSpectrum ? .init(
-                spectrum: wantsSpectrum, media: wantsMedia,
-                receiveSpectrum: { [weak self] values in self?.receiveSpectrum(values) },
+                sceneSpectrum: wantsSpectrum, media: wantsMedia,
+                receiveSceneSpectrum: { [weak self] values in self?.receiveSpectrum(values) },
                 receiveMedia: { [weak self] value, enabled in self?.receiveMedia(value, isAvailable: enabled) }
             ) : nil)
         }
     }
 
-    /// 64 bands per channel, left first, as LocalWebIntegration sends them.
+    /// 64 bands per channel, left first, as SceneAudioAnalyzer makes them.
     private func receiveSpectrum(_ values: [Float]) {
         guard isSubscribedToSpectrum, values.count == 2 * SceneAudioSpectrum.bandCount else { return }
         let count = SceneAudioSpectrum.bandCount
