@@ -124,4 +124,62 @@ final class SceneParticleSystemTests: XCTestCase {
         XCTAssertEqual(sprites.count, 2)
         XCTAssertEqual(sprites[0].center.x, sprites[1].center.x, accuracy: 0.01)
     }
+
+    func testVortexTurnsClockwiseAboutPlusZAtTheFittedRate() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.emitters = [.init(shape: .box, distanceMin: [40, 0, 0], distanceMax: [40, 0, 0], sign: [1, 0, 0])]
+            $0.behaviors.append(.vortex(.init(distanceInner: 0, distanceOuter: 100, speedInner: 100, speedOuter: 100)))
+        }, seed: 1)
+        simulator.apply(.init(events: [.emit(1)]))
+        run(simulator, seconds: 0.5)
+        let sprite = simulator.instances(aspect: 1).first!
+        // Tangential acceleration 0.83 * 100 from rest: about 0.5 * 83 * 0.5^2 down.
+        XCTAssertEqual(Double(sprite.center.y), -0.5 * 83 * 0.25, accuracy: 1.5)
+        XCTAssertGreaterThan(sprite.center.x, 38)
+    }
+
+    func testRampBringsABehaviourInAndOut() {
+        let ramp = SceneParticleSystem.Ramp(inStart: 0.2, inEnd: 0.4, outStart: 0.6, outEnd: 0.8)
+        XCTAssertEqual(SceneParticleSimulator.weight(ramp, 0.1), 0)
+        XCTAssertEqual(SceneParticleSimulator.weight(ramp, 0.3), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(SceneParticleSimulator.weight(ramp, 0.5), 1)
+        XCTAssertEqual(SceneParticleSimulator.weight(ramp, 0.7), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(SceneParticleSimulator.weight(ramp, 0.9), 0)
+        XCTAssertEqual(SceneParticleSimulator.weight(nil, 0.9), 1)
+    }
+
+    func testOscillatingAlphaStaysWithinItsBounds() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.behaviors.append(.oscillateAlpha(.init(frequency: .init(5, 5), amplitude: .init(0.2, 0.6), phase: .init(0, 6))))
+        }, seed: 3)
+        simulator.apply(.init(events: [.emit(20)]))
+        for _ in 0 ..< 30 {
+            run(simulator, seconds: step)
+            for sprite in simulator.instances(aspect: 1) {
+                XCTAssertGreaterThanOrEqual(sprite.color.w, 0.2 - 1e-5)
+                XCTAssertLessThanOrEqual(sprite.color.w, 0.6 + 1e-5)
+            }
+        }
+    }
+
+    func testPeriodicEmittersPauseAndCapEachBurst() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.maxCount = 1000
+            $0.emitters[0].rate = 100
+            $0.emitters[0].periodic = .init(duration: .init(1, 1), pause: .init(1, 1), maxPerBurst: 30)
+        }, seed: 1)
+        run(simulator, seconds: 1.5)
+        XCTAssertEqual(simulator.count, 30)
+        run(simulator, seconds: 1.0)
+        XCTAssertEqual(simulator.count, 60)
+    }
+
+    func testRopeJoinsEachParticleToTheNext() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.emitters = [.init(shape: .box, distanceMax: [100, 0, 0])]
+            $0.renderer = .rope
+        }, seed: 1)
+        simulator.apply(.init(events: [.emit(4)]))
+        XCTAssertEqual(simulator.instances(aspect: 1).count, 3)
+    }
 }

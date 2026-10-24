@@ -89,6 +89,15 @@ struct SceneParticleSystem: Codable, Equatable {
         var delay: Double = 0
         /// Seconds the emitter runs; nil runs on.
         var duration: Double?
+        /// Emits in bursts of random length separated by random pauses.
+        var periodic: Periodic?
+    }
+
+    struct Periodic: Codable, Equatable {
+        var duration = Range(1, 1)
+        var pause = Range(1, 1)
+        /// The most one burst emits; nil has no limit.
+        var maxPerBurst: Int?
     }
 
     struct Initial: Codable, Equatable {
@@ -107,6 +116,90 @@ struct SceneParticleSystem: Codable, Equatable {
         var rotation = VectorRange.zero
         /// Radians per second; only an `angularMovement` behaviour applies it.
         var angularVelocity = VectorRange.zero
+        /// Adds a speed in a direction that wanders with a noise over time.
+        var turbulentVelocity: TurbulentVelocity?
+        /// Moves the birth position by a noise over time.
+        var positionOffset: PositionOffset?
+        /// Places births one after another along control points.
+        var sequence: Sequence?
+        /// Applied once at birth.
+        var remaps: [Remap] = []
+    }
+
+    struct TurbulentVelocity: Codable, Equatable {
+        var speed = Range(100, 250)
+        var phase = Range(0, 0.1)
+        /// How fast the noise moves.
+        var timeScale: Double = 1
+        /// How far the direction turns from `forward`: 1 is all the way round.
+        var scale: Double = 1
+        /// Turns the direction, in half turns.
+        var offset: Double = 0
+        var forward: [Double] = [0, 1, 0]
+        /// The axis the direction turns about.
+        var axis: [Double] = [0, 0, 1]
+    }
+
+    struct PositionOffset: Codable, Equatable {
+        var distance: Double = 100
+        /// How fast the noise changes across space.
+        var scale: Double = 0.001
+        var timeScale: Double = 1
+        var directions: [Double] = [1, 1, 1]
+        /// Per axis: 0 either side, above 0 only positive, below 0 only negative.
+        var sign: [Double] = [0, 0, 0]
+    }
+
+    struct Sequence: Codable, Equatable {
+        enum Path: Codable, Equatable {
+            /// From one control point to the other, bent sideways by `arc` times
+            /// their distance.
+            case between(start: Int, end: Int, arc: Double, arcDirection: [Double])
+            /// Round a control point about `axis`, through where the emitter put
+            /// the particle.
+            case around(controlPoint: Int, axis: [Double], speedMin: [Double], speedMax: [Double])
+        }
+
+        var path: Path
+        /// Births per pass.
+        var count: Double = 32
+        /// The part of the path used, 0...1 per pass (beyond 1 goes round again).
+        var boundsMin: Double = 0
+        var boundsMax: Double = 1
+        /// Back and forth instead of starting over.
+        var mirrors = false
+    }
+
+    /// Maps a value of the particle or the scene onto one of its properties.
+    struct Remap: Codable, Equatable {
+        enum Input: String, Codable {
+            case lifetimeFraction, particleSystemTime, runtime, timeOfDay, speed, distanceToControlPoint
+        }
+
+        enum Output: String, Codable {
+            case size, opacity, color, velocity, speed, rotation, angularVelocity
+        }
+
+        enum Operation: String, Codable {
+            case assign, multiply, add, subtract
+        }
+
+        enum Transform: String, Codable {
+            case none, sine, square, saw, triangle, noise, fractalNoise
+        }
+
+        var input: Input = .lifetimeFraction
+        var output: Output = .size
+        var operation: Operation = .multiply
+        var inputMin: Double = 0
+        var inputMax: Double = 1
+        var clampsInput = false
+        var outputMin: [Double] = [0, 0, 0]
+        var outputMax: [Double] = [1, 1, 1]
+        var transform: Transform = .none
+        var transformScale: Double = 2
+        var controlPoint: Int = 0
+        var ramp: Ramp?
     }
 
     enum Behavior: Codable, Equatable {
@@ -125,6 +218,67 @@ struct SceneParticleSystem: Codable, Equatable {
         /// Accelerates particles within `threshold` towards a control point, the
         /// harder the nearer (negative `scale` pushes away).
         case attract(controlPoint: Int, scale: Double, threshold: Double)
+        /// Multiplies the alpha by a sine between the amplitude's min and max.
+        case oscillateAlpha(Oscillation)
+        /// Multiplies the size the same way.
+        case oscillateSize(Oscillation)
+        /// Accelerates particles through a noise that moves over space and time.
+        case turbulence(Turbulence)
+        /// Accelerates particles round a control point.
+        case vortex(Vortex)
+        case capVelocity(maxSpeed: Double, ramp: Ramp?)
+        /// Slows particles near a control point.
+        case reduceMovement(ReduceMovement)
+        /// Steers particles like a flock.
+        case flock(Flock)
+        case remap(Remap)
+    }
+
+    /// Life fractions over which a behaviour comes in and goes out.
+    struct Ramp: Codable, Equatable {
+        var inStart: Double = 0
+        var inEnd: Double = 0
+        var outStart: Double = 1
+        var outEnd: Double = 1
+    }
+
+    struct Turbulence: Codable, Equatable {
+        var speed = Range(500, 1000)
+        var timeScale: Double = 20
+        /// How fast the noise changes across space.
+        var scale: Double = 0.01
+        var mask: [Double] = [1, 1, 1]
+        var phase = Range(0, 0)
+        var ramp: Ramp?
+    }
+
+    struct Vortex: Codable, Equatable {
+        var controlPoint: Int = 0
+        var offset: [Double] = [0, 0, 0]
+        var axis: [Double] = [0, 0, 1]
+        var distanceInner: Double = 500
+        var distanceOuter: Double = 650
+        var speedInner: Double = 2500
+        var speedOuter: Double = 0
+        var ramp: Ramp?
+    }
+
+    struct ReduceMovement: Codable, Equatable {
+        var controlPoint: Int = 0
+        var distanceInner: Double = 100
+        var distanceOuter: Double = 350
+        var reductionInner: Double = 100
+        var reductionOuter: Double = 0
+    }
+
+    struct Flock: Codable, Equatable {
+        var neighborThreshold: Double = 50
+        var separationThreshold: Double = 20
+        var separationFactor: Double = 15
+        var cohesionFactor: Double = 2
+        var alignmentFactor: Double = 1
+        /// nil leaves the speed unlimited.
+        var maxSpeed: Double?
     }
 
     struct Change: Codable, Equatable {
@@ -147,6 +301,7 @@ struct SceneParticleSystem: Codable, Equatable {
         var amplitude = Range(0, 10)
         var phase = Range(0, 0)
         var mask: [Double] = [1, 1, 0]
+        var ramp: Ramp?
     }
 
     enum Renderer: Codable, Equatable {
@@ -154,6 +309,18 @@ struct SceneParticleSystem: Codable, Equatable {
         /// Stretched along the velocity: its length in sizes is speed * length,
         /// kept between minLength and maxLength.
         case trail(length: Double, minLength: Double, maxLength: Double)
+        /// A band from each particle to the next one born.
+        case rope
+        /// A band along where each particle has been over the last `length`
+        /// seconds, in `segments` pieces; `fadesAlpha` fades it towards the tail.
+        case ropeTrail(length: Double, segments: Int, fadesAlpha: Bool)
+    }
+
+    /// Sharpens the sprite's alpha: smoothstep(start, end, alpha) * opacity.
+    struct Cutout: Codable, Equatable {
+        var start: Double = 0.1
+        var end: Double = 0.2
+        var opacity: Double = 1
     }
 
     struct ControlPoint: Codable, Equatable {
@@ -162,7 +329,7 @@ struct SceneParticleSystem: Codable, Equatable {
             case layer
             /// At the pointer; without one the point pulls nothing.
             case pointer
-            /// At the canvas's bottom-left corner.
+            /// At `offset` from the canvas's bottom-left corner.
             case canvasCorner
             /// Pulls nothing.
             case none
@@ -235,6 +402,7 @@ struct SceneParticleSystem: Codable, Equatable {
     /// Multiplies the colour; can go past white on a wide canvas.
     var brightness: Double = 1
     var refraction: Refraction?
+    var cutout: Cutout?
     var emitters: [Emitter] = []
     var initial = Initial()
     var behaviors: [Behavior] = []

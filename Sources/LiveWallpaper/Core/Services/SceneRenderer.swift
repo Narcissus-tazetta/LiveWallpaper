@@ -1243,7 +1243,11 @@ final class SceneRenderer {
         var blend: Int32
         var refracts: Int32
         var hasNormal: Int32
-        var padding: Int32 = 0
+        var cuts: Int32
+        var cutoutStart: Float
+        var cutoutEnd: Float
+        var cutoutOpacity: Float
+        var padding: Float = 0
     }
 
     /// Keeps what a script asked of the particles in a frame that will not be drawn
@@ -1402,7 +1406,11 @@ final class SceneRenderer {
                 refractAmount: Float(system.refraction?.amount ?? 0),
                 blend: Int32(SceneParticleSystem.Blend.allCases.firstIndex(of: system.blend)!),
                 refracts: system.refraction == nil ? 0 : 1,
-                hasNormal: normal == nil ? 0 : 1
+                hasNormal: normal == nil ? 0 : 1,
+                cuts: system.cutout == nil ? 0 : 1,
+                cutoutStart: Float(system.cutout?.start ?? 0),
+                cutoutEnd: Float(system.cutout?.end ?? 0),
+                cutoutOpacity: Float(system.cutout?.opacity ?? 1)
             )
             let additive = system.blend == .add
             encoder.setRenderPipelineState(wide
@@ -3040,7 +3048,11 @@ final class SceneRenderer {
         int blend;
         int refracts;
         int hasNormal;
-        int padding;
+        int cuts;
+        float cutoutStart;
+        float cutoutEnd;
+        float cutoutOpacity;
+        float padding;
     };
 
     struct ParticleSystemOut {
@@ -3095,6 +3107,9 @@ final class SceneRenderer {
             color.rgb *= background.sample(s, (canvasUV - u.viewOrigin) / u.viewSize).rgb;
         }
         float3 rgb = color.rgb * u.brightness;
+        if (u.cuts != 0) {
+            color.a = smoothstep(u.cutoutStart, u.cutoutEnd, color.a) * u.cutoutOpacity;
+        }
         // Opaque particles cover what is below whatever their alpha.
         if (u.blend == 0) { return float4(rgb, 1.0); }
         float alpha = saturate(color.a);
