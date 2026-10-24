@@ -1426,3 +1426,31 @@
 "離れる強さ" = "Độ mạnh tách";
 "最小値" = "Tối thiểu";
 "最大値" = "Tối đa";
+
+"壁紙の再変換" = "Chuyển đổi lại hình nền";
+
+"壁紙をすべて再変換" = "Chuyển đổi lại tất cả hình nền";
+
+"外部アプリから取り込んだ壁紙をすべて更新します。編集した内容は元作品の内容に置き換わり、更新前のデータはバックアップに保存されます。" = "Cập nhật tất cả hình nền đã nhập từ ứng dụng bên ngoài. Các chỉnh sửa sẽ được thay bằng nội dung gốc. Dữ liệu trước đó sẽ được sao lưu.";
+
+"再変換中…" = "Đang chuyển đổi lại…";
+
+"%d / %d 件" = "%d / %d mục";
+
+"%d 件を再変換しました" = "Đã chuyển đổi lại %d hình nền";
+
+"バックアップを開く" = "Mở bản sao lưu";
+
+"更新できなかった壁紙" = "Hình nền chưa cập nhật được";
+
+"取り込み元アプリ" = "Ứng dụng nguồn";
+
+"壁紙の取り込み元アプリが見つかりません。取り込み元アプリを起動してください。" = "Không tìm thấy ứng dụng nguồn. Vui lòng mở ứng dụng đó.";
+
+"壁紙の取り込み元アプリを起動できませんでした。" = "Không thể mở ứng dụng nguồn.";
+
+"取り込み元アプリから応答がありません。最新版に更新して起動し直してください。" = "Ứng dụng nguồn không phản hồi. Hãy cập nhật rồi mở lại.";
+
+"再変換中に取り込み元アプリが終了しました。もう一度実行してください。" = "Ứng dụng nguồn đã thoát khi đang chuyển đổi. Vui lòng thử lại.";
+
+"再変換の進捗を読み取れませんでした。" = "Không thể đọc tiến trình chuyển đổi.";

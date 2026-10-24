@@ -1426,3 +1426,31 @@
 "離れる強さ" = "Força de Separação";
 "最小値" = "Mín.";
 "最大値" = "Máx.";
+
+"壁紙の再変換" = "Reconverter papéis de parede";
+
+"壁紙をすべて再変換" = "Reconverter todos os papéis de parede";
+
+"外部アプリから取り込んだ壁紙をすべて更新します。編集した内容は元作品の内容に置き換わり、更新前のデータはバックアップに保存されます。" = "Atualiza todos os papéis de parede importados de outros apps. Suas edições serão substituídas pelo conteúdo original. Um backup dos dados anteriores será salvo.";
+
+"再変換中…" = "Reconvertendo…";
+
+"%d / %d 件" = "%d / %d itens";
+
+"%d 件を再変換しました" = "%d papéis de parede reconvertidos";
+
+"バックアップを開く" = "Abrir backup";
+
+"更新できなかった壁紙" = "Papéis de parede não atualizados";
+
+"取り込み元アプリ" = "App de origem";
+
+"壁紙の取り込み元アプリが見つかりません。取り込み元アプリを起動してください。" = "O app de origem não foi encontrado. Abra-o para continuar.";
+
+"壁紙の取り込み元アプリを起動できませんでした。" = "Não foi possível abrir o app de origem.";
+
+"取り込み元アプリから応答がありません。最新版に更新して起動し直してください。" = "O app de origem não respondeu. Atualize-o e abra-o novamente.";
+
+"再変換中に取り込み元アプリが終了しました。もう一度実行してください。" = "O app de origem foi encerrado durante a reconversão. Tente novamente.";
+
+"再変換の進捗を読み取れませんでした。" = "Não foi possível ler o progresso.";

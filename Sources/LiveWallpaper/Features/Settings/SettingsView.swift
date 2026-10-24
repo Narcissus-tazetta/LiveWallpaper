@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var model: WallpaperModel
+    @StateObject var reconversionController = WallpaperReconversionController.shared
     @State var selectedTab: SettingsTab = .wallpaper
     @State var isAdvancedSettingsPresented: Bool = false
     @State var expandedHelpTopics: Set<HelpTopic> = []
@@ -263,6 +264,13 @@ struct SettingsView: View {
                 if let path = note.object as? String {
                     thumbnailCache.refresh(path: path)
                     fitEditor.invalidateStillImage(path: path)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .reconvertedWebWallpaper)) { note in
+                if let id = note.object as? UUID,
+                   let source = model.webWallpaperSources.first(where: { $0.id == id }) {
+                    webThumbnailStore.remove(sourceID: id)
+                    webThumbnailStore.loadIfNeeded(for: source)
                 }
             }
             .onChange(of: model.lockScreenVideoPath) { _ in
@@ -604,6 +612,10 @@ struct SettingsView: View {
                 if settingsSectionVisible(.cache) {
                     cacheSettingsSection
                     settingsSectionMatchHint(.cache)
+                }
+                if settingsSectionVisible(.reconversion) {
+                    reconversionSettingsSection
+                    settingsSectionMatchHint(.reconversion)
                 }
             }
             Group {

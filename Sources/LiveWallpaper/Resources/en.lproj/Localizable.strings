@@ -1426,3 +1426,31 @@
 "離れる強さ" = "Separation Strength";
 "最小値" = "Min";
 "最大値" = "Max";
+
+"壁紙の再変換" = "Reconvert wallpapers";
+
+"壁紙をすべて再変換" = "Reconvert all wallpapers";
+
+"外部アプリから取り込んだ壁紙をすべて更新します。編集した内容は元作品の内容に置き換わり、更新前のデータはバックアップに保存されます。" = "Update all wallpapers imported from external apps. Your edits will be replaced with the original content. A backup of the previous data will be saved.";
+
+"再変換中…" = "Reconverting…";
+
+"%d / %d 件" = "%d / %d items";
+
+"%d 件を再変換しました" = "Reconverted %d wallpapers";
+
+"バックアップを開く" = "Open backup";
+
+"更新できなかった壁紙" = "Wallpapers that could not be updated";
+
+"取り込み元アプリ" = "Source app";
+
+"壁紙の取り込み元アプリが見つかりません。取り込み元アプリを起動してください。" = "The wallpaper source app was not found. Please launch it.";
+
+"壁紙の取り込み元アプリを起動できませんでした。" = "Could not launch the wallpaper source app.";
+
+"取り込み元アプリから応答がありません。最新版に更新して起動し直してください。" = "The source app did not respond. Update it to the latest version and relaunch it.";
+
+"再変換中に取り込み元アプリが終了しました。もう一度実行してください。" = "The source app quit during reconversion. Please try again.";
+
+"再変換の進捗を読み取れませんでした。" = "Could not read reconversion progress.";

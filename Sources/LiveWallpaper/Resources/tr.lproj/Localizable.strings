@@ -1426,3 +1426,31 @@
 "離れる強さ" = "Ayrılma Gücü";
 "最小値" = "En az";
 "最大値" = "En çok";
+
+"壁紙の再変換" = "Duvar kâğıtlarını yeniden dönüştür";
+
+"壁紙をすべて再変換" = "Tüm duvar kâğıtlarını yeniden dönüştür";
+
+"外部アプリから取り込んだ壁紙をすべて更新します。編集した内容は元作品の内容に置き換わり、更新前のデータはバックアップに保存されます。" = "Diğer uygulamalardan içe aktarılan tüm duvar kâğıtlarını günceller. Düzenlemeleriniz özgün içerikle değiştirilir. Önceki verilerin yedeği kaydedilir.";
+
+"再変換中…" = "Yeniden dönüştürülüyor…";
+
+"%d / %d 件" = "%d / %d öğe";
+
+"%d 件を再変換しました" = "%d duvar kâğıdı yeniden dönüştürüldü";
+
+"バックアップを開く" = "Yedeği aç";
+
+"更新できなかった壁紙" = "Güncellenemeyen duvar kâğıtları";
+
+"取り込み元アプリ" = "Kaynak uygulama";
+
+"壁紙の取り込み元アプリが見つかりません。取り込み元アプリを起動してください。" = "Duvar kâğıdı kaynak uygulaması bulunamadı. Lütfen uygulamayı açın.";
+
+"壁紙の取り込み元アプリを起動できませんでした。" = "Kaynak uygulama başlatılamadı.";
+
+"取り込み元アプリから応答がありません。最新版に更新して起動し直してください。" = "Kaynak uygulama yanıt vermedi. Güncelleyip yeniden başlatın.";
+
+"再変換中に取り込み元アプリが終了しました。もう一度実行してください。" = "Kaynak uygulama dönüştürme sırasında kapandı. Yeniden deneyin.";
+
+"再変換の進捗を読み取れませんでした。" = "Dönüştürme ilerlemesi okunamadı.";

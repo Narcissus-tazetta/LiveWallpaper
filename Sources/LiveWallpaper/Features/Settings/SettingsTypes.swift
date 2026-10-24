@@ -44,7 +44,7 @@ extension SettingsView {
             case .general: return [.video, .language, .update]
             case .display: return [.display]
             case .integrations: return [.share, .webWallpaper, .hotKeys]
-            case .other: return [.cache, .reset, .support]
+            case .other: return [.cache, .reconversion, .reset, .support]
             }
         }
 
