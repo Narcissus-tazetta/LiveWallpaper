@@ -16,7 +16,12 @@ extension WallpaperModel {
     }
 
     func configureLocalWebProperties(_ view: WebPlayerView) {
-        guard let source = activeWebWallpaperSource, source.localFolderPath != nil else { return }
+        // Each screen may show its own wallpaper, so the view's screen picks the source.
+        let source = webDisplayEntries.first { $0.view === view }.flatMap { webSource(forScreenID: $0.displayID) }
+        guard let source, source.localFolderPath != nil else {
+            view.setDisplayAdjustment(WebDisplayAdjustment())
+            return
+        }
         do {
             let (package, settings) = try localWebConfiguration(for: source)
             var values = Dictionary(uniqueKeysWithValues: (package.properties ?? []).map { (
@@ -29,6 +34,7 @@ extension WallpaperModel {
                 settings: settings,
                 assets: (package.properties ?? []).filter { $0.kind == "file" }.map(\.id)
             )
+            view.setDisplayAdjustment(WebDisplayAdjustment(keys: package.displayAdjustment, values: values))
         } catch {
             webWallpaperErrorMessage = error.localizedDescription
             AppLog.externalWallpapers

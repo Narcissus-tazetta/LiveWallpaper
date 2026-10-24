@@ -99,7 +99,11 @@ final class WebPlayerView: NSView {
     func forwardPointer(
         _ phase: PointerPhase, at point: CGPoint, scroll: CGVector = .zero, onDeclined: (() -> Void)? = nil
     ) {
-        let call = "window.__liveWallpaperPointer ? window.__liveWallpaperPointer('\(phase.rawValue)', \(point.x), \(point.y), \(scroll.dx), \(scroll.dy)) : false"
+        // The page is drawn mirrored when flipped, so a press lands on what is shown there.
+        let flipped = displayAdjustment.flipsHorizontally
+        let x = flipped ? bounds.width - point.x : point.x
+        let dx = flipped ? -scroll.dx : scroll.dx
+        let call = "window.__liveWallpaperPointer ? window.__liveWallpaperPointer('\(phase.rawValue)', \(x), \(point.y), \(dx), \(scroll.dy)) : false"
         webView.evaluateJavaScript(call) { result, error in
             if let error {
                 AppLog.externalWallpapers
@@ -682,10 +686,14 @@ final class WebPlayerView: NSView {
         layer?.backgroundColor = NSColor.black.cgColor
         webView.setValue(false, forKey: "drawsBackground")
         webView.autoresizingMask = [.width, .height]
-        addSubview(webView)
-        webView.frame = bounds
-        addSubview(freezeImageView)
-        freezeImageView.frame = bounds
+        pageView.wantsLayer = true
+        pageView.layerUsesCoreImageFilters = true
+        addSubview(pageView)
+        pageView.frame = bounds
+        pageView.addSubview(webView)
+        webView.frame = pageView.bounds
+        pageView.addSubview(freezeImageView)
+        freezeImageView.frame = pageView.bounds
         // 減光オーバーレイはメニューバーマスクより上に載せる(理由は PlayerView 参照)。
         addSubview(menuBarMaskView, positioned: .above, relativeTo: nil)
         addSubview(readabilityDimOverlayView, positioned: .above, relativeTo: nil)
@@ -693,10 +701,31 @@ final class WebPlayerView: NSView {
 
     override func layout() {
         super.layout()
-        webView.frame = bounds
-        freezeImageView.frame = bounds
+        pageView.frame = bounds
+        webView.frame = pageView.bounds
+        freezeImageView.frame = pageView.bounds
+        applyFlip()
         readabilityDimOverlayView.frame = bounds
         layoutMenuBarMask()
+    }
+
+    /// Holds the page and its freeze image, so that the display adjustment covers both.
+    private let pageView = NSView()
+    private(set) var displayAdjustment = WebDisplayAdjustment()
+
+    func setDisplayAdjustment(_ adjustment: WebDisplayAdjustment) {
+        guard adjustment != displayAdjustment else { return }
+        let colorChanged = adjustment.color != displayAdjustment.color
+        displayAdjustment = adjustment
+        if colorChanged { pageView.layer?.filters = adjustment.color?.layerFilters() }
+        applyFlip()
+    }
+
+    private func applyFlip() {
+        // AppKit owns the layer's own transform, so the mirror goes on its sublayers.
+        pageView.layer?.sublayerTransform = displayAdjustment.flipsHorizontally
+            ? CATransform3DScale(CATransform3DMakeTranslation(pageView.bounds.width, 0, 0), -1, 1, 1)
+            : CATransform3DIdentity
     }
 
     private func layoutMenuBarMask() {

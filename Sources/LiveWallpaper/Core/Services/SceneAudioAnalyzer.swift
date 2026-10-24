@@ -1,8 +1,9 @@
 import Accelerate
 import Foundation
 
-/// The system audio as imported scenes expect it: 64 bands per channel, each group of 8 bands
-/// scaled by its own slowly tracked peak.
+/// The system audio as imported scenes and web wallpapers expect it: 64 bands per channel.
+/// Scenes get each group of 8 bands scaled by its own slowly tracked peak; web wallpapers get
+/// the same bands without any gain, proportional to the amplitude.
 ///
 /// The sizes and the scale were fitted to recordings of the original player playing known
 /// tones (bands, leakage and the rise after silence match to about 0.01). The original's
@@ -16,7 +17,11 @@ final class SceneAudioAnalyzer {
     let windowLength: Int
     /// Bins 1 ..< `bandSpan` spread over the 64 bands; every bin above lands in the last one.
     private static let bandSpan = 640
-    private static let scale: Float = 0.008635
+    private static let sceneScale: Float = 0.008635
+    /// Fitted to the original's web array at steady 1 kHz tones from -50 to 0 dBFS (0.563 at
+    /// 0 dBFS); its bands and leakage then match to the 1e-4 the recordings were rounded to.
+    /// It sits 1 % under `sceneScale`, which was fitted less directly, through the auto gain.
+    private static let webScale: Float = 0.008552
     let sampleRate: Double
     private let paddedLength: Int
     private let log2PaddedLength: vDSP_Length
@@ -102,18 +107,23 @@ final class SceneAudioAnalyzer {
         vDSP_destroy_fftsetup(setup)
     }
 
-    /// Analyses every 1/30 s of audio and returns the newest result, 64 left bands then 64
-    /// right bands, or nil when no thirtieth ended in these frames.
+    struct Output {
+        var scene: [Float]
+        var web: [Float]
+    }
+
+    /// Analyses every 1/30 s of audio and returns the newest result, each 64 left bands then
+    /// 64 right bands, or nil when no thirtieth ended in these frames.
     func append(
         left inputLeft: UnsafePointer<Float>,
         right inputRight: UnsafePointer<Float>,
         frames: Int,
         stride: Int
-    ) -> [Float]? {
+    ) -> Output? {
         // The auto gain advances by the time it is given, so each step is exactly one
         // period, cut at the sample where it ends, whatever size the capture's blocks are.
         let period = Int(sampleRate / 30)
-        var result: [Float]?
+        var result: Output?
         for index in 0 ..< frames {
             left[cursor] = inputLeft[index * stride]
             right[cursor] = inputRight[index * stride]
@@ -121,12 +131,17 @@ final class SceneAudioAnalyzer {
             sinceLastOutput += 1
             if sinceLastOutput == period {
                 sinceLastOutput = 0
-                result = loudness.process(bands(left) + bands(right), elapsed: Float(Double(period) / sampleRate))
+                let raw = bands(left) + bands(right)
+                result = Output(
+                    scene: loudness.process(raw.map { $0 * Self.sceneScale }, elapsed: Float(Double(period) / sampleRate)),
+                    web: raw.map { $0 * Self.webScale }
+                )
             }
         }
         return result
     }
 
+    /// Unscaled.
     private func bands(_ samples: [Float]) -> [Float] {
         for index in 0 ..< windowLength {
             let sample = samples[(cursor + index) % windowLength]
@@ -160,7 +175,7 @@ final class SceneAudioAnalyzer {
             let bin = offset + 1
             let real = workReal[bin] * inverseScale
             let imaginary = workImaginary[bin] * inverseScale
-            let value = sqrt((real * real + imaginary * imaginary) * weightOfBin[offset]) * Self.scale
+            let value = sqrt((real * real + imaginary * imaginary) * weightOfBin[offset])
             result[band] = max(result[band], value)
         }
         return result
