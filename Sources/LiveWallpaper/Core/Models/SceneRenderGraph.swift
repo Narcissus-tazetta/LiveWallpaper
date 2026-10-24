@@ -47,7 +47,7 @@ struct SceneRenderGraph: Codable, Equatable {
             case time, cursor, textureSize, boneMatrices, boneOpacity, effectValue, audioSpectrum
             case pointer, previousPointer, layerFromCanvas, canvasFromLayer, screenFromLayer, frameTime, pointerState
             case parallaxPosition, texelSize, texelOffsets
-            case modelViewProjection, model, viewProjection, layerAlpha, layerColor
+            case modelViewProjection, model, normalModel, viewProjection, layerAlpha, layerColor
             case eyePosition, ambientColor, skylightColor
         }
         var offset: Int

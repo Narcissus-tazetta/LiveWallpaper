@@ -164,6 +164,8 @@ final class SceneRenderer {
     private var modelRenderer: SceneModelRenderer?
     private var modelImages: [String: MTLTexture] = [:]
     private var modelDepthTexture: MTLTexture?
+    /// The mesh of each layer that is a solid model, read once.
+    private var staticShapes: [UUID: SceneModelLayerFrame.Shape] = [:]
     private let graphTexturePool = SceneTexturePool()
     private var graphTextures: [String: MTLTexture] = [:]
     private var graphResources: [UUID: [String: MTLTexture]] = [:]
@@ -494,7 +496,8 @@ final class SceneRenderer {
         let visibleLayers = ordered.filter { layer in
             evaluated.layers[layer.id]!.layer.isVisible &&
                 (lastPlacements[layer.id] == nil || lastInversePlacements[layer.id] != nil) &&
-                (layer.capturesCanvas || (layer.kind == .particles ? layer.hasParticles : picture(for: layer) != nil))
+                (layer.capturesCanvas || layer.model != nil
+                    || (layer.kind == .particles ? layer.hasParticles : picture(for: layer) != nil))
         }
         let visible = modelRenderer == nil || evaluated.models.isEmpty
             ? visibleLayers.map(Drawn.layer)
@@ -779,6 +782,18 @@ final class SceneRenderer {
             switch item {
             case let .model(model): prepared.append(.model(model))
             case let .layer(layer):
+                if let model = layer.model {
+                    let drawn = evaluated.layers[layer.id]!
+                    let shape = staticShapes[layer.id] ?? model.shape
+                    staticShapes[layer.id] = shape
+                    let tint = drawn.layer.tint
+                    prepared.append(.model(SceneModelLayerFrame(
+                        serial: 0, order: 0, alpha: Float(drawn.layer.opacity * drawn.opacity),
+                        color: SIMD3(Float(tint.red), Float(tint.green), Float(tint.blue)),
+                        world: drawn.world ?? layer.space?.matrix ?? matrix_identity_float4x4, perspective: false, shapes: [shape]
+                    )))
+                    continue
+                }
                 guard var space = layer.space else { continue }
                 if layer.kind == .text {
                     // The plane is the drawn string's picture, centred away from where its anchor sits.

@@ -85,6 +85,7 @@ final class SceneModelRenderer {
                 let bytes: Int = switch update.value {
                 case .modelViewProjection, .model, .viewProjection: 64
                 case .layerAlpha, .time, .frameTime: 4
+                case .normalModel: 48
                 case .layerColor, .eyePosition, .ambientColor, .skylightColor: 12
                 case .textureSize: 16
                 default: throw ModelError(detail: "material \(material.path) reads \(update.value.rawValue)")

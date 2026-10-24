@@ -736,6 +736,23 @@ final class SceneRenderGraphRenderer {
                 }
                 withUnsafeBytes(of: &matrix) { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
                 continue
+            case .normalModel:
+                guard let model else { continue }
+                // Normals turn by the inverse transpose of the model's 3×3, each column padded to 16 bytes.
+                let linear = simd_float3x3(columns: (
+                    SIMD3(model.model.columns.0.x, model.model.columns.0.y, model.model.columns.0.z),
+                    SIMD3(model.model.columns.1.x, model.model.columns.1.y, model.model.columns.1.z),
+                    SIMD3(model.model.columns.2.x, model.model.columns.2.y, model.model.columns.2.z)
+                ))
+                let normal = linear.inverse.transpose
+                var padded = [Float](repeating: 0, count: 12)
+                for (column, vector) in [normal.columns.0, normal.columns.1, normal.columns.2].enumerated() {
+                    padded[column * 4] = vector.x
+                    padded[column * 4 + 1] = vector.y
+                    padded[column * 4 + 2] = vector.z
+                }
+                padded.withUnsafeBytes { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
+                continue
             case .layerAlpha: values = [model?.alpha ?? 1]
             case .layerColor: values = model.map { [$0.color.x, $0.color.y, $0.color.z] } ?? [1, 1, 1]
             case .eyePosition, .ambientColor, .skylightColor:
@@ -937,8 +954,8 @@ final class SceneRenderGraphRenderer {
                 case .parallaxPosition, .texelSize: bytes = 8
                 case .texelOffsets: bytes = 16
                 case .textureSize: bytes = 16
-                case .modelViewProjection, .model, .viewProjection, .layerAlpha, .layerColor, .eyePosition, .ambientColor,
-                     .skylightColor:
+                case .modelViewProjection, .model, .normalModel, .viewProjection, .layerAlpha, .layerColor, .eyePosition,
+                     .ambientColor, .skylightColor:
                     throw GraphError(detail: "model layer values outside a model layer")
                 case .boneMatrices, .boneOpacity:
                     let count = (draw.skeleton ?? draw.skeletonID.flatMap { rigs.skeletons[$0] })?

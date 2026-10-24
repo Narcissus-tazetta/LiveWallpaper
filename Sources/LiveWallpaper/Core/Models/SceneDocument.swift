@@ -676,6 +676,43 @@ enum SceneLayerKind: String, Codable {
     case image
     case particles
     case text
+    /// A solid model the scene places, seen through its camera.
+    case model
+}
+
+/// A solid model: one shape, drawn with the scene's mesh material at `material`.
+struct SceneStaticModel: Codable, Equatable {
+    var material: Int
+    /// Bit i set when the vertices hold `Semantic.allCases[i]`.
+    var components: UInt32
+    /// Little-endian 32-bit floats.
+    var vertices: Data
+    /// Little-endian 32-bit vertex indices, three to a triangle.
+    var indices: Data
+
+    private var floatsPerVertex: Int {
+        SceneRenderGraph.Attribute.Semantic.allCases.enumerated()
+            .reduce(0) { $0 + (components & (1 << UInt32($1.offset)) != 0 ? $1.element.floats : 0) }
+    }
+
+    var isValid: Bool {
+        let stride = floatsPerVertex
+        guard stride > 0, vertices.count % (stride * 4) == 0, indices.count % 12 == 0 else { return false }
+        let count = UInt32(vertices.count / (stride * 4))
+        return indices.withUnsafeBytes { bytes in
+            (0 ..< indices.count / 4).allSatisfy { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian < count }
+        }
+    }
+
+    var shape: SceneModelLayerFrame.Shape {
+        let floats = vertices.withUnsafeBytes { bytes in
+            (0 ..< vertices.count / 4).map { Float(bitPattern: bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian) }
+        }
+        let triangles = indices.withUnsafeBytes { bytes in
+            (0 ..< indices.count / 4).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian }
+        }
+        return SceneModelLayerFrame.Shape(material: material, components: components, vertices: floats, indices: triangles)
+    }
 }
 
 enum SceneParticlePreset: String, Codable, CaseIterable {
@@ -811,6 +848,8 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var particleSystem: SceneParticleSystem?
     /// In a scene seen through its camera: where the picture stands in it.
     var space: SceneSpace?
+    /// What a layer of kind `model` draws.
+    var model: SceneStaticModel?
     var text: SceneText?
     /// Grayscale depth map (white = near) in the scene folder; shifts each pixel by
     /// its depth for a 3D look.
@@ -870,6 +909,10 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         space = try container.decodeIfPresent(SceneSpace.self, forKey: .space)
         guard space.map({ $0.isValid }) ?? true else {
             throw DecodingError.dataCorruptedError(forKey: .space, in: container, debugDescription: "Invalid placement in space")
+        }
+        model = try container.decodeIfPresent(SceneStaticModel.self, forKey: .model)
+        guard model.map({ $0.isValid }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .model, in: container, debugDescription: "Invalid model")
         }
         text = try container.decodeIfPresent(SceneText.self, forKey: .text)
         renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
