@@ -102,6 +102,7 @@ struct SceneScriptOutput {
     /// Parts of the script that failed while the rest kept running.
     var warnings: [String]
     var meshes: [SceneMeshFrame] = []
+    var models: [SceneModelLayerFrame] = []
 }
 
 struct SceneScriptAdjustment {

@@ -1,0 +1,247 @@
+import Foundation
+import Metal
+import simd
+
+/// Draws the layers scripts make from their own geometry straight onto the canvas, each
+/// with its material's own shaders.
+final class SceneModelRenderer {
+    struct ModelError: LocalizedError {
+        let detail: String
+        var errorDescription: String? { "Scene model layer: \(detail)" }
+    }
+
+    private struct Material {
+        var source: SceneMeshMaterial
+        var vertex: MTLFunction
+        var fragment: MTLFunction
+        var samplers: [MTLSamplerState]
+    }
+
+    private struct PipelineKey: Hashable {
+        var material: Int
+        var components: UInt32
+        var format: MTLPixelFormat
+        var blend: SceneRenderGraph.Draw.Blend?
+    }
+
+    let materials: [SceneMeshMaterial?]
+    private let device: MTLDevice
+    private var compiled: [Int: Material] = [:]
+    private var pipelines: [PipelineKey: MTLRenderPipelineState] = [:]
+    /// Components a shape lacks but a shader reads, from a buffer that every vertex shares.
+    private let defaults: MTLBuffer
+
+    init(materials: [SceneMeshMaterial?], device: MTLDevice) throws {
+        self.materials = materials
+        self.device = device
+        for (index, material) in materials.enumerated() {
+            guard let material else { continue }
+            try Self.validate(material)
+            let vertex = try device.makeLibrary(source: material.draw.vertex.source, options: nil)
+            let fragment = try device.makeLibrary(source: material.draw.fragment.source, options: nil)
+            guard let vertexFunction = vertex.makeFunction(name: material.draw.vertex.entryPoint),
+                  let fragmentFunction = fragment.makeFunction(name: material.draw.fragment.entryPoint)
+            else { throw ModelError(detail: "material \(material.path) has no entry point") }
+            let samplers = try material.draw.textures.map { texture -> MTLSamplerState in
+                let descriptor = MTLSamplerDescriptor()
+                descriptor.minFilter = texture.linear ? .linear : .nearest
+                descriptor.magFilter = texture.linear ? .linear : .nearest
+                let mode: MTLSamplerAddressMode = texture.repeats ? .repeat : .clampToEdge
+                descriptor.sAddressMode = mode
+                descriptor.tAddressMode = mode
+                guard let sampler = device.makeSamplerState(descriptor: descriptor) else {
+                    throw ModelError(detail: "sampler allocation failed")
+                }
+                return sampler
+            }
+            compiled[index] = Material(source: material, vertex: vertexFunction, fragment: fragmentFunction, samplers: samplers)
+        }
+        // Inferred, not traced: white opaque colour, a normal facing the viewer, the tangent
+        // along x and zero texture coordinates.
+        let values: [Float] = [0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1]
+        guard let buffer = device.makeBuffer(bytes: values, length: values.count * 4, options: .storageModeShared) else {
+            throw ModelError(detail: "buffer allocation failed")
+        }
+        defaults = buffer
+    }
+
+    /// Image files the materials sample, by resource name.
+    var imageFiles: Set<String> {
+        Set(materials.compactMap { $0 }.flatMap(\.images.values))
+    }
+
+    private static func validate(_ material: SceneMeshMaterial) throws {
+        let draw = material.draw
+        guard draw.dynamic == nil, draw.skeleton == nil, draw.skeletonID == nil, draw.commands == nil,
+              !draw.attributes.isEmpty, draw.attributes.allSatisfy({ $0.semantic != nil }),
+              Set(draw.attributes.map(\.location)).count == draw.attributes.count,
+              draw.textures.allSatisfy({ (0 ..< 16).contains($0.index) && material.images[$0.source] != nil })
+        else { throw ModelError(detail: "material \(material.path) is invalid") }
+        for stage in [draw.vertex, draw.fragment] {
+            for update in stage.updates {
+                let bytes: Int = switch update.value {
+                case .modelViewProjection, .model, .viewProjection: 64
+                case .layerAlpha, .time, .frameTime: 4
+                case .layerColor: 12
+                case .textureSize: 16
+                default: throw ModelError(detail: "material \(material.path) reads \(update.value.rawValue)")
+                }
+                guard update.offset >= 0, update.offset + bytes <= stage.uniforms.count else {
+                    throw ModelError(detail: "material \(material.path) has a uniform outside its block")
+                }
+                if update.value == .textureSize, !(update.texture.map { material.images[$0] != nil } ?? false) {
+                    throw ModelError(detail: "material \(material.path) sizes an unknown texture")
+                }
+            }
+        }
+    }
+
+    private func pipeline(
+        material index: Int, components: UInt32, format: MTLPixelFormat, blend: SceneRenderGraph.Draw.Blend?
+    ) throws -> MTLRenderPipelineState {
+        let key = PipelineKey(material: index, components: components, format: format, blend: blend)
+        if let pipeline = pipelines[key] { return pipeline }
+        let material = compiled[index]!
+        let draw = material.source.draw
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.vertexFunction = material.vertex
+        descriptor.fragmentFunction = material.fragment
+        let vertices = MTLVertexDescriptor()
+        var offsets: [SceneRenderGraph.Attribute.Semantic: Int] = [:]
+        var stride = 0
+        for (bit, semantic) in SceneRenderGraph.Attribute.Semantic.allCases.enumerated() where components & (1 << UInt32(bit)) != 0 {
+            offsets[semantic] = stride
+            stride += semantic.floats * 4
+        }
+        // Offsets of the shared defaults, in the order of `init`.
+        let defaultOffsets: [SceneRenderGraph.Attribute.Semantic: Int] = [
+            .position: 0, .normal: 12, .tangentSigned: 24, .uv: 40, .color: 48
+        ]
+        for attribute in draw.attributes {
+            let semantic = attribute.semantic!
+            let element = vertices.attributes[attribute.location]!
+            element.format = switch semantic.floats {
+            case 2: .float2
+            case 3: .float3
+            default: .float4
+            }
+            if let offset = offsets[semantic] {
+                element.offset = offset
+                element.bufferIndex = 1
+            } else {
+                element.offset = defaultOffsets[semantic]!
+                element.bufferIndex = 2
+            }
+        }
+        vertices.layouts[1].stride = stride
+        if draw.attributes.contains(where: { offsets[$0.semantic!] == nil }) {
+            vertices.layouts[2].stride = 64
+            vertices.layouts[2].stepFunction = .constant
+            vertices.layouts[2].stepRate = 0
+        }
+        descriptor.vertexDescriptor = vertices
+        let attachment = descriptor.colorAttachments[0]!
+        attachment.pixelFormat = format
+        if draw.writesAlpha == false { attachment.writeMask = [.red, .green, .blue] }
+        if let blend {
+            attachment.isBlendingEnabled = true
+            let weighted = blend == .alphaAdditive || blend == .alphaOver
+            let source: MTLBlendFactor = weighted ? .sourceAlpha : .one
+            attachment.sourceRGBBlendFactor = source
+            attachment.sourceAlphaBlendFactor = source
+            let destination: MTLBlendFactor = blend == .sourceOver || blend == .alphaOver ? .oneMinusSourceAlpha : .one
+            attachment.destinationRGBBlendFactor = destination
+            attachment.destinationAlphaBlendFactor = destination
+            if blend == .maximum {
+                attachment.rgbBlendOperation = .max
+                attachment.alphaBlendOperation = .max
+            }
+        }
+        let pipeline = try device.makeRenderPipelineState(descriptor: descriptor)
+        pipelines[key] = pipeline
+        return pipeline
+    }
+
+    /// Draws `layer` into the encoder's target. `viewProjection` takes scene pixels to
+    /// the target's clip space.
+    func draw(
+        _ layer: SceneModelLayerFrame, viewProjection: simd_float4x4, images: [String: MTLTexture],
+        frame: SceneRenderGraphRenderer.FrameValues, time: Double, cursor: SIMD2<Float>?,
+        audio: SceneAudioSpectrum?, format: MTLPixelFormat, encoder: MTLRenderCommandEncoder
+    ) throws {
+        let values = SceneRenderGraphRenderer.ModelValues(
+            modelViewProjection: viewProjection * layer.world, model: layer.world, viewProjection: viewProjection,
+            alpha: layer.alpha, color: layer.color
+        )
+        for shape in layer.shapes {
+            guard let index = shape.material, let material = compiled[index], !shape.vertices.isEmpty else { continue }
+            if let indices = shape.indices, indices.isEmpty { continue }
+            let draw = material.source.draw
+            var resources: [String: MTLTexture] = [:]
+            for (name, file) in material.source.images {
+                guard let texture = images[file] else { throw ModelError(detail: "image \(file) is missing") }
+                resources[name] = texture
+            }
+            // Measured: an opaque material stays opaque whatever the alpha of its vertices or
+            // of the layer.
+            encoder.setRenderPipelineState(try pipeline(material: index, components: shape.components, format: format, blend: draw.blend))
+            for (stage, isVertex) in [(draw.vertex, true), (draw.fragment, false)] {
+                let data = SceneRenderGraphRenderer.updatedUniforms(
+                    stage, frame: frame, model: values, resources: resources, time: time, cursor: cursor, pose: nil,
+                    effectValues: [:], audio: audio
+                ) ?? stage.uniforms
+                guard !data.isEmpty else { continue }
+                try data.withUnsafeBytes { bytes in
+                    if bytes.count <= 4096 {
+                        if isVertex {
+                            encoder.setVertexBytes(bytes.baseAddress!, length: bytes.count, index: 0)
+                        } else {
+                            encoder.setFragmentBytes(bytes.baseAddress!, length: bytes.count, index: 0)
+                        }
+                    } else {
+                        guard let buffer = device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+                        else { throw ModelError(detail: "uniform allocation failed") }
+                        if isVertex { encoder.setVertexBuffer(buffer, offset: 0, index: 0) } else {
+                            encoder.setFragmentBuffer(buffer, offset: 0, index: 0)
+                        }
+                    }
+                }
+            }
+            for (binding, sampler) in zip(draw.textures, material.samplers) {
+                let texture = resources[binding.source]!
+                encoder.setVertexTexture(texture, index: binding.index)
+                encoder.setFragmentTexture(texture, index: binding.index)
+                encoder.setVertexSamplerState(sampler, index: binding.index)
+                encoder.setFragmentSamplerState(sampler, index: binding.index)
+            }
+            guard let vertices = shape.vertices.withUnsafeBytes({
+                device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)
+            }) else { throw ModelError(detail: "vertex allocation failed") }
+            encoder.setVertexBuffer(vertices, offset: 0, index: 1)
+            encoder.setVertexBuffer(defaults, offset: 0, index: 2)
+            if let indices = shape.indices {
+                guard let buffer = indices.withUnsafeBytes({
+                    device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)
+                }) else { throw ModelError(detail: "index allocation failed") }
+                encoder.drawIndexedPrimitives(type: .triangle, indexCount: indices.count, indexType: .uint32,
+                                              indexBuffer: buffer, indexBufferOffset: 0)
+            } else {
+                let count = shape.vertices.count / shape.stride / 3 * 3
+                if count > 0 { encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: count) }
+            }
+        }
+    }
+
+    /// Scene pixels (origin bottom left, y up) to the clip space of a target that shows
+    /// `viewport` (origin and size in canvas UV, y down) of the canvas.
+    static func canvasProjection(width: Double, height: Double, viewport: SIMD4<Float>) -> simd_float4x4 {
+        let w = Float(width), h = Float(height)
+        let vx = viewport.x, vy = viewport.y, vw = viewport.z, vh = viewport.w
+        return simd_float4x4(columns: (
+            SIMD4(2 / (w * vw), 0, 0, 0),
+            SIMD4(0, 2 / (h * vh), 0, 0),
+            SIMD4(0, 0, 0, 0),
+            SIMD4(-2 * vx / vw - 1, 1 - 2 * (1 - vy) / vh, 0.5, 1)
+        ))
+    }
+}

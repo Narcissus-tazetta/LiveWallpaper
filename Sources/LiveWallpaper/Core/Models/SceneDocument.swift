@@ -1024,6 +1024,9 @@ struct SceneDocument: Codable, Equatable {
     /// (capped at all of it per frame); the screen's own easing when absent.
     var parallaxResponse: Double?
     var cameraShake: SceneCameraShake?
+    /// The materials of the layers scripts make from their own geometry, by the index a
+    /// script names; nil where one could not be converted.
+    var meshMaterials: [SceneMeshMaterial?]?
 
     init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer]) {
         self.canvasWidth = canvasWidth
@@ -1058,6 +1061,7 @@ struct SceneDocument: Codable, Equatable {
         parallaxTravel = try container.decodeIfPresent(Double.self, forKey: .parallaxTravel)
         parallaxResponse = try container.decodeIfPresent(Double.self, forKey: .parallaxResponse)
         cameraShake = try container.decodeIfPresent(SceneCameraShake.self, forKey: .cameraShake)
+        meshMaterials = try container.decodeIfPresent([SceneMeshMaterial?].self, forKey: .meshMaterials)
         guard [parallaxTravel, parallaxResponse].allSatisfy({ $0?.isFinite ?? true }) else {
             throw DecodingError.dataCorruptedError(forKey: .parallaxTravel, in: container, debugDescription: "Parallax values must be finite")
         }

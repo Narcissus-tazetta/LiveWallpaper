@@ -27,6 +27,10 @@ struct LWJSProgram {
     uint8_t *meshes;
     size_t mesh_length;
     size_t mesh_capacity;
+    /* The layers made from a script's own geometry, as the bridge packs them. */
+    uint8_t *models;
+    size_t model_length;
+    size_t model_capacity;
     lwjs_storage_handler storage;
     void *storage_opaque;
 };
@@ -129,20 +133,24 @@ static JSValue console_log(JSContext *context, JSValueConst this_value, int coun
     return JS_UNDEFINED;
 }
 
-static int append_mesh_bytes(LWJSProgram *program, const void *bytes, size_t length) {
-    if (length > LWJS_MAX_MESH_BYTES - program->mesh_length) return -1;
-    size_t needed = program->mesh_length + length;
-    if (needed > program->mesh_capacity) {
-        size_t capacity = program->mesh_capacity ? program->mesh_capacity : 65536;
+static int append_bytes(uint8_t **buffer, size_t *used, size_t *reserved, const void *bytes, size_t length) {
+    if (length > LWJS_MAX_MESH_BYTES - *used) return -1;
+    size_t needed = *used + length;
+    if (needed > *reserved) {
+        size_t capacity = *reserved ? *reserved : 65536;
         while (capacity < needed) capacity *= 2;
-        uint8_t *grown = realloc(program->meshes, capacity);
+        uint8_t *grown = realloc(*buffer, capacity);
         if (!grown) return -1;
-        program->meshes = grown;
-        program->mesh_capacity = capacity;
+        *buffer = grown;
+        *reserved = capacity;
     }
-    memcpy(program->meshes + program->mesh_length, bytes, length);
-    program->mesh_length = needed;
+    memcpy(*buffer + *used, bytes, length);
+    *used = needed;
     return 0;
+}
+
+static int append_mesh_bytes(LWJSProgram *program, const void *bytes, size_t length) {
+    return append_bytes(&program->meshes, &program->mesh_length, &program->mesh_capacity, bytes, length);
 }
 
 static int append_mesh_string(LWJSProgram *program, JSContext *context, JSValueConst value) {
@@ -176,6 +184,26 @@ static JSValue emit_mesh(JSContext *context, JSValueConst this_value, int count,
                  append_mesh_bytes(program, &prefix, 4) < 0 || append_mesh_bytes(program, data + offset, (size_t)floats * 4) < 0;
     JS_FreeValue(context, buffer);
     if (failed) return JS_ThrowRangeError(context, "Mesh output exceeds its limit");
+    return JS_UNDEFINED;
+}
+
+/* emitModels(uint8Array): the frame's model layers, packed by the bridge. */
+static JSValue emit_models(JSContext *context, JSValueConst this_value, int count, JSValueConst *values) {
+    (void)this_value;
+    LWJSProgram *program = JS_GetContextOpaque(context);
+    if (count != 1) return JS_ThrowTypeError(context, "emitModels expects a Uint8Array");
+    size_t offset, byte_length, element;
+    JSValue buffer = JS_GetTypedArrayBuffer(context, values[0], &offset, &byte_length, &element);
+    if (JS_IsException(buffer)) return JS_EXCEPTION;
+    size_t capacity;
+    uint8_t *data = JS_GetArrayBuffer(context, &capacity, buffer);
+    if (!data || element != 1 || offset + byte_length > capacity) {
+        JS_FreeValue(context, buffer);
+        return JS_ThrowTypeError(context, "emitModels expects a Uint8Array");
+    }
+    int failed = append_bytes(&program->models, &program->model_length, &program->model_capacity, data + offset, byte_length);
+    JS_FreeValue(context, buffer);
+    if (failed) return JS_ThrowRangeError(context, "Model output exceeds its limit");
     return JS_UNDEFINED;
 }
 
@@ -240,6 +268,7 @@ static JSContext *new_context(LWJSProgram *program) {
     JS_SetPropertyStr(context, console, "log", JS_NewCFunction(context, console_log, "log", 1));
     JS_SetPropertyStr(context, global, "console", console);
     JS_SetPropertyStr(context, global, "__lwjs_emitMesh", JS_NewCFunction(context, emit_mesh, "emitMesh", 4));
+    JS_SetPropertyStr(context, global, "__lwjs_emitModels", JS_NewCFunction(context, emit_models, "emitModels", 1));
     JS_SetPropertyStr(context, global, "__lwjs_storage", JS_NewCFunction(context, storage, "storage", 4));
     JS_FreeValue(context, global);
     return context;
@@ -422,6 +451,7 @@ char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_se
     program->log_length = 0;
     program->log_count = 0;
     program->mesh_length = 0;
+    program->model_length = 0;
     update_stack_limit(program->runtime);
     JSContext *context = program->module_context ? program->module_context : new_context(program);
     if (!context) {
@@ -524,6 +554,7 @@ char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_se
 void lwjs_destroy(LWJSProgram *program) {
     if (!program) return;
     free(program->meshes);
+    free(program->models);
     if (program->module_context) {
         JS_FreeValue(program->module_context, program->module_entry);
         JS_FreeValue(program->module_context, program->module_namespace);
@@ -541,6 +572,10 @@ const char *lwjs_logs(LWJSProgram *program) { return program->logs; }
 const uint8_t *lwjs_meshes(LWJSProgram *program, size_t *length) {
     *length = program->mesh_length;
     return program->meshes;
+}
+const uint8_t *lwjs_models(LWJSProgram *program, size_t *length) {
+    *length = program->model_length;
+    return program->models;
 }
 size_t lwjs_memory_usage(LWJSProgram *program) {
     JSMemoryUsage usage;

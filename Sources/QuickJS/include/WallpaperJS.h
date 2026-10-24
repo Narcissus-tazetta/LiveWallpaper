@@ -15,6 +15,8 @@ char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_se
 const char *lwjs_logs(LWJSProgram *program);
 /* The meshes emitted by the last evaluation, valid until the next one. */
 const uint8_t *lwjs_meshes(LWJSProgram *program, size_t *length);
+/* The model layers emitted by the last evaluation (packed by the bridge), valid until the next one. */
+const uint8_t *lwjs_models(LWJSProgram *program, size_t *length);
 size_t lwjs_memory_usage(LWJSProgram *program);
 void lwjs_set_memory_limit(LWJSProgram *program, size_t bytes);
 /* The storage the next evaluations use; opaque must outlive them. */

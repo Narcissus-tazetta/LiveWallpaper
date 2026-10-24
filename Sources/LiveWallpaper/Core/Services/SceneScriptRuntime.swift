@@ -1,5 +1,6 @@
 import CoreFoundation
 import Foundation
+import simd
 import QuickJS
 import OSLog
 
@@ -149,6 +150,7 @@ final class SceneScriptRuntime {
             var output = try JSONSerialization.jsonObject(with: outputData)
             var warnings: [String] = []
             var meshes: [SceneMeshFrame] = []
+            var models: [SceneModelLayerFrame] = []
             // A module bundle runs several independent scripts; one that failed is
             // reported here while the rest keep running.
             if script.modules != nil, let wrapped = output as? [String: Any] {
@@ -161,10 +163,12 @@ final class SceneScriptRuntime {
                 var length = 0
                 let bytes = lwjs_meshes(programs[script.id]!.pointer, &length)
                 meshes = try Self.readMeshes(bytes, length: length)
+                let modelBytes = lwjs_models(programs[script.id]!.pointer, &length)
+                models = try Self.readModels(modelBytes, length: length)
                 output = wrapped["adjustments"] as Any
             }
             return SceneScriptOutput(adjustments: try Self.readOutput(output, script: script, layers: layers, rigs: rigs),
-                                     warnings: warnings, meshes: meshes)
+                                     warnings: warnings, meshes: meshes, models: models)
         } catch let failure as SceneScriptIssue {
             throw issue(failure.message, script: script)
         } catch {
@@ -394,6 +398,99 @@ final class SceneScriptRuntime {
             meshes.append(SceneMeshFrame(parent: parent, material: material, vertices: vertices))
         }
         return meshes
+    }
+
+    /// The model layers the bridge packed, in 32-bit words: the layer count; per layer its
+    /// serial, order, alpha, colour (3), world matrix (16, column-major), flags (bit 0
+    /// perspective) and shape count; per shape its material (all ones for none), components,
+    /// float count, index kind (0 none, 1 u16, 2 u32), index count, the floats and the indices
+    /// (u16 padded to a whole word).
+    static func readModels(_ bytes: UnsafePointer<UInt8>?, length: Int) throws -> [SceneModelLayerFrame] {
+        guard let bytes, length > 0 else { return [] }
+        guard length % 4 == 0 else { throw failure("output.models: truncated") }
+        let data = UnsafeRawBufferPointer(start: bytes, count: length)
+        var offset = 0
+        func word() throws -> UInt32 {
+            guard offset + 4 <= length else { throw failure("output.models: truncated") }
+            defer { offset += 4 }
+            return data.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
+        }
+        func float() throws -> Float { Float(bitPattern: try word()) }
+        func floats(_ count: Int) throws -> [Float] {
+            guard count >= 0, offset + count * 4 <= length else { throw failure("output.models: truncated") }
+            let values = [Float](unsafeUninitializedCapacity: count) { buffer, filled in
+                if count > 0 {
+                    UnsafeMutableRawBufferPointer(buffer).copyMemory(from: UnsafeRawBufferPointer(rebasing: data[offset ..< offset + count * 4]))
+                }
+                filled = count
+            }
+            offset += count * 4
+            return values
+        }
+        let count = Int(try word())
+        guard count <= 4096 else { throw failure("output.models: too many layers") }
+        var layers: [SceneModelLayerFrame] = []
+        var total = 0
+        for _ in 0 ..< count {
+            let serial = try word(), order = Int(try word())
+            let alpha = try float(), color = SIMD3(try float(), try float(), try float())
+            let m = try floats(16)
+            let world = simd_float4x4(columns: (SIMD4(m[0], m[1], m[2], m[3]), SIMD4(m[4], m[5], m[6], m[7]),
+                                                SIMD4(m[8], m[9], m[10], m[11]), SIMD4(m[12], m[13], m[14], m[15])))
+            let flags = try word(), shapeCount = Int(try word())
+            guard shapeCount <= 256, ([alpha] + m + [color.x, color.y, color.z]).allSatisfy(\.isFinite) else {
+                throw failure("output.models: invalid layer")
+            }
+            var shapes: [SceneModelLayerFrame.Shape] = []
+            for _ in 0 ..< shapeCount {
+                let material = try word(), components = try word()
+                let floatCount = Int(try word()), indexKind = try word(), indexCount = Int(try word())
+                total += floatCount + indexCount
+                guard total <= maximumMeshFloats, components & 1 != 0, components < 32, indexKind <= 2 else {
+                    throw failure("output.models: invalid shape")
+                }
+                let vertices = try floats(floatCount)
+                var indices: [UInt32]?
+                switch indexKind {
+                case 1:
+                    let words = (indexCount + 1) / 2
+                    guard offset + words * 4 <= length else { throw failure("output.models: truncated") }
+                    indices = (0 ..< indexCount).map { UInt32(data.loadUnaligned(fromByteOffset: offset + $0 * 2, as: UInt16.self)) }
+                    offset += words * 4
+                case 2:
+                    guard offset + indexCount * 4 <= length else { throw failure("output.models: truncated") }
+                    indices = (0 ..< indexCount).map { data.loadUnaligned(fromByteOffset: offset + $0 * 4, as: UInt32.self) }
+                    offset += indexCount * 4
+                default:
+                    break
+                }
+                var shape = SceneModelLayerFrame.Shape(material: material == .max ? nil : Int(material), components: components,
+                                                       vertices: vertices, indices: indices)
+                guard vertices.allSatisfy(\.isFinite), vertices.count % shape.stride == 0 else {
+                    throw failure("output.models: vertices must be finite and whole")
+                }
+                // An index past the vertices reads memory the shape does not own; such a
+                // triangle is left out.
+                if let list = shape.indices {
+                    let vertexCount = UInt32(vertices.count / shape.stride)
+                    var kept: [UInt32] = []
+                    kept.reserveCapacity(list.count)
+                    var at = 0
+                    while at + 3 <= list.count {
+                        if list[at] < vertexCount, list[at + 1] < vertexCount, list[at + 2] < vertexCount {
+                            kept += list[at ..< at + 3]
+                        }
+                        at += 3
+                    }
+                    shape.indices = kept
+                }
+                shapes.append(shape)
+            }
+            layers.append(.init(serial: serial, order: order, alpha: alpha, color: color, world: world,
+                                perspective: flags & 1 != 0, shapes: shapes))
+        }
+        guard offset == length else { throw failure("output.models: trailing bytes") }
+        return layers
     }
 
     private static func readText(_ raw: Any, layer: SceneLayer) throws -> SceneScriptTextValues {

@@ -14,6 +14,7 @@ struct SceneEvaluatedFrame {
     var rigPlayback: [UUID: [SceneSkeleton.Playback]] = [:]
     var order: [UUID: Int] = [:]
     var meshes: [SceneMeshFrame] = []
+    var models: [SceneModelLayerFrame] = []
     /// What scripts asked of simulated particles this frame; carried out once, when drawn.
     var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
 }
@@ -113,6 +114,7 @@ final class SceneFrameEvaluator {
         var targetInputs: [UUID: SceneScriptInput] = [:]
         var warnings: [SceneScriptIssue] = []
         var meshes: [SceneMeshFrame] = []
+        var models: [SceneModelLayerFrame] = []
         var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
         for script in document.scripts where script.canRun && !script.targetLayerIDs(in: document.layers).isEmpty {
             if let issue = stopped[script.id] {
@@ -260,6 +262,7 @@ final class SceneFrameEvaluator {
                     SceneScriptIssue(scriptID: script.id, name: script.name, message: $0, isPartial: true)
                 }
                 meshes += output.meshes
+                models += output.models
                 for (id, adjustment) in output.adjustments {
                     if let position = adjustment.order { order[id] = position }
                     for (rigID, changes) in adjustment.rigPlayback {
@@ -291,7 +294,7 @@ final class SceneFrameEvaluator {
                 if failOnError { throw issue }
             }
         }
-        return SceneEvaluatedFrame(input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, particleControls: particleControls)
+        return SceneEvaluatedFrame(input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, particleControls: particleControls)
     }
 
     /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets
