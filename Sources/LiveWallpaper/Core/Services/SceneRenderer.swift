@@ -412,6 +412,17 @@ final class SceneRenderer {
 
     /// Encodes the scene into `target` (bgra8Unorm, renderTarget usage).
     func encode(into target: MTLTexture, commandBuffer: MTLCommandBuffer, input: SceneFrameInput, frame: SceneEvaluatedFrame? = nil) throws {
+        var input = input
+        // A flat scene's camera shows a window of the canvas: its eye moves the window
+        // (y up, from the canvas's bottom left) and its zoom shrinks it about its middle.
+        // The editor's own zoom takes precedence.
+        if let camera = document.camera, !camera.perspective, let path = camera.path, input.viewport == SceneFrameInput.rest.viewport {
+            let (eye, _, _, zoom) = path.transform(at: input.time)
+            let size = SIMD2(Float(document.canvasWidth), Float(document.canvasHeight))
+            let window = size / zoom
+            let origin = (size - window) / 2 + SIMD2(eye.x, eye.y)
+            input.viewport = SIMD4(origin.x / size.x, 1 - (origin.y + window.y) / size.y, window.x / size.x, window.y / size.y)
+        }
         guard document.highDynamicRange || document.finishing != nil else {
             return try composite(into: target, commandBuffer: commandBuffer, input: input, frame: frame)
         }
@@ -871,7 +882,7 @@ final class SceneRenderer {
             return state
         }
         if let path = scene?.path, var moved = state, !moved.isPlacedByScript {
-            (moved.eye, moved.center, moved.up) = path.transform(at: input.time)
+            (moved.eye, moved.center, moved.up, _) = path.transform(at: input.time)
             state = moved
         }
         let canvas = SceneModelRenderer.View(

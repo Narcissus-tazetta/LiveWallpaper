@@ -5,8 +5,8 @@ final class SceneCameraPathTests: XCTestCase {
     private func path(duration: Double) -> SceneCameraPath {
         let up = [0.0, 1, 0]
         return SceneCameraPath(duration: duration, transforms: [
-            .init(timestamp: 0, eye: [0, 0, 400], center: [0, 0, 0], up: up),
-            .init(timestamp: 4, eye: [100, 0, 400], center: [100, 0, 0], up: up),
+            .init(timestamp: 0, eye: [0, 0, 400], center: [0, 0, 0], up: up, zoom: 1),
+            .init(timestamp: 4, eye: [100, 0, 400], center: [100, 0, 0], up: up, zoom: 1),
         ])
     }
 
@@ -22,8 +22,8 @@ final class SceneCameraPathTests: XCTestCase {
     func testRepeatsAfterTheLongerOfTheLastTimeAndWhatIsLeftOfTheDuration() {
         XCTAssertEqual(path(duration: 8).period, 4)
         let long = SceneCameraPath(duration: 8, transforms: [
-            .init(timestamp: 0, eye: [0, 0, 0], center: [0, 0, -1], up: [0, 1, 0]),
-            .init(timestamp: 2, eye: [60, 0, 0], center: [60, 0, -1], up: [0, 1, 0]),
+            .init(timestamp: 0, eye: [0, 0, 0], center: [0, 0, -1], up: [0, 1, 0], zoom: 1),
+            .init(timestamp: 2, eye: [60, 0, 0], center: [60, 0, -1], up: [0, 1, 0], zoom: 1),
         ])
         XCTAssertEqual(long.period, 6)
         XCTAssertEqual(long.transform(at: 5).eye.x, 60, accuracy: 1e-4)

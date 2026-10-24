@@ -1100,6 +1100,10 @@ struct SceneCameraPath: Codable, Equatable {
         var eye: [Double]
         var center: [Double]
         var up: [Double]
+        /// Magnification about the middle of the view; flat scenes only.
+        var zoom: Double
+
+        var zoomAxis: [Double] { [zoom, 0, 0] }
     }
 
     var duration: Double
@@ -1109,7 +1113,7 @@ struct SceneCameraPath: Codable, Equatable {
     var isValid: Bool {
         duration.isFinite && !transforms.isEmpty
             && transforms.allSatisfy {
-                $0.timestamp.isFinite && $0.timestamp >= 0 && [$0.eye, $0.center, $0.up].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
+                $0.timestamp.isFinite && $0.timestamp >= 0 && $0.zoom.isFinite && $0.zoom > 0 && [$0.eye, $0.center, $0.up].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
             }
             && zip(transforms, transforms.dropFirst()).allSatisfy { $0.timestamp <= $1.timestamp }
             && period > 0
@@ -1125,13 +1129,13 @@ struct SceneCameraPath: Codable, Equatable {
     /// neighbours (at the ends, between it and the next), fitted to CP-022 within about
     /// 0.3 px: a half-way mix of a straight line and an ease at both ends. Only two key
     /// points were measured; the slope with more, and uneven times, is the usual spline's.
-    func transform(at time: Double) -> (eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>) {
+    func transform(at time: Double) -> (eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>, zoom: Float) {
         let t = time.truncatingRemainder(dividingBy: period)
         let next = transforms.firstIndex { $0.timestamp > t } ?? transforms.count
         func vector(_ values: [Double]) -> SIMD3<Float> { SIMD3(values.map(Float.init)) }
         guard next > 0, next < transforms.count else {
             let held = transforms[next == 0 ? 0 : transforms.count - 1]
-            return (vector(held.eye), vector(held.center), vector(held.up))
+            return (vector(held.eye), vector(held.center), vector(held.up), Float(held.zoom))
         }
         let a = transforms[next - 1], b = transforms[next]
         let span = b.timestamp - a.timestamp
@@ -1149,7 +1153,7 @@ struct SceneCameraPath: Codable, Equatable {
             return h00 * vector(a[keyPath: key]) + h10 * Float(span) * slope(next - 1)
                 + h01 * vector(b[keyPath: key]) + h11 * Float(span) * slope(next)
         }
-        return (point(\.eye), point(\.center), point(\.up))
+        return (point(\.eye), point(\.center), point(\.up), point(\.zoomAxis).x)
     }}
 
 /// A light whose shadow the scene draws.
