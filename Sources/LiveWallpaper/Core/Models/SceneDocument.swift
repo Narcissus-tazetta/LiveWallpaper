@@ -993,6 +993,26 @@ struct SceneLayer: Codable, Equatable, Identifiable {
 /// A still-image wallpaper built from layers. Lives in a folder next to the video it
 /// is baked into (SceneStore); the desktop draws it live, everything else that only
 /// plays videos (lock screen, screen saver, thumbnails) uses the baked video.
+/// A scene's camera as the scene sets it up.
+struct SceneCamera: Codable, Equatable {
+    /// Seen through the camera with its field of view, rather than laid out on the canvas.
+    var perspective: Bool
+    var eye: [Double]
+    var center: [Double]
+    var up: [Double]
+    /// Vertical, in degrees.
+    var fov: Double
+    var nearZ: Double
+    var farZ: Double
+    var ambientColor: [Double]
+    var skylightColor: [Double]
+
+    var isValid: Bool {
+        [eye, center, up, ambientColor, skylightColor].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
+            && [fov, nearZ, farZ].allSatisfy(\.isFinite)
+    }
+}
+
 struct SceneDocument: Codable, Equatable {
     static let loopSecondsChoices = [10, 20, 30, 60]
 
@@ -1027,6 +1047,8 @@ struct SceneDocument: Codable, Equatable {
     /// The materials of the layers scripts make from their own geometry, by the index a
     /// script names; nil where one could not be converted.
     var meshMaterials: [SceneMeshMaterial?]?
+    /// Where model layers scripts make are seen from; scripts can move it.
+    var camera: SceneCamera?
 
     init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer]) {
         self.canvasWidth = canvasWidth
@@ -1062,6 +1084,10 @@ struct SceneDocument: Codable, Equatable {
         parallaxResponse = try container.decodeIfPresent(Double.self, forKey: .parallaxResponse)
         cameraShake = try container.decodeIfPresent(SceneCameraShake.self, forKey: .cameraShake)
         meshMaterials = try container.decodeIfPresent([SceneMeshMaterial?].self, forKey: .meshMaterials)
+        camera = try container.decodeIfPresent(SceneCamera.self, forKey: .camera)
+        guard camera.map({ $0.isValid }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .camera, in: container, debugDescription: "Invalid camera")
+        }
         guard [parallaxTravel, parallaxResponse].allSatisfy({ $0?.isFinite ?? true }) else {
             throw DecodingError.dataCorruptedError(forKey: .parallaxTravel, in: container, debugDescription: "Parallax values must be finite")
         }

@@ -151,10 +151,12 @@ final class SceneScriptRuntime {
             var warnings: [String] = []
             var meshes: [SceneMeshFrame] = []
             var models: [SceneModelLayerFrame] = []
+            var camera: SceneCameraState?
             // A module bundle runs several independent scripts; one that failed is
             // reported here while the rest keep running.
             if script.modules != nil, let wrapped = output as? [String: Any] {
-                try Self.keys(wrapped, allowed: ["adjustments", "warnings"], path: "output")
+                try Self.keys(wrapped, allowed: ["adjustments", "warnings", "camera"], path: "output")
+                camera = try wrapped["camera"].map(Self.readCamera)
                 guard let list = wrapped["warnings"] as? [String], list.count <= 16,
                       list.allSatisfy({ $0.utf8.count <= 1024 }) else {
                     throw failure("output.warnings: expected at most 16 messages of at most 1 KiB")
@@ -168,7 +170,7 @@ final class SceneScriptRuntime {
                 output = wrapped["adjustments"] as Any
             }
             return SceneScriptOutput(adjustments: try Self.readOutput(output, script: script, layers: layers, rigs: rigs),
-                                     warnings: warnings, meshes: meshes, models: models)
+                                     warnings: warnings, meshes: meshes, models: models, camera: camera)
         } catch let failure as SceneScriptIssue {
             throw issue(failure.message, script: script)
         } catch {
@@ -400,6 +402,26 @@ final class SceneScriptRuntime {
         return meshes
     }
 
+    private static func readCamera(_ raw: Any) throws -> SceneCameraState {
+        guard let object = raw as? [String: Any] else { throw failure("output.camera: expected an object") }
+        try keys(object, allowed: ["eye", "center", "up", "zoom", "fov", "nearZ", "farZ"], path: "output.camera")
+        func vector(_ key: String) throws -> SIMD3<Float> {
+            guard let list = object[key] as? [NSNumber], list.count == 3 else { throw failure("output.camera.\(key): expected 3 numbers") }
+            return SIMD3(list.map(\.floatValue))
+        }
+        func number(_ key: String) throws -> Float {
+            guard let value = (object[key] as? NSNumber)?.floatValue else { throw failure("output.camera.\(key): expected a number") }
+            return value
+        }
+        let state = SceneCameraState(eye: try vector("eye"), center: try vector("center"), up: try vector("up"),
+                                     zoom: try number("zoom"), fov: try number("fov"), nearZ: try number("nearZ"),
+                                     farZ: try number("farZ"))
+        // A camera that cannot be drawn through (a NaN from a script) is ignored for the frame.
+        let values = [state.eye, state.center, state.up].flatMap { [$0.x, $0.y, $0.z] } + [state.zoom, state.fov, state.nearZ, state.farZ]
+        guard values.allSatisfy(\.isFinite) else { throw failure("output.camera: values must be finite") }
+        return state
+    }
+
     /// The model layers the bridge packed, in 32-bit words: the layer count; per layer its
     /// serial, order, alpha, colour (3), world matrix (16, column-major), flags (bit 0
     /// perspective) and shape count; per shape its material (all ones for none), components,
@@ -525,7 +547,8 @@ final class SceneScriptRuntime {
             else { throw failure("output.id: expected a unique ID from context.targets") }
             var adjustment = SceneScriptAdjustment()
             if item["order"] != nil {
-                try numbers(item, ranges: ["order": 0 ... Double(max(layers.count - 1, 0))], path: "output")
+                // A sort key shared with the model layers scripts make, not an index.
+                try numbers(item, ranges: ["order": 0 ... 1_000_000_000], path: "output")
                 try integers(item, names: ["order"], path: "output")
                 adjustment.order = (item["order"] as? NSNumber)?.intValue
             }

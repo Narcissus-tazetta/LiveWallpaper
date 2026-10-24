@@ -96,6 +96,9 @@ final class SceneRenderGraphRenderer {
         var viewProjection: simd_float4x4
         var alpha: Float
         var color: SIMD3<Float>
+        var eye: SIMD3<Float>
+        var ambient: SIMD3<Float>
+        var skylight: SIMD3<Float>
     }
 
     /// `uv` (canvas UV → layer UV, origin top-left) as the same map between clip spaces
@@ -735,6 +738,13 @@ final class SceneRenderGraphRenderer {
                 continue
             case .layerAlpha: values = [model?.alpha ?? 1]
             case .layerColor: values = model.map { [$0.color.x, $0.color.y, $0.color.z] } ?? [1, 1, 1]
+            case .eyePosition, .ambientColor, .skylightColor:
+                let value: SIMD3<Float>? = switch update.value {
+                case .eyePosition: model?.eye
+                case .ambientColor: model?.ambient
+                default: model?.skylight
+                }
+                values = [value?.x ?? 0, value?.y ?? 0, value?.z ?? 0]
             case .effectValue:
                 let count = update.components ?? 1
                 let key = update.key!
@@ -927,7 +937,8 @@ final class SceneRenderGraphRenderer {
                 case .parallaxPosition, .texelSize: bytes = 8
                 case .texelOffsets: bytes = 16
                 case .textureSize: bytes = 16
-                case .modelViewProjection, .model, .viewProjection, .layerAlpha, .layerColor:
+                case .modelViewProjection, .model, .viewProjection, .layerAlpha, .layerColor, .eyePosition, .ambientColor,
+                     .skylightColor:
                     throw GraphError(detail: "model layer values outside a model layer")
                 case .boneMatrices, .boneOpacity:
                     let count = (draw.skeleton ?? draw.skeletonID.flatMap { rigs.skeletons[$0] })?

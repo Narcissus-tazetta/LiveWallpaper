@@ -15,6 +15,7 @@ struct SceneEvaluatedFrame {
     var order: [UUID: Int] = [:]
     var meshes: [SceneMeshFrame] = []
     var models: [SceneModelLayerFrame] = []
+    var camera: SceneCameraState?
     /// What scripts asked of simulated particles this frame; carried out once, when drawn.
     var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
 }
@@ -115,8 +116,12 @@ final class SceneFrameEvaluator {
         var warnings: [SceneScriptIssue] = []
         var meshes: [SceneMeshFrame] = []
         var models: [SceneModelLayerFrame] = []
+        var camera: SceneCameraState?
         var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
-        for script in document.scripts where script.canRun && !script.targetLayerIDs(in: document.layers).isEmpty {
+        // A converted bundle runs even with no layer of its own to drive: it may draw
+        // what it makes.
+        for script in document.scripts where script.canRun
+            && (script.modules != nil || !script.targetLayerIDs(in: document.layers).isEmpty) {
             if let issue = stopped[script.id] {
                 if failOnError { throw issue }
                 continue
@@ -263,6 +268,7 @@ final class SceneFrameEvaluator {
                 }
                 meshes += output.meshes
                 models += output.models
+                camera = output.camera ?? camera
                 for (id, adjustment) in output.adjustments {
                     if let position = adjustment.order { order[id] = position }
                     for (rigID, changes) in adjustment.rigPlayback {
@@ -294,7 +300,7 @@ final class SceneFrameEvaluator {
                 if failOnError { throw issue }
             }
         }
-        return SceneEvaluatedFrame(input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, particleControls: particleControls)
+        return SceneEvaluatedFrame(input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, camera: camera, particleControls: particleControls)
     }
 
     /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets

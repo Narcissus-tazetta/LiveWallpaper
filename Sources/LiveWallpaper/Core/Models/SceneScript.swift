@@ -103,6 +103,19 @@ struct SceneScriptOutput {
     var warnings: [String]
     var meshes: [SceneMeshFrame] = []
     var models: [SceneModelLayerFrame] = []
+    var camera: SceneCameraState?
+}
+
+/// The camera as scripts left it this frame.
+struct SceneCameraState: Equatable {
+    var eye: SIMD3<Float>
+    var center: SIMD3<Float>
+    var up: SIMD3<Float>
+    var zoom: Float
+    /// Vertical, in degrees.
+    var fov: Float
+    var nearZ: Float
+    var farZ: Float
 }
 
 struct SceneScriptAdjustment {

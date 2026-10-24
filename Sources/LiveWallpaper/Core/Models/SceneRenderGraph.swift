@@ -41,12 +41,14 @@ struct SceneRenderGraph: Codable, Equatable {
         /// (x, y, −x, −y).
         /// For a model layer a script made: `modelViewProjection` takes its vertices to
         /// clip space, `model` to scene pixels and `viewProjection` scene pixels to clip
-        /// space; `layerAlpha` and `layerColor` are the layer's own.
+        /// space; `layerAlpha` and `layerColor` are the layer's own; `eyePosition` is the
+        /// camera's and `ambientColor` and `skylightColor` the scene's light all round.
         enum Value: String, Codable {
             case time, cursor, textureSize, boneMatrices, boneOpacity, effectValue, audioSpectrum
             case pointer, previousPointer, layerFromCanvas, canvasFromLayer, screenFromLayer, frameTime, pointerState
             case parallaxPosition, texelSize, texelOffsets
             case modelViewProjection, model, viewProjection, layerAlpha, layerColor
+            case eyePosition, ambientColor, skylightColor
         }
         var offset: Int
         var value: Value
@@ -115,6 +117,12 @@ struct SceneRenderGraph: Codable, Equatable {
         var clears: Bool?
         /// false leaves the target's alpha as it was.
         var writesAlpha: Bool?
+        /// A model layer's material: whether it tests and writes the frame's depth, and
+        /// which faces it leaves out (counter-clockwise ones face the viewer).
+        var depthTest: Bool?
+        var depthWrite: Bool?
+        var cull: Cull?
+        enum Cull: String, Codable { case back, front }
     }
 
     /// Geometry made at run time. Each mesh frame is four vertices per quad of nine

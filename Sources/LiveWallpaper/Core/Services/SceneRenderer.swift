@@ -163,6 +163,7 @@ final class SceneRenderer {
     private var graphRenderers: [UUID: SceneRenderGraphRenderer] = [:]
     private var modelRenderer: SceneModelRenderer?
     private var modelImages: [String: MTLTexture] = [:]
+    private var modelDepthTexture: MTLTexture?
     private let graphTexturePool = SceneTexturePool()
     private var graphTextures: [String: MTLTexture] = [:]
     private var graphResources: [UUID: [String: MTLTexture]] = [:]
@@ -496,42 +497,65 @@ final class SceneRenderer {
             : Self.interleave(visibleLayers, models: evaluated.models, place: { id in
                 evaluated.order[id] ?? document.layers.firstIndex { $0.id == id }!
             })
-        let canvasProjection = SceneModelRenderer.canvasProjection(
-            width: Double(document.canvasWidth), height: Double(document.canvasHeight), viewport: input.viewport
-        )
-        func drawModel(_ model: SceneModelLayerFrame, format: MTLPixelFormat, encoder: MTLRenderCommandEncoder) throws {
-            try modelRenderer!.draw(
-                model, viewProjection: canvasProjection, images: modelImages, frame: .init(), time: input.time,
-                cursor: input.cursor, audio: input.audio, format: format, encoder: encoder
-            )
+        let views = modelViews(camera: evaluated.camera, input: input, target: target)
+        // The frame's model layers share one depth buffer; the first pass clears it.
+        var depthCleared = false
+        func drawModels(_ models: [SceneModelLayerFrame], into texture: MTLTexture, clear: Bool) throws {
+            let pass = MTLRenderPassDescriptor()
+            pass.colorAttachments[0].texture = texture
+            pass.colorAttachments[0].loadAction = clear ? .clear : .load
+            pass.colorAttachments[0].clearColor = backgroundClearColor
+            pass.colorAttachments[0].storeAction = .store
+            pass.depthAttachment.texture = try modelDepth(width: texture.width, height: texture.height)
+            pass.depthAttachment.loadAction = depthCleared ? .load : .clear
+            pass.depthAttachment.clearDepth = 1
+            pass.depthAttachment.storeAction = .store
+            depthCleared = true
+            guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
+                throw RendererError.textureAllocationFailed
+            }
+            defer { encoder.endEncoding() }
+            for model in models {
+                try modelRenderer!.draw(
+                    model, view: model.perspective ? views.perspective : views.flat, images: modelImages, frame: .init(),
+                    time: input.time, cursor: input.cursor, audio: input.audio, format: texture.pixelFormat, encoder: encoder
+                )
+            }
         }
         if allowsSinglePassComposite, let fetch = pipeline.compositeFetch(for: target.pixelFormat) {
             enum Segment {
-                case batch([Drawn])
+                case batch([SceneLayer])
                 case capture(SceneLayer)
+                case models([SceneModelLayerFrame])
             }
             var segments: [Segment] = []
-            var currentBatch: [Drawn] = []
+            var currentBatch: [SceneLayer] = []
+            var currentModels: [SceneModelLayerFrame] = []
+            func close() {
+                if !currentBatch.isEmpty { segments.append(.batch(currentBatch)) }
+                if !currentModels.isEmpty { segments.append(.models(currentModels)) }
+                currentBatch.removeAll()
+                currentModels.removeAll()
+            }
             for item in visible {
-                // A layer whose effects read what lies below it needs the canvas drawn
-                // up to it, as a canvas-capturing layer does.
                 guard case let .layer(layer) = item else {
-                    currentBatch.append(item)
+                    if case let .model(model) = item {
+                        if !currentBatch.isEmpty { close() }
+                        currentModels.append(model)
+                    }
                     continue
                 }
+                if !currentModels.isEmpty { close() }
+                // A layer whose effects read what lies below it needs the canvas drawn
+                // up to it, as a canvas-capturing layer does.
                 if layer.capturesCanvas || readsBackground(layer) {
-                    if !currentBatch.isEmpty {
-                        segments.append(.batch(currentBatch))
-                        currentBatch.removeAll()
-                    }
+                    close()
                     segments.append(.capture(layer))
                 } else {
-                    currentBatch.append(item)
+                    currentBatch.append(layer)
                 }
             }
-            if !currentBatch.isEmpty {
-                segments.append(.batch(currentBatch))
-            }
+            close()
 
             try ensureAccumulation(width: target.width, height: target.height, format: target.pixelFormat)
             var source: MTLTexture? = nil
@@ -542,22 +566,38 @@ final class SceneRenderer {
                 let destination = isLast ? target : accumulation[nextIndex]
 
                 switch segment {
-                case .batch(let items):
-                    var prepared: [PreparedItem] = []
-                    for item in items {
-                        guard case let .layer(layer) = item else {
-                            if case let .model(model) = item { prepared.append(.model(model)) }
-                            continue
+                case .models(let models):
+                    // Drawn straight onto the canvas so far; the last segment has to end in the target.
+                    if let current = source {
+                        if isLast, current !== target {
+                            guard let blit = commandBuffer.makeBlitCommandEncoder() else {
+                                throw RendererError.textureAllocationFailed
+                            }
+                            blit.copy(from: current, to: target)
+                            blit.endEncoding()
+                            try drawModels(models, into: target, clear: false)
+                            source = target
+                        } else {
+                            try drawModels(models, into: current, clear: false)
                         }
+                    } else {
+                        try drawModels(models, into: destination, clear: true)
+                        source = destination
+                        nextIndex = 1 - nextIndex
+                    }
+
+                case .batch(let layers):
+                    var prepared: [PreparedLayer] = []
+                    for layer in layers {
                         let drawn = evaluated.layers[layer.id]!
                         let layerTexture = try applyEffects(
                             to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize
                         )
-                        prepared.append(.layer(PreparedLayer(
+                        prepared.append(PreparedLayer(
                             layerTexture: layerTexture,
                             uniforms: compositeUniforms(for: drawn.layer, drawn: drawn, input: input, targetSize: targetSize),
                             depth: layer.depthFile.flatMap { maskTextures[$0] }
-                        )))
+                        ))
                     }
 
                     if let currentSource = source {
@@ -586,22 +626,10 @@ final class SceneRenderer {
                     guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
                         throw RendererError.textureAllocationFailed
                     }
-                    var fetchIsSet = false
-                    for entry in prepared {
-                        guard case let .layer(item) = entry else {
-                            if case let .model(model) = entry {
-                                encoder.setScissorRect(MTLScissorRect(x: 0, y: 0, width: destination.width, height: destination.height))
-                                try drawModel(model, format: destination.pixelFormat, encoder: encoder)
-                                fetchIsSet = false
-                            }
-                            continue
-                        }
+                    encoder.setRenderPipelineState(fetch)
+                    for item in prepared {
                         guard let scissor = Self.scissor(for: item.uniforms, width: target.width, height: target.height) else {
                             continue
-                        }
-                        if !fetchIsSet {
-                            encoder.setRenderPipelineState(fetch)
-                            fetchIsSet = true
                         }
                         var uniforms = item.uniforms
                         encoder.setScissorRect(scissor)
@@ -651,23 +679,17 @@ final class SceneRenderer {
         for item in visible {
             guard case let .layer(layer) = item else {
                 guard case let .model(model) = item else { continue }
-                let destination = accumulation[nextIndex]
-                // The canvas so far, which may still be the background's single pixel.
-                try compositePass(
-                    commandBuffer: commandBuffer, destination: destination, base: source,
-                    layerTexture: blackTexture, uniforms: Self.passThroughUniforms
-                )
-                let pass = MTLRenderPassDescriptor()
-                pass.colorAttachments[0].texture = destination
-                pass.colorAttachments[0].loadAction = .load
-                pass.colorAttachments[0].storeAction = .store
-                guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
-                    throw RendererError.textureAllocationFailed
+                if !accumulation.contains(where: { $0 === source }) {
+                    // The canvas so far may still be the background's single pixel.
+                    let destination = accumulation[nextIndex]
+                    try compositePass(
+                        commandBuffer: commandBuffer, destination: destination, base: source,
+                        layerTexture: blackTexture, uniforms: Self.passThroughUniforms
+                    )
+                    source = destination
+                    nextIndex = 1 - nextIndex
                 }
-                try drawModel(model, format: destination.pixelFormat, encoder: encoder)
-                encoder.endEncoding()
-                source = destination
-                nextIndex = 1 - nextIndex
+                try drawModels([model], into: source, clear: false)
                 continue
             }
             let drawn = evaluated.layers[layer.id]!
@@ -734,9 +756,45 @@ final class SceneRenderer {
         let depth: MTLTexture?
     }
 
-    private enum PreparedItem {
-        case layer(PreparedLayer)
-        case model(SceneModelLayerFrame)
+    /// How model layers are seen this frame: `flat` for those laid out on the canvas,
+    /// `perspective` for those marked perspective. In a scene seen through its camera
+    /// the unmarked ones go through the camera.
+    private func modelViews(camera: SceneCameraState?, input: SceneFrameInput, target: MTLTexture)
+        -> (flat: SceneModelRenderer.View, perspective: SceneModelRenderer.View)
+    {
+        let scene = document.camera
+        let ambient = SIMD3((scene?.ambientColor ?? [0, 0, 0]).map(Float.init))
+        let skylight = SIMD3((scene?.skylightColor ?? [0, 0, 0]).map(Float.init))
+        let state = camera ?? scene.map { scene in
+            SceneCameraState(eye: SIMD3(scene.eye.map(Float.init)), center: SIMD3(scene.center.map(Float.init)),
+                             up: SIMD3(scene.up.map(Float.init)), zoom: 1, fov: Float(scene.fov),
+                             nearZ: Float(scene.nearZ), farZ: Float(scene.farZ))
+        }
+        let canvas = SceneModelRenderer.View(
+            viewProjection: SceneModelRenderer.canvasProjection(
+                width: Double(document.canvasWidth), height: Double(document.canvasHeight), viewport: input.viewport
+            ),
+            eye: state?.eye ?? .zero, ambient: ambient, skylight: skylight
+        )
+        guard let state, scene?.perspective == true else { return (canvas, canvas) }
+        // A camera scene fills the target, whatever its shape.
+        let aspect = Float(target.width) / Float(target.height)
+        var flat = canvas, perspective = canvas
+        flat.viewProjection = SceneModelRenderer.perspective(state, aspect: aspect)
+        perspective.viewProjection = SceneModelRenderer.unitPerspective(state, aspect: aspect)
+        return (flat, perspective)
+    }
+
+    private func modelDepth(width: Int, height: Int) throws -> MTLTexture {
+        if let depth = modelDepthTexture, depth.width == width, depth.height == height { return depth }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: SceneModelRenderer.depthFormat, width: width, height: height, mipmapped: false
+        )
+        descriptor.usage = .renderTarget
+        descriptor.storageMode = .private
+        guard let texture = device.makeTexture(descriptor: descriptor) else { throw RendererError.textureAllocationFailed }
+        modelDepthTexture = texture
+        return texture
     }
 
     /// What the canvas draws, bottom to top.

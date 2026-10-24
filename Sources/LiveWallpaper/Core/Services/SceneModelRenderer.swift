@@ -28,6 +28,9 @@ final class SceneModelRenderer {
     private let device: MTLDevice
     private var compiled: [Int: Material] = [:]
     private var pipelines: [PipelineKey: MTLRenderPipelineState] = [:]
+    private var depthStates: [Int: MTLDepthStencilState] = [:]
+    /// Model layers draw in passes with a depth buffer of this format.
+    static let depthFormat = MTLPixelFormat.depth32Float
     /// Components a shape lacks but a shader reads, from a buffer that every vertex shares.
     private let defaults: MTLBuffer
 
@@ -82,7 +85,7 @@ final class SceneModelRenderer {
                 let bytes: Int = switch update.value {
                 case .modelViewProjection, .model, .viewProjection: 64
                 case .layerAlpha, .time, .frameTime: 4
-                case .layerColor: 12
+                case .layerColor, .eyePosition, .ambientColor, .skylightColor: 12
                 case .textureSize: 16
                 default: throw ModelError(detail: "material \(material.path) reads \(update.value.rawValue)")
                 }
@@ -140,6 +143,7 @@ final class SceneModelRenderer {
             vertices.layouts[2].stepRate = 0
         }
         descriptor.vertexDescriptor = vertices
+        descriptor.depthAttachmentPixelFormat = Self.depthFormat
         let attachment = descriptor.colorAttachments[0]!
         attachment.pixelFormat = format
         if draw.writesAlpha == false { attachment.writeMask = [.red, .green, .blue] }
@@ -162,16 +166,36 @@ final class SceneModelRenderer {
         return pipeline
     }
 
-    /// Draws `layer` into the encoder's target. `viewProjection` takes scene pixels to
-    /// the target's clip space.
+    /// How a frame's model layers are seen: `viewProjection` takes scene units to the
+    /// target's clip space.
+    struct View {
+        var viewProjection: simd_float4x4
+        var eye: SIMD3<Float>
+        var ambient: SIMD3<Float>
+        var skylight: SIMD3<Float>
+    }
+
+    private func depthState(test: Bool, write: Bool) -> MTLDepthStencilState {
+        let key = (test ? 1 : 0) | (write ? 2 : 0)
+        if let state = depthStates[key] { return state }
+        let descriptor = MTLDepthStencilDescriptor()
+        // Equal depths pass so that flat layers at one depth keep their drawing order (inferred).
+        descriptor.depthCompareFunction = test ? .lessEqual : .always
+        descriptor.isDepthWriteEnabled = write
+        let state = device.makeDepthStencilState(descriptor: descriptor)!
+        depthStates[key] = state
+        return state
+    }
+
+    /// Draws `layer` into the encoder's target, which has a depth attachment of `depthFormat`.
     func draw(
-        _ layer: SceneModelLayerFrame, viewProjection: simd_float4x4, images: [String: MTLTexture],
+        _ layer: SceneModelLayerFrame, view: View, images: [String: MTLTexture],
         frame: SceneRenderGraphRenderer.FrameValues, time: Double, cursor: SIMD2<Float>?,
         audio: SceneAudioSpectrum?, format: MTLPixelFormat, encoder: MTLRenderCommandEncoder
     ) throws {
         let values = SceneRenderGraphRenderer.ModelValues(
-            modelViewProjection: viewProjection * layer.world, model: layer.world, viewProjection: viewProjection,
-            alpha: layer.alpha, color: layer.color
+            modelViewProjection: view.viewProjection * layer.world, model: layer.world, viewProjection: view.viewProjection,
+            alpha: layer.alpha, color: layer.color, eye: view.eye, ambient: view.ambient, skylight: view.skylight
         )
         for shape in layer.shapes {
             guard let index = shape.material, let material = compiled[index], !shape.vertices.isEmpty else { continue }
@@ -185,6 +209,14 @@ final class SceneModelRenderer {
             // Measured: an opaque material stays opaque whatever the alpha of its vertices or
             // of the layer.
             encoder.setRenderPipelineState(try pipeline(material: index, components: shape.components, format: format, blend: draw.blend))
+            encoder.setDepthStencilState(depthState(test: draw.depthTest == true, write: draw.depthWrite == true))
+            encoder.setFrontFacing(.counterClockwise)
+            let cull: MTLCullMode = switch draw.cull {
+            case .back: .back
+            case .front: .front
+            case nil: .none
+            }
+            encoder.setCullMode(cull)
             for (stage, isVertex) in [(draw.vertex, true), (draw.fragment, false)] {
                 let data = SceneRenderGraphRenderer.updatedUniforms(
                     stage, frame: frame, model: values, resources: resources, time: time, cursor: cursor, pose: nil,
@@ -230,6 +262,32 @@ final class SceneModelRenderer {
                 if count > 0 { encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: count) }
             }
         }
+    }
+
+    /// A camera looking from `eye` to `center` with a vertical field of view, for a target
+    /// of `aspect` (width over height); depth 0 at `near` to 1 at `far`.
+    static func perspective(_ camera: SceneCameraState, aspect: Float) -> simd_float4x4 {
+        let f = 1 / tan(camera.fov * .pi / 360), near = camera.nearZ, far = camera.farZ
+        let projection = simd_float4x4(columns: (
+            SIMD4(f / aspect, 0, 0, 0), SIMD4(0, f, 0, 0),
+            SIMD4(0, 0, far / (near - far), -1), SIMD4(0, 0, near * far / (near - far), 0)
+        ))
+        let z = simd_normalize(camera.eye - camera.center)
+        let x = simd_normalize(simd_cross(camera.up, z))
+        let y = simd_cross(z, x)
+        let view = simd_float4x4(columns: (
+            SIMD4(x.x, y.x, z.x, 0), SIMD4(x.y, y.y, z.y, 0), SIMD4(x.z, y.z, z.z, 0),
+            SIMD4(-simd_dot(x, camera.eye), -simd_dot(y, camera.eye), -simd_dot(z, camera.eye), 1)
+        ))
+        return projection * view
+    }
+
+    /// Measured for a layer marked perspective in a scene seen through its camera: the
+    /// camera's place and the depth of the vertices change nothing, and a unit spans
+    /// half the height over tan(fov / 2). Only this case was measured.
+    static func unitPerspective(_ camera: SceneCameraState, aspect: Float) -> simd_float4x4 {
+        let f = 1 / tan(camera.fov * .pi / 360)
+        return simd_float4x4(columns: (SIMD4(f / aspect, 0, 0, 0), SIMD4(0, f, 0, 0), SIMD4(0, 0, 0, 0), SIMD4(0, 0, 0.5, 1)))
     }
 
     /// Scene pixels (origin bottom left, y up) to the clip space of a target that shows
