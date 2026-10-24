@@ -1081,13 +1081,76 @@ struct SceneCamera: Codable, Equatable {
     var skylightColor: [Double]
     /// The lights that cast a shadow, in the order of the shadow maps materials read.
     var shadowLights: [SceneShadowLight]?
+    /// Moves the camera on its own from the moment the scene is shown.
+    var path: SceneCameraPath?
 
     var isValid: Bool {
         [eye, center, up, ambientColor, skylightColor].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
             && [fov, nearZ, farZ].allSatisfy(\.isFinite)
             && (shadowLights ?? []).allSatisfy(\.isValid)
+            && (path?.isValid ?? true)
     }
 }
+
+/// Key points the camera passes through: straight lines between them, held at the last
+/// one, and back to the first after `period` (measured on Wallpaper Engine's own scenes).
+struct SceneCameraPath: Codable, Equatable {
+    struct Transform: Codable, Equatable {
+        var timestamp: Double
+        var eye: [Double]
+        var center: [Double]
+        var up: [Double]
+    }
+
+    var duration: Double
+    /// By timestamp.
+    var transforms: [Transform]
+
+    var isValid: Bool {
+        duration.isFinite && !transforms.isEmpty
+            && transforms.allSatisfy {
+                $0.timestamp.isFinite && $0.timestamp >= 0 && [$0.eye, $0.center, $0.up].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
+            }
+            && zip(transforms, transforms.dropFirst()).allSatisfy { $0.timestamp <= $1.timestamp }
+            && period > 0
+    }
+
+    /// The last key point's time, or the time left of `duration` after it if that is longer.
+    var period: Double {
+        let last = transforms[transforms.count - 1].timestamp
+        return max(last, duration - last)
+    }
+
+    /// A cubic curve through the key points whose slope at each is the one between its
+    /// neighbours (at the ends, between it and the next), fitted to CP-022 within about
+    /// 0.3 px: a half-way mix of a straight line and an ease at both ends. Only two key
+    /// points were measured; the slope with more, and uneven times, is the usual spline's.
+    func transform(at time: Double) -> (eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>) {
+        let t = time.truncatingRemainder(dividingBy: period)
+        let next = transforms.firstIndex { $0.timestamp > t } ?? transforms.count
+        func vector(_ values: [Double]) -> SIMD3<Float> { SIMD3(values.map(Float.init)) }
+        guard next > 0, next < transforms.count else {
+            let held = transforms[next == 0 ? 0 : transforms.count - 1]
+            return (vector(held.eye), vector(held.center), vector(held.up))
+        }
+        let a = transforms[next - 1], b = transforms[next]
+        let span = b.timestamp - a.timestamp
+        let u = Float((t - a.timestamp) / span)
+        let h00 = 2 * u * u * u - 3 * u * u + 1, h10 = u * u * u - 2 * u * u + u
+        let h01 = -2 * u * u * u + 3 * u * u, h11 = u * u * u - u * u
+        func point(_ key: KeyPath<Transform, [Double]>) -> SIMD3<Float> {
+            func slope(_ index: Int) -> SIMD3<Float> {
+                let first = index == 0, last = index == transforms.count - 1
+                let before = first ? index : index - 1, after = last ? index : index + 1
+                let width = transforms[after].timestamp - transforms[before].timestamp
+                let delta = vector(transforms[after][keyPath: key]) - vector(transforms[before][keyPath: key])
+                return delta / Float(first || last ? 2 * width : width)
+            }
+            return h00 * vector(a[keyPath: key]) + h10 * Float(span) * slope(next - 1)
+                + h01 * vector(b[keyPath: key]) + h11 * Float(span) * slope(next)
+        }
+        return (point(\.eye), point(\.center), point(\.up))
+    }}
 
 /// A light whose shadow the scene draws.
 struct SceneShadowLight: Codable, Equatable {

@@ -428,7 +428,7 @@ final class SceneScriptRuntime {
 
     private static func readCamera(_ raw: Any) throws -> SceneCameraState {
         guard let object = raw as? [String: Any] else { throw failure("output.camera: expected an object") }
-        try keys(object, allowed: ["eye", "center", "up", "zoom", "fov", "nearZ", "farZ"], path: "output.camera")
+        try keys(object, allowed: ["eye", "center", "up", "zoom", "fov", "nearZ", "farZ", "placed"], path: "output.camera")
         func vector(_ key: String) throws -> SIMD3<Float> {
             guard let list = object[key] as? [NSNumber], list.count == 3 else { throw failure("output.camera.\(key): expected 3 numbers") }
             return SIMD3(list.map(\.floatValue))
@@ -437,9 +437,10 @@ final class SceneScriptRuntime {
             guard let value = (object[key] as? NSNumber)?.floatValue else { throw failure("output.camera.\(key): expected a number") }
             return value
         }
-        let state = SceneCameraState(eye: try vector("eye"), center: try vector("center"), up: try vector("up"),
+        var state = SceneCameraState(eye: try vector("eye"), center: try vector("center"), up: try vector("up"),
                                      zoom: try number("zoom"), fov: try number("fov"), nearZ: try number("nearZ"),
                                      farZ: try number("farZ"))
+        state.isPlacedByScript = (object["placed"] as? Bool) ?? true
         // A camera that cannot be drawn through (a NaN from a script) is ignored for the frame.
         let values = [state.eye, state.center, state.up].flatMap { [$0.x, $0.y, $0.z] } + [state.zoom, state.fov, state.nearZ, state.farZ]
         guard values.allSatisfy(\.isFinite) else { throw failure("output.camera: values must be finite") }

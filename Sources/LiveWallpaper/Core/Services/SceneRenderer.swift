@@ -863,10 +863,16 @@ final class SceneRenderer {
         let scene = document.camera
         let ambient = SIMD3((scene?.ambientColor ?? [0, 0, 0]).map(Float.init))
         let skylight = SIMD3((scene?.skylightColor ?? [0, 0, 0]).map(Float.init))
-        let state = camera ?? scene.map { scene in
-            SceneCameraState(eye: SIMD3(scene.eye.map(Float.init)), center: SIMD3(scene.center.map(Float.init)),
-                             up: SIMD3(scene.up.map(Float.init)), zoom: 1, fov: Float(scene.fov),
-                             nearZ: Float(scene.nearZ), farZ: Float(scene.farZ))
+        var state = camera ?? scene.map { scene in
+            var state = SceneCameraState(eye: SIMD3(scene.eye.map(Float.init)), center: SIMD3(scene.center.map(Float.init)),
+                                         up: SIMD3(scene.up.map(Float.init)), zoom: 1, fov: Float(scene.fov),
+                                         nearZ: Float(scene.nearZ), farZ: Float(scene.farZ))
+            state.isPlacedByScript = false
+            return state
+        }
+        if let path = scene?.path, var moved = state, !moved.isPlacedByScript {
+            (moved.eye, moved.center, moved.up) = path.transform(at: input.time)
+            state = moved
         }
         let canvas = SceneModelRenderer.View(
             viewProjection: SceneModelRenderer.canvasProjection(

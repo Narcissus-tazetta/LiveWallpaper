@@ -126,6 +126,8 @@ struct SceneCameraState: Equatable {
     var fov: Float
     var nearZ: Float
     var farZ: Float
+    /// A script moved the camera; otherwise its place is the scene's own, which a path may move.
+    var isPlacedByScript = true
 }
 
 struct SceneScriptAdjustment {
