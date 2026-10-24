@@ -261,6 +261,41 @@ final class SceneScriptRuntime {
         try JSONDecoder().decode(type, from: JSONSerialization.data(withJSONObject: value))
     }
 
+    /// For simulated particles: `events` in order, each `{"emit": count}` or
+    /// `{"clear": true}`, and `emitting` to stop or restart the emitters.
+    private static func readParticleControl(_ raw: Any) throws -> SceneParticleSimulator.Control {
+        let particles = try object(raw, path: "particles")
+        try keys(particles, allowed: ["events", "emitting"], path: "particles")
+        var control = SceneParticleSimulator.Control()
+        if let rawEmitting = particles["emitting"] {
+            guard let emitting = rawEmitting as? Bool else { throw failure("particles.emitting: expected a boolean") }
+            control.emitting = emitting
+        }
+        if let rawEvents = particles["events"] {
+            guard let events = rawEvents as? [Any], events.count <= 1000 else {
+                throw failure("particles.events: expected an array of at most 1000 entries")
+            }
+            for rawEvent in events {
+                let event = try object(rawEvent, path: "particles.events")
+                try keys(event, allowed: ["emit", "clear"], path: "particles.events")
+                if event["clear"] != nil {
+                    guard event.count == 1, event["clear"] as? Bool == true else {
+                        throw failure("particles.events: clear must be true and alone")
+                    }
+                    control.events.append(.clear)
+                } else {
+                    try numbers(event, ranges: ["emit": 1 ... 100_000], path: "particles.events")
+                    try integers(event, names: ["emit"], path: "particles.events")
+                    guard let count = (event["emit"] as? NSNumber)?.intValue else {
+                        throw failure("particles.events: expected emit or clear")
+                    }
+                    control.events.append(.emit(count))
+                }
+            }
+        }
+        return control
+    }
+
     /// Built once: readOutput runs for every target of every frame.
     private enum OutputKeys {
         static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text"]
@@ -476,7 +511,9 @@ final class SceneScriptRuntime {
                     adjustment.effects[effectID] = try decode(SceneScriptEffectValues.self, effect)
                 }
             }
-            if let raw = item["particles"] {
+            if let raw = item["particles"], layer.particleSystem != nil {
+                adjustment.particleControl = try readParticleControl(raw)
+            } else if let raw = item["particles"] {
                 guard layer.particles != nil else { throw failure("particles: target is not a particle layer") }
                 let particles = try object(raw, path: "particles")
                 try choices(particles, values: ["preset": Set(SceneParticlePreset.allCases.map(\.rawValue)), "cursorMode": Set(SceneParticleCursorMode.allCases.map(\.rawValue))], path: "particles")

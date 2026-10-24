@@ -806,6 +806,8 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var renderGraph: SceneRenderGraph?
     var placement: SceneLayerPlacement?
     var particles: SceneParticles?
+    /// Simulated particles, in place of `particles` on a particle layer.
+    var particleSystem: SceneParticleSystem?
     var text: SceneText?
     /// Grayscale depth map (white = near) in the scene folder; shifts each pixel by
     /// its depth for a 3D look.
@@ -852,6 +854,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         usesMediaArtwork = try container.decodeIfPresent(Bool.self, forKey: .usesMediaArtwork) ?? false
         capturesCanvas = (try? container.decode(Bool.self, forKey: .capturesCanvas)) ?? false
         particles = try? container.decodeIfPresent(SceneParticles.self, forKey: .particles)
+        particleSystem = try container.decodeIfPresent(SceneParticleSystem.self, forKey: .particleSystem)
         text = try container.decodeIfPresent(SceneText.self, forKey: .text)
         renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
         placement = try container.decodeIfPresent(SceneLayerPlacement.self, forKey: .placement)
@@ -913,6 +916,11 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         return copy
     }
 
+    /// A particle layer with something to draw.
+    var hasParticles: Bool {
+        kind == .particles && (particles != nil || particleSystem != nil)
+    }
+
     var hasDepth: Bool {
         depthFile != nil && depthStrength > 0
     }
@@ -960,13 +968,14 @@ struct SceneLayer: Codable, Equatable, Identifiable {
 
     var usesCursor: Bool {
         isVisible && (parallaxDepth > 0 || cursorMask != nil || (particles.map { $0.cursorMode != .none } ?? false)
+            || particleSystem?.usesPointer == true
             || (hasDepth && depthFollowsCursor) || renderGraph?.uses(.cursor) == true)
     }
 
     /// Particles move on their own; an image layer through its effects or the
     /// depth's own drift.
     var isAnimated: Bool {
-        !activeEffects.isEmpty || (isVisible && kind == .particles && particles != nil)
+        !activeEffects.isEmpty || (isVisible && hasParticles)
             || (isVisible && hasDepth && depthAutoMotion > 0) || (isVisible && (isKeyframed || motion != nil))
             || (isVisible && (renderGraph != nil || placement != nil || videoFile != nil))
     }

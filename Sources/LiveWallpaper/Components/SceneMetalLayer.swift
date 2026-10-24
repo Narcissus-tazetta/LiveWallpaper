@@ -472,6 +472,7 @@ final class SceneMetalLayer: CAMetalLayer {
             return
         }
         guard !isFrameInFlight else {
+            if let frame { renderer.holdParticleControls(from: frame) }
             needsRedrawAfterFrame = true
             return
         }
@@ -483,6 +484,7 @@ final class SceneMetalLayer: CAMetalLayer {
         guard let drawable = nextDrawable(),
               let commandBuffer = renderer.commandQueue.makeCommandBuffer()
         else {
+            if let frame { renderer.holdParticleControls(from: frame) }
             return
         }
         do {

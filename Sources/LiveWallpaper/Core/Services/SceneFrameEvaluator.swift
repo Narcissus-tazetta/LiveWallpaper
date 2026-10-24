@@ -14,6 +14,8 @@ struct SceneEvaluatedFrame {
     var rigPlayback: [UUID: [SceneSkeleton.Playback]] = [:]
     var order: [UUID: Int] = [:]
     var meshes: [SceneMeshFrame] = []
+    /// What scripts asked of simulated particles this frame; carried out once, when drawn.
+    var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
 }
 
 final class SceneFrameEvaluator {
@@ -111,6 +113,7 @@ final class SceneFrameEvaluator {
         var targetInputs: [UUID: SceneScriptInput] = [:]
         var warnings: [SceneScriptIssue] = []
         var meshes: [SceneMeshFrame] = []
+        var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
         for script in document.scripts where script.canRun && !script.targetLayerIDs(in: document.layers).isEmpty {
             if let issue = stopped[script.id] {
                 if failOnError { throw issue }
@@ -221,6 +224,8 @@ final class SceneFrameEvaluator {
                 try context.value(missing)
                 context.end(contextPosition, count: contextCount)
                 let output: SceneScriptOutput
+                // A held frame repeats the last output, whose particle requests were already carried out.
+                var heldOutput = false
                 do {
                     output = try runtime.evaluate(
                         script, input: context, elapsedTime: input.time, layers: document.layers, rigs: document.rigs, storage: storage,
@@ -236,6 +241,7 @@ final class SceneFrameEvaluator {
                     consecutiveTimeouts[script.id] = count
                     guard let held = lastOutputs[script.id] else { continue }
                     output = held
+                    heldOutput = true
                 }
                 warnings += output.warnings.map {
                     SceneScriptIssue(scriptID: script.id, name: script.name, message: $0, isPartial: true)
@@ -263,6 +269,7 @@ final class SceneFrameEvaluator {
                         adjustment.effects[layer.layer.effects[index].id]?.apply(to: &layer.layer.effects[index])
                     }
                     if let particles = adjustment.particles { particles.apply(to: &layer.layer.particles!) }
+                    if let control = adjustment.particleControl, !heldOutput { particleControls[id, default: .init()].append(control) }
                     if let text = adjustment.text { text.apply(to: &layer.layer.text!) }
                     result[id] = layer
                 }
@@ -271,7 +278,7 @@ final class SceneFrameEvaluator {
                 if failOnError { throw issue }
             }
         }
-        return SceneEvaluatedFrame(input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes)
+        return SceneEvaluatedFrame(input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, particleControls: particleControls)
     }
 
     /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets

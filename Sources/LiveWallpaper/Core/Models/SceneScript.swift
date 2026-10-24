@@ -105,6 +105,7 @@ struct SceneScriptAdjustment {
     var appearance: SceneScriptAppearanceValues?
     var effects: [UUID: SceneScriptEffectValues] = [:]
     var particles: SceneScriptParticleValues?
+    var particleControl: SceneParticleSimulator.Control?
     var text: SceneScriptTextValues?
 }
 

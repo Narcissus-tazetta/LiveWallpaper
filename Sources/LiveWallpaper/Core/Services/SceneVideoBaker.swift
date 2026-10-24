@@ -119,6 +119,9 @@ enum SceneVideoBaker {
         let (width, height) = SceneRenderer.outputSize(for: document, maxEdge: maxEdge)
         let fps = framesPerSecond
         let frameCount = max(document.loopSeconds, 1) * fps
+        // Simulated particles cannot loop; starting with them already spread out
+        // keeps the video from opening on an empty sky.
+        renderer.warmUpParticles(seconds: renderer.particleWarmUpSeconds, fps: fps)
 
         let tmpURL = outputURL.deletingLastPathComponent()
             .appendingPathComponent(".\(outputURL.lastPathComponent).\(UUID().uuidString).tmp.mp4")

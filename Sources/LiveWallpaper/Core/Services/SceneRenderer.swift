@@ -122,6 +122,11 @@ final class SceneRenderer {
         let effect: MTLRenderPipelineState
         let particlesOver: MTLRenderPipelineState
         let particlesAdd: MTLRenderPipelineState
+        /// Simulated particles, for an ordinary and a wide canvas.
+        let particleSystemOver: MTLRenderPipelineState
+        let particleSystemAdd: MTLRenderPipelineState
+        let particleSystemOverWide: MTLRenderPipelineState
+        let particleSystemAddWide: MTLRenderPipelineState
         /// Single-pass compositing; nil where the GPU cannot read its framebuffer.
         let compositeFetch: MTLRenderPipelineState?
         /// The same two for a high-dynamic-range canvas (half floats).
@@ -191,6 +196,13 @@ final class SceneRenderer {
     private var usedEffectScratchSizes: Set<SIMD2<Int>> = []
     private var captureTargets: [UUID: MTLTexture] = [:]
     private var particleTargets: [UUID: MTLTexture] = [:]
+    private var particleSimulators: [UUID: SceneParticleSimulator] = [:]
+    /// The input time the simulators last advanced to.
+    private var particleTime: Double?
+    /// Script requests from frames that were not drawn, applied with the next one.
+    private var pendingParticleControls: [UUID: SceneParticleSimulator.Control] = [:]
+    /// By file, with mipmaps: sprites are often drawn far smaller than their image.
+    private var particleTextures: [String: MTLTexture] = [:]
     private var accumulation: [MTLTexture] = []
     private var finishingCanvas: MTLTexture?
     private var finishingRenderer: SceneRenderGraphRenderer?
@@ -218,6 +230,7 @@ final class SceneRenderer {
         return solidBackground!
     }
     private let blackTexture: MTLTexture
+    private let whiteTexture: MTLTexture
     private let whiteMask: MTLTexture
     private let stillFlow: MTLTexture
     /// Fraction of the displayed size that effects are computed at. The baked video
@@ -255,6 +268,7 @@ final class SceneRenderer {
         self.videoPath = videoPath
         timeOfDay = document.timeOfDay(at: Date())
         blackTexture = try Self.makeSolidTexture(device: pipeline.device, pixelFormat: .rgba8Unorm, bytes: [0, 0, 0, 255])
+        whiteTexture = try Self.makeSolidTexture(device: pipeline.device, pixelFormat: .rgba8Unorm, bytes: [255, 255, 255, 255])
         whiteMask = try Self.makeSolidTexture(device: pipeline.device, pixelFormat: .r8Unorm, bytes: [255])
         stillFlow = try Self.makeSolidTexture(device: pipeline.device, pixelFormat: .rgba8Unorm, bytes: [128, 128, 0, 255])
         try loadTextures()
@@ -327,6 +341,7 @@ final class SceneRenderer {
 
     private func readsBackground(_ layer: SceneLayer) -> Bool {
         if graphRenderers[layer.id]?.graph.readsBackground == true { return true }
+        if layer.particleSystem?.refracts == true { return true }
         return layer.activeEffects.contains { graphRenderers[$0.id]?.graph.readsBackground == true }
     }
 
@@ -454,6 +469,7 @@ final class SceneRenderer {
         lastInversePlacements = lastPlacements.compactMapValues(Self.inversePlacement)
         lastPhase = Double(loopPhase(input.time))
         lastTime = input.time
+        advanceParticles(evaluated, input: input)
         let targetSize = SIMD2(Float(target.width), Float(target.height))
         let ordered = document.layers.enumerated().sorted { a, b in
             let left = evaluated.order[a.element.id] ?? a.offset
@@ -471,7 +487,7 @@ final class SceneRenderer {
         let visible = ordered.filter { layer in
             evaluated.layers[layer.id]!.layer.isVisible &&
                 (lastPlacements[layer.id] == nil || lastInversePlacements[layer.id] != nil) &&
-                (layer.capturesCanvas || (layer.kind == .particles ? layer.particles != nil : picture(for: layer) != nil))
+                (layer.capturesCanvas || (layer.kind == .particles ? layer.hasParticles : picture(for: layer) != nil))
         }
         if allowsSinglePassComposite, let fetch = pipeline.compositeFetch(for: target.pixelFormat) {
             enum Segment {
@@ -921,6 +937,9 @@ final class SceneRenderer {
                 uniforms: compositeUniforms ?? Self.passThroughUniforms
             )
             source = capture
+        } else if layer.kind == .particles, layer.particleSystem != nil {
+            source = try renderParticleSystem(layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize,
+                                              background: canvasSource ?? blackTexture)
         } else if layer.kind == .particles, let particles = layer.particles {
             source = try renderParticles(
                 particles, layerID: layer.id, commandBuffer: commandBuffer, input: input, targetSize: targetSize
@@ -1206,6 +1225,224 @@ final class SceneRenderer {
         return target
     }
 
+    // MARK: - Simulated particles
+
+    /// A longer gap (a pause, a hidden window) continues as if one short frame passed.
+    private static let longestParticleStep = 0.1
+
+    private struct ParticleSystemUniforms {
+        var column0: SIMD2<Float>
+        var column1: SIMD2<Float>
+        var origin: SIMD2<Float>
+        /// Canvas UV → the background texture's UV (the editor's zoom).
+        var viewOrigin: SIMD2<Float>
+        var viewSize: SIMD2<Float>
+        var canvasSize: SIMD2<Float>
+        var brightness: Float
+        var refractAmount: Float
+        var blend: Int32
+        var refracts: Int32
+        var hasNormal: Int32
+        var padding: Int32 = 0
+    }
+
+    /// Keeps what a script asked of the particles in a frame that will not be drawn
+    /// (the previous one is still on the GPU), so the next frame carries it out.
+    func holdParticleControls(from frame: SceneEvaluatedFrame) {
+        for (id, control) in frame.particleControls {
+            pendingParticleControls[id, default: .init()].append(control)
+        }
+    }
+
+    /// Runs the particles `seconds` ahead in frames of `fps`, so a bake starts with
+    /// them already spread out instead of just born.
+    func warmUpParticles(seconds: Double, fps: Int) {
+        let step = 1 / Double(max(fps, 1))
+        for layer in document.layers {
+            guard layer.kind == .particles, let system = layer.particleSystem else { continue }
+            let simulator = particleSimulator(for: layer, system: system)
+            var remaining = seconds
+            while remaining > 1e-9 {
+                simulator.advance(by: min(step, remaining), surroundings: .init())
+                remaining -= step
+            }
+        }
+    }
+
+    /// Seconds a bake should run its particles before its first frame: until the
+    /// longest-lived ones have come and gone once.
+    var particleWarmUpSeconds: Double {
+        min(document.layers.compactMap(\.particleSystem).map(\.longestLifetime).max() ?? 0, 60)
+    }
+
+    private func particleSimulator(for layer: SceneLayer, system: SceneParticleSystem) -> SceneParticleSimulator {
+        if let existing = particleSimulators[layer.id], existing.system == system { return existing }
+        let bytes = layer.id.uuid
+        let seed = [bytes.0, bytes.1, bytes.2, bytes.3, bytes.4, bytes.5, bytes.6, bytes.7]
+            .reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+        let simulator = SceneParticleSimulator(system: system, seed: seed)
+        particleSimulators[layer.id] = simulator
+        return simulator
+    }
+
+    private func advanceParticles(_ evaluated: SceneEvaluatedFrame, input: SceneFrameInput) {
+        var dt = 0.0
+        if let previous = particleTime {
+            dt = input.time - previous
+            // A loop (the editor's preview) starts over; its particles carry on.
+            if !input.isRealTime, dt < 0 { dt += Double(max(document.loopSeconds, 1)) }
+        }
+        particleTime = input.time
+        dt = min(max(dt, 0), Self.longestParticleStep)
+        for layer in document.layers {
+            guard layer.kind == .particles, let system = layer.particleSystem else { continue }
+            let simulator = particleSimulator(for: layer, system: system)
+            var control = pendingParticleControls.removeValue(forKey: layer.id) ?? .init()
+            if let requested = evaluated.particleControls[layer.id] { control.append(requested) }
+            let toCanvas = particleLocalToCanvas(evaluated.layers[layer.id]?.transform ?? layer.transform)
+            var surroundings = SceneParticleSimulator.Surroundings()
+            let determinant = simd_determinant(toCanvas)
+            if abs(determinant) > 1e-12 {
+                let toLayer = simd_inverse(toCanvas)
+                func local(_ uv: SIMD2<Float>) -> SIMD3<Double> {
+                    let point = toLayer * SIMD3(uv.x, uv.y, 1)
+                    return SIMD3(Double(point.x), Double(point.y), 0)
+                }
+                surroundings.pointer = input.cursor.map(local)
+                surroundings.canvasCorner = local(SIMD2(0, 1))
+            }
+            simulator.advance(by: dt, surroundings: surroundings)
+            simulator.apply(control)
+        }
+    }
+
+    /// The layer's pixels (y up, origin at the layer's position) → canvas UV.
+    private func particleLocalToCanvas(_ transform: SceneTransform) -> simd_float3x3 {
+        let width = Float(document.canvasWidth)
+        let height = Float(document.canvasHeight)
+        let radians = Float(transform.rotation * .pi / 180)
+        let c = cos(radians)
+        let s = sin(radians)
+        let scaleX = Float(transform.scale)
+        let scaleY = Float(transform.scaleY ?? transform.scale)
+        // The rotation turns clockwise on the canvas.
+        return simd_float3x3(columns: (
+            SIMD3(scaleX * c / width, scaleX * s / height, 0),
+            SIMD3(scaleY * s / width, -scaleY * c / height, 0),
+            SIMD3(0.5 + Float(transform.offsetX), 0.5 + Float(transform.offsetY), 1)
+        ))
+    }
+
+    /// Draws the particles already placed on a transparent texture the size of the
+    /// canvas on the target, which then goes through the layer's effects and composite.
+    private func renderParticleSystem(
+        _ layer: SceneLayer,
+        commandBuffer: MTLCommandBuffer,
+        input: SceneFrameInput,
+        targetSize: SIMD2<Float>,
+        background: MTLTexture
+    ) throws -> MTLTexture {
+        var canvasSize = targetSize / SIMD2(input.viewport.z, input.viewport.w)
+        canvasSize *= min(1, Float(Self.maxTextureEdge) / max(canvasSize.x, canvasSize.y))
+        let width = max(Int(canvasSize.x.rounded()), 16)
+        let height = max(Int(canvasSize.y.rounded()), 16)
+        // A wide canvas keeps sprites brightened past white.
+        let format: MTLPixelFormat = document.highDynamicRange ? .rgba16Float : .rgba8Unorm
+        let target: MTLTexture
+        if let existing = particleTargets[layer.id], existing.width == width, existing.height == height,
+           existing.pixelFormat == format
+        {
+            target = existing
+        } else {
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: format, width: width, height: height, mipmapped: false
+            )
+            descriptor.usage = [.renderTarget, .shaderRead]
+            descriptor.storageMode = .private
+            guard let texture = device.makeTexture(descriptor: descriptor) else {
+                throw RendererError.textureAllocationFailed
+            }
+            particleTargets[layer.id] = texture
+            target = texture
+        }
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = target
+        pass.colorAttachments[0].loadAction = .clear
+        pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        pass.colorAttachments[0].storeAction = .store
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
+            throw RendererError.textureAllocationFailed
+        }
+        defer { encoder.endEncoding() }
+        guard let simulator = particleSimulators[layer.id] else { return target }
+        let toCanvas = particleLocalToCanvas(currentTransform(layerID: layer.id) ?? layer.transform)
+        let wide = format == .rgba16Float
+        try simulator.forEach { node in
+            let system = node.system
+            let texture = system.textureFile.flatMap { particleTextures[$0] } ?? whiteTexture
+            var aspect = Double(texture.height) / Double(max(texture.width, 1))
+            if let sheet = system.sheet, sheet.columns > 0, sheet.rows > 0 {
+                aspect *= Double(sheet.columns) / Double(sheet.rows)
+            }
+            let instances = node.instances(aspect: aspect)
+            guard !instances.isEmpty else { return }
+            let length = instances.count * MemoryLayout<SceneParticleSimulator.Instance>.stride
+            guard let buffer = device.makeBuffer(bytes: instances, length: length, options: .storageModeShared) else {
+                throw RendererError.textureAllocationFailed
+            }
+            let normal = system.refraction?.normalFile.flatMap { particleTextures[$0] }
+            var uniforms = ParticleSystemUniforms(
+                column0: SIMD2(toCanvas.columns.0.x, toCanvas.columns.0.y),
+                column1: SIMD2(toCanvas.columns.1.x, toCanvas.columns.1.y),
+                origin: SIMD2(toCanvas.columns.2.x, toCanvas.columns.2.y),
+                viewOrigin: SIMD2(input.viewport.x, input.viewport.y),
+                viewSize: SIMD2(input.viewport.z, input.viewport.w),
+                canvasSize: SIMD2(Float(document.canvasWidth), Float(document.canvasHeight)),
+                brightness: Float(system.brightness),
+                refractAmount: Float(system.refraction?.amount ?? 0),
+                blend: Int32(SceneParticleSystem.Blend.allCases.firstIndex(of: system.blend)!),
+                refracts: system.refraction == nil ? 0 : 1,
+                hasNormal: normal == nil ? 0 : 1
+            )
+            let additive = system.blend == .add
+            encoder.setRenderPipelineState(wide
+                ? (additive ? pipeline.particleSystemAddWide : pipeline.particleSystemOverWide)
+                : (additive ? pipeline.particleSystemAdd : pipeline.particleSystemOver))
+            encoder.setVertexBuffer(buffer, offset: 0, index: 0)
+            encoder.setVertexBytes(&uniforms, length: MemoryLayout<ParticleSystemUniforms>.stride, index: 1)
+            encoder.setFragmentBytes(&uniforms, length: MemoryLayout<ParticleSystemUniforms>.stride, index: 1)
+            encoder.setFragmentTexture(texture, index: 0)
+            encoder.setFragmentTexture(background, index: 1)
+            encoder.setFragmentTexture(normal ?? whiteTexture, index: 2)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: instances.count)
+        }
+        return target
+    }
+
+    private func mipmapped(_ texture: MTLTexture) throws -> MTLTexture {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: texture.pixelFormat, width: texture.width, height: texture.height, mipmapped: true
+        )
+        descriptor.usage = [.shaderRead]
+        descriptor.storageMode = .private
+        guard let copy = device.makeTexture(descriptor: descriptor),
+              let commandBuffer = commandQueue.makeCommandBuffer(),
+              let blit = commandBuffer.makeBlitCommandEncoder()
+        else {
+            throw RendererError.textureAllocationFailed
+        }
+        blit.copy(
+            from: texture, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(),
+            sourceSize: MTLSize(width: texture.width, height: texture.height, depth: 1),
+            to: copy, destinationSlice: 0, destinationLevel: 0, destinationOrigin: MTLOrigin()
+        )
+        blit.generateMipmaps(for: copy)
+        blit.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        return copy
+    }
+
     private func loopPhase(_ time: Double) -> Float {
         let loop = Double(max(document.loopSeconds, 1))
         return Float((time.truncatingRemainder(dividingBy: loop) + loop).truncatingRemainder(dividingBy: loop) / loop)
@@ -1431,6 +1668,9 @@ final class SceneRenderer {
             placement = Placement(column0: SIMD2(inverse.columns.0.x, inverse.columns.0.y),
                                   column1: SIMD2(inverse.columns.1.x, inverse.columns.1.y),
                                   offset: SIMD2(center.x, center.y) - 0.5)
+        } else if layer.particleSystem != nil {
+            // Simulated particles are drawn already placed on the canvas.
+            placement = self.placement(for: .identity)
         } else {
             placement = self.placement(for: placedTransform(layer, drawn.transform))
         }
@@ -1594,6 +1834,21 @@ final class SceneRenderer {
         effectLayerTargets = effectLayerTargets.filter { layerIDs.contains($0.key) }
         captureTargets = captureTargets.filter { layerIDs.contains($0.key) }
         particleTargets = particleTargets.filter { layerIDs.contains($0.key) }
+        particleSimulators = particleSimulators.filter { id, simulator in
+            document.layers.first { $0.id == id }?.particleSystem == simulator.system
+        }
+        pendingParticleControls = pendingParticleControls.filter { particleSimulators[$0.key] != nil }
+        let spriteFiles = Set(document.layers.compactMap(\.particleSystem).flatMap(\.textureFiles))
+        particleTextures = particleTextures.filter { spriteFiles.contains($0.key) }
+        let normalFiles = Set(document.layers.compactMap(\.particleSystem).flatMap(\.normalFiles))
+        for file in spriteFiles where particleTextures[file] == nil {
+            // Normal maps are opaque data; sprites keep their soft edge.
+            let alpha: ImageAlpha = normalFiles.contains(file) ? .straightDropped : .straightKept
+            let image = try Self.cachedTexture(url: fileURL(file), variant: "rgba-\(alpha)") { url in
+                try Self.decodeRGBA(url: url, device: device, alpha: alpha)
+            }
+            particleTextures[file] = try mipmapped(image)
+        }
         var graphs: [UUID: SceneRenderGraph] = [:]
         for layer in document.layers {
             if let graph = layer.renderGraph { graphs[layer.id] = graph }
@@ -1879,6 +2134,10 @@ final class SceneRenderer {
             effect: state(fragment: "scene_effect", format: .rgba8Unorm),
             particlesOver: state(vertex: "particle_vertex", fragment: "particle_fragment", format: .rgba8Unorm, additive: false),
             particlesAdd: state(vertex: "particle_vertex", fragment: "particle_fragment", format: .rgba8Unorm, additive: true),
+            particleSystemOver: state(vertex: "particle_system_vertex", fragment: "particle_system_fragment", format: .rgba8Unorm, additive: false),
+            particleSystemAdd: state(vertex: "particle_system_vertex", fragment: "particle_system_fragment", format: .rgba8Unorm, additive: true),
+            particleSystemOverWide: state(vertex: "particle_system_vertex", fragment: "particle_system_fragment", format: .rgba16Float, additive: false),
+            particleSystemAddWide: state(vertex: "particle_system_vertex", fragment: "particle_system_fragment", format: .rgba16Float, additive: true),
             compositeFetch: compositeFetch,
             compositeWide: state(fragment: "scene_composite", format: .rgba16Float),
             compositeFetchWide: compositeFetchWide
@@ -2756,6 +3015,90 @@ final class SceneRenderer {
         }
         float alpha = clamp(shape, 0.0, 1.0) * in.alpha;
         return float4(color * alpha, alpha);
+    }
+
+    // MARK: simulated particles
+
+    struct ParticleSystemInstance {
+        float2 center;
+        float2 right;
+        float2 up;
+        float2 uvOrigin;
+        float2 uvSize;
+        float4 color;
+    };
+
+    struct ParticleSystemUniforms {
+        float2 column0;
+        float2 column1;
+        float2 origin;
+        float2 viewOrigin;
+        float2 viewSize;
+        float2 canvasSize;
+        float brightness;
+        float refractAmount;
+        int blend;
+        int refracts;
+        int hasNormal;
+        int padding;
+    };
+
+    struct ParticleSystemOut {
+        float4 position [[position]];
+        float2 uv;
+        float4 color;
+        float2 canvasUV;
+        // The sprite's right and up on the canvas (x right, y up), normalized:
+        // (right.x, up.x, right.y, up.y) times the refraction amount.
+        float4 tangents;
+    };
+
+    vertex ParticleSystemOut particle_system_vertex(uint vid [[vertex_id]],
+                                                    uint iid [[instance_id]],
+                                                    const device ParticleSystemInstance *instances [[buffer(0)]],
+                                                    constant ParticleSystemUniforms &u [[buffer(1)]]) {
+        ParticleSystemInstance p = instances[iid];
+        // The sprite's texture coordinates, v down from its top edge.
+        float2 corner = float2((vid & 1u) ? 1.0 : 0.0, (vid & 2u) ? 1.0 : 0.0);
+        float2 local = p.center + p.right * (corner.x - 0.5) - p.up * (corner.y - 0.5);
+        float2 uv = u.origin + u.column0 * local.x + u.column1 * local.y;
+        ParticleSystemOut out;
+        out.position = float4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 0.0, 1.0);
+        out.uv = p.uvOrigin + corner * p.uvSize;
+        out.color = p.color;
+        out.canvasUV = uv;
+        float2 pixels = float2(u.canvasSize.x, -u.canvasSize.y);
+        float2 right = (u.column0 * p.right.x + u.column1 * p.right.y) * pixels;
+        float2 up = (u.column0 * p.up.x + u.column1 * p.up.y) * pixels;
+        right = length(right) > 0.0 ? normalize(right) : float2(1.0, 0.0);
+        up = length(up) > 0.0 ? normalize(up) : float2(0.0, 1.0);
+        out.tangents = float4(right.x, up.x, right.y, up.y) * u.refractAmount;
+        return out;
+    }
+
+    fragment float4 particle_system_fragment(ParticleSystemOut in [[stage_in]],
+                                             constant ParticleSystemUniforms &u [[buffer(1)]],
+                                             texture2d<float> sprite [[texture(0)]],
+                                             texture2d<float> background [[texture(1)]],
+                                             texture2d<float> normals [[texture(2)]]) {
+        constexpr sampler s(filter::linear, mip_filter::linear, address::clamp_to_edge);
+        float4 color = in.color * sprite.sample(s, in.uv);
+        if (u.refracts != 0) {
+            float2 offset = float2(0.0);
+            if (u.hasNormal != 0) {
+                float3 n = normals.sample(s, in.uv).rgb;
+                float2 normal = n.xy * 2.0 - 1.0;
+                offset = (in.tangents.xy * normal.x + in.tangents.zw * normal.y) * n.z * in.color.a;
+            }
+            // The offset has y up; canvas UV runs down.
+            float2 canvasUV = in.canvasUV + float2(offset.x, -offset.y);
+            color.rgb *= background.sample(s, (canvasUV - u.viewOrigin) / u.viewSize).rgb;
+        }
+        float3 rgb = color.rgb * u.brightness;
+        // Opaque particles cover what is below whatever their alpha.
+        if (u.blend == 0) { return float4(rgb, 1.0); }
+        float alpha = saturate(color.a);
+        return float4(rgb * alpha, alpha);
     }
     """
 }

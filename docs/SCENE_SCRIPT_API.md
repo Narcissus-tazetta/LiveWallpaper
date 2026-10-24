@@ -116,6 +116,22 @@ function update(ctx) {
 
 粒子の調整は`preset`, `cursorMode`, `seed`, `count`, `size`, `cycles`, `direction`, `sway`, `opacity`, `color`。`preset`は`snow/rain/petals/fireflies/dust/embers/bubbles/stars`、`cursorMode`は`none/repel/attract`。シードは整数0〜2147483647、数は整数5〜2000、周期は整数1〜12、方向は-3600〜3600度、それ以外の数値は0〜1。色は`{red,green,blue,alpha}`の全項目が必要。プリセットの切り替えは他の数値を維持する。必要に応じて`appearance.blendMode`も設定する。
 
+時間とともに生まれて消える粒子(取り込んだシーンの粒子レイヤー)は、上の項目ではなく、発生の指示を受け付ける。この対象の入力の`particles`はnull。
+
+```js
+function update(ctx) {
+  return ctx.targets.map(layer => ({
+    id: layer.id,
+    particles: {
+      events: ctx.pointerPresses.filter(press => press.isDown).map(() => ({ emit: 20 })),
+      emitting: ctx.timeOfDay !== "night",
+    },
+  }));
+}
+```
+
+`events`は順に実行する指示の配列(最大1000件)で、各要素は`{emit: 数}`(整数1〜100000。上限数を超える分は出ない)か`{clear: true}`(子の粒子も含めてすべて消す)。`emitting`をfalseにすると発生だけを止め、出ている粒子は動き続けて寿命で消える。trueで再開し、未指定なら前の状態を保つ。指示はそのフレームが描かれるときに一度だけ実行される。
+
 複数スクリプトは一覧順に評価する。位置などは上の合成規則を使い、同じエフェクト／粒子の項目は後の指定で上書きする。1回の出力内で同じ対象やエフェクトのIDを重複させることはできない。
 
 ## 表示・合成・立体感・カーソルマスク

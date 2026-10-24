@@ -1,0 +1,127 @@
+@testable import LiveWallpaper
+import XCTest
+
+/// The behaviours measured in the scenes this follows, at their 30 updates a second.
+final class SceneParticleSystemTests: XCTestCase {
+    private let step = 1.0 / 30
+
+    private func system(_ change: (inout SceneParticleSystem) -> Void = { _ in }) -> SceneParticleSystem {
+        var system = SceneParticleSystem()
+        system.emitters = [.init(shape: .box)]
+        system.initial.lifetime = .fixed(100)
+        system.initial.size = .fixed(16)
+        system.behaviors = [.movement(gravity: [0, 0, 0], drag: 0)]
+        change(&system)
+        return system
+    }
+
+    private func run(_ simulator: SceneParticleSimulator, seconds: Double) {
+        for _ in 0 ..< Int((seconds / step).rounded()) {
+            simulator.advance(by: step, surroundings: .init())
+        }
+    }
+
+    func testEmitAddsClearRemovesAndTheLimitHolds() {
+        let simulator = SceneParticleSimulator(system: system { $0.maxCount = 8 }, seed: 1)
+        simulator.apply(.init(events: [.emit(3)]))
+        XCTAssertEqual(simulator.count, 3)
+        simulator.apply(.init(events: [.emit(10)]))
+        XCTAssertEqual(simulator.count, 8)
+        simulator.apply(.init(events: [.clear, .emit(2)]))
+        XCTAssertEqual(simulator.count, 2)
+    }
+
+    func testStoppedEmittersKeepTheParticlesMovingAndAging() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.emitters[0].rate = 30
+            $0.initial.lifetime = .fixed(1)
+            $0.initial.velocity = .init([20, 0, 0], [20, 0, 0])
+        }, seed: 1)
+        simulator.apply(.init(emitting: false))
+        simulator.apply(.init(events: [.emit(1)]))
+        run(simulator, seconds: 0.5)
+        XCTAssertEqual(simulator.instances(aspect: 1).first!.center.x, 10, accuracy: 0.5)
+        run(simulator, seconds: 0.6)
+        XCTAssertEqual(simulator.count, 0)
+    }
+
+    func testDragAt30FramesASecondDecaysAtAbout0_82PerSecondPerDrag() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.initial.velocity = .init([50, 0, 0], [50, 0, 0])
+            $0.behaviors = [.movement(gravity: [0, 0, 0], drag: 1)]
+        }, seed: 1)
+        simulator.apply(.init(events: [.emit(1)]))
+        run(simulator, seconds: 2)
+        let k = 0.82
+        XCTAssertEqual(Double(simulator.instances(aspect: 1).first!.center.x), 50 / k * (1 - exp(-k * 2)), accuracy: 2)
+    }
+
+    func testADragThatStopsAParticleInOneFrameLeavesOneFrameOfTravel() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.initial.velocity = .init([600, 0, 0], [600, 0, 0])
+            $0.behaviors = [.movement(gravity: [0, 0, 0], drag: 80)]
+        }, seed: 1)
+        simulator.apply(.init(events: [.emit(1)]))
+        run(simulator, seconds: 1)
+        XCTAssertEqual(simulator.instances(aspect: 1).first!.center.x, 20, accuracy: 0.01)
+    }
+
+    func testSpritesAreDrawnAtHalfTheirSizeTimesTheSizeChange() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.initial.size = .fixed(30)
+            $0.initial.lifetime = .fixed(2)
+            $0.behaviors.append(.sizeChange(.init(startTime: 0, endTime: 0.5, startValue: 1, endValue: 0)))
+        }, seed: 1)
+        simulator.apply(.init(events: [.emit(1)]))
+        XCTAssertEqual(simulator.instances(aspect: 1).first!.right.x, 15, accuracy: 0.01)
+        run(simulator, seconds: 0.4)
+        XCTAssertEqual(simulator.instances(aspect: 1).first!.right.x, 9, accuracy: 0.01)
+        run(simulator, seconds: 0.7)
+        XCTAssertTrue(simulator.instances(aspect: 1).isEmpty)
+        XCTAssertEqual(simulator.count, 1)
+    }
+
+    func testAlphaFadeHoldsTheHigherFadeWhereTheyOverlap() {
+        XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0.5, fadeOut: 0.5, at: 0.25), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0.5, fadeOut: 0.5, at: 0.75), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0, fadeOut: 0, at: 0.25), 0.75, accuracy: 1e-9)
+        // fadeIn 0.7, fadeOut 0.3: high in between, then the fade-out line.
+        XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0.7, fadeOut: 0.3, at: 0.31), 0.986, accuracy: 0.001)
+        XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0.7, fadeOut: 0.3, at: 0.75), 0.357, accuracy: 0.001)
+    }
+
+    func testTrailLengthFollowsTheSpeedWithinItsBounds() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.initial.size = .fixed(20)
+            $0.initial.velocity = .init([100, 0, 0], [100, 0, 0])
+            $0.renderer = .trail(length: 0.02, minLength: 5, maxLength: 100)
+        }, seed: 1)
+        simulator.apply(.init(events: [.emit(1)]))
+        let sprite = simulator.instances(aspect: 1).first!
+        XCTAssertEqual(sprite.up.x, 50, accuracy: 0.01)
+        XCTAssertEqual(abs(sprite.right.y), 10, accuracy: 0.01)
+    }
+
+    func testRotationTurnsClockwise() {
+        let axes = SceneParticleSimulator.axes(rotation: [0, 0, .pi / 6])
+        XCTAssertEqual(atan2(axes.right.y, axes.right.x), -.pi / 6, accuracy: 1e-9)
+    }
+
+    func testFollowingChildrenMoveWithTheirParentWhileItLives() {
+        var child = SceneParticleSystem()
+        child.emitters = [.init(shape: .box, burst: 1)]
+        child.initial.lifetime = .fixed(5)
+        child.behaviors = [.movement(gravity: [0, 0, 0], drag: 0)]
+        let simulator = SceneParticleSimulator(system: system {
+            $0.initial.lifetime = .fixed(1)
+            $0.initial.velocity = .init([100, 0, 0], [100, 0, 0])
+            $0.children = [.init(trigger: .follow, system: .init(child))]
+        }, seed: 1)
+        simulator.apply(.init(events: [.emit(1)]))
+        run(simulator, seconds: 0.5)
+        var sprites: [SceneParticleSimulator.Instance] = []
+        simulator.forEach { sprites += $0.instances(aspect: 1) }
+        XCTAssertEqual(sprites.count, 2)
+        XCTAssertEqual(sprites[0].center.x, sprites[1].center.x, accuracy: 0.01)
+    }
+}
