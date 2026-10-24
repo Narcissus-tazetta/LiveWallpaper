@@ -152,10 +152,12 @@ final class SceneScriptRuntime {
             var meshes: [SceneMeshFrame] = []
             var models: [SceneModelLayerFrame] = []
             var camera: SceneCameraState?
+            var instances: [SceneScriptInstance] = []
             // A module bundle runs several independent scripts; one that failed is
             // reported here while the rest keep running.
             if script.modules != nil, let wrapped = output as? [String: Any] {
-                try Self.keys(wrapped, allowed: ["adjustments", "warnings", "camera"], path: "output")
+                try Self.keys(wrapped, allowed: ["adjustments", "warnings", "camera", "instances"], path: "output")
+                instances = try wrapped["instances"].map { try Self.readInstances($0, script: script, layers: layers, rigs: rigs) } ?? []
                 camera = try wrapped["camera"].map(Self.readCamera)
                 guard let list = wrapped["warnings"] as? [String], list.count <= 16,
                       list.allSatisfy({ $0.utf8.count <= 1024 }) else {
@@ -170,7 +172,8 @@ final class SceneScriptRuntime {
                 output = wrapped["adjustments"] as Any
             }
             return SceneScriptOutput(adjustments: try Self.readOutput(output, script: script, layers: layers, rigs: rigs),
-                                     warnings: warnings, meshes: meshes, models: models, camera: camera)
+                                     warnings: warnings, meshes: meshes, models: models, camera: camera,
+                                     instances: instances)
         } catch let failure as SceneScriptIssue {
             throw issue(failure.message, script: script)
         } catch {
@@ -400,6 +403,27 @@ final class SceneScriptRuntime {
             meshes.append(SceneMeshFrame(parent: parent, material: material, vertices: vertices))
         }
         return meshes
+    }
+
+    /// Each entry reads as an adjustment of its template, under an ID of its own.
+    private static func readInstances(_ raw: Any, script: SceneScript, layers: [SceneLayer],
+                                      rigs: [UUID: SceneSkeleton]) throws -> [SceneScriptInstance] {
+        guard let entries = raw as? [Any], entries.count <= 4096 else {
+            throw failure("output.instances: expected at most 4096 entries")
+        }
+        let templateIDs = Set(layers.map(\.id))
+        var seen = Set<UUID>()
+        return try entries.map { entry in
+            var item = try object(entry, path: "output.instances")
+            guard let text = item["id"] as? String, let id = UUID(uuidString: text), !templateIDs.contains(id),
+                  seen.insert(id).inserted, let templateText = item.removeValue(forKey: "template") as? String
+            else { throw failure("output.instances: expected a unique ID of its own and a template") }
+            item["id"] = templateText
+            guard let (template, adjustment) = try readOutput([item], script: script, layers: layers, rigs: rigs).first else {
+                throw failure("output.instances: empty")
+            }
+            return SceneScriptInstance(id: id, template: template, adjustment: adjustment)
+        }
     }
 
     private static func readCamera(_ raw: Any) throws -> SceneCameraState {

@@ -104,6 +104,15 @@ struct SceneScriptOutput {
     var meshes: [SceneMeshFrame] = []
     var models: [SceneModelLayerFrame] = []
     var camera: SceneCameraState?
+    var instances: [SceneScriptInstance] = []
+}
+
+/// A layer a script made from one of the scene's: drawn like `template`, adjusted on
+/// its own.
+struct SceneScriptInstance {
+    var id: UUID
+    var template: UUID
+    var adjustment: SceneScriptAdjustment
 }
 
 /// The camera as scripts left it this frame.

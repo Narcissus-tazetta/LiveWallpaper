@@ -207,6 +207,43 @@ static JSValue emit_models(JSContext *context, JSValueConst this_value, int coun
     return JS_UNDEFINED;
 }
 
+/* evalModule(name, source): loads one more module into the running bundle (a layer a
+   script made may bring its own script) and returns its namespace. Its imports come
+   from the bundle. */
+static JSValue eval_module(JSContext *context, JSValueConst this_value, int count, JSValueConst *values) {
+    (void)this_value;
+    if (count != 2 || !JS_IsString(values[0]) || !JS_IsString(values[1]))
+        return JS_ThrowTypeError(context, "evalModule expects a name and a source");
+    size_t name_length, source_length;
+    const char *name = JS_ToCStringLen(context, &name_length, values[0]);
+    if (!name) return JS_EXCEPTION;
+    const char *source = JS_ToCStringLen(context, &source_length, values[1]);
+    if (!source) { JS_FreeCString(context, name); return JS_EXCEPTION; }
+    JSValue module = source_length > 65536 ? JS_ThrowRangeError(context, "Module source exceeds its limit")
+        : JS_Eval(context, source, source_length, name, JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+    JS_FreeCString(context, source);
+    JS_FreeCString(context, name);
+    if (JS_IsException(module)) return module;
+    if (JS_ResolveModule(context, module) < 0) { JS_FreeValue(context, module); return JS_EXCEPTION; }
+    JSModuleDef *definition = JS_VALUE_GET_PTR(module);
+    JSValue result = JS_EvalFunction(context, module);
+    if (JS_IsException(result)) return result;
+    if (JS_IsPromise(result)) {
+        int state = JS_PromiseState(context, result);
+        if (state == JS_PROMISE_REJECTED) {
+            JSValue exception = JS_PromiseResult(context, result);
+            JS_FreeValue(context, result);
+            return JS_Throw(context, exception);
+        }
+        if (state == JS_PROMISE_PENDING) {
+            JS_FreeValue(context, result);
+            return JS_ThrowTypeError(context, "Asynchronous module initialization is not supported");
+        }
+    }
+    JS_FreeValue(context, result);
+    return JS_GetModuleNamespace(context, definition);
+}
+
 /* storage(operation, global, key, json): the host's saved values, read and written
    synchronously so another instance of the scene sees a write in the same frame. */
 static JSValue storage(JSContext *context, JSValueConst this_value, int count, JSValueConst *values) {
@@ -269,6 +306,7 @@ static JSContext *new_context(LWJSProgram *program) {
     JS_SetPropertyStr(context, global, "console", console);
     JS_SetPropertyStr(context, global, "__lwjs_emitMesh", JS_NewCFunction(context, emit_mesh, "emitMesh", 4));
     JS_SetPropertyStr(context, global, "__lwjs_emitModels", JS_NewCFunction(context, emit_models, "emitModels", 1));
+    JS_SetPropertyStr(context, global, "__lwjs_evalModule", JS_NewCFunction(context, eval_module, "evalModule", 2));
     JS_SetPropertyStr(context, global, "__lwjs_storage", JS_NewCFunction(context, storage, "storage", 4));
     JS_FreeValue(context, global);
     return context;

@@ -463,9 +463,11 @@ final class SceneRenderer {
         rigs!.setPlaybackOverrides(evaluated.rigPlayback)
         lastFrame = evaluated
         try prepareMediaArtwork(input.media)
-        lastPlacements = placementEvaluator!.evaluate(time: input.time)
-        for (id, matrix) in lastPlacements {
-            let layer = evaluated.layers[id]!
+        let placements = placementEvaluator!.evaluate(time: input.time)
+        lastPlacements = [:]
+        // A copy a script made is placed like its template, moved by its own transform.
+        for (id, template) in evaluated.instances.map({ ($0.key, $0.value) }) + placements.keys.map({ ($0, $0) }) {
+            guard let matrix = placements[template], let layer = evaluated.layers[id] else { continue }
             let reference = layer.layer.placement!.referenceTransform
             lastPlacements[id] = placementMatrix(layer.transform) * simd_inverse(placementMatrix(reference)) * matrix
         }
@@ -474,7 +476,9 @@ final class SceneRenderer {
         lastTime = input.time
         advanceParticles(evaluated, input: input)
         let targetSize = SIMD2(Float(target.width), Float(target.height))
-        let ordered = document.layers.enumerated().sorted { a, b in
+        let copies = evaluated.instances.keys.sorted { evaluated.order[$0] ?? 0 < evaluated.order[$1] ?? 0 }
+            .compactMap { evaluated.layers[$0]?.layer }
+        let ordered = (document.layers + copies).enumerated().sorted { a, b in
             let left = evaluated.order[a.element.id] ?? a.offset
             let right = evaluated.order[b.element.id] ?? b.offset
             return left == right ? a.offset < b.offset : left < right
@@ -495,7 +499,7 @@ final class SceneRenderer {
         let visible = modelRenderer == nil || evaluated.models.isEmpty
             ? visibleLayers.map(Drawn.layer)
             : Self.interleave(visibleLayers, models: evaluated.models, place: { id in
-                evaluated.order[id] ?? document.layers.firstIndex { $0.id == id }!
+                evaluated.order[id] ?? document.layers.firstIndex { $0.id == id } ?? 0
             })
         let views = modelViews(camera: evaluated.camera, input: input, target: target)
         // The frame's model layers share one depth buffer; the first pass clears it.

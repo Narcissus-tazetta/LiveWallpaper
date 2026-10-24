@@ -1,6 +1,9 @@
 import Foundation
 
 struct SceneEvaluatedFrame {
+    /// Layers scripts made from the scene's own, each to its template; they are in
+    /// `layers` and `order` under their own IDs.
+    var instances: [UUID: UUID] = [:]
     struct Layer {
         var layer: SceneLayer
         var transform: SceneTransform
@@ -69,6 +72,23 @@ final class SceneFrameEvaluator {
         self.storage = storage
     }
 
+    private static func apply(_ adjustment: SceneScriptAdjustment, to layer: inout SceneEvaluatedFrame.Layer) {
+        layer.transform.offsetX += adjustment.values.offsetX
+        layer.transform.offsetY += adjustment.values.offsetY
+        layer.transform.rotation += adjustment.values.rotation
+        if layer.transform.scaleY != nil || adjustment.values.scaleY != nil {
+            layer.transform.scaleY = (layer.transform.scaleY ?? layer.transform.scale) * (adjustment.values.scaleY ?? adjustment.values.scale)
+        }
+        layer.transform.scale *= adjustment.values.scale
+        layer.opacity *= adjustment.values.opacity
+        layer.color = layer.color.combined(with: adjustment.values)
+        adjustment.appearance?.apply(to: &layer.layer)
+        for index in layer.layer.effects.indices {
+            adjustment.effects[layer.layer.effects[index].id]?.apply(to: &layer.layer.effects[index])
+        }
+        if let text = adjustment.text { text.apply(to: &layer.layer.text!) }
+    }
+
     func evaluate(_ document: SceneDocument, input: SceneFrameInput, timeOfDay: SceneTimeOfDay, failOnError: Bool = true) throws -> SceneEvaluatedFrame {
         if previousScripts != document.scripts {
             stopped = [:]
@@ -117,6 +137,7 @@ final class SceneFrameEvaluator {
         var meshes: [SceneMeshFrame] = []
         var models: [SceneModelLayerFrame] = []
         var camera: SceneCameraState?
+        var instances: [UUID: UUID] = [:]
         var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
         // A converted bundle runs even with no layer of its own to drive: it may draw
         // what it makes.
@@ -277,30 +298,29 @@ final class SceneFrameEvaluator {
                         rigPlayback[rigID] = playback
                     }
                     var layer = result[id]!
-                    layer.transform.offsetX += adjustment.values.offsetX
-                    layer.transform.offsetY += adjustment.values.offsetY
-                    layer.transform.rotation += adjustment.values.rotation
-                    if layer.transform.scaleY != nil || adjustment.values.scaleY != nil {
-                        layer.transform.scaleY = (layer.transform.scaleY ?? layer.transform.scale) * (adjustment.values.scaleY ?? adjustment.values.scale)
-                    }
-                    layer.transform.scale *= adjustment.values.scale
-                    layer.opacity *= adjustment.values.opacity
-                    layer.color = layer.color.combined(with: adjustment.values)
-                    adjustment.appearance?.apply(to: &layer.layer)
-                    for index in layer.layer.effects.indices {
-                        adjustment.effects[layer.layer.effects[index].id]?.apply(to: &layer.layer.effects[index])
-                    }
+                    Self.apply(adjustment, to: &layer)
                     if let particles = adjustment.particles { particles.apply(to: &layer.layer.particles!) }
                     if let control = adjustment.particleControl, !heldOutput { particleControls[id, default: .init()].append(control) }
-                    if let text = adjustment.text { text.apply(to: &layer.layer.text!) }
                     result[id] = layer
+                }
+                // A copy starts from its template as the scene places it, before scripts.
+                for instance in output.instances {
+                    guard var layer = base[instance.template], layer.layer.particleSystem == nil else { continue }
+                    layer.layer.id = instance.id
+                    // An effect with a render graph keeps state under its own ID, which a
+                    // copy would advance a second time each frame.
+                    layer.layer.effects.removeAll { $0.renderGraph != nil }
+                    Self.apply(instance.adjustment, to: &layer)
+                    result[instance.id] = layer
+                    if let position = instance.adjustment.order { order[instance.id] = position }
+                    instances[instance.id] = instance.template
                 }
             } catch let issue as SceneScriptIssue {
                 stop(issue)
                 if failOnError { throw issue }
             }
         }
-        return SceneEvaluatedFrame(input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, camera: camera, particleControls: particleControls)
+        return SceneEvaluatedFrame(instances: instances, input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, camera: camera, particleControls: particleControls)
     }
 
     /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets
