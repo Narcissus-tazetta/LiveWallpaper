@@ -526,6 +526,11 @@ final class SceneRenderer {
                 )
             }
         }
+        if document.camera?.perspective == true {
+            try compositeInSpace(visible, evaluated: evaluated, views: views, target: target,
+                                 commandBuffer: commandBuffer, input: input, targetSize: targetSize)
+            return
+        }
         if allowsSinglePassComposite, let fetch = pipeline.compositeFetch(for: target.pixelFormat) {
             enum Segment {
                 case batch([SceneLayer])
@@ -758,6 +763,70 @@ final class SceneRenderer {
         let layerTexture: MTLTexture
         let uniforms: LayerUniforms
         let depth: MTLTexture?
+    }
+
+    /// A scene seen through its camera: each layer's picture, effects applied, stands as
+    /// a plane in the scene; planes and model layers draw in order over one depth buffer.
+    private func compositeInSpace(
+        _ items: [Drawn], evaluated: SceneEvaluatedFrame,
+        views: (flat: SceneModelRenderer.View, perspective: SceneModelRenderer.View), target: MTLTexture,
+        commandBuffer: MTLCommandBuffer, input: SceneFrameInput, targetSize: SIMD2<Float>
+    ) throws {
+        if modelRenderer == nil { modelRenderer = try SceneModelRenderer(materials: [], device: device) }
+        enum Prepared { case model(SceneModelLayerFrame), plane(MTLTexture, SceneEvaluatedFrame.Layer, SceneSpace) }
+        var prepared: [Prepared] = []
+        for item in items {
+            switch item {
+            case let .model(model): prepared.append(.model(model))
+            case let .layer(layer):
+                guard var space = layer.space else { continue }
+                if layer.kind == .text {
+                    // The plane is the drawn string's picture, centred away from where its anchor sits.
+                    guard let text = textTextures[layer.id], text.texture != nil else { continue }
+                    space.width = text.canvasSize.x
+                    space.height = text.canvasSize.y
+                    space.offsetX = text.centerOffset.x
+                    space.offsetY = text.centerOffset.y
+                }
+                let drawn = evaluated.layers[layer.id]!
+                let picture = try applyEffects(to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize)
+                prepared.append(.plane(picture, drawn, space))
+            }
+        }
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = target
+        pass.colorAttachments[0].loadAction = .clear
+        pass.colorAttachments[0].clearColor = backgroundClearColor
+        pass.colorAttachments[0].storeAction = .store
+        pass.depthAttachment.texture = try modelDepth(width: target.width, height: target.height)
+        pass.depthAttachment.loadAction = .clear
+        pass.depthAttachment.clearDepth = 1
+        pass.depthAttachment.storeAction = .dontCare
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
+            throw RendererError.textureAllocationFailed
+        }
+        defer { encoder.endEncoding() }
+        for item in prepared {
+            switch item {
+            case let .model(model):
+                try modelRenderer!.draw(
+                    model, view: model.perspective ? views.perspective : views.flat, images: modelImages, frame: .init(),
+                    time: input.time, cursor: input.cursor, audio: input.audio, format: target.pixelFormat, encoder: encoder
+                )
+            case let .plane(picture, drawn, space):
+                let tint = drawn.layer.tint
+                let opacity = Float(min(max(drawn.layer.opacity * tint.alpha * drawn.opacity, 0), 1))
+                let local = simd_float4x4(columns: (
+                    SIMD4(Float(space.width), 0, 0, 0), SIMD4(0, Float(space.height), 0, 0), SIMD4(0, 0, 1, 0),
+                    SIMD4(Float(space.offsetX), Float(space.offsetY), 0, 1)
+                ))
+                try modelRenderer!.drawPlane(
+                    picture, transform: views.flat.viewProjection * (drawn.world ?? space.matrix) * local,
+                    color: SIMD4(Float(tint.red), Float(tint.green), Float(tint.blue), opacity), space: space,
+                    format: target.pixelFormat, encoder: encoder
+                )
+            }
+        }
     }
 
     /// How model layers are seen this frame: `flat` for those laid out on the canvas,

@@ -1,4 +1,5 @@
 import Foundation
+import simd
 
 struct SceneEvaluatedFrame {
     /// Layers scripts made from the scene's own, each to its template; they are in
@@ -9,6 +10,8 @@ struct SceneEvaluatedFrame {
         var transform: SceneTransform
         var opacity: Double
         var color: SceneLinkValues
+        /// In a scene seen through its camera: where scripts placed the layer, when they did.
+        var world: simd_float4x4?
     }
     var input: SceneFrameInput
     var layers: [UUID: Layer]
@@ -87,6 +90,7 @@ final class SceneFrameEvaluator {
             adjustment.effects[layer.layer.effects[index].id]?.apply(to: &layer.layer.effects[index])
         }
         if let text = adjustment.text { text.apply(to: &layer.layer.text!) }
+        if let world = adjustment.world { layer.world = world }
     }
 
     func evaluate(_ document: SceneDocument, input: SceneFrameInput, timeOfDay: SceneTimeOfDay, failOnError: Bool = true) throws -> SceneEvaluatedFrame {

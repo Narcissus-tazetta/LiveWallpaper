@@ -307,7 +307,7 @@ final class SceneScriptRuntime {
 
     /// Built once: readOutput runs for every target of every frame.
     private enum OutputKeys {
-        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text"]
+        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text", "world"]
         static let appearance: Set = ["isVisible", "tint", "blendMode", "parallaxDepth", "depthStrength", "depthFollowsCursor",
                                       "depthAutoMotion", "depthAutoCycles", "cursorMask", "clearCursorMask"]
         static let appearanceRanges: [String: ClosedRange<Double>] = [
@@ -575,6 +575,15 @@ final class SceneScriptRuntime {
                 try numbers(item, ranges: ["order": 0 ... 1_000_000_000], path: "output")
                 try integers(item, names: ["order"], path: "output")
                 adjustment.order = (item["order"] as? NSNumber)?.intValue
+            }
+            if let raw = item["world"] {
+                guard let list = raw as? [NSNumber], list.count == 16, layer.space != nil else {
+                    throw failure("output.world: expected 16 numbers for a layer placed in space")
+                }
+                let m = list.map(\.floatValue)
+                guard m.allSatisfy(\.isFinite) else { throw failure("output.world: values must be finite") }
+                adjustment.world = simd_float4x4(columns: (SIMD4(m[0], m[1], m[2], m[3]), SIMD4(m[4], m[5], m[6], m[7]),
+                                                           SIMD4(m[8], m[9], m[10], m[11]), SIMD4(m[12], m[13], m[14], m[15])))
             }
             if let raw = item["rigs"] {
                 guard let entries = raw as? [Any], entries.count <= layer.scriptRigIDs.count else {

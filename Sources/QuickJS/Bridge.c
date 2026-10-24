@@ -496,13 +496,36 @@ char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_se
         *error = strdup(program->timed_out ? "Execution time limit exceeded" : "Could not initialize JavaScript runtime");
         return NULL;
     }
+    const uint8_t *cursor = input;
+    JSValue argument = decode_input(context, &cursor, 0);
+    if (!JS_IsException(argument)) {
+        const char *guard_source =
+            "c => { for (const key of c._missing || []) Object.defineProperty(c, key,"
+            " {get(){throw new Error('Enable the input dependency: '+key);}, configurable:false});"
+            " delete c._missing; return c; }";
+        JSValue guard_function = JS_Eval(context, guard_source, strlen(guard_source), "inputs.js", JS_EVAL_TYPE_GLOBAL);
+        JSValue guarded = JS_IsException(guard_function) ? JS_EXCEPTION : JS_Call(context, guard_function, JS_UNDEFINED, 1, &argument);
+        JS_FreeValue(context, guard_function);
+        JS_FreeValue(context, argument);
+        argument = guarded;
+    }
     // Only bytecode produced by lwjs_compile is ever read; packages contain source.
     JSValue result = JS_UNDEFINED;
-    if (program->module_context) {
+    if (JS_IsException(argument)) {
+        result = JS_EXCEPTION;
+    } else if (program->module_context) {
         if (!program->module_started) {
             JSValue entry = program->module_entry;
             program->module_started = 1;
+            // Module top-level code runs before the first update(context) yet may read the
+            // clock (Date.now()); it sees this frame's input as __lwjsLoadContext.
+            JSValue load_global = JS_GetGlobalObject(context);
+            JS_SetPropertyStr(context, load_global, "__lwjsLoadContext", JS_DupValue(context, argument));
             result = JS_EvalFunction(context, JS_DupValue(context, entry));
+            JSAtom load_key = JS_NewAtom(context, "__lwjsLoadContext");
+            JS_DeleteProperty(context, load_global, load_key, 0);
+            JS_FreeAtom(context, load_key);
+            JS_FreeValue(context, load_global);
             if (!JS_IsException(result) && JS_IsPromise(result)) {
                 if (JS_PromiseState(context, result) == JS_PROMISE_REJECTED) {
                     JSValue exception = JS_PromiseResult(context, result);
@@ -530,25 +553,13 @@ char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_se
     if (JS_IsException(result)) {
         describe_error(program, context, error);
         JS_FreeValue(context, result);
+        JS_FreeValue(context, argument);
         if (!program->module_context) JS_FreeContext(context);
         return NULL;
     }
     JS_FreeValue(context, result);
     JSValue global = program->module_context ? JS_DupValue(context, program->module_namespace) : JS_GetGlobalObject(context);
     JSValue function = JS_GetPropertyStr(context, global, "update");
-    const uint8_t *cursor = input;
-    JSValue argument = decode_input(context, &cursor, 0);
-    if (!JS_IsException(argument)) {
-        const char *guard_source =
-            "c => { for (const key of c._missing || []) Object.defineProperty(c, key,"
-            " {get(){throw new Error('Enable the input dependency: '+key);}, configurable:false});"
-            " delete c._missing; return c; }";
-        JSValue guard_function = JS_Eval(context, guard_source, strlen(guard_source), "inputs.js", JS_EVAL_TYPE_GLOBAL);
-        JSValue guarded = JS_IsException(guard_function) ? JS_EXCEPTION : JS_Call(context, guard_function, JS_UNDEFINED, 1, &argument);
-        JS_FreeValue(context, guard_function);
-        JS_FreeValue(context, argument);
-        argument = guarded;
-    }
     if (!JS_IsFunction(context, function)) {
         JS_ThrowTypeError(context, "Define function update(context)");
         result = JS_EXCEPTION;

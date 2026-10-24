@@ -1,4 +1,5 @@
 import Foundation
+import simd
 
 /// The renderer selects the formula by position, so new cases go at the end. The
 /// layer's colour blends with what is below, weighted by its alpha, except `minimum`
@@ -808,6 +809,8 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var particles: SceneParticles?
     /// Simulated particles, in place of `particles` on a particle layer.
     var particleSystem: SceneParticleSystem?
+    /// In a scene seen through its camera: where the picture stands in it.
+    var space: SceneSpace?
     var text: SceneText?
     /// Grayscale depth map (white = near) in the scene folder; shifts each pixel by
     /// its depth for a 3D look.
@@ -864,6 +867,10 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         capturesCanvas = (try? container.decode(Bool.self, forKey: .capturesCanvas)) ?? false
         particles = try? container.decodeIfPresent(SceneParticles.self, forKey: .particles)
         particleSystem = try container.decodeIfPresent(SceneParticleSystem.self, forKey: .particleSystem)
+        space = try container.decodeIfPresent(SceneSpace.self, forKey: .space)
+        guard space.map({ $0.isValid }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .space, in: container, debugDescription: "Invalid placement in space")
+        }
         text = try container.decodeIfPresent(SceneText.self, forKey: .text)
         renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
         placement = try container.decodeIfPresent(SceneLayerPlacement.self, forKey: .placement)
@@ -990,9 +997,32 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     }
 }
 
-/// A still-image wallpaper built from layers. Lives in a folder next to the video it
-/// is baked into (SceneStore); the desktop draws it live, everything else that only
-/// plays videos (lock screen, screen saver, thumbnails) uses the baked video.
+/// A picture standing in a scene seen through its camera: a `width` × `height` plane
+/// centred at (`offsetX`, `offsetY`) in the layer's own units (y up), placed by `world`
+/// (column-major, scene units).
+struct SceneSpace: Codable, Equatable {
+    enum Blending: String, Codable { case translucent, additive, normal }
+    var world: [Double]
+    var width: Double
+    var height: Double
+    var offsetX: Double
+    var offsetY: Double
+    var depthTest: Bool
+    var depthWrite: Bool
+    var blending: Blending
+    var cull: SceneRenderGraph.Draw.Cull?
+
+    var isValid: Bool {
+        world.count == 16 && world.allSatisfy(\.isFinite) && [width, height, offsetX, offsetY].allSatisfy(\.isFinite)
+    }
+
+    var matrix: simd_float4x4 {
+        let m = world.map(Float.init)
+        return simd_float4x4(columns: (SIMD4(m[0], m[1], m[2], m[3]), SIMD4(m[4], m[5], m[6], m[7]),
+                                       SIMD4(m[8], m[9], m[10], m[11]), SIMD4(m[12], m[13], m[14], m[15])))
+    }
+}
+
 /// A scene's camera as the scene sets it up.
 struct SceneCamera: Codable, Equatable {
     /// Seen through the camera with its field of view, rather than laid out on the canvas.
@@ -1013,6 +1043,9 @@ struct SceneCamera: Codable, Equatable {
     }
 }
 
+/// A still-image wallpaper built from layers. Lives in a folder next to the video it
+/// is baked into (SceneStore); the desktop draws it live, everything else that only
+/// plays videos (lock screen, screen saver, thumbnails) uses the baked video.
 struct SceneDocument: Codable, Equatable {
     static let loopSecondsChoices = [10, 20, 30, 60]
 

@@ -264,6 +264,73 @@ final class SceneModelRenderer {
         }
     }
 
+    private static let planeSource = """
+    #include <metal_stdlib>
+    using namespace metal;
+    struct PlaneUniforms { float4x4 transform; float4 color; };
+    struct PlaneOut { float4 position [[position]]; float2 uv; };
+    vertex PlaneOut planeVertex(uint id [[vertex_id]], constant PlaneUniforms& u [[buffer(0)]]) {
+        float2 corner = float2(id == 1 || id == 2 || id == 4 ? 0.5 : -0.5, id == 2 || id == 4 || id == 5 ? 0.5 : -0.5);
+        PlaneOut out;
+        out.position = u.transform * float4(corner, 0, 1);
+        out.uv = float2(corner.x + 0.5, 0.5 - corner.y);
+        return out;
+    }
+    fragment float4 planeFragment(PlaneOut in [[stage_in]], texture2d<float> picture [[texture(0)]],
+                                  sampler linear [[sampler(0)]], constant PlaneUniforms& u [[buffer(0)]]) {
+        // The picture is premultiplied; the tint scales its colour, the alpha its coverage.
+        float4 c = picture.sample(linear, in.uv);
+        return float4(c.rgb * u.color.rgb, c.a) * u.color.a;
+    }
+    """
+    private var planeFunctions: (MTLFunction, MTLFunction)?
+    private var planePipelines: [String: MTLRenderPipelineState] = [:]
+    private var planeSampler: MTLSamplerState?
+
+    /// Draws a layer's picture as the plane it is in the scene: `transform` takes the unit
+    /// square centred at the origin (y up) to clip space; `color` is the tint and opacity.
+    func drawPlane(
+        _ picture: MTLTexture, transform: simd_float4x4, color: SIMD4<Float>, space: SceneSpace,
+        format: MTLPixelFormat, encoder: MTLRenderCommandEncoder
+    ) throws {
+        if planeFunctions == nil {
+            let library = try device.makeLibrary(source: Self.planeSource, options: nil)
+            planeFunctions = (library.makeFunction(name: "planeVertex")!, library.makeFunction(name: "planeFragment")!)
+            let descriptor = MTLSamplerDescriptor()
+            descriptor.minFilter = .linear
+            descriptor.magFilter = .linear
+            planeSampler = device.makeSamplerState(descriptor: descriptor)
+        }
+        let key = "\(space.blending.rawValue)-\(format.rawValue)"
+        if planePipelines[key] == nil {
+            let descriptor = MTLRenderPipelineDescriptor()
+            descriptor.vertexFunction = planeFunctions!.0
+            descriptor.fragmentFunction = planeFunctions!.1
+            descriptor.depthAttachmentPixelFormat = Self.depthFormat
+            let attachment = descriptor.colorAttachments[0]!
+            attachment.pixelFormat = format
+            if space.blending != .normal {
+                attachment.isBlendingEnabled = true
+                attachment.sourceRGBBlendFactor = .one
+                attachment.sourceAlphaBlendFactor = .one
+                let destination: MTLBlendFactor = space.blending == .additive ? .one : .oneMinusSourceAlpha
+                attachment.destinationRGBBlendFactor = destination
+                attachment.destinationAlphaBlendFactor = destination
+            }
+            planePipelines[key] = try device.makeRenderPipelineState(descriptor: descriptor)
+        }
+        encoder.setRenderPipelineState(planePipelines[key]!)
+        encoder.setDepthStencilState(depthState(test: space.depthTest, write: space.depthWrite))
+        encoder.setFrontFacing(.counterClockwise)
+        encoder.setCullMode(space.cull == .back ? .back : space.cull == .front ? .front : .none)
+        var uniforms = (transform, color)
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<(simd_float4x4, SIMD4<Float>)>.stride, index: 0)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<(simd_float4x4, SIMD4<Float>)>.stride, index: 0)
+        encoder.setFragmentTexture(picture, index: 0)
+        encoder.setFragmentSamplerState(planeSampler, index: 0)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+    }
+
     /// A camera looking from `eye` to `center` with a vertical field of view, for a target
     /// of `aspect` (width over height); depth 0 at `near` to 1 at `far`.
     static func perspective(_ camera: SceneCameraState, aspect: Float) -> simd_float4x4 {

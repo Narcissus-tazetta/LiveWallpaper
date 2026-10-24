@@ -1,4 +1,5 @@
 import Foundation
+import simd
 
 struct SceneScript: Codable, Equatable, Identifiable {
     static let apiVersion = 4
@@ -136,6 +137,8 @@ struct SceneScriptAdjustment {
     var particles: SceneScriptParticleValues?
     var particleControl: SceneParticleSimulator.Control?
     var text: SceneScriptTextValues?
+    /// In a scene seen through its camera: the layer's placement now (column-major).
+    var world: simd_float4x4?
 }
 
 struct SceneScriptEffectValues: Decodable {
