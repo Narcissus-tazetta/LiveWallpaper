@@ -1454,3 +1454,19 @@
 "再変換中に取り込み元アプリが終了しました。もう一度実行してください。" = "Kaynak uygulama dönüştürme sırasında kapandı. Yeniden deneyin.";
 
 "再変換の進捗を読み取れませんでした。" = "Dönüştürme ilerlemesi okunamadı.";
+
+"設定を適用すると、元作品から作り直します。シーン編集での変更は置き換えられます。" = "Ayarları uygulamak özgün duvar kâğıdını yeniden oluşturur ve sahne düzenleyicisindeki değişikliklerin yerini alır.";
+
+"元作品の情報がありません。取り込み元アプリで作品を再変換してから追加し直してください。" = "Özgün duvar kâğıdı bilgileri eksik. Kaynak uygulamada yeniden dönüştürüp tekrar ekleyin.";
+
+"シーンが編集中に変更されました。もう一度適用してください。" = "Sahne düzenleme sırasında değişti. Ayarları tekrar uygulayın.";
+
+"作品の設定の反映が時間内に完了しませんでした。取り込み元アプリを確認してください。" = "Duvar kâğıdı ayarları uygulanırken süre doldu. Kaynak uygulamayı kontrol edin.";
+
+"元作品のデータがありません。取り込み元アプリで作品を再取得してください。" = "Özgün duvar kâğıdı dosyaları eksik. Kaynak uygulamada tekrar indirin.";
+
+"作品の設定に未定義の項目または不正な値があります" = "Duvar kâğıdı ayarlarında bilinmeyen bir özellik veya geçersiz bir değer var.";
+
+"作品の設定を読み取れませんでした" = "Duvar kâğıdı ayarları okunamadı.";
+
+"壁紙の準備が終わってから、もう一度適用してください。" = "Duvar kâğıdının hazırlanmasını bekleyin ve ayarları tekrar uygulayın.";

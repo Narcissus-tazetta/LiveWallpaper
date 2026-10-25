@@ -1454,3 +1454,19 @@
 "再変換中に取り込み元アプリが終了しました。もう一度実行してください。" = "La app de origen se cerró durante la conversión. Inténtalo de nuevo.";
 
 "再変換の進捗を読み取れませんでした。" = "No se pudo leer el progreso de la conversión.";
+
+"設定を適用すると、元作品から作り直します。シーン編集での変更は置き換えられます。" = "Aplicar los ajustes reconstruye la obra original y reemplaza los cambios del editor de escenas.";
+
+"元作品の情報がありません。取り込み元アプリで作品を再変換してから追加し直してください。" = "Falta la información original. Convierte de nuevo la obra en la app de origen y vuelve a añadirla.";
+
+"シーンが編集中に変更されました。もう一度適用してください。" = "La escena cambió durante la edición. Vuelve a aplicar los ajustes.";
+
+"作品の設定の反映が時間内に完了しませんでした。取り込み元アプリを確認してください。" = "Se agotó el tiempo para aplicar los ajustes. Comprueba la app de origen.";
+
+"元作品のデータがありません。取り込み元アプリで作品を再取得してください。" = "Faltan los archivos originales. Descarga la obra de nuevo en la app de origen.";
+
+"作品の設定に未定義の項目または不正な値があります" = "Los ajustes contienen una propiedad desconocida o un valor no válido.";
+
+"作品の設定を読み取れませんでした" = "No se pudieron leer los ajustes de la obra.";
+
+"壁紙の準備が終わってから、もう一度適用してください。" = "Espera a que termine la preparación del fondo y vuelve a aplicar los ajustes.";

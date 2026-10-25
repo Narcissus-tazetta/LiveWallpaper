@@ -107,7 +107,9 @@ extension WallpaperModel {
         var scene: SceneDocument?
         if wallpaper.isScene {
             let sourceFolder: URL
-            if let originalFolder = wallpaper.sceneFolderPath,
+            if SceneStore.hasScene(videoPath: wallpaper.path) {
+                sourceFolder = SceneStore.folderURL(forVideoPath: wallpaper.path)
+            } else if let originalFolder = wallpaper.sceneFolderPath,
                FileManager.default.fileExists(atPath: URL(fileURLWithPath: originalFolder).appendingPathComponent("scene.json").path) {
                 sourceFolder = URL(fileURLWithPath: originalFolder, isDirectory: true)
             } else {
@@ -136,6 +138,11 @@ extension WallpaperModel {
         if let scene {
             SceneScriptPermissions.carry(scene, from: wallpaper.path, to: localURL.path)
             registerImportedScene(scene, path: localURL.path)
+            let extKey = "authorSettings.external." + id
+            if let saved = try? LocalWebSettings.load(key: extKey), !saved.values.isEmpty {
+                let sceneKey = "authorSettings.scene." + localURL.standardizedFileURL.path
+                try? saved.save(key: sceneKey)
+            }
         }
         importedExternalWallpaperPaths[id] = localURL.path
         UserDefaults.standard.set(
@@ -319,7 +326,7 @@ extension WallpaperModel {
         let task = Task { @MainActor [weak self] in
             do {
                 // Copying tens of megabytes of images stays off the main thread.
-                let document = try await Task.detached(priority: .utility) {
+                var document = try await Task.detached(priority: .utility) {
                     let bakeFolder = URL(fileURLWithPath: videoPath).deletingLastPathComponent()
                     if FileManager.default.fileExists(atPath: bakeFolder.path) {
                         try FileManager.default.removeItem(at: bakeFolder)
@@ -329,6 +336,17 @@ extension WallpaperModel {
                 }.value
                 try Task.checkCancellation()
                 guard let self else { return }
+                let settings = try LocalWebSettings.load(key: "authorSettings.external." + id)
+                if !settings.values.isEmpty {
+                    let sourceDirectory = document.authorSourceDirectory
+                    let itemID = id.hasPrefix("we-import.json/") ? String(id.dropFirst("we-import.json/".count)) : nil
+                    try await SceneAuthorSettingsConversion.apply(sourceDirectory: sourceDirectory, itemID: itemID, values: settings.values) { source in
+                        document = try await Task.detached(priority: .utility) {
+                            try SceneStore.importScene(from: source, videoPath: videoPath)
+                        }.value
+                    }
+                    try settings.save(key: "authorSettings.scene." + URL(fileURLWithPath: videoPath).standardizedFileURL.path)
+                }
                 // A still stands in for the video: the desktop draws the scene live, and
                 // a full loop is baked only once it goes on the lock screen or screen saver.
                 try await self.bakeSceneOutsideLibrary(document, videoPath: videoPath, stillOnly: true)

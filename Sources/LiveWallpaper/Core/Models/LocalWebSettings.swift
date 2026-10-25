@@ -70,12 +70,30 @@ struct LocalWebSettings: Codable, Equatable {
     var mediaEnabled = false
 
     static func load(id: UUID) throws -> Self {
-        guard let data = UserDefaults.standard.data(forKey: key(id)) else { return Self() }
+        try load(key: key(id))
+    }
+
+    static func load(key: String) throws -> Self {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return Self() }
         return try JSONDecoder().decode(Self.self, from: data)
     }
 
+    static func loadScene(videoPath: String) throws -> Self {
+        let normalized = URL(fileURLWithPath: videoPath).standardizedFileURL.path
+        let key = "authorSettings.scene." + normalized
+        if UserDefaults.standard.object(forKey: key) != nil {
+            return try load(key: key)
+        }
+        return try load(key: "authorSettings.scene." + URL(fileURLWithPath: videoPath).lastPathComponent)
+    }
+
     func save(id: UUID) throws {
-        try UserDefaults.standard.set(JSONEncoder().encode(self), forKey: Self.key(id))
+        try save(key: Self.key(id))
+    }
+
+    func save(key: String) throws {
+        let data = try JSONEncoder().encode(self)
+        UserDefaults.standard.set(data, forKey: key)
     }
 
     private static func key(_ id: UUID) -> String {

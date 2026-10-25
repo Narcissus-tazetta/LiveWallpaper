@@ -91,6 +91,20 @@ final class SceneMetalLayer: CAMetalLayer {
     var scriptIssueHandler: (([SceneScriptIssue]) -> Void)?
     var scriptLogHandler: (([UUID: String]) -> Void)?
 
+    var userProperties: [String: WebPropertyValue]? {
+        didSet {
+            guard userProperties != oldValue else { return }
+            current.userProperties = userProperties
+            target.userProperties = userProperties
+            redraw()
+        }
+    }
+
+    static func loadUserProperties(forVideoPath videoPath: String) -> [String: WebPropertyValue]? {
+        guard let settings = try? LocalWebSettings.loadScene(videoPath: videoPath), !settings.values.isEmpty else { return nil }
+        return settings.values
+    }
+
     /// Provides the animation time. nil leaves the scene at the loop start.
     var clock: (() -> SceneClockReading)?
     /// The part of the canvas shown (origin and size in canvas UV); the editor zooms.
@@ -175,17 +189,19 @@ final class SceneMetalLayer: CAMetalLayer {
         )
     }
 
-    func show(_ document: SceneDocument, videoPath: String) throws {
-        if self.videoPath != videoPath {
+    func show(_ document: SceneDocument, videoPath: String, userProperties: [String: WebPropertyValue]? = nil) throws {
+        let changedVideo = self.videoPath != videoPath
+        if changedVideo {
             scriptWorker = SceneScriptWorker()
             frozenScriptInput = nil
             storage = nil
+            self.userProperties = nil
         }
-        if self.videoPath != videoPath || renderer?.document != document {
+        if changedVideo || renderer?.document != document {
             scriptGeneration = UUID()
             stoppedScriptIDs = []
         }
-        if let renderer, self.videoPath == videoPath {
+        if let renderer, !changedVideo {
             if renderer.document != document {
                 try renderer.update(document: document)
             }
@@ -204,6 +220,9 @@ final class SceneMetalLayer: CAMetalLayer {
         }
         current.media = media
         target.media = media
+        self.userProperties = userProperties ?? Self.loadUserProperties(forVideoPath: videoPath)
+        current.userProperties = self.userProperties
+        target.userProperties = self.userProperties
         updateMediaSubscription()
         loadVideos()
         readClock()
@@ -222,6 +241,7 @@ final class SceneMetalLayer: CAMetalLayer {
         scriptIssueHandler?([])
         renderer = nil
         videoPath = nil
+        userProperties = nil
         target = .rest
         current = .rest
         updateMediaSubscription()

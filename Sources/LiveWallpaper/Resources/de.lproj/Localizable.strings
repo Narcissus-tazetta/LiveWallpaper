@@ -1454,3 +1454,19 @@
 "再変換中に取り込み元アプリが終了しました。もう一度実行してください。" = "Die Quell-App wurde während der Konvertierung beendet. Versuchen Sie es erneut.";
 
 "再変換の進捗を読み取れませんでした。" = "Der Fortschritt konnte nicht gelesen werden.";
+
+"設定を適用すると、元作品から作り直します。シーン編集での変更は置き換えられます。" = "Das Anwenden der Einstellungen erstellt das Original neu und ersetzt Änderungen im Szeneneditor.";
+
+"元作品の情報がありません。取り込み元アプリで作品を再変換してから追加し直してください。" = "Die Originalinformationen fehlen. Konvertiere das Werk in der Quell-App erneut und füge es wieder hinzu.";
+
+"シーンが編集中に変更されました。もう一度適用してください。" = "Die Szene wurde während der Bearbeitung geändert. Wende die Einstellungen erneut an.";
+
+"作品の設定の反映が時間内に完了しませんでした。取り込み元アプリを確認してください。" = "Das Anwenden der Einstellungen hat zu lange gedauert. Überprüfe die Quell-App.";
+
+"元作品のデータがありません。取り込み元アプリで作品を再取得してください。" = "Die Originaldateien fehlen. Lade das Werk in der Quell-App erneut herunter.";
+
+"作品の設定に未定義の項目または不正な値があります" = "Die Einstellungen enthalten eine unbekannte Eigenschaft oder einen ungültigen Wert.";
+
+"作品の設定を読み取れませんでした" = "Die Einstellungen konnten nicht gelesen werden.";
+
+"壁紙の準備が終わってから、もう一度適用してください。" = "Warte, bis das Hintergrundbild bereit ist, und wende die Einstellungen erneut an.";

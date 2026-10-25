@@ -275,6 +275,20 @@ final class SceneFrameEvaluator {
                         context.end(position, count: 2)
                     } else { context.null() }
                 } else { missing.append("audio") }
+                if let userProps = input.userProperties {
+                    member("userProperties")
+                    let position = context.beginObject()
+                    for (k, v) in userProps.sorted(by: { $0.key < $1.key }) {
+                        context.key(k)
+                        switch v {
+                        case let .bool(b): context.bool(b)
+                        case let .number(n): try context.number(n)
+                        case let .string(s): context.string(s)
+                        case .null: context.null()
+                        }
+                    }
+                    context.end(position, count: userProps.count)
+                }
                 member("_missing")
                 try context.value(missing)
                 context.end(contextPosition, count: contextCount)

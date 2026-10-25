@@ -747,6 +747,7 @@ extension WallpaperModel {
         let folder = SceneStore.folderURL(forVideoPath: path)
         var used = SceneStore.referencedFiles(of: document)
         used.insert("scene.json")
+        used.insert("properties.json")
         for snapshot in (sceneHistories[path]?.snapshots ?? []) + [sceneComparisonSnapshots[path]].compactMap({ $0 }) {
             used.formUnion(SceneStore.referencedFiles(of: snapshot))
         }
@@ -969,8 +970,9 @@ extension WallpaperModel {
             sceneBakeProgress[videoPath] = 0
         }
         let throttle = MediaImportProgressThrottle()
+        let userProps = SceneMetalLayer.loadUserProperties(forVideoPath: videoPath)
         try await SceneVideoBaker.bake(
-            document: document, videoPath: videoPath, timeOfDay: timeOfDay, stillOnly: stillOnly, to: stagedOutput
+            document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProps, stillOnly: stillOnly, to: stagedOutput
         ) { [weak self] value in
             guard throttle.shouldReport(value) else { return }
             Task { @MainActor [weak self] in
@@ -1057,11 +1059,13 @@ extension WallpaperModel {
                         "scene live display=\(displayID, privacy: .public) stale=\(isStale, privacy: .public) realTime=\(document.requiresRealTimePlayback, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
                     )
                 }
+                let userProps = SceneMetalLayer.loadUserProperties(forVideoPath: path)
                 try view.showScene(
                     document, videoPath: path, freeClock: isStale || document.requiresRealTimePlayback,
                     timeOfDay: document.timeOfDay(at: Date()),
                     maximumFramesPerSecond: maximumFramesPerSecond,
-                    storageScreen: Self.storageScreen(forDisplayID: displayID)
+                    storageScreen: Self.storageScreen(forDisplayID: displayID),
+                    userProperties: userProps
                 )
                 view.setSceneScriptIssueHandler { [weak self] issues in
                     guard let self, self.sceneScriptIssues[path] != issues else { return }

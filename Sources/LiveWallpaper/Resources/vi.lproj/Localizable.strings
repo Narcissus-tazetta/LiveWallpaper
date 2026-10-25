@@ -1454,3 +1454,19 @@
 "再変換中に取り込み元アプリが終了しました。もう一度実行してください。" = "Ứng dụng nguồn đã thoát khi đang chuyển đổi. Vui lòng thử lại.";
 
 "再変換の進捗を読み取れませんでした。" = "Không thể đọc tiến trình chuyển đổi.";
+
+"設定を適用すると、元作品から作り直します。シーン編集での変更は置き換えられます。" = "Áp dụng cài đặt sẽ dựng lại tác phẩm gốc và thay thế các thay đổi trong trình sửa cảnh.";
+
+"元作品の情報がありません。取り込み元アプリで作品を再変換してから追加し直してください。" = "Thiếu thông tin tác phẩm gốc. Hãy chuyển đổi lại trong ứng dụng nguồn rồi thêm lại.";
+
+"シーンが編集中に変更されました。もう一度適用してください。" = "Cảnh đã thay đổi trong khi chỉnh sửa. Hãy áp dụng lại cài đặt.";
+
+"作品の設定の反映が時間内に完了しませんでした。取り込み元アプリを確認してください。" = "Đã hết thời gian áp dụng cài đặt. Hãy kiểm tra ứng dụng nguồn.";
+
+"元作品のデータがありません。取り込み元アプリで作品を再取得してください。" = "Thiếu dữ liệu tác phẩm gốc. Hãy tải lại tác phẩm trong ứng dụng nguồn.";
+
+"作品の設定に未定義の項目または不正な値があります" = "Cài đặt có thuộc tính không xác định hoặc giá trị không hợp lệ.";
+
+"作品の設定を読み取れませんでした" = "Không thể đọc cài đặt tác phẩm.";
+
+"壁紙の準備が終わってから、もう一度適用してください。" = "Hãy đợi hình nền chuẩn bị xong rồi áp dụng lại cài đặt.";

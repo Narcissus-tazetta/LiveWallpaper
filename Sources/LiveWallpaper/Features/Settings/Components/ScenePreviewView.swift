@@ -212,7 +212,8 @@ final class ScenePreviewNSView: NSView {
 
     func show(_ document: SceneDocument, videoPath: String) {
         do {
-            try sceneLayer?.show(document, videoPath: videoPath)
+            let userProps = SceneMetalLayer.loadUserProperties(forVideoPath: videoPath)
+            try sceneLayer?.show(document, videoPath: videoPath, userProperties: userProps)
         } catch {
             AppLog.windowRefresh.error("scene preview failed: \(error.localizedDescription, privacy: .public)")
         }

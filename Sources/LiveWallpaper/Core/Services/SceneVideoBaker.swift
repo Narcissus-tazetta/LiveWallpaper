@@ -46,6 +46,7 @@ enum SceneVideoBaker {
         document: SceneDocument,
         videoPath: String,
         timeOfDay: SceneTimeOfDay? = nil,
+        userProperties: [String: WebPropertyValue]? = nil,
         stillOnly: Bool = false,
         to outputURL: URL,
         progress: @escaping @Sendable (Double) -> Void
@@ -55,10 +56,10 @@ enum SceneVideoBaker {
             try Task.checkCancellation()
             if document.isAnimated, !stillOnly {
                 try await render(
-                    document: document, videoPath: videoPath, timeOfDay: timeOfDay, outputURL: outputURL, progress: progress
+                    document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProperties, outputURL: outputURL, progress: progress
                 )
             } else {
-                try await renderStill(document: document, videoPath: videoPath, timeOfDay: timeOfDay, outputURL: outputURL)
+                try await renderStill(document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProperties, outputURL: outputURL)
             }
         }
         try await withTaskCancellationHandler {
@@ -76,11 +77,11 @@ enum SceneVideoBaker {
     }
 
     private static func renderStill(
-        document: SceneDocument, videoPath: String, timeOfDay: SceneTimeOfDay, outputURL: URL
+        document: SceneDocument, videoPath: String, timeOfDay: SceneTimeOfDay, userProperties: [String: WebPropertyValue]?, outputURL: URL
     ) async throws {
         let renderer = try SceneRenderer(document: document, videoPath: videoPath)
         renderer.timeOfDay = timeOfDay
-        let image = try renderer.renderStill()
+        let image = try renderer.renderStill(input: SceneFrameInput(userProperties: userProperties))
         let temporaryBase = outputURL.deletingLastPathComponent().appendingPathComponent(".scene-\(UUID().uuidString)")
         let stillURL = temporaryBase.appendingPathExtension("png")
         let videoURL = temporaryBase.appendingPathExtension("mp4")
@@ -105,6 +106,7 @@ enum SceneVideoBaker {
         document: SceneDocument,
         videoPath: String,
         timeOfDay: SceneTimeOfDay,
+        userProperties: [String: WebPropertyValue]?,
         outputURL: URL,
         progress: @Sendable (Double) -> Void
     ) async throws {
@@ -164,7 +166,7 @@ enum SceneVideoBaker {
                     throw BakeError.writerFailed("Cannot allocate frame \(frame)")
                 }
                 let time = Double(frame) / Double(fps)
-                try renderer.encode(into: texture, commandBuffer: commandBuffer, input: SceneFrameInput(time: time))
+                try renderer.encode(into: texture, commandBuffer: commandBuffer, input: SceneFrameInput(time: time, userProperties: userProperties))
                 await withCheckedContinuation { continuation in
                     commandBuffer.addCompletedHandler { _ in
                         continuation.resume()

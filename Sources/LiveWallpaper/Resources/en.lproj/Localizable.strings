@@ -1454,3 +1454,19 @@
 "再変換中に取り込み元アプリが終了しました。もう一度実行してください。" = "The source app quit during reconversion. Please try again.";
 
 "再変換の進捗を読み取れませんでした。" = "Could not read reconversion progress.";
+
+"設定を適用すると、元作品から作り直します。シーン編集での変更は置き換えられます。" = "Applying settings rebuilds the original wallpaper and replaces changes made in the scene editor.";
+
+"元作品の情報がありません。取り込み元アプリで作品を再変換してから追加し直してください。" = "Original wallpaper information is missing. Reconvert it in the source app, then add it again.";
+
+"シーンが編集中に変更されました。もう一度適用してください。" = "The scene changed while editing. Apply the settings again.";
+
+"作品の設定の反映が時間内に完了しませんでした。取り込み元アプリを確認してください。" = "Applying wallpaper settings timed out. Check the source app.";
+
+"元作品のデータがありません。取り込み元アプリで作品を再取得してください。" = "The original wallpaper files are missing. Download the wallpaper again in the source app.";
+
+"作品の設定に未定義の項目または不正な値があります" = "The wallpaper settings contain an unknown property or an invalid value.";
+
+"作品の設定を読み取れませんでした" = "Could not read the wallpaper settings.";
+
+"壁紙の準備が終わってから、もう一度適用してください。" = "Wait for the wallpaper to finish preparing, then apply the settings again.";

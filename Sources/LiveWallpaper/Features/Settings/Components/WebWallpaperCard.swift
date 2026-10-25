@@ -198,7 +198,11 @@ extension SettingsView {
         )
         Divider()
         if source.localFolderPath != nil {
-            Button(model.localizedString("作品の設定")) { localWebSettingsSource = source }
+            Button(model.localizedString("作品の設定")) {
+                if let context = model.authorSettingsContext(for: source) {
+                    authorSettingsContext = context
+                }
+            }
         }
         Button(model.localizedString("名前を編集")) {
             startWebWallpaperNameEdit(sourceID: source.id)

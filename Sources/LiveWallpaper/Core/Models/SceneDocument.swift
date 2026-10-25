@@ -1235,11 +1235,14 @@ struct SceneDocument: Codable, Equatable {
     var meshMaterials: [SceneMeshMaterial?]?
     /// Where model layers scripts make are seen from; scripts can move it.
     var camera: SceneCamera?
+    var properties: [LocalWebProperty]?
+    var authorSourceDirectory: String?
 
-    init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer]) {
+    init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer], properties: [LocalWebProperty]? = nil) {
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
         self.layers = layers
+        self.properties = properties
     }
 
     init(from decoder: Decoder) throws {
@@ -1281,6 +1284,8 @@ struct SceneDocument: Codable, Equatable {
         guard scripts.count <= SceneScript.maximumCount, Set(scripts.map(\.id)).count == scripts.count else {
             throw DecodingError.dataCorruptedError(forKey: .scripts, in: container, debugDescription: "Too many scripts or duplicate script IDs")
         }
+        properties = try container.decodeIfPresent([LocalWebProperty].self, forKey: .properties)
+        authorSourceDirectory = try container.decodeIfPresent(String.self, forKey: .authorSourceDirectory)
     }
 
     var isAnimated: Bool {

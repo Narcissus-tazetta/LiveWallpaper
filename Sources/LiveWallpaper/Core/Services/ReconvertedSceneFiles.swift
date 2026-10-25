@@ -3,7 +3,7 @@ import Foundation
 import ImageIO
 
 enum ReconvertedSceneFiles {
-    static func replace(source: URL, videoPath: String, backup: URL) async throws -> SceneDocument {
+    static func replace(source: URL, videoPath: String, backup: URL, userProperties: [String: WebPropertyValue]? = nil) async throws -> SceneDocument {
         let fm = FileManager.default
         let video = URL(fileURLWithPath: videoPath)
         let staging = video.deletingLastPathComponent().appendingPathComponent(".reconversion-\(UUID().uuidString)")
@@ -16,7 +16,7 @@ enum ReconvertedSceneFiles {
         let document = try SceneStore.importScene(from: source, videoPath: preparedVideo.path)
         let permitted = SceneScriptPermissions.restored(document, path: videoPath)
         try await SceneVideoBaker.bake(document: permitted, videoPath: preparedVideo.path,
-                                       stillOnly: true, to: preparedVideo) { _ in }
+                                       userProperties: userProperties, stillOnly: true, to: preparedVideo) { _ in }
         let preparedPreview = VideoThumbnailGenerator.expectedSidecarURL(for: preparedVideo.path)
         try writePreview(video: preparedVideo, destination: preparedPreview)
         let scene = SceneStore.folderURL(forVideoPath: videoPath)

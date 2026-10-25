@@ -281,6 +281,13 @@ extension SettingsView {
             }
         }
         Divider()
+        if model.hasAuthorSettings(forPath: path) {
+            Button(model.localizedString("作品の設定")) {
+                if let context = model.authorSettingsContext(forPath: path) {
+                    authorSettingsContext = context
+                }
+            }
+        }
         Button(model.localizedString("名前を編集")) {
             startWallpaperNameEdit(path: path)
         }

@@ -29,6 +29,8 @@ struct SceneFrameInput: Equatable {
     var audio: SceneAudioSpectrum?
     /// Pixels of the surface drawn on screen, for scripts told when it changes; nil off screen.
     var screenSize: SIMD2<Int>?
+    /// Author properties for scene evaluation and scripts; nil when no custom properties.
+    var userProperties: [String: WebPropertyValue]?
 
     static let rest = SceneFrameInput()
 }
@@ -1013,7 +1015,7 @@ final class SceneRenderer {
     }
 
     /// The scene at rest (no cursor, loop start), at canvas resolution capped like the layers.
-    func renderStill() throws -> CGImage {
+    func renderStill(input: SceneFrameInput = .rest) throws -> CGImage {
         let (width, height) = Self.outputSize(for: document, maxEdge: Self.maxTextureEdge)
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false
@@ -1025,7 +1027,7 @@ final class SceneRenderer {
         else {
             throw RendererError.textureAllocationFailed
         }
-        try encode(into: target, commandBuffer: commandBuffer, input: .rest)
+        try encode(into: target, commandBuffer: commandBuffer, input: input)
         if target.storageMode == .managed, let blit = commandBuffer.makeBlitCommandEncoder() {
             blit.synchronize(resource: target)
             blit.endEncoding()

@@ -278,6 +278,10 @@ enum SceneStore {
                 at: folder.appendingPathComponent(name), to: destination.appendingPathComponent(name)
             )
         }
+        let propURL = folder.appendingPathComponent("properties.json")
+        if FileManager.default.fileExists(atPath: propURL.path) {
+            try FileManager.default.copyItem(at: propURL, to: destination.appendingPathComponent("properties.json"))
+        }
     }
 
     enum ImportError: LocalizedError {
@@ -298,7 +302,10 @@ enum SceneStore {
         let documentURL = source.appendingPathComponent(documentFileName)
         let document = try JSONDecoder().decode(SceneDocument.self, from: Data(contentsOf: documentURL))
         let root = source.resolvingSymlinksInPath().standardizedFileURL.path
-        let names = referencedFiles(of: document).union([documentFileName])
+        var names = referencedFiles(of: document).union([documentFileName])
+        if FileManager.default.fileExists(atPath: source.appendingPathComponent("properties.json").path) {
+            names.insert("properties.json")
+        }
         for name in names {
             guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\\"),
                   !name.contains("\0")
