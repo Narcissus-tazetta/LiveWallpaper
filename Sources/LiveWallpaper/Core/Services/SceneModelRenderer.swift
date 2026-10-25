@@ -183,6 +183,9 @@ final class SceneModelRenderer {
         var ambient: SIMD3<Float>
         var skylight: SIMD3<Float>
         var shadows: Shadows?
+        /// The camera's axes in the scene; particles face them.
+        var cameraRight = SIMD3<Float>(1, 0, 0)
+        var cameraUp = SIMD3<Float>(0, 1, 0)
     }
 
     /// The shadow maps of a frame, one per light that casts, and the matrices that take
@@ -375,6 +378,8 @@ final class SceneModelRenderer {
         var viewProjection: simd_float4x4
         var world: simd_float4x4
         var eye: SIMD4<Float>
+        var cameraRight: SIMD4<Float>
+        var cameraUp: SIMD4<Float>
         var plane: SIMD4<Float>
         var mapping: SIMD4<Float>
         var origin: SIMD4<Float>
@@ -390,9 +395,9 @@ final class SceneModelRenderer {
     static let particleSource = """
     #include <metal_stdlib>
     using namespace metal;
-    struct Instance { float2 center; float2 right; float2 up; float2 uvOrigin; float2 uvSize; float4 color; };
+    struct Instance { float2 center; float2 right; float2 up; float2 uvOrigin; float2 uvSize; float4 color; float depth; };
     struct Uniforms {
-        float4x4 viewProjection; float4x4 world; float4 eye; float4 plane; float4 mapping; float4 origin;
+        float4x4 viewProjection; float4x4 world; float4 eye; float4 cameraRight; float4 cameraUp; float4 plane; float4 mapping; float4 origin;
         float4 tint; float4 shading; int4 flags;
         float4 distanceParams; float4 distanceColor; float4 heightParams; float4 heightColor;
     };
@@ -404,7 +409,14 @@ final class SceneModelRenderer {
         float2 local = p.center + p.right * (corner.x - 0.5) - p.up * (corner.y - 0.5);
         float2 uv = u.origin.xy + u.mapping.xy * local.x + u.mapping.zw * local.y;
         float2 onPlane = float2(u.plane.z + (uv.x - 0.5) * u.plane.x, u.plane.w + (0.5 - uv.y) * u.plane.y);
-        float4 world = u.world * float4(onPlane, 0.0, 1.0);
+        float2 centerUV = u.origin.xy + u.mapping.xy * p.center.x + u.mapping.zw * p.center.y;
+        float2 centerOnPlane = float2(u.plane.z + (centerUV.x - 0.5) * u.plane.x, u.plane.w + (0.5 - centerUV.y) * u.plane.y);
+        // The sprite faces the camera round the particle's place, which can lie off the plane.
+        float3 centerWorld = (u.world * float4(centerOnPlane, p.depth, 1.0)).xyz;
+        float2 offset = onPlane - centerOnPlane;
+        float3 position = centerWorld + u.cameraRight.xyz * (offset.x * length(u.world[0].xyz))
+                                      + u.cameraUp.xyz * (offset.y * length(u.world[1].xyz));
+        float4 world = float4(position, 1.0);
         Out out;
         out.position = u.viewProjection * world;
         out.uv = p.uvOrigin + corner * p.uvSize;
@@ -478,7 +490,8 @@ final class SceneModelRenderer {
         let (distanceParams, distanceColor) = zone(style.fog?.distance)
         let (heightParams, heightColor) = zone(style.fog?.height)
         var uniforms = SpaceParticleUniforms(
-            viewProjection: view.viewProjection, world: world, eye: SIMD4(view.eye.x, view.eye.y, view.eye.z, 0), plane: style.plane,
+            viewProjection: view.viewProjection, world: world, eye: SIMD4(view.eye.x, view.eye.y, view.eye.z, 0),
+            cameraRight: SIMD4(view.cameraRight, 0), cameraUp: SIMD4(view.cameraUp, 0), plane: style.plane,
             mapping: SIMD4(lowHalf: style.column0, highHalf: style.column1), origin: SIMD4(lowHalf: style.origin, highHalf: .zero), tint: style.tint,
             shading: SIMD4(style.brightness, style.cutout?.x ?? 0, style.cutout?.y ?? 0, style.cutout?.z ?? 1),
             flags: SIMD4(style.blend == .opaque ? 0 : 1, style.cutout == nil ? 0 : 1, 0, 0),

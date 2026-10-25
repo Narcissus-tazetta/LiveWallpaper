@@ -970,6 +970,9 @@ final class SceneRenderer {
         let aspect = Float(target.width) / Float(target.height)
         var flat = canvas, perspective = canvas
         flat.viewProjection = SceneModelRenderer.perspective(state, aspect: aspect)
+        let back = simd_normalize(state.eye - state.center)
+        flat.cameraRight = simd_normalize(simd_cross(state.up, back))
+        flat.cameraUp = simd_cross(back, flat.cameraRight)
         perspective.viewProjection = SceneModelRenderer.unitPerspective(state, aspect: aspect)
         return (flat, perspective)
     }
@@ -3377,6 +3380,7 @@ final class SceneRenderer {
         float2 uvOrigin;
         float2 uvSize;
         float4 color;
+        float depth;
     };
 
     struct ParticleSystemUniforms {

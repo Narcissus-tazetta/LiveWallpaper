@@ -38,6 +38,8 @@ final class SceneParticleSimulator {
         var uvSize: SIMD2<Float>
         /// Straight alpha.
         var color: SIMD4<Float>
+        /// Distance off the layer's plane (layer pixels); only a scene seen through its camera draws it.
+        var depth: Float = 0
     }
 
     private struct Particle {
@@ -280,7 +282,8 @@ final class SceneParticleSimulator {
                 center: SIMD2(Float(particle.position.x), Float(particle.position.y)),
                 right: SIMD2<Float>(right), up: SIMD2<Float>(up),
                 uvOrigin: uvOrigin, uvSize: uvSize,
-                color: SIMD4(Float(color.x), Float(color.y), Float(color.z), Float(min(max(alpha, 0), 1)))
+                color: SIMD4(Float(color.x), Float(color.y), Float(color.z), Float(min(max(alpha, 0), 1))),
+                depth: Float(particle.position.z)
             ))
         }
         return result
