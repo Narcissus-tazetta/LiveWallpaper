@@ -1092,7 +1092,7 @@ struct SceneCamera: Codable, Equatable {
     }
 }
 
-/// Key points the camera passes through: straight lines between them, held at the last
+/// Key points the camera passes through: a curve between each pair, held at the last
 /// one, and back to the first after `period` (measured on Wallpaper Engine's own scenes).
 struct SceneCameraPath: Codable, Equatable {
     struct Transform: Codable, Equatable {
@@ -1125,10 +1125,9 @@ struct SceneCameraPath: Codable, Equatable {
         return max(last, duration - last)
     }
 
-    /// A cubic curve through the key points whose slope at each is the one between its
-    /// neighbours (at the ends, between it and the next), fitted to CP-022 within about
-    /// 0.3 px: a half-way mix of a straight line and an ease at both ends. Only two key
-    /// points were measured; the slope with more, and uneven times, is the usual spline's.
+    /// Each segment is its own cubic: P + ΔP·(½u + 3⁄2u² − u³), a Hermite curve whose slope
+    /// at both ends is half the segment's own change. Wallpaper Engine's three-point paths
+    /// fit this within about 1 px; a slope taken from the neighbouring key points does not.
     func transform(at time: Double) -> (eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>, zoom: Float) {
         let t = time.truncatingRemainder(dividingBy: period)
         let next = transforms.firstIndex { $0.timestamp > t } ?? transforms.count
@@ -1138,20 +1137,11 @@ struct SceneCameraPath: Codable, Equatable {
             return (vector(held.eye), vector(held.center), vector(held.up), Float(held.zoom))
         }
         let a = transforms[next - 1], b = transforms[next]
-        let span = b.timestamp - a.timestamp
-        let u = Float((t - a.timestamp) / span)
-        let h00 = 2 * u * u * u - 3 * u * u + 1, h10 = u * u * u - 2 * u * u + u
-        let h01 = -2 * u * u * u + 3 * u * u, h11 = u * u * u - u * u
+        let u = Float((t - a.timestamp) / (b.timestamp - a.timestamp))
+        let ease = 0.5 * u + 1.5 * u * u - u * u * u
         func point(_ key: KeyPath<Transform, [Double]>) -> SIMD3<Float> {
-            func slope(_ index: Int) -> SIMD3<Float> {
-                let first = index == 0, last = index == transforms.count - 1
-                let before = first ? index : index - 1, after = last ? index : index + 1
-                let width = transforms[after].timestamp - transforms[before].timestamp
-                let delta = vector(transforms[after][keyPath: key]) - vector(transforms[before][keyPath: key])
-                return delta / Float(first || last ? 2 * width : width)
-            }
-            return h00 * vector(a[keyPath: key]) + h10 * Float(span) * slope(next - 1)
-                + h01 * vector(b[keyPath: key]) + h11 * Float(span) * slope(next)
+            let start = vector(a[keyPath: key])
+            return start + (vector(b[keyPath: key]) - start) * ease
         }
         return (point(\.eye), point(\.center), point(\.up), point(\.zoomAxis).x)
     }}

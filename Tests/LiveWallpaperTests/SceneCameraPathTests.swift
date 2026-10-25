@@ -29,4 +29,16 @@ final class SceneCameraPathTests: XCTestCase {
         XCTAssertEqual(long.transform(at: 5).eye.x, 60, accuracy: 1e-4)
         XCTAssertEqual(long.transform(at: 6).eye.x, 0, accuracy: 1e-4)
     }
+
+    func testEachSegmentEasesOnItsOwnChangeNotTheNeighbours() {
+        let up = [0.0, 1, 0]
+        let path = SceneCameraPath(duration: 4, transforms: [
+            .init(timestamp: 0, eye: [0, 0, 0], center: [0, 0, -1], up: up, zoom: 1),
+            .init(timestamp: 1, eye: [1, 0, 0], center: [1, 0, -1], up: up, zoom: 1),
+            .init(timestamp: 4, eye: [121, 0, 0], center: [121, 0, -1], up: up, zoom: 1),
+        ])
+        XCTAssertEqual(path.transform(at: 1).eye.x, 1, accuracy: 1e-4)
+        // Halfway through the second segment: 1 + 120 * (0.25 + 0.375 - 0.125).
+        XCTAssertEqual(path.transform(at: 2.5).eye.x, 61, accuracy: 1e-3)
+    }
 }
