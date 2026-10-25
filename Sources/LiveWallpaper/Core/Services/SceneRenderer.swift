@@ -512,9 +512,14 @@ final class SceneRenderer {
                 (layer.capturesCanvas || layer.model != nil
                     || (layer.kind == .particles ? layer.hasParticles : picture(for: layer) != nil))
         }
+        // On the canvas a solid model stands in the layer order, like the ones a script makes.
+        let placed = visibleLayers.map { layer -> Drawn in
+            layer.model != nil && document.camera?.perspective != true
+                ? .model(staticModelFrame(layer, evaluated: evaluated)) : .layer(layer)
+        }
         let visible = modelRenderer == nil || evaluated.models.isEmpty
-            ? visibleLayers.map(Drawn.layer)
-            : Self.interleave(visibleLayers, models: evaluated.models, place: { id in
+            ? placed
+            : Self.interleave(visibleLayers, placed: placed, models: evaluated.models, place: { id in
                 evaluated.order[id] ?? document.layers.firstIndex { $0.id == id } ?? 0
             })
         let views = modelViews(camera: evaluated.camera, input: input, target: target)
@@ -798,16 +803,8 @@ final class SceneRenderer {
             switch item {
             case let .model(model): prepared.append(.model(model))
             case let .layer(layer):
-                if let model = layer.model {
-                    let drawn = evaluated.layers[layer.id]!
-                    let shape = staticShapes[layer.id] ?? model.shape
-                    staticShapes[layer.id] = shape
-                    let tint = drawn.layer.tint
-                    prepared.append(.model(SceneModelLayerFrame(
-                        serial: 0, order: 0, alpha: Float(drawn.layer.opacity * drawn.opacity),
-                        color: SIMD3(Float(tint.red), Float(tint.green), Float(tint.blue)),
-                        world: drawn.world ?? layer.space?.matrix ?? matrix_identity_float4x4, perspective: false, shapes: [shape]
-                    )))
+                if layer.model != nil {
+                    prepared.append(.model(staticModelFrame(layer, evaluated: evaluated)))
                     continue
                 }
                 guard var space = layer.space else { continue }
@@ -894,6 +891,18 @@ final class SceneRenderer {
         }
     }
 
+    private func staticModelFrame(_ layer: SceneLayer, evaluated: SceneEvaluatedFrame) -> SceneModelLayerFrame {
+        let drawn = evaluated.layers[layer.id]!
+        let shape = staticShapes[layer.id] ?? layer.model!.shape
+        staticShapes[layer.id] = shape
+        let tint = drawn.layer.tint
+        return SceneModelLayerFrame(
+            serial: 0, order: 0, alpha: Float(drawn.layer.opacity * drawn.opacity),
+            color: SIMD3(Float(tint.red), Float(tint.green), Float(tint.blue)),
+            world: drawn.world ?? layer.space?.matrix ?? matrix_identity_float4x4, perspective: false, shapes: [shape]
+        )
+    }
+
     /// Particles with nothing to run them through (effects, a painted area, a picture of
     /// what is behind) are sprites in the scene itself rather than a picture on a plane.
     private func drawsParticlesInSpace(_ layer: SceneLayer) -> Bool {
@@ -961,11 +970,15 @@ final class SceneRenderer {
             (moved.eye, moved.center, moved.up, _) = path.transform(at: input.time)
             state = moved
         }
+        // Fog and highlights on a solid model of a canvas scene are measured from a point
+        // 2000 in front of the canvas's centre, not from the camera's eye.
+        let eye: SIMD3<Float> = scene?.perspective != true && document.layers.contains { $0.model != nil }
+            ? SIMD3(Float(document.canvasWidth) / 2, Float(document.canvasHeight) / 2, 2000) : state?.eye ?? .zero
         let canvas = SceneModelRenderer.View(
             viewProjection: SceneModelRenderer.canvasProjection(
                 width: Double(document.canvasWidth), height: Double(document.canvasHeight), viewport: input.viewport
             ),
-            eye: state?.eye ?? .zero, ambient: ambient, skylight: skylight
+            eye: eye, ambient: ambient, skylight: skylight
         )
         guard let state, scene?.perspective == true else { return (canvas, canvas) }
         // A camera scene fills the target, whatever its shape.
@@ -999,16 +1012,18 @@ final class SceneRenderer {
 
     /// The scene's layers, bottom to top, with the model layers scripts made, by their
     /// shared drawing order (`place` of a scene layer).
-    private static func interleave(_ layers: [SceneLayer], models: [SceneModelLayerFrame], place: (UUID) -> Int) -> [Drawn] {
+    private static func interleave(
+        _ layers: [SceneLayer], placed: [Drawn], models: [SceneModelLayerFrame], place: (UUID) -> Int
+    ) -> [Drawn] {
         var result: [Drawn] = []
         var pending = models.sorted { $0.order < $1.order }[...]
-        for layer in layers {
+        for (layer, item) in zip(layers, placed) {
             let place = place(layer.id)
             while let next = pending.first, next.order < place {
                 result.append(.model(next))
                 pending.removeFirst()
             }
-            result.append(.layer(layer))
+            result.append(item)
         }
         result += pending.map(Drawn.model)
         return result
