@@ -827,14 +827,15 @@ final class SceneRenderer {
             }
         }
         if document.camera?.sortsByDistance == true {
-            // Ties keep the listed order. How the distance is measured off the camera's axis
-            // was not measured; the straight line from the eye to the layer's origin is used.
+            // Ties keep the listed order. The distance is the depth along the camera's axis
+            // (not the straight line to the eye): measured with the camera turned off the z axis
+            // and with plates off the axis. The perspective projection's w is that depth.
             func distance(_ item: Prepared) -> Float {
                 let world: simd_float4x4 = switch item {
                 case let .model(model): model.world
                 case let .plane(_, drawn, space), let .particles(_, drawn, space): drawn.world ?? space.matrix
                 }
-                return simd_distance(SIMD3(world.columns.3.x, world.columns.3.y, world.columns.3.z), views.flat.eye)
+                return (views.flat.viewProjection * SIMD4(world.columns.3.x, world.columns.3.y, world.columns.3.z, 1)).w
             }
             var keyed: [(distance: Float, index: Int, item: Prepared)] = []
             for (index, item) in prepared.enumerated() { keyed.append((distance(item), index, item)) }
