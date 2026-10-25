@@ -606,4 +606,100 @@ final class SceneRenderGraphTests: XCTestCase {
         let pixels = try render(renderer, device: device, input: texture, values: ["alpha": 0.75])
         XCTAssertEqual(pixels[0], 191, accuracy: 2)
     }
+
+    func testUsesPointerDetectsPointerUniformsInVertexAndFragment() {
+        let pointerValues: [SceneRenderGraph.UniformUpdate.Value] = [
+            .cursor, .pointer, .previousPointer, .pointerState, .parallaxPosition
+        ]
+        for value in pointerValues {
+            let fragmentGraph = graph(fragment: "", updates: [.init(offset: 0, value: value)])
+            XCTAssertTrue(fragmentGraph.usesPointer)
+
+            let vertexStage = SceneRenderGraph.Stage(
+                source: vertex,
+                entryPoint: "vertexMain",
+                updates: [.init(offset: 0, value: value)]
+            )
+            let vertexGraph = SceneRenderGraph(
+                targets: [.init(name: "work")],
+                passes: [.init(operation: .draw, target: "work", draw: .init(
+                    vertex: vertexStage,
+                    fragment: .init(source: "", entryPoint: "fragmentMain"),
+                    vertices: Data(), vertexStride: 0, vertexCount: 0, attributes: [], textures: []
+                ))],
+                output: "work"
+            )
+            XCTAssertTrue(vertexGraph.usesPointer)
+        }
+
+        let nonPointerValues: [SceneRenderGraph.UniformUpdate.Value] = [
+            .time, .audioSpectrum, .texelSize, .effectValue, .frameTime
+        ]
+        for value in nonPointerValues {
+            let g = graph(fragment: "", updates: [.init(offset: 0, value: value)])
+            XCTAssertFalse(g.usesPointer)
+        }
+    }
+
+    func testShaderEffectPointerUniformEnablesCursorTracking() {
+        var effect = SceneEffect(kind: .shader)
+        effect.renderGraph = graph(fragment: "", updates: [.init(offset: 0, value: .pointer)])
+
+        var layer = SceneLayer(name: "image", imageFile: "image.png")
+        layer.effects = [effect]
+        let document = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [layer])
+
+        XCTAssertTrue(layer.usesCursor)
+        XCTAssertTrue(document.usesCursor)
+        XCTAssertTrue(document.hasLiveInteraction)
+
+        var disabledLayer = layer
+        disabledLayer.effects[0].isEnabled = false
+        let disabledDoc = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [disabledLayer])
+        XCTAssertFalse(disabledLayer.usesCursor)
+        XCTAssertFalse(disabledDoc.usesCursor)
+
+        var hiddenLayer = layer
+        hiddenLayer.isVisible = false
+        let hiddenDoc = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [hiddenLayer])
+        XCTAssertFalse(hiddenLayer.usesCursor)
+        XCTAssertFalse(hiddenDoc.usesCursor)
+
+        var directLayer = SceneLayer(name: "direct", imageFile: "image.png")
+        directLayer.renderGraph = graph(fragment: "", updates: [.init(offset: 0, value: .previousPointer)])
+        let directDoc = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [directLayer])
+        XCTAssertTrue(directLayer.usesCursor)
+        XCTAssertTrue(directDoc.usesCursor)
+
+        let multiPassGraph = SceneRenderGraph(
+            targets: [.init(name: "first"), .init(name: "second"), .init(name: "out")],
+            passes: [
+                .init(operation: .draw, target: "first", draw: .init(
+                    vertex: .init(source: vertex, entryPoint: "vertexMain"),
+                    fragment: .init(source: "", entryPoint: "fragmentMain", updates: [.init(offset: 0, value: .time)]),
+                    vertices: Data(), vertexStride: 0, vertexCount: 0, attributes: [], textures: []
+                )),
+                .init(operation: .copy, target: "second", source: "first"),
+                .init(operation: .draw, target: "out", draw: .init(
+                    vertex: .init(source: vertex, entryPoint: "vertexMain"),
+                    fragment: .init(source: "", entryPoint: "fragmentMain", updates: [.init(offset: 0, value: .pointerState)]),
+                    vertices: Data(), vertexStride: 0, vertexCount: 0, attributes: [], textures: []
+                ))
+            ],
+            output: "out"
+        )
+        XCTAssertTrue(multiPassGraph.usesPointer)
+
+        let emptyGraph = SceneRenderGraph(targets: [], passes: [], output: "")
+        XCTAssertFalse(emptyGraph.usesPointer)
+
+        var timeEffect = SceneEffect(kind: .shader)
+        timeEffect.renderGraph = graph(fragment: "", updates: [.init(offset: 0, value: .time)])
+        var mixedLayer = SceneLayer(name: "mixed", imageFile: "image.png")
+        mixedLayer.effects = [timeEffect, disabledLayer.effects[0]]
+        XCTAssertFalse(mixedLayer.usesCursor)
+
+        mixedLayer.effects.append(effect)
+        XCTAssertTrue(mixedLayer.usesCursor)
+    }
 }

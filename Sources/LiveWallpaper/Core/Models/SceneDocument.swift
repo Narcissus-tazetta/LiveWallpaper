@@ -1028,7 +1028,8 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var usesCursor: Bool {
         isVisible && (parallaxDepth > 0 || cursorMask != nil || (particles.map { $0.cursorMode != .none } ?? false)
             || particleSystem?.usesPointer == true
-            || (hasDepth && depthFollowsCursor) || renderGraph?.uses(.cursor) == true)
+            || (hasDepth && depthFollowsCursor) || renderGraph?.usesPointer == true
+            || activeEffects.contains { $0.renderGraph?.usesPointer == true })
     }
 
     /// Particles move on their own; an image layer through its effects or the

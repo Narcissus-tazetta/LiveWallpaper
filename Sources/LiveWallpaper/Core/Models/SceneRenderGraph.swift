@@ -172,11 +172,27 @@ struct SceneRenderGraph: Codable, Equatable {
         uses(.audioSpectrum)
     }
 
-    func uses(_ value: UniformUpdate.Value) -> Bool {
+    var usesPointer: Bool {
+        uses { value in
+            switch value {
+            case .cursor, .pointer, .previousPointer, .pointerState, .parallaxPosition:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    func uses(_ predicate: (UniformUpdate.Value) -> Bool) -> Bool {
         passes.contains { pass in
             guard let draw = pass.draw else { return false }
-            return (draw.vertex.updates + draw.fragment.updates).contains { $0.value == value }
+            return draw.vertex.updates.contains { predicate($0.value) }
+                || draw.fragment.updates.contains { predicate($0.value) }
         }
+    }
+
+    func uses(_ value: UniformUpdate.Value) -> Bool {
+        uses { $0 == value }
     }
 }
 
