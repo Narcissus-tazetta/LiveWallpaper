@@ -355,6 +355,145 @@ final class SceneModelRenderer {
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
     }
 
+    // MARK: Particles drawn in space
+
+    struct SpaceParticleStyle {
+        /// Sprites in layer pixels (y up) → canvas UV (y down): `origin + column0 * x + column1 * y`.
+        var column0: SIMD2<Float>
+        var column1: SIMD2<Float>
+        var origin: SIMD2<Float>
+        /// The layer's plane: size and offset in layer pixels, as for `drawPlane`.
+        var plane: SIMD4<Float>
+        var tint: SIMD4<Float>
+        var brightness: Float
+        var cutout: SIMD3<Float>?
+        var blend: SceneParticleSystem.Blend
+        var fog: SceneFog?
+    }
+
+    private struct SpaceParticleUniforms {
+        var viewProjection: simd_float4x4
+        var world: simd_float4x4
+        var eye: SIMD4<Float>
+        var plane: SIMD4<Float>
+        var mapping: SIMD4<Float>
+        var origin: SIMD4<Float>
+        var tint: SIMD4<Float>
+        var shading: SIMD4<Float>
+        var flags: SIMD4<Int32>
+        var distanceParams: SIMD4<Float>
+        var distanceColor: SIMD4<Float>
+        var heightParams: SIMD4<Float>
+        var heightColor: SIMD4<Float>
+    }
+
+    static let particleSource = """
+    #include <metal_stdlib>
+    using namespace metal;
+    struct Instance { float2 center; float2 right; float2 up; float2 uvOrigin; float2 uvSize; float4 color; };
+    struct Uniforms {
+        float4x4 viewProjection; float4x4 world; float4 eye; float4 plane; float4 mapping; float4 origin;
+        float4 tint; float4 shading; int4 flags;
+        float4 distanceParams; float4 distanceColor; float4 heightParams; float4 heightColor;
+    };
+    struct Out { float4 position [[position]]; float2 uv; float4 color; float4 viewDir; };
+    vertex Out spaceParticleVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
+                                   const device Instance *instances [[buffer(0)]], constant Uniforms &u [[buffer(1)]]) {
+        Instance p = instances[iid];
+        float2 corner = float2((vid & 1u) ? 1.0 : 0.0, (vid & 2u) ? 1.0 : 0.0);
+        float2 local = p.center + p.right * (corner.x - 0.5) - p.up * (corner.y - 0.5);
+        float2 uv = u.origin.xy + u.mapping.xy * local.x + u.mapping.zw * local.y;
+        float2 onPlane = float2(u.plane.z + (uv.x - 0.5) * u.plane.x, u.plane.w + (0.5 - uv.y) * u.plane.y);
+        float4 world = u.world * float4(onPlane, 0.0, 1.0);
+        Out out;
+        out.position = u.viewProjection * world;
+        out.uv = p.uvOrigin + corner * p.uvSize;
+        out.color = p.color;
+        out.viewDir = float4(u.eye.xyz - world.xyz, world.y);
+        return out;
+    }
+    fragment float4 spaceParticleFragment(Out in [[stage_in]], constant Uniforms &u [[buffer(1)]],
+                                          texture2d<float> sprite [[texture(0)]]) {
+        constexpr sampler s(filter::linear, mip_filter::linear, address::clamp_to_edge);
+        float4 color = in.color * sprite.sample(s, in.uv);
+        color.rgb *= u.shading.x;
+        if (u.flags.y != 0) { color.a = smoothstep(u.shading.y, u.shading.z, color.a) * u.shading.w; }
+        // The fog reads the position and the density the way common_fog.h does.
+        float fogDistance = 0.0, fogHeight = 0.0;
+        if (u.heightColor.w != 0.0) {
+            float t = saturate((in.viewDir.w - u.heightParams.x) / u.heightParams.y);
+            fogHeight = u.heightParams.z + u.heightParams.w * t * t;
+            color.rgb = mix(color.rgb, u.heightColor.rgb, fogHeight);
+        }
+        if (u.distanceColor.w != 0.0) {
+            float t = saturate((length(in.viewDir.xyz) - u.distanceParams.x) / u.distanceParams.y);
+            fogDistance = u.distanceParams.z + u.distanceParams.w * t * t;
+            color.rgb = mix(color.rgb, u.distanceColor.rgb, fogDistance);
+        }
+        if (u.heightColor.w != 0.0 || u.distanceColor.w != 0.0) {
+            float factor = saturate(max(fogDistance, fogHeight));
+            color.a *= 1.0 - factor * factor;
+        }
+        color.rgb *= u.tint.rgb;
+        // Opaque particles cover what is below whatever their alpha.
+        if (u.flags.x == 0) { return float4(color.rgb, 1.0) * u.tint.a; }
+        float alpha = saturate(color.a) * u.tint.a;
+        return float4(color.rgb * saturate(color.a) * u.tint.a, alpha);
+    }
+    """
+    private var particleFunctions: (MTLFunction, MTLFunction)?
+    private var particlePipelines: [String: MTLRenderPipelineState] = [:]
+
+    /// Draws sprites (`instances`, in layer pixels) as billboards of a plane's own place in
+    /// the scene, so they scale with distance, are hidden by nearer geometry and take the fog.
+    func drawParticles(
+        instances: MTLBuffer, count: Int, texture: MTLTexture, world: simd_float4x4, view: View,
+        style: SpaceParticleStyle, depthTest: Bool, depthWrite: Bool, format: MTLPixelFormat, encoder: MTLRenderCommandEncoder
+    ) throws {
+        if particleFunctions == nil {
+            let library = try device.makeLibrary(source: Self.particleSource, options: nil)
+            particleFunctions = (library.makeFunction(name: "spaceParticleVertex")!, library.makeFunction(name: "spaceParticleFragment")!)
+        }
+        let key = "\(style.blend.rawValue)-\(format.rawValue)"
+        if particlePipelines[key] == nil {
+            let descriptor = MTLRenderPipelineDescriptor()
+            descriptor.vertexFunction = particleFunctions!.0
+            descriptor.fragmentFunction = particleFunctions!.1
+            descriptor.depthAttachmentPixelFormat = Self.depthFormat
+            let attachment = descriptor.colorAttachments[0]!
+            attachment.pixelFormat = format
+            attachment.isBlendingEnabled = true
+            attachment.sourceRGBBlendFactor = .one
+            attachment.sourceAlphaBlendFactor = .one
+            let destination: MTLBlendFactor = style.blend == .add ? .one : .oneMinusSourceAlpha
+            attachment.destinationRGBBlendFactor = destination
+            attachment.destinationAlphaBlendFactor = destination
+            particlePipelines[key] = try device.makeRenderPipelineState(descriptor: descriptor)
+        }
+        func zone(_ zone: SceneFog.Zone?) -> (SIMD4<Float>, SIMD4<Float>) {
+            guard let zone else { return (.zero, .zero) }
+            return (SIMD4(Float(zone.start), Float(zone.end - zone.start), Float(zone.startDensity), Float(zone.endDensity - zone.startDensity)),
+                    SIMD4(Float(zone.color[0]), Float(zone.color[1]), Float(zone.color[2]), 1))
+        }
+        let (distanceParams, distanceColor) = zone(style.fog?.distance)
+        let (heightParams, heightColor) = zone(style.fog?.height)
+        var uniforms = SpaceParticleUniforms(
+            viewProjection: view.viewProjection, world: world, eye: SIMD4(view.eye.x, view.eye.y, view.eye.z, 0), plane: style.plane,
+            mapping: SIMD4(lowHalf: style.column0, highHalf: style.column1), origin: SIMD4(lowHalf: style.origin, highHalf: .zero), tint: style.tint,
+            shading: SIMD4(style.brightness, style.cutout?.x ?? 0, style.cutout?.y ?? 0, style.cutout?.z ?? 1),
+            flags: SIMD4(style.blend == .opaque ? 0 : 1, style.cutout == nil ? 0 : 1, 0, 0),
+            distanceParams: distanceParams, distanceColor: distanceColor, heightParams: heightParams, heightColor: heightColor
+        )
+        encoder.setRenderPipelineState(particlePipelines[key]!)
+        encoder.setDepthStencilState(depthState(test: depthTest, write: depthWrite))
+        encoder.setCullMode(.none)
+        encoder.setVertexBuffer(instances, offset: 0, index: 0)
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<SpaceParticleUniforms>.stride, index: 1)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<SpaceParticleUniforms>.stride, index: 1)
+        encoder.setFragmentTexture(texture, index: 0)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: count)
+    }
+
     /// A camera looking from `eye` to `center` with a vertical field of view, for a target
     /// of `aspect` (width over height); depth 0 at `near` to 1 at `far`.
     static func perspective(_ camera: SceneCameraState, aspect: Float) -> simd_float4x4 {

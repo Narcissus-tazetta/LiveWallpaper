@@ -403,6 +403,8 @@ struct SceneParticleSystem: Codable, Equatable {
     var brightness: Double = 1
     var refraction: Refraction?
     var cutout: Cutout?
+    /// Takes the scene camera's fog when drawn in space.
+    var receivesFog: Bool?
     var emitters: [Emitter] = []
     var initial = Initial()
     var behaviors: [Behavior] = []

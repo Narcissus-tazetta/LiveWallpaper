@@ -1087,12 +1087,40 @@ struct SceneCamera: Codable, Equatable {
     /// Draws the scene's layers far to near, by their distance from the eye, instead of in
     /// the order they are listed.
     var sortsByDistance: Bool?
+    /// Fades what is drawn directly in space (particles) toward a colour with distance
+    /// from the eye or with height.
+    var fog: SceneFog?
 
     var isValid: Bool {
         [eye, center, up, ambientColor, skylightColor].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
             && [fov, nearZ, farZ].allSatisfy(\.isFinite)
             && (shadowLights ?? []).allSatisfy(\.isValid)
+            && (fog?.isValid ?? true)
             && (path?.isValid ?? true)
+    }
+}
+
+/// Fog by distance from the eye and by height. Each zone blends toward its colour by a
+/// density that is `startDensity` up to `start` and rises along the square of the
+/// position between `start` and `end` to `endDensity` (Wallpaper Engine's common_fog.h).
+struct SceneFog: Codable, Equatable {
+    struct Zone: Codable, Equatable {
+        var start: Double
+        var end: Double
+        var startDensity: Double
+        var endDensity: Double
+        var color: [Double]
+
+        var isValid: Bool {
+            color.count == 3 && ([start, end, startDensity, endDensity] + color).allSatisfy(\.isFinite) && start != end
+        }
+    }
+
+    var distance: Zone?
+    var height: Zone?
+
+    var isValid: Bool {
+        (distance?.isValid ?? true) && (height?.isValid ?? true)
     }
 }
 

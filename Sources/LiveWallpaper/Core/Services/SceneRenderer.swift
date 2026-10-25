@@ -787,7 +787,10 @@ final class SceneRenderer {
         commandBuffer: MTLCommandBuffer, input: SceneFrameInput, targetSize: SIMD2<Float>
     ) throws {
         if modelRenderer == nil { modelRenderer = try SceneModelRenderer(materials: [], device: device) }
-        enum Prepared { case model(SceneModelLayerFrame), plane(MTLTexture, SceneEvaluatedFrame.Layer, SceneSpace) }
+        enum Prepared {
+            case model(SceneModelLayerFrame), plane(MTLTexture, SceneEvaluatedFrame.Layer, SceneSpace)
+            case particles(SceneLayer, SceneEvaluatedFrame.Layer, SceneSpace)
+        }
         var prepared: [Prepared] = []
         for item in items {
             switch item {
@@ -815,6 +818,10 @@ final class SceneRenderer {
                     space.offsetY = text.centerOffset.y
                 }
                 let drawn = evaluated.layers[layer.id]!
+                if drawsParticlesInSpace(drawn.layer) {
+                    prepared.append(.particles(drawn.layer, drawn, space))
+                    continue
+                }
                 let picture = try applyEffects(to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize)
                 prepared.append(.plane(picture, drawn, space))
             }
@@ -825,7 +832,7 @@ final class SceneRenderer {
             func distance(_ item: Prepared) -> Float {
                 let world: simd_float4x4 = switch item {
                 case let .model(model): model.world
-                case let .plane(_, drawn, space): drawn.world ?? space.matrix
+                case let .plane(_, drawn, space), let .particles(_, drawn, space): drawn.world ?? space.matrix
                 }
                 return simd_distance(SIMD3(world.columns.3.x, world.columns.3.y, world.columns.3.z), views.flat.eye)
             }
@@ -876,7 +883,58 @@ final class SceneRenderer {
                     color: SIMD4(Float(tint.red), Float(tint.green), Float(tint.blue), opacity), space: space,
                     format: target.pixelFormat, encoder: encoder
                 )
+            case let .particles(layer, drawn, space):
+                try drawParticlesInSpace(
+                    layer, drawn: drawn, space: space, view: views.flat, format: target.pixelFormat, encoder: encoder
+                )
             }
+        }
+    }
+
+    /// Particles with nothing to run them through (effects, a painted area, a picture of
+    /// what is behind) are sprites in the scene itself rather than a picture on a plane.
+    private func drawsParticlesInSpace(_ layer: SceneLayer) -> Bool {
+        guard layer.kind == .particles, let system = layer.particleSystem, particleSimulators[layer.id] != nil else { return false }
+        return !system.refracts && layer.activeEffects.isEmpty && graphRenderers[layer.id] == nil
+            && paintOverride?.effectID != layer.id
+    }
+
+    private func drawParticlesInSpace(
+        _ layer: SceneLayer, drawn: SceneEvaluatedFrame.Layer, space: SceneSpace, view: SceneModelRenderer.View,
+        format: MTLPixelFormat, encoder: MTLRenderCommandEncoder
+    ) throws {
+        guard let simulator = particleSimulators[layer.id] else { return }
+        let toCanvas = particleLocalToCanvas(currentTransform(layerID: layer.id) ?? layer.transform)
+        let tint = drawn.layer.tint
+        let opacity = Float(min(max(drawn.layer.opacity * tint.alpha * drawn.opacity, 0), 1))
+        try simulator.forEach { node in
+            let system = node.system
+            let texture = system.textureFile.flatMap { particleTextures[$0] } ?? whiteTexture
+            var aspect = Double(texture.height) / Double(max(texture.width, 1))
+            if let sheet = system.sheet, sheet.columns > 0, sheet.rows > 0 {
+                aspect *= Double(sheet.columns) / Double(sheet.rows)
+            }
+            let instances = node.instances(aspect: aspect)
+            guard !instances.isEmpty else { return }
+            let length = instances.count * MemoryLayout<SceneParticleSimulator.Instance>.stride
+            guard let buffer = device.makeBuffer(bytes: instances, length: length, options: .storageModeShared) else {
+                throw RendererError.textureAllocationFailed
+            }
+            let style = SceneModelRenderer.SpaceParticleStyle(
+                column0: SIMD2(toCanvas.columns.0.x, toCanvas.columns.0.y),
+                column1: SIMD2(toCanvas.columns.1.x, toCanvas.columns.1.y),
+                origin: SIMD2(toCanvas.columns.2.x, toCanvas.columns.2.y),
+                plane: SIMD4(Float(space.width), Float(space.height), Float(space.offsetX), Float(space.offsetY)),
+                tint: SIMD4(Float(tint.red), Float(tint.green), Float(tint.blue), opacity),
+                brightness: Float(system.brightness),
+                cutout: system.cutout.map { SIMD3(Float($0.start), Float($0.end), Float($0.opacity)) },
+                blend: system.blend,
+                fog: system.receivesFog == true ? document.camera?.fog : nil
+            )
+            try modelRenderer!.drawParticles(
+                instances: buffer, count: instances.count, texture: texture, world: drawn.world ?? space.matrix, view: view,
+                style: style, depthTest: space.depthTest, depthWrite: space.depthWrite, format: format, encoder: encoder
+            )
         }
     }
 
