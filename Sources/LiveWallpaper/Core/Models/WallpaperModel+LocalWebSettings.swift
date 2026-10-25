@@ -60,8 +60,8 @@ extension WallpaperModel {
     }
 
     func hasAuthorSettings(forPath path: String) -> Bool {
-        if let doc = sceneDocumentsByPath[path] {
-            return !(doc.properties ?? []).isEmpty
+        if let properties = sceneDocumentsByPath[path]?.properties {
+            return !properties.isEmpty
         }
         let propURL = SceneStore.folderURL(forVideoPath: path).appendingPathComponent("properties.json")
         if FileManager.default.fileExists(atPath: propURL.path) {
@@ -70,6 +70,9 @@ extension WallpaperModel {
                 return !props.isEmpty
             }
             return false
+        }
+        if let properties = legacyAuthorProperties(forPath: path) {
+            return !properties.isEmpty
         }
         let sceneURL = SceneStore.folderURL(forVideoPath: path).appendingPathComponent("scene.json")
         if FileManager.default.fileExists(atPath: sceneURL.path) {
@@ -82,6 +85,32 @@ extension WallpaperModel {
             }
         }
         return false
+    }
+
+    private func legacyAuthorProperties(forPath path: String) -> [LocalWebProperty]? {
+        guard let externalID = importedExternalWallpaperPaths.first(where: { $0.value == path })?.key else { return nil }
+        let wallpaper = externalWallpapers.first { $0.id == externalID }
+        if let properties = wallpaper?.properties { return properties }
+        var folders = wallpaper?.sceneFolderPath.map { [URL(fileURLWithPath: $0)] } ?? []
+        let prefix = "we-import.json/"
+        if externalID.hasPrefix(prefix) {
+            let itemID = String(externalID.dropFirst(prefix.count))
+            if !itemID.isEmpty, itemID.allSatisfy({ $0.isASCII && $0.isNumber }) {
+                let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                folders.append(support.appendingPathComponent("we-import/Wallpapers/we-\(itemID)/wallpaper.scene"))
+            }
+        }
+        for folder in folders {
+            let file = folder.appendingPathComponent("properties.json")
+            guard FileManager.default.fileExists(atPath: file.path) else { continue }
+            do {
+                return try JSONDecoder().decode([LocalWebProperty].self, from: Data(contentsOf: file))
+            } catch {
+                AppLog.externalWallpapers.error("legacy author settings schema failed: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
+        }
+        return nil
     }
 
     func hasAuthorSettings(forExternalWallpaper wallpaper: ExternalWallpaper) -> Bool {
@@ -240,9 +269,6 @@ extension WallpaperModel {
     func authorSettingsContext(forPath path: String) -> WallpaperAuthorSettingsContext? {
         var properties: [LocalWebProperty]? = sceneDocumentsByPath[path]?.properties
         if properties == nil {
-            if sceneDocumentsByPath[path] != nil {
-                return nil
-            }
             let propURL = SceneStore.folderURL(forVideoPath: path).appendingPathComponent("properties.json")
             if FileManager.default.fileExists(atPath: propURL.path) {
                 if let data = try? Data(contentsOf: propURL),
@@ -250,6 +276,9 @@ extension WallpaperModel {
                     properties = props
                 }
             } else {
+                properties = legacyAuthorProperties(forPath: path)
+            }
+            if properties == nil {
                 let sceneURL = SceneStore.folderURL(forVideoPath: path).appendingPathComponent("scene.json")
                 if FileManager.default.fileExists(atPath: sceneURL.path) {
                     let fileSize = (try? FileManager.default.attributesOfItem(atPath: sceneURL.path)[.size] as? Int64) ?? 0

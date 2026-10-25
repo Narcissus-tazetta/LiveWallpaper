@@ -326,7 +326,7 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         XCTAssertEqual(loaded.values["tint"], .string("#ff0000"))
     }
 
-    func testHasAuthorSettingsDoesNotFallThroughWhenPropertiesNil() throws {
+    func testLoadedLegacySceneReadsAuthorSettingsFromSidecar() throws {
         let model = WallpaperModel()
         let videoURL = tempDirectory.appendingPathComponent("fallthrough-\(UUID().uuidString).mp4")
         let path = videoURL.path
@@ -353,7 +353,10 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         }
         defer { cancellable.cancel() }
 
-        XCTAssertFalse(model.hasAuthorSettings(forPath: path))
+        XCTAssertTrue(model.hasAuthorSettings(forPath: path))
+        let context = try XCTUnwrap(model.authorSettingsContext(forPath: path))
+        XCTAssertEqual(context.properties, [prop])
+        XCTAssertEqual(model.sceneDocumentsByPath[path], document)
         XCTAssertEqual(changeCount, 0)
     }
 
@@ -602,6 +605,43 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         let destination = tempDirectory.appendingPathComponent("destination.mp4").path
         XCTAssertThrowsError(try SceneStore.importScene(from: source, videoPath: destination))
         XCTAssertFalse(SceneStore.hasScene(videoPath: destination))
+    }
+
+    func testLegacyLibraryCopyUsesProviderSchemaWithoutModifyingScene() throws {
+        let model = WallpaperModel()
+        let path = tempDirectory.appendingPathComponent("old-import.mp4").path
+        let document = SceneDocument(canvasWidth: 100, canvasHeight: 80, layers: [])
+        let property = LocalWebProperty(id: "speed", kind: "slider", label: ["en": "Speed"], value: .number(1))
+        let externalID = "provider/legacy"
+        model.importedExternalWallpaperPaths[externalID] = path
+        model.externalWallpapers = [ExternalWallpaper(id: externalID, providerName: "Provider", name: "Legacy", path: "/provider/video.mp4", properties: [property])]
+        model.sceneDocumentsByPath[path] = document
+        var changeCount = 0
+        let subscription = model.objectWillChange.sink { _ in changeCount += 1 }
+        defer { subscription.cancel() }
+        XCTAssertTrue(model.hasAuthorSettings(forPath: path))
+        let context = try XCTUnwrap(model.authorSettingsContext(forPath: path))
+        XCTAssertEqual(context.properties, [property])
+        XCTAssertEqual(model.sceneDocumentsByPath[path], document)
+        XCTAssertEqual(changeCount, 0)
+        model.sceneDocumentsByPath[path]?.properties = []
+        XCTAssertFalse(model.hasAuthorSettings(forPath: path))
+        XCTAssertNil(model.authorSettingsContext(forPath: path))
+    }
+
+    func testLegacyLibraryCopyCanReadProviderSidecar() throws {
+        let model = WallpaperModel()
+        let path = tempDirectory.appendingPathComponent("old-import-sidecar.mp4").path
+        let folder = tempDirectory.appendingPathComponent("provider.scene")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let property = LocalWebProperty(id: "tint", kind: "color", label: ["en": "Tint"], value: .string("1 0 0"))
+        try JSONEncoder().encode([property]).write(to: folder.appendingPathComponent("properties.json"))
+        let externalID = "provider/legacy-sidecar"
+        model.importedExternalWallpaperPaths[externalID] = path
+        model.externalWallpapers = [ExternalWallpaper(id: externalID, providerName: "Provider", name: "Legacy", path: "/provider/video.mp4", sceneFolderPath: folder.path)]
+        model.sceneDocumentsByPath[path] = SceneDocument(canvasWidth: 100, canvasHeight: 80, layers: [])
+        XCTAssertTrue(model.hasAuthorSettings(forPath: path))
+        XCTAssertEqual(try XCTUnwrap(model.authorSettingsContext(forPath: path)).properties, [property])
     }
 
 }
