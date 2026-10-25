@@ -1084,6 +1084,9 @@ struct SceneCamera: Codable, Equatable {
     var shadowLights: [SceneShadowLight]?
     /// Moves the camera on its own from the moment the scene is shown.
     var path: SceneCameraPath?
+    /// Draws the scene's layers far to near, by their distance from the eye, instead of in
+    /// the order they are listed.
+    var sortsByDistance: Bool?
 
     var isValid: Bool {
         [eye, center, up, ambientColor, skylightColor].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }

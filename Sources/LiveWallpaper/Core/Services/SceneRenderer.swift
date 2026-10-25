@@ -819,6 +819,21 @@ final class SceneRenderer {
                 prepared.append(.plane(picture, drawn, space))
             }
         }
+        if document.camera?.sortsByDistance == true {
+            // Ties keep the listed order. How the distance is measured off the camera's axis
+            // was not measured; the straight line from the eye to the layer's origin is used.
+            func distance(_ item: Prepared) -> Float {
+                let world: simd_float4x4 = switch item {
+                case let .model(model): model.world
+                case let .plane(_, drawn, space): drawn.world ?? space.matrix
+                }
+                return simd_distance(SIMD3(world.columns.3.x, world.columns.3.y, world.columns.3.z), views.flat.eye)
+            }
+            var keyed: [(distance: Float, index: Int, item: Prepared)] = []
+            for (index, item) in prepared.enumerated() { keyed.append((distance(item), index, item)) }
+            keyed.sort { $0.distance == $1.distance ? $0.index < $1.index : $0.distance > $1.distance }
+            prepared = keyed.map(\.item)
+        }
         var views = views
         if let lights = document.camera?.shadowLights, !lights.isEmpty {
             let casters = prepared.compactMap { item -> SceneModelLayerFrame? in
