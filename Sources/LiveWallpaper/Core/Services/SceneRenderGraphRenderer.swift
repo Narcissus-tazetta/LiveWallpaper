@@ -739,13 +739,17 @@ final class SceneRenderGraphRenderer {
                 continue
             case .normalModel:
                 guard let model else { continue }
-                // Normals turn by the inverse transpose of the model's 3×3, each column padded to 16 bytes.
+                // Normals turn by the model's axes with the scale divided out, each column padded to 16 bytes. The
+                // inverse transpose would stretch the normals of a mesh squashed along one axis (a sphere scaled
+                // to 3 3 0.00001 shades like a sphere in the capture, not like a plane facing the camera).
                 let linear = simd_float3x3(columns: (
                     SIMD3(model.model.columns.0.x, model.model.columns.0.y, model.model.columns.0.z),
                     SIMD3(model.model.columns.1.x, model.model.columns.1.y, model.model.columns.1.z),
                     SIMD3(model.model.columns.2.x, model.model.columns.2.y, model.model.columns.2.z)
                 ))
-                let normal = linear.inverse.transpose
+                let normal = simd_float3x3(columns: (
+                    simd_normalize(linear.columns.0), simd_normalize(linear.columns.1), simd_normalize(linear.columns.2)
+                ))
                 var padded = [Float](repeating: 0, count: 12)
                 for (column, vector) in [normal.columns.0, normal.columns.1, normal.columns.2].enumerated() {
                     padded[column * 4] = vector.x
