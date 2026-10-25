@@ -47,8 +47,8 @@ struct SceneScript: Codable, Equatable, Identifiable {
         layerIDs = try c.decode([UUID].self, forKey: .layerIDs)
         targetsAllLayers = try c.decodeIfPresent(Bool.self, forKey: .targetsAllLayers) ?? false
         params = try c.decode([String: Double].self, forKey: .params)
-        guard (modules?.count ?? 0) <= 256,
-              (modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 1048576,
+        guard (modules?.count ?? 0) <= 2048,
+              (modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 4194304,
               modules?.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }) != false,
               source.utf8.count <= 65536, layerIDs.count <= 512, params.count <= 64,
               params.allSatisfy({ $0.key.utf8.count <= 128 && $0.value.isFinite })

@@ -19,10 +19,14 @@ final class SceneScriptRuntime {
     /// The first run of a module bundle also loads its modules and runs every init,
     /// once: it gets the time compiling gets instead of one frame's share.
     static let moduleStartSeconds: TimeInterval = 0.1
+    /// A start that ran out of time is tried again with this many times more, up to the cap,
+    /// since a large bundle needs the time to finish loading however often it is retried.
+    private static let maximumStartScale = 10.0
     /// The messages of running out of time: Bridge.c's for one script, and evaluate's
     /// for the frame.
     private static let timeLimitMessages: Set = ["Execution time limit exceeded", "Frame execution time limit exceeded"]
     private var programs: [UUID: Program] = [:]
+    private var startScales: [UUID: Double] = [:]
     private(set) var logs: [UUID: String] = [:]
 
     deinit {
@@ -48,8 +52,8 @@ final class SceneScriptRuntime {
             throw SceneScriptIssue(scriptID: script.id, name: script.name, message: "Script source cannot contain NUL")
         }
         guard script.source.utf8.count <= 65536,
-              (script.modules?.count ?? 0) <= 256,
-              (script.modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 1048576,
+              (script.modules?.count ?? 0) <= 2048,
+              (script.modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 4194304,
               script.modules?.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }) != false
         else { throw issue("Script bundle exceeds supported limits", script: script) }
         if let old = programs.removeValue(forKey: script.id) { destroy(old.pointer, id: script.id, reason: "source changed") }
@@ -115,10 +119,11 @@ final class SceneScriptRuntime {
             let starting = script.modules != nil && !programs[script.id]!.hasStarted
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
             guard remaining > 0 || starting else { throw failure("Frame execution time limit exceeded") }
-            let budget = starting ? max(min(remaining, perScript), Self.moduleStartSeconds) : min(remaining, perScript)
+            let startScale = startScales[script.id] ?? 1
+            let budget = starting ? max(min(remaining, perScript), Self.moduleStartSeconds * startScale) : min(remaining, perScript)
             var error: UnsafeMutablePointer<CChar>?
             let otherMemory = programs.keys.filter { $0 != script.id }.reduce(0) { $0 + memoryBytes(of: $1) }
-            lwjs_set_memory_limit(programs[script.id]!.pointer, min(16 * 1024 * 1024, Self.maximumMemoryBytes - otherMemory))
+            lwjs_set_memory_limit(programs[script.id]!.pointer, min(64 * 1024 * 1024, Self.maximumMemoryBytes - otherMemory))
             let pointer = programs[script.id]!.pointer
             lwjs_set_storage(pointer, Self.storageHandler, Unmanaged.passUnretained(storage).toOpaque())
             let result = withExtendedLifetime(storage) {
@@ -136,6 +141,9 @@ final class SceneScriptRuntime {
                 // short while the modules were still initializing is half-built, though.
                 if script.modules != nil, !starting, Self.timeLimitMessages.contains(message) {
                     throw failure(message)
+                }
+                if starting, Self.timeLimitMessages.contains(message) {
+                    startScales[script.id] = min(startScale * 2, Self.maximumStartScale)
                 }
                 destroy(programs.removeValue(forKey: script.id)!.pointer, id: script.id,
                         reason: Self.timeLimitMessages.contains(message) ? "time limit" : "script error",
@@ -205,6 +213,7 @@ final class SceneScriptRuntime {
             destroy(programs.removeValue(forKey: id)!.pointer, id: id, reason: "retain")
         }
         logs = logs.filter { ids.contains($0.key) }
+        startScales = startScales.filter { ids.contains($0.key) }
     }
 
     private func failure(_ message: String) -> SceneScriptIssue {
@@ -659,7 +668,7 @@ final class SceneScriptRuntime {
                     try choices(effect, values: ["kind": Set(SceneEffectKind.allCases.map(\.rawValue)), "fixedEdge": Set(SceneFixedEdge.allCases.map(\.rawValue))], path: "effects")
                     if let rawValues = effect["values"] {
                         let values = try object(rawValues, path: "effects.values")
-                        guard values.count <= 64 else { throw failure("effects.values: expected at most 64 entries") }
+                        guard values.count <= 256 else { throw failure("effects.values: expected at most 256 entries") }
                         try numbers(values, ranges: Dictionary(uniqueKeysWithValues: values.keys.map { ($0, -1e9 ... 1e9) }), path: "effects.values")
                     }
                     adjustment.effects[effectID] = try decode(SceneScriptEffectValues.self, effect)

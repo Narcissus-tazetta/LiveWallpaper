@@ -325,7 +325,7 @@ LWJSProgram *lwjs_compile(const char *source, char **error) {
         *error = strdup("Could not allocate JavaScript runtime");
         return NULL;
     }
-    JS_SetMemoryLimit(program->runtime, 16 * 1024 * 1024);
+    JS_SetMemoryLimit(program->runtime, 64 * 1024 * 1024);
     update_stack_limit(program->runtime);
     JS_SetCanBlock(program->runtime, false);
     JS_SetInterruptHandler(program->runtime, interrupt, program);

@@ -50,6 +50,25 @@ final class SceneScriptModuleTests: XCTestCase {
         XCTAssertEqual(try offset(4).0, 0.03)
     }
 
+    func testBundleSlowerThanTheScreenBudgetGetsMoreTimeAndKeepsRunning() throws {
+        let document = scene(source: """
+        import { next } from './lib/counter.js';
+        export function update(c) {
+          let x = 0; for (let i = 0; i < 4e5; i++) x += i;
+          return [{id:c.targets[0].id, values:{offsetX:next()}}];
+        }
+        """, modules: ["lib/counter.js": "let n=0; export function next(){return ++n/100;}"])
+        let evaluator = SceneFrameEvaluator()
+        let id = document.layers[0].id
+        var offset = 0.0
+        for index in 1 ... 12 {
+            let frame = try evaluator.evaluate(document, input: .init(time: Double(index)), timeOfDay: .day, failOnError: false)
+            XCTAssertTrue(frame.issues.isEmpty, "\(frame.issues.map(\.message))")
+            offset = frame.layers[id]!.transform.offsetX
+        }
+        XCTAssertGreaterThan(offset, 0.05)
+    }
+
     func testBundleThatKeepsRunningOutOfTimeStops() throws {
         let document = scene(source: """
         export function update(c) {

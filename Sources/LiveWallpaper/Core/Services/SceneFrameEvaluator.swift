@@ -49,6 +49,13 @@ final class SceneFrameEvaluator {
     /// What each script last returned, shown again for a frame it ran out of time in.
     private var lastOutputs: [UUID: SceneScriptOutput] = [:]
     private var consecutiveTimeouts: [UUID: Int] = [:]
+    /// How many times its normal time a module bundle gets: one that runs out of time
+    /// is given more on the next frame, up to `maximumTimeScale`, so a heavy scene runs
+    /// at a lower frame rate instead of never finishing a frame.
+    private var timeScales: [UUID: Double] = [:]
+    private static let maximumTimeScale = 16.0
+    /// Read for every frame, and scanning a large bundle's code for it takes as long as running it.
+    private var audioScripts: Set<UUID> = []
     /// A script that keeps running out of time is slower than the frame rate allows;
     /// after this many frames in a row it is stopped, as one that cannot run at all.
     private static let maximumHeldFrames = 30
@@ -99,6 +106,8 @@ final class SceneFrameEvaluator {
             resumeTimes = [:]
             lastOutputs = [:]
             consecutiveTimeouts = [:]
+            timeScales = [:]
+            audioScripts = Set(document.scripts.filter(\.usesAudio).map(\.id))
             cachedScriptTargets.removeAll(keepingCapacity: true)
             previousScripts = document.scripts
             runtime.retainPrograms(for: Set(document.scripts.map(\.id)))
@@ -115,7 +124,8 @@ final class SceneFrameEvaluator {
                 if failOnError { throw issue }
             }
         }
-        let deadline = ProcessInfo.processInfo.systemUptime + budget.perFrame
+        let allowance = document.scripts.reduce(0) { $0 + budget.perScript * (timeScales[$1.id] ?? 1) }
+        let deadline = ProcessInfo.processInfo.systemUptime + max(budget.perFrame, allowance)
         let phase = (input.time / Double(document.loopSeconds)).truncatingRemainder(dividingBy: 1)
         let normalizedPhase = phase < 0 ? phase + 1 : phase
         var base: [UUID: SceneEvaluatedFrame.Layer] = [:]
@@ -252,7 +262,7 @@ final class SceneFrameEvaluator {
                     member("media")
                     try context.value(Self.mediaInput(input.media))
                 } else { missing.append("media") }
-                if script.usesAudio {
+                if audioScripts.contains(script.id) {
                     member("audio")
                     if let audio = input.audio {
                         let position = context.beginObject()
@@ -271,16 +281,22 @@ final class SceneFrameEvaluator {
                 let output: SceneScriptOutput
                 // A held frame repeats the last output, whose particle requests were already carried out.
                 var heldOutput = false
+                let scale = timeScales[script.id] ?? 1
+                let started = ProcessInfo.processInfo.systemUptime
                 do {
                     output = try runtime.evaluate(
                         script, input: context, elapsedTime: input.time, layers: document.layers, rigs: document.rigs, storage: storage,
-                        perScript: budget.perScript, deadline: deadline
+                        perScript: budget.perScript * scale, deadline: deadline
                     )
+                    if scale > 1, ProcessInfo.processInfo.systemUptime - started < budget.perScript * scale / 4 {
+                        timeScales[script.id] = max(scale / 2, 1)
+                    }
                     consecutiveTimeouts[script.id] = nil
                     lastOutputs[script.id] = output
                 } catch let issue as SceneScriptIssue where !failOnError && issue.isTemporary && runtime.isLoaded(script.id) {
                     // A slow frame (other work took the CPU) is skipped: the script keeps its
                     // state, so its animations carry on instead of restarting.
+                    if script.modules != nil { timeScales[script.id] = min(scale * 2, Self.maximumTimeScale) }
                     let count = (consecutiveTimeouts[script.id] ?? 0) + 1
                     guard count <= Self.maximumHeldFrames else { throw issue }
                     consecutiveTimeouts[script.id] = count
