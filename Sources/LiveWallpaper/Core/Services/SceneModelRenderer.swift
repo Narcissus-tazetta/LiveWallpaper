@@ -533,15 +533,19 @@ final class SceneModelRenderer {
         return simd_float4x4(columns: (SIMD4(f / aspect, 0, 0, 0), SIMD4(0, f, 0, 0), SIMD4(0, 0, 0, 0), SIMD4(0, 0, 0.5, 1)))
     }
 
+    private static let canvasDepthRange: Float = 40000
+
     /// Scene pixels (origin bottom left, y up) to the clip space of a target that shows
-    /// `viewport` (origin and size in canvas UV, y down) of the canvas.
+    /// `viewport` (origin and size in canvas UV, y down) of the canvas. Depth follows the scene z
+    /// (larger is nearer; measured: overlapping opaque models are ordered by z, not by layer order),
+    /// without scaling the picture.
     static func canvasProjection(width: Double, height: Double, viewport: SIMD4<Float>) -> simd_float4x4 {
         let w = Float(width), h = Float(height)
         let vx = viewport.x, vy = viewport.y, vw = viewport.z, vh = viewport.w
         return simd_float4x4(columns: (
             SIMD4(2 / (w * vw), 0, 0, 0),
             SIMD4(0, 2 / (h * vh), 0, 0),
-            SIMD4(0, 0, 0, 0),
+            SIMD4(0, 0, -1 / canvasDepthRange, 0),
             SIMD4(-2 * vx / vw - 1, 1 - 2 * (1 - vy) / vh, 0.5, 1)
         ))
     }
