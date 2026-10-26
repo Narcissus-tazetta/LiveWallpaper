@@ -78,7 +78,7 @@ final class SceneRenderGraphRenderer {
     private var pointerHeld = false
     private var frame = FrameValues()
 
-    private struct FrameValues {
+    struct FrameValues {
         var pointer = SIMD2<Float>.zero
         var previousPointer = SIMD2<Float>.zero
         var layerFromCanvas = matrix_identity_float4x4
@@ -87,6 +87,19 @@ final class SceneRenderGraphRenderer {
         var frameTime: Float = 0
         var pointerHeld = false
         var parallax = SIMD2<Float>.zero
+    }
+
+    /// What a model layer's material reads of the layer.
+    struct ModelValues {
+        var modelViewProjection: simd_float4x4
+        var model: simd_float4x4
+        var viewProjection: simd_float4x4
+        var alpha: Float
+        var color: SIMD3<Float>
+        var eye: SIMD3<Float>
+        var ambient: SIMD3<Float>
+        var skylight: SIMD3<Float>
+        var shadowMatrices: [simd_float4x4] = []
     }
 
     /// `uv` (canvas UV → layer UV, origin top-left) as the same map between clip spaces
@@ -602,8 +615,10 @@ final class SceneRenderGraphRenderer {
         effectValues: [String: Double],
         audio: SceneAudioSpectrum?
     ) throws -> UniformBinding {
-        guard let data = updatedUniforms(
+        guard let data = Self.updatedUniforms(
             stage,
+            frame: frame,
+            model: nil,
             resources: resources,
             time: time,
             cursor: cursor,
@@ -640,8 +655,10 @@ final class SceneRenderGraphRenderer {
         }
     }
 
-    private func updatedUniforms(
+    static func updatedUniforms(
         _ stage: SceneRenderGraph.Stage,
+        frame: FrameValues,
+        model: ModelValues?,
         resources: [String: MTLTexture],
         time: Double,
         cursor: SIMD2<Float>?,
@@ -711,6 +728,51 @@ final class SceneRenderGraphRenderer {
                     }
                 }
                 continue
+            case .modelViewProjection, .model, .viewProjection:
+                guard let model else { continue }
+                var matrix = switch update.value {
+                case .modelViewProjection: model.modelViewProjection
+                case .model: model.model
+                default: model.viewProjection
+                }
+                withUnsafeBytes(of: &matrix) { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
+                continue
+            case .normalModel:
+                guard let model else { continue }
+                // Normals turn by the model's axes with the scale divided out, each column padded to 16 bytes. The
+                // inverse transpose would stretch the normals of a mesh squashed along one axis (a sphere scaled
+                // to 3 3 0.00001 shades like a sphere in the capture, not like a plane facing the camera).
+                let linear = simd_float3x3(columns: (
+                    SIMD3(model.model.columns.0.x, model.model.columns.0.y, model.model.columns.0.z),
+                    SIMD3(model.model.columns.1.x, model.model.columns.1.y, model.model.columns.1.z),
+                    SIMD3(model.model.columns.2.x, model.model.columns.2.y, model.model.columns.2.z)
+                ))
+                let normal = simd_float3x3(columns: (
+                    simd_normalize(linear.columns.0), simd_normalize(linear.columns.1), simd_normalize(linear.columns.2)
+                ))
+                var padded = [Float](repeating: 0, count: 12)
+                for (column, vector) in [normal.columns.0, normal.columns.1, normal.columns.2].enumerated() {
+                    padded[column * 4] = vector.x
+                    padded[column * 4 + 1] = vector.y
+                    padded[column * 4 + 2] = vector.z
+                }
+                padded.withUnsafeBytes { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
+                continue
+            case .shadowMatrix:
+                // Without a shadow map the matrix stays zero and the lookup falls outside it.
+                guard let model, let index = update.key.flatMap(Int.init), model.shadowMatrices.indices.contains(index) else { continue }
+                var matrix = model.shadowMatrices[index]
+                withUnsafeBytes(of: &matrix) { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
+                continue
+            case .layerAlpha: values = [model?.alpha ?? 1]
+            case .layerColor: values = model.map { [$0.color.x, $0.color.y, $0.color.z] } ?? [1, 1, 1]
+            case .eyePosition, .ambientColor, .skylightColor:
+                let value: SIMD3<Float>? = switch update.value {
+                case .eyePosition: model?.eye
+                case .ambientColor: model?.ambient
+                default: model?.skylight
+                }
+                values = [value?.x ?? 0, value?.y ?? 0, value?.z ?? 0]
             case .effectValue:
                 let count = update.components ?? 1
                 let key = update.key!
@@ -903,6 +965,9 @@ final class SceneRenderGraphRenderer {
                 case .parallaxPosition, .texelSize: bytes = 8
                 case .texelOffsets: bytes = 16
                 case .textureSize: bytes = 16
+                case .modelViewProjection, .model, .normalModel, .viewProjection, .layerAlpha, .layerColor, .eyePosition,
+                     .ambientColor, .skylightColor, .shadowMatrix:
+                    throw GraphError(detail: "model layer values outside a model layer")
                 case .boneMatrices, .boneOpacity:
                     let count = (draw.skeleton ?? draw.skeletonID.flatMap { rigs.skeletons[$0] })?
                         .bones.count ?? 0

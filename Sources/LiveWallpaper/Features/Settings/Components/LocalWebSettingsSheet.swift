@@ -3,24 +3,27 @@ import SwiftUI
 
 struct LocalWebSettingsSheet: View {
     @ObservedObject var model: WallpaperModel
-    let source: WebWallpaperSource
+    let context: WallpaperAuthorSettingsContext
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var integration = LocalWebIntegration.shared
-    @State private var package: LocalWebWallpaperPackage?
     @State private var settings = LocalWebSettings()
     @State private var error: String?
     @State private var search = ""
     @State private var importingFile = false
+    @State private var savedSettings = LocalWebSettings()
+    @State private var isApplying = false
+
+    init(model: WallpaperModel, context: WallpaperAuthorSettingsContext) {
+        self.model = model
+        self.context = context
+    }
 
     private func localized(_ key: String) -> String {
         model.localizedString(key)
     }
 
     private var values: [String: WebPropertyValue] {
-        var values = Dictionary(uniqueKeysWithValues: (package?.properties ?? []).map { (
-            $0.id,
-            $0.value
-        ) })
+        var values = Dictionary(context.properties.map { ($0.id, $0.value) }, uniquingKeysWith: { _, last in last })
         values.merge(settings.values) { _, new in new }
         return values
     }
@@ -28,15 +31,30 @@ struct LocalWebSettingsSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(source.displayName).font(.headline).lineLimit(1)
+                Text(context.title).font(.headline).lineLimit(1)
                 Spacer()
-                Button(localized("完了")) { dismiss() }.keyboardShortcut(.defaultAction)
+                if context.applySettings != nil {
+                    Button(localized("キャンセル")) { dismiss() }.disabled(isApplying)
+                }
+                Button(localized("完了")) {
+                    if context.applySettings != nil, settings != savedSettings {
+                        apply(dismissAfterward: true)
+                    } else {
+                        dismiss()
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(isApplying || importingFile)
             }
-            if let package {
-                if package.supportsSpectrum == true || package.supportsMedia == true {
+            if context.applySettings != nil {
+                Text(localized("設定を適用すると、元作品から作り直します。シーン編集での変更は置き換えられます。"))
+                    .font(.caption).foregroundColor(.secondary)
+            }
+            Group {
+                if context.supportsSpectrum || context.supportsMedia {
                     GroupBox {
                         VStack(alignment: .leading, spacing: 8) {
-                            if package.supportsSpectrum == true {
+                            if context.supportsSpectrum {
                                 Toggle(localized("システム音に反応"), isOn: toggle(\.audioReactiveEnabled))
                                 Text(localized("システム音の取得には、画面収録の許可が必要です。音声は保存しません。"))
                                     .font(.caption).foregroundColor(.secondary)
@@ -46,7 +64,7 @@ struct LocalWebSettingsSheet: View {
                                     IntegrationFailureNote(model: model, message: error, privacy: "Privacy_ScreenCapture")
                                 }
                             }
-                            if package.supportsMedia == true {
+                            if context.supportsMedia {
                                 Toggle(localized("Music／Spotifyの曲情報"), isOn: toggle(\.mediaEnabled))
                                 Text(localized("起動中のアプリから曲名・ジャケット・再生状態を取得します。初回はオートメーションの許可が必要です。"))
                                     .font(.caption).foregroundColor(.secondary)
@@ -57,48 +75,61 @@ struct LocalWebSettingsSheet: View {
                         }.padding(4)
                     }
                 }
-                TextField(localized("検索"), text: $search).textFieldStyle(.roundedBorder)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        ForEach(package.properties ?? []) { property in
-                            let label = LocalWebProperty.text(
-                                property.label,
-                                locale: model.appLocale
-                            )
-                            let condition = property.condition
-                                .flatMap { LocalWebPropertyCondition.evaluate(
-                                    $0,
-                                    values: values
-                                ) }
-                            if condition != false,
-                               search.isEmpty || label.localizedCaseInsensitiveContains(search)
-                            {
-                                propertyRow(property, label: label)
-                                if property.condition != nil, condition == nil {
-                                    Text(localized("この項目の表示条件には未対応です。常に表示します。"))
-                                        .font(.caption).foregroundColor(.secondary)
+                if !context.properties.isEmpty {
+                    TextField(localized("検索"), text: $search).textFieldStyle(.roundedBorder)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 14) {
+                            ForEach(context.properties) { property in
+                                let label = LocalWebProperty.text(
+                                    property.label,
+                                    locale: model.appLocale
+                                )
+                                let condition = property.condition
+                                    .flatMap { LocalWebPropertyCondition.evaluate(
+                                        $0,
+                                        values: values
+                                    ) }
+                                if condition != false,
+                                   search.isEmpty || label.localizedCaseInsensitiveContains(search)
+                                {
+                                    propertyRow(property, label: label)
+                                    if property.condition != nil, condition == nil {
+                                        Text(localized("この項目の表示条件には未対応です。常に表示します。"))
+                                            .font(.caption).foregroundColor(.secondary)
+                                    }
                                 }
                             }
-                        }
-                    }.padding(4)
-                }
-                HStack {
-                    Button(localized("既定値に戻す")) {
-                        settings.values = [:]
-                        save()
+                        }.padding(4)
                     }
-                    Spacer()
-                    if importingFile { ProgressView().controlSize(.small) }
+                    HStack {
+                        Button(localized("既定値に戻す")) {
+                            settings.values = [:]
+                            save()
+                        }
+                        Spacer()
+                        if importingFile { ProgressView().controlSize(.small) }
+                        if context.applySettings != nil {
+                            if isApplying {
+                                ProgressView().controlSize(.small)
+                                Text(localized("準備中…")).foregroundColor(.secondary)
+                            }
+                            Button(localized("適用")) { apply() }
+                                .disabled(isApplying || importingFile || settings == savedSettings)
+                        }
+                    }
                 }
             }
+            .disabled(isApplying)
             if let error { Text(error).font(.caption).foregroundColor(.red).textSelection(.enabled)
             }
         }
         .padding(20)
-        .frame(width: 560, height: 620)
+        .frame(width: 560, height: context.properties.isEmpty ? nil : 620)
+        .interactiveDismissDisabled(isApplying)
         .task {
             do {
-                (package, settings) = try model.localWebConfiguration(for: source)
+                settings = try context.loadSettings()
+                savedSettings = settings
             } catch { self.error = error.localizedDescription }
         }
     }
@@ -141,7 +172,7 @@ struct LocalWebSettingsSheet: View {
                         Slider(
                             value: binding(
                                 property,
-                                read: { $0.number },
+                                read: { min(max($0.number, minimum), maximum) },
                                 write: WebPropertyValue.number
                             ),
                             in: minimum ... maximum,
@@ -151,7 +182,7 @@ struct LocalWebSettingsSheet: View {
                         Slider(
                             value: binding(
                                 property,
-                                read: { $0.number },
+                                read: { min(max($0.number, minimum), maximum) },
                                 write: WebPropertyValue.number
                             ),
                             in: minimum ... maximum
@@ -176,7 +207,9 @@ struct LocalWebSettingsSheet: View {
                     blue: components[2]
                 ) : .black
             }, write: { color in
-                let rgb = NSColor(color).usingColorSpace(.sRGB)!
+                guard let rgb = NSColor(color).usingColorSpace(.sRGB) else {
+                    return .string("0 0 0")
+                }
                 return .string("\(rgb.redComponent) \(rgb.greenComponent) \(rgb.blueComponent)")
             }), supportsOpacity: false)
         case "textinput":
@@ -197,7 +230,7 @@ struct LocalWebSettingsSheet: View {
                         settings.values[property.id] = property.value; save()
                     }
                 }
-                Button(localized("ファイルを選択")) { selectFile(property) }.disabled(importingFile)
+                Button(localized("ファイルを選択")) { selectFile(property) }.disabled(importingFile || context.importFile == nil)
             }
         case "group":
             Divider()
@@ -209,6 +242,7 @@ struct LocalWebSettingsSheet: View {
     }
 
     private func selectFile(_ property: LocalWebProperty) {
+        guard let importFile = context.importFile else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
@@ -219,10 +253,7 @@ struct LocalWebSettingsSheet: View {
                 defer { importingFile = false }
                 do {
                     settings
-                        .values[property.id] = try await .string(model.importLocalWebPropertyFile(
-                            url,
-                            source: source
-                        ))
+                        .values[property.id] = try await .string(importFile(url))
                     save()
                 } catch { self.error = error.localizedDescription }
             }
@@ -230,9 +261,26 @@ struct LocalWebSettingsSheet: View {
     }
 
     private func save() {
+        guard context.applySettings == nil else { return }
         do {
-            try model.saveLocalWebSettings(settings, source: source)
+            try context.saveSettings(settings)
+            savedSettings = settings
             error = nil
         } catch { self.error = error.localizedDescription }
+    }
+
+    private func apply(dismissAfterward: Bool = false) {
+        guard let applySettings = context.applySettings else { return }
+        isApplying = true
+        error = nil
+        let snapshot = settings
+        Task { @MainActor in
+            defer { isApplying = false }
+            do {
+                try await applySettings(snapshot)
+                savedSettings = snapshot
+                if dismissAfterward { dismiss() }
+            } catch { self.error = localized(error.localizedDescription) }
+        }
     }
 }

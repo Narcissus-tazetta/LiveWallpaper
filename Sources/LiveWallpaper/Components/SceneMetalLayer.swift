@@ -82,8 +82,28 @@ final class SceneMetalLayer: CAMetalLayer {
     }
     private var artwork: Artwork?
     private var loadingVideos: Set<String> = []
+    /// The screen whose per-screen storage area the scene's scripts use. nil (the
+    /// editor preview, a window on no screen) gives them the global area under both names.
+    var storageScreen: String? {
+        didSet { if storageScreen != oldValue { storage = nil } }
+    }
+    private var storage: SceneScriptStorage.Session?
     var scriptIssueHandler: (([SceneScriptIssue]) -> Void)?
     var scriptLogHandler: (([UUID: String]) -> Void)?
+
+    var userProperties: [String: WebPropertyValue]? {
+        didSet {
+            guard userProperties != oldValue else { return }
+            current.userProperties = userProperties
+            target.userProperties = userProperties
+            redraw()
+        }
+    }
+
+    static func loadUserProperties(forVideoPath videoPath: String) -> [String: WebPropertyValue]? {
+        guard let settings = try? LocalWebSettings.loadScene(videoPath: videoPath), !settings.values.isEmpty else { return nil }
+        return settings.values
+    }
 
     /// Provides the animation time. nil leaves the scene at the loop start.
     var clock: (() -> SceneClockReading)?
@@ -169,16 +189,19 @@ final class SceneMetalLayer: CAMetalLayer {
         )
     }
 
-    func show(_ document: SceneDocument, videoPath: String) throws {
-        if self.videoPath != videoPath {
+    func show(_ document: SceneDocument, videoPath: String, userProperties: [String: WebPropertyValue]? = nil) throws {
+        let changedVideo = self.videoPath != videoPath
+        if changedVideo {
             scriptWorker = SceneScriptWorker()
             frozenScriptInput = nil
+            storage = nil
+            self.userProperties = nil
         }
-        if self.videoPath != videoPath || renderer?.document != document {
+        if changedVideo || renderer?.document != document {
             scriptGeneration = UUID()
             stoppedScriptIDs = []
         }
-        if let renderer, self.videoPath == videoPath {
+        if let renderer, !changedVideo {
             if renderer.document != document {
                 try renderer.update(document: document)
             }
@@ -197,6 +220,9 @@ final class SceneMetalLayer: CAMetalLayer {
         }
         current.media = media
         target.media = media
+        self.userProperties = userProperties ?? Self.loadUserProperties(forVideoPath: videoPath)
+        current.userProperties = self.userProperties
+        target.userProperties = self.userProperties
         updateMediaSubscription()
         loadVideos()
         readClock()
@@ -215,6 +241,7 @@ final class SceneMetalLayer: CAMetalLayer {
         scriptIssueHandler?([])
         renderer = nil
         videoPath = nil
+        userProperties = nil
         target = .rest
         current = .rest
         updateMediaSubscription()
@@ -256,14 +283,14 @@ final class SceneMetalLayer: CAMetalLayer {
         if !wantsSpectrum { setAudio(nil) }
         MainActor.assumeIsolated {
             LocalWebIntegration.shared.update(id: mediaSubscriptionID, subscription: wantsMedia || wantsSpectrum ? .init(
-                spectrum: wantsSpectrum, media: wantsMedia,
-                receiveSpectrum: { [weak self] values in self?.receiveSpectrum(values) },
+                sceneSpectrum: wantsSpectrum, media: wantsMedia,
+                receiveSceneSpectrum: { [weak self] values in self?.receiveSpectrum(values) },
                 receiveMedia: { [weak self] value, enabled in self?.receiveMedia(value, isAvailable: enabled) }
             ) : nil)
         }
     }
 
-    /// 64 bands per channel, left first, as LocalWebIntegration sends them.
+    /// 64 bands per channel, left first, as SceneAudioAnalyzer makes them.
     private func receiveSpectrum(_ values: [Float]) {
         guard isSubscribedToSpectrum, values.count == 2 * SceneAudioSpectrum.bandCount else { return }
         let count = SceneAudioSpectrum.bandCount
@@ -428,8 +455,13 @@ final class SceneMetalLayer: CAMetalLayer {
                 input.pointerPresses = pendingPointerPresses
                 pendingPointerPresses = []
             }
+            if drawableSize.width > 0, drawableSize.height > 0 {
+                input.screenSize = SIMD2(Int(drawableSize.width), Int(drawableSize.height))
+            }
             let requestedTimeOfDay = timeOfDay
-            scriptWorker.evaluate(document, input: input, timeOfDay: requestedTimeOfDay) { [weak self] result in
+            let storage = storage ?? SceneScriptStorage.shared.session(path: videoPath!, screen: storageScreen)
+            self.storage = storage
+            scriptWorker.evaluate(document, input: input, timeOfDay: requestedTimeOfDay, storage: storage) { [weak self] result in
                 guard let self else { return }
                 self.isEvaluatingScript = false
                 if self.scriptGeneration == generation, self.renderer?.document == document,
@@ -460,6 +492,7 @@ final class SceneMetalLayer: CAMetalLayer {
             return
         }
         guard !isFrameInFlight else {
+            if let frame { renderer.holdParticleControls(from: frame) }
             needsRedrawAfterFrame = true
             return
         }
@@ -471,6 +504,7 @@ final class SceneMetalLayer: CAMetalLayer {
         guard let drawable = nextDrawable(),
               let commandBuffer = renderer.commandQueue.makeCommandBuffer()
         else {
+            if let frame { renderer.holdParticleControls(from: frame) }
             return
         }
         do {

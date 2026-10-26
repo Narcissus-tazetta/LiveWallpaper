@@ -247,12 +247,16 @@ enum SceneStore {
     /// Every file a scene reads, besides scene.json.
     static func referencedFiles(of document: SceneDocument) -> Set<String> {
         var files = Set<String>()
+        for material in (document.meshMaterials ?? []).compactMap({ $0 }) {
+            files.formUnion(material.images.values)
+        }
         for layer in document.layers {
             if layer.kind == .image {
                 files.insert(layer.imageFile)
             }
             files.formUnion([layer.particles?.maskFile, layer.depthFile, layer.text?.fontFile, layer.videoFile].compactMap { $0 })
             if let graph = layer.renderGraph { files.formUnion(graph.images.values) }
+            files.formUnion(layer.particleSystem?.textureFiles ?? [])
             for effect in layer.effects {
                 if let graph = effect.renderGraph { files.formUnion(graph.images.values) }
                 files.formUnion([effect.maskFile, effect.flowFile, effect.timeOffsetFile, effect.patternFile].compactMap { $0 })
@@ -274,6 +278,10 @@ enum SceneStore {
                 at: folder.appendingPathComponent(name), to: destination.appendingPathComponent(name)
             )
         }
+        let propURL = folder.appendingPathComponent("properties.json")
+        if FileManager.default.fileExists(atPath: propURL.path) {
+            try FileManager.default.copyItem(at: propURL, to: destination.appendingPathComponent("properties.json"))
+        }
     }
 
     enum ImportError: LocalizedError {
@@ -294,7 +302,10 @@ enum SceneStore {
         let documentURL = source.appendingPathComponent(documentFileName)
         let document = try JSONDecoder().decode(SceneDocument.self, from: Data(contentsOf: documentURL))
         let root = source.resolvingSymlinksInPath().standardizedFileURL.path
-        let names = referencedFiles(of: document).union([documentFileName])
+        var names = referencedFiles(of: document).union([documentFileName])
+        if FileManager.default.fileExists(atPath: source.appendingPathComponent("properties.json").path) {
+            names.insert("properties.json")
+        }
         for name in names {
             guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\\"),
                   !name.contains("\0")

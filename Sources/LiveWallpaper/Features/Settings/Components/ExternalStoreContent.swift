@@ -106,10 +106,14 @@ extension SettingsView {
                     .accessibilityLabel(warnings.joined(separator: "\n"))
             }
             HStack(alignment: .top, spacing: 6) {
-                if let source = wallpaper.webSource {
-                    Button(model.localizedString("作品の設定")) { localWebSettingsSource = source }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                if model.hasAuthorSettings(forExternalWallpaper: wallpaper) {
+                    Button(model.localizedString("作品の設定")) {
+                        if let context = model.authorSettingsContext(forExternalWallpaper: wallpaper) {
+                            authorSettingsContext = context
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
                 if !model.isExternalWallpaperReady(wallpaper) {
                     externalScenePreparationStatus(wallpaper)

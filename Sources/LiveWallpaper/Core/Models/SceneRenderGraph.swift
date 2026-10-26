@@ -1,4 +1,5 @@
 import Foundation
+import simd
 
 struct SceneRenderGraph: Codable, Equatable {
     struct Target: Codable, Equatable {
@@ -38,10 +39,17 @@ struct SceneRenderGraph: Codable, Equatable {
         /// `parallaxPosition` is the eased parallax input as 0...1 per axis. For `texture`,
         /// `texelSize` is one pixel of it in UV and `texelOffsets` that pixel both ways
         /// (x, y, −x, −y).
+        /// For a model layer a script made: `modelViewProjection` takes its vertices to
+        /// clip space, `model` to scene pixels and `viewProjection` scene pixels to clip
+        /// space; `layerAlpha` and `layerColor` are the layer's own; `eyePosition` is the
+        /// camera's and `ambientColor` and `skylightColor` the scene's light all round;
+        /// `shadowMatrix` takes scene pixels to the clip space of the shadow map `key`.
         enum Value: String, Codable {
             case time, cursor, textureSize, boneMatrices, boneOpacity, effectValue, audioSpectrum
             case pointer, previousPointer, layerFromCanvas, canvasFromLayer, screenFromLayer, frameTime, pointerState
             case parallaxPosition, texelSize, texelOffsets
+            case modelViewProjection, model, normalModel, viewProjection, layerAlpha, layerColor
+            case eyePosition, ambientColor, skylightColor, shadowMatrix
         }
         var offset: Int
         var value: Value
@@ -60,9 +68,23 @@ struct SceneRenderGraph: Codable, Equatable {
 
     struct Attribute: Codable, Equatable {
         enum Format: String, Codable { case float, float2, float3, float4, uint4 }
+        /// A vertex component of a model a script made, which lays its vertices out itself.
+        enum Semantic: String, Codable, CaseIterable {
+            case position, normal, tangentSigned, uv, color
+
+            /// Floats per vertex; the components come in this order in a vertex.
+            var floats: Int {
+                switch self {
+                case .position, .normal: 3
+                case .tangentSigned, .color: 4
+                case .uv: 2
+                }
+            }
+        }
         var location: Int
         var offset: Int
         var format: Format
+        var semantic: Semantic?
     }
 
     struct Draw: Codable, Equatable {
@@ -96,6 +118,12 @@ struct SceneRenderGraph: Codable, Equatable {
         var clears: Bool?
         /// false leaves the target's alpha as it was.
         var writesAlpha: Bool?
+        /// A model layer's material: whether it tests and writes the frame's depth, and
+        /// which faces it leaves out (counter-clockwise ones face the viewer).
+        var depthTest: Bool?
+        var depthWrite: Bool?
+        var cull: Cull?
+        enum Cull: String, Codable { case back, front }
     }
 
     /// Geometry made at run time. Each mesh frame is four vertices per quad of nine
@@ -144,12 +172,66 @@ struct SceneRenderGraph: Codable, Equatable {
         uses(.audioSpectrum)
     }
 
-    func uses(_ value: UniformUpdate.Value) -> Bool {
-        passes.contains { pass in
-            guard let draw = pass.draw else { return false }
-            return (draw.vertex.updates + draw.fragment.updates).contains { $0.value == value }
+    var usesPointer: Bool {
+        uses { value in
+            switch value {
+            case .cursor, .pointer, .previousPointer, .pointerState, .parallaxPosition:
+                return true
+            default:
+                return false
+            }
         }
     }
+
+    func uses(_ predicate: (UniformUpdate.Value) -> Bool) -> Bool {
+        passes.contains { pass in
+            guard let draw = pass.draw else { return false }
+            return draw.vertex.updates.contains { predicate($0.value) }
+                || draw.fragment.updates.contains { predicate($0.value) }
+        }
+    }
+
+    func uses(_ value: UniformUpdate.Value) -> Bool {
+        uses { $0 == value }
+    }
+}
+
+/// The material of model layers scripts make, drawn straight onto the canvas.
+struct SceneMeshMaterial: Codable, Equatable {
+    var path: String
+    /// Its attributes name their `semantic`; `vertices`, `vertexStride` and `vertexCount`
+    /// are unused.
+    var draw: SceneRenderGraph.Draw
+    /// Resource name to a plain file name in the scene folder.
+    var images: [String: String]
+}
+
+/// A layer a script made from its own geometry, as it should look this frame.
+struct SceneModelLayerFrame: Equatable {
+    struct Shape: Equatable {
+        /// Index into the scene's mesh materials; nil when the script named none of them.
+        var material: Int?
+        /// Bit i set when the vertices hold `Semantic.allCases[i]`.
+        var components: UInt32
+        var vertices: [Float]
+        /// Triangles by vertex index; nil draws the vertices three at a time.
+        var indices: [UInt32]?
+
+        var stride: Int {
+            SceneRenderGraph.Attribute.Semantic.allCases.enumerated()
+                .reduce(0) { $0 + (components & (1 << UInt32($1.offset)) != 0 ? $1.element.floats : 0) }
+        }
+    }
+    /// Stable for the life of the layer.
+    var serial: UInt32
+    /// The layer's place in the drawing order, shared with the scene's layers.
+    var order: Int
+    var alpha: Float
+    var color: SIMD3<Float>
+    /// From the model's vertices to scene pixels (origin bottom left, y up).
+    var world: simd_float4x4
+    var perspective: Bool
+    var shapes: [Shape]
 }
 
 /// One mesh a script made, as it should look this frame.

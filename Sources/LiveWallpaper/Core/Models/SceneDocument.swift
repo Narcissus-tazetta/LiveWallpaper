@@ -1,4 +1,5 @@
 import Foundation
+import simd
 
 /// The renderer selects the formula by position, so new cases go at the end. The
 /// layer's colour blends with what is below, weighted by its alpha, except `minimum`
@@ -598,10 +599,120 @@ struct SceneKeyframe: Codable, Equatable, Identifiable {
     }
 }
 
+/// A movement recorded from another format: poses at times since the scene started,
+/// followed in straight lines. Past the last pose it plays on from `loopStart`, or
+/// rests on the last pose when there is none. It replaces the layer's placement,
+/// keyframes and opacity factor.
+struct SceneMotion: Codable, Equatable {
+    struct Sample: Codable, Equatable {
+        /// Seconds since the scene started.
+        var time: Double
+        var transform: SceneTransform
+        var opacity: Double = 1
+
+        init(time: Double, transform: SceneTransform, opacity: Double = 1) {
+            self.time = time
+            self.transform = transform
+            self.opacity = opacity
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            time = try container.decode(Double.self, forKey: .time)
+            transform = (try? container.decode(SceneTransform.self, forKey: .transform)) ?? .identity
+            opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
+        }
+    }
+
+    /// In time order.
+    var samples: [Sample]
+    var loopStart: Double?
+
+    var duration: Double {
+        samples.last?.time ?? 0
+    }
+
+    func pose(at time: Double) -> (transform: SceneTransform, opacity: Double) {
+        guard let first = samples.first, let last = samples.last else {
+            return (.identity, 1)
+        }
+        var t = max(time, 0)
+        if t > last.time {
+            guard let loopStart, last.time - loopStart > 1e-9 else {
+                return (last.transform, last.opacity)
+            }
+            t = loopStart + (t - loopStart).truncatingRemainder(dividingBy: last.time - loopStart)
+        }
+        if t <= first.time {
+            return (first.transform, first.opacity)
+        }
+        // The last sample at or before t.
+        var low = 0
+        var high = samples.count - 1
+        while low < high {
+            let mid = (low + high + 1) / 2
+            if samples[mid].time <= t { low = mid } else { high = mid - 1 }
+        }
+        guard low + 1 < samples.count else {
+            return (last.transform, last.opacity)
+        }
+        let a = samples[low], b = samples[low + 1]
+        let span = b.time - a.time
+        let f = span > 1e-12 ? (t - a.time) / span : 1
+        func mix(_ x: Double, _ y: Double) -> Double { x + (y - x) * f }
+        var transform = SceneTransform()
+        transform.offsetX = mix(a.transform.offsetX, b.transform.offsetX)
+        transform.offsetY = mix(a.transform.offsetY, b.transform.offsetY)
+        transform.scale = mix(a.transform.scale, b.transform.scale)
+        if a.transform.scaleY != nil || b.transform.scaleY != nil {
+            transform.scaleY = mix(a.transform.scaleY ?? a.transform.scale, b.transform.scaleY ?? b.transform.scale)
+        }
+        transform.rotation = mix(a.transform.rotation, b.transform.rotation)
+        return (transform, mix(a.opacity, b.opacity))
+    }
+}
+
 enum SceneLayerKind: String, Codable {
     case image
     case particles
     case text
+    /// A solid model the scene places, seen through its camera.
+    case model
+}
+
+/// A solid model: one shape, drawn with the scene's mesh material at `material`.
+struct SceneStaticModel: Codable, Equatable {
+    var material: Int
+    /// Bit i set when the vertices hold `Semantic.allCases[i]`.
+    var components: UInt32
+    /// Little-endian 32-bit floats.
+    var vertices: Data
+    /// Little-endian 32-bit vertex indices, three to a triangle.
+    var indices: Data
+
+    private var floatsPerVertex: Int {
+        SceneRenderGraph.Attribute.Semantic.allCases.enumerated()
+            .reduce(0) { $0 + (components & (1 << UInt32($1.offset)) != 0 ? $1.element.floats : 0) }
+    }
+
+    var isValid: Bool {
+        let stride = floatsPerVertex
+        guard stride > 0, vertices.count % (stride * 4) == 0, indices.count % 12 == 0 else { return false }
+        let count = UInt32(vertices.count / (stride * 4))
+        return indices.withUnsafeBytes { bytes in
+            (0 ..< indices.count / 4).allSatisfy { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian < count }
+        }
+    }
+
+    var shape: SceneModelLayerFrame.Shape {
+        let floats = vertices.withUnsafeBytes { bytes in
+            (0 ..< vertices.count / 4).map { Float(bitPattern: bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian) }
+        }
+        let triangles = indices.withUnsafeBytes { bytes in
+            (0 ..< indices.count / 4).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian }
+        }
+        return SceneModelLayerFrame.Shape(material: material, components: components, vertices: floats, indices: triangles)
+    }
 }
 
 enum SceneParticlePreset: String, Codable, CaseIterable {
@@ -733,6 +844,12 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var renderGraph: SceneRenderGraph?
     var placement: SceneLayerPlacement?
     var particles: SceneParticles?
+    /// Simulated particles, in place of `particles` on a particle layer.
+    var particleSystem: SceneParticleSystem?
+    /// In a scene seen through its camera: where the picture stands in it.
+    var space: SceneSpace?
+    /// What a layer of kind `model` draws.
+    var model: SceneStaticModel?
     var text: SceneText?
     /// Grayscale depth map (white = near) in the scene folder; shifts each pixel by
     /// its depth for a 3D look.
@@ -746,6 +863,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var depthAutoCycles = 1
     var transform = SceneTransform()
     var keyframes: [SceneKeyframe] = []
+    var motion: SceneMotion?
 
     init(name: String, imageFile: String) {
         self.name = name
@@ -759,6 +877,15 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         imageFile = ""
         self.particles = particles
         blendMode = particles.preset.isAdditive ? .add : .normal
+    }
+
+    /// Additive particles add their light to what is below.
+    init(name: String, particleSystem: SceneParticleSystem) {
+        self.name = name
+        kind = .particles
+        imageFile = ""
+        self.particleSystem = particleSystem
+        blendMode = particleSystem.blend == .add ? .add : .normal
     }
 
     init(name: String, text: SceneText) {
@@ -778,6 +905,15 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         usesMediaArtwork = try container.decodeIfPresent(Bool.self, forKey: .usesMediaArtwork) ?? false
         capturesCanvas = (try? container.decode(Bool.self, forKey: .capturesCanvas)) ?? false
         particles = try? container.decodeIfPresent(SceneParticles.self, forKey: .particles)
+        particleSystem = try container.decodeIfPresent(SceneParticleSystem.self, forKey: .particleSystem)
+        space = try container.decodeIfPresent(SceneSpace.self, forKey: .space)
+        guard space.map({ $0.isValid }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .space, in: container, debugDescription: "Invalid placement in space")
+        }
+        model = try container.decodeIfPresent(SceneStaticModel.self, forKey: .model)
+        guard model.map({ $0.isValid }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .model, in: container, debugDescription: "Invalid model")
+        }
         text = try container.decodeIfPresent(SceneText.self, forKey: .text)
         renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
         placement = try container.decodeIfPresent(SceneLayerPlacement.self, forKey: .placement)
@@ -788,6 +924,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         depthAutoCycles = (try? container.decode(Int.self, forKey: .depthAutoCycles)) ?? 1
         transform = (try? container.decode(SceneTransform.self, forKey: .transform)) ?? .identity
         keyframes = (try? container.decode([SceneKeyframe].self, forKey: .keyframes)) ?? []
+        motion = try? container.decodeIfPresent(SceneMotion.self, forKey: .motion)
         isVisible = (try? container.decode(Bool.self, forKey: .isVisible)) ?? true
         isLocked = (try? container.decode(Bool.self, forKey: .isLocked)) ?? false
         opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
@@ -838,6 +975,11 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         return copy
     }
 
+    /// A particle layer with something to draw.
+    var hasParticles: Bool {
+        kind == .particles && (particles != nil || particleSystem != nil)
+    }
+
     var hasDepth: Bool {
         depthFile != nil && depthStrength > 0
     }
@@ -846,7 +988,16 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         keyframes.count >= 2
     }
 
-    /// Placement and opacity factor at `phase` (0..<1 of the loop).
+    /// Placement and opacity factor at `phase` (0..<1 of the loop), or for a recorded
+    /// motion at `time` seconds since the scene started.
+    func pose(at phase: Double, time: Double) -> (transform: SceneTransform, opacity: Double) {
+        if let motion, !motion.samples.isEmpty {
+            return motion.pose(at: time)
+        }
+        return pose(at: phase)
+    }
+
+    /// Placement and opacity factor at `phase` (0..<1 of the loop), keyframes only.
     func pose(at phase: Double) -> (transform: SceneTransform, opacity: Double) {
         guard isKeyframed else {
             return (transform, 1)
@@ -876,15 +1027,172 @@ struct SceneLayer: Codable, Equatable, Identifiable {
 
     var usesCursor: Bool {
         isVisible && (parallaxDepth > 0 || cursorMask != nil || (particles.map { $0.cursorMode != .none } ?? false)
-            || (hasDepth && depthFollowsCursor) || renderGraph?.uses(.cursor) == true)
+            || particleSystem?.usesPointer == true
+            || (hasDepth && depthFollowsCursor) || renderGraph?.usesPointer == true
+            || activeEffects.contains { $0.renderGraph?.usesPointer == true })
     }
 
     /// Particles move on their own; an image layer through its effects or the
     /// depth's own drift.
     var isAnimated: Bool {
-        !activeEffects.isEmpty || (isVisible && kind == .particles && particles != nil)
-            || (isVisible && hasDepth && depthAutoMotion > 0) || (isVisible && isKeyframed)
+        !activeEffects.isEmpty || (isVisible && hasParticles)
+            || (isVisible && hasDepth && depthAutoMotion > 0) || (isVisible && (isKeyframed || motion != nil))
             || (isVisible && (renderGraph != nil || placement != nil || videoFile != nil))
+    }
+}
+
+/// A picture standing in a scene seen through its camera: a `width` × `height` plane
+/// centred at (`offsetX`, `offsetY`) in the layer's own units (y up), placed by `world`
+/// (column-major, scene units).
+struct SceneSpace: Codable, Equatable {
+    enum Blending: String, Codable { case translucent, additive, normal }
+    var world: [Double]
+    var width: Double
+    var height: Double
+    var offsetX: Double
+    var offsetY: Double
+    var depthTest: Bool
+    var depthWrite: Bool
+    var blending: Blending
+    var cull: SceneRenderGraph.Draw.Cull?
+
+    var isValid: Bool {
+        world.count == 16 && world.allSatisfy(\.isFinite) && [width, height, offsetX, offsetY].allSatisfy(\.isFinite)
+    }
+
+    var matrix: simd_float4x4 {
+        let m = world.map(Float.init)
+        return simd_float4x4(columns: (SIMD4(m[0], m[1], m[2], m[3]), SIMD4(m[4], m[5], m[6], m[7]),
+                                       SIMD4(m[8], m[9], m[10], m[11]), SIMD4(m[12], m[13], m[14], m[15])))
+    }
+}
+
+/// A scene's camera as the scene sets it up.
+struct SceneCamera: Codable, Equatable {
+    /// Seen through the camera with its field of view, rather than laid out on the canvas.
+    var perspective: Bool
+    var eye: [Double]
+    var center: [Double]
+    var up: [Double]
+    /// Vertical, in degrees.
+    var fov: Double
+    var nearZ: Double
+    var farZ: Double
+    var ambientColor: [Double]
+    var skylightColor: [Double]
+    /// The lights that cast a shadow, in the order of the shadow maps materials read.
+    var shadowLights: [SceneShadowLight]?
+    /// Moves the camera on its own from the moment the scene is shown.
+    var path: SceneCameraPath?
+    /// Draws the scene's layers far to near, by their distance from the eye, instead of in
+    /// the order they are listed.
+    var sortsByDistance: Bool?
+    /// Fades what is drawn directly in space (particles) toward a colour with distance
+    /// from the eye or with height.
+    var fog: SceneFog?
+
+    var isValid: Bool {
+        [eye, center, up, ambientColor, skylightColor].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
+            && [fov, nearZ, farZ].allSatisfy(\.isFinite)
+            && (shadowLights ?? []).allSatisfy(\.isValid)
+            && (fog?.isValid ?? true)
+            && (path?.isValid ?? true)
+    }
+}
+
+/// Fog by distance from the eye and by height. Each zone blends toward its colour by a
+/// density that is `startDensity` up to `start` and rises along the square of the
+/// position between `start` and `end` to `endDensity` (Wallpaper Engine's common_fog.h).
+struct SceneFog: Codable, Equatable {
+    struct Zone: Codable, Equatable {
+        var start: Double
+        var end: Double
+        var startDensity: Double
+        var endDensity: Double
+        var color: [Double]
+
+        var isValid: Bool {
+            color.count == 3 && ([start, end, startDensity, endDensity] + color).allSatisfy(\.isFinite) && start != end
+        }
+    }
+
+    var distance: Zone?
+    var height: Zone?
+
+    var isValid: Bool {
+        (distance?.isValid ?? true) && (height?.isValid ?? true)
+    }
+}
+
+/// Key points the camera passes through: a curve between each pair, held at the last
+/// one, and back to the first after `period` (measured on Wallpaper Engine's own scenes).
+struct SceneCameraPath: Codable, Equatable {
+    struct Transform: Codable, Equatable {
+        var timestamp: Double
+        var eye: [Double]
+        var center: [Double]
+        var up: [Double]
+        /// Magnification about the middle of the view; flat scenes only.
+        var zoom: Double
+
+        var zoomAxis: [Double] { [zoom, 0, 0] }
+    }
+
+    var duration: Double
+    /// By timestamp.
+    var transforms: [Transform]
+
+    var isValid: Bool {
+        duration.isFinite && !transforms.isEmpty
+            && transforms.allSatisfy {
+                $0.timestamp.isFinite && $0.timestamp >= 0 && $0.zoom.isFinite && $0.zoom > 0 && [$0.eye, $0.center, $0.up].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
+            }
+            && zip(transforms, transforms.dropFirst()).allSatisfy { $0.timestamp <= $1.timestamp }
+            && period > 0
+    }
+
+    /// The last key point's time, or the time left of `duration` after it if that is longer.
+    var period: Double {
+        let last = transforms[transforms.count - 1].timestamp
+        return max(last, duration - last)
+    }
+
+    /// Each segment is its own cubic: P + ΔP·(½u + 3⁄2u² − u³), a Hermite curve whose slope
+    /// at both ends is half the segment's own change. Wallpaper Engine's three-point paths
+    /// fit this within about 1 px; a slope taken from the neighbouring key points does not.
+    func transform(at time: Double) -> (eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>, zoom: Float) {
+        let t = time.truncatingRemainder(dividingBy: period)
+        let next = transforms.firstIndex { $0.timestamp > t } ?? transforms.count
+        func vector(_ values: [Double]) -> SIMD3<Float> { SIMD3(values.map(Float.init)) }
+        guard next > 0, next < transforms.count else {
+            let held = transforms[next == 0 ? 0 : transforms.count - 1]
+            return (vector(held.eye), vector(held.center), vector(held.up), Float(held.zoom))
+        }
+        let a = transforms[next - 1], b = transforms[next]
+        let u = Float((t - a.timestamp) / (b.timestamp - a.timestamp))
+        let ease = 0.5 * u + 1.5 * u * u - u * u * u
+        func point(_ key: KeyPath<Transform, [Double]>) -> SIMD3<Float> {
+            let start = vector(a[keyPath: key])
+            return start + (vector(b[keyPath: key]) - start) * ease
+        }
+        return (point(\.eye), point(\.center), point(\.up), point(\.zoomAxis).x)
+    }}
+
+/// A light whose shadow the scene draws.
+struct SceneShadowLight: Codable, Equatable {
+    enum Kind: String, Codable { case point, spot, directional }
+    var kind: Kind
+    var origin: [Double]
+    /// Where the light shines.
+    var axis: [Double]
+    /// Half angle of a spot's cone, in degrees.
+    var outerCone: Double
+    /// How far from the camera a directional light's shadow reaches.
+    var cascadeDistance: Double
+
+    var isValid: Bool {
+        origin.count == 3 && axis.count == 3 && (origin + axis + [outerCone, cascadeDistance]).allSatisfy(\.isFinite)
+            && axis.contains { $0 != 0 } && (0 ..< 90).contains(outerCone)
     }
 }
 
@@ -922,11 +1230,19 @@ struct SceneDocument: Codable, Equatable {
     /// (capped at all of it per frame); the screen's own easing when absent.
     var parallaxResponse: Double?
     var cameraShake: SceneCameraShake?
+    /// The materials of the layers scripts make from their own geometry, by the index a
+    /// script names; nil where one could not be converted.
+    var meshMaterials: [SceneMeshMaterial?]?
+    /// Where model layers scripts make are seen from; scripts can move it.
+    var camera: SceneCamera?
+    var properties: [LocalWebProperty]?
+    var authorSourceDirectory: String?
 
-    init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer]) {
+    init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer], properties: [LocalWebProperty]? = nil) {
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
         self.layers = layers
+        self.properties = properties
     }
 
     init(from decoder: Decoder) throws {
@@ -956,6 +1272,11 @@ struct SceneDocument: Codable, Equatable {
         parallaxTravel = try container.decodeIfPresent(Double.self, forKey: .parallaxTravel)
         parallaxResponse = try container.decodeIfPresent(Double.self, forKey: .parallaxResponse)
         cameraShake = try container.decodeIfPresent(SceneCameraShake.self, forKey: .cameraShake)
+        meshMaterials = try container.decodeIfPresent([SceneMeshMaterial?].self, forKey: .meshMaterials)
+        camera = try container.decodeIfPresent(SceneCamera.self, forKey: .camera)
+        guard camera.map({ $0.isValid }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .camera, in: container, debugDescription: "Invalid camera")
+        }
         guard [parallaxTravel, parallaxResponse].allSatisfy({ $0?.isFinite ?? true }) else {
             throw DecodingError.dataCorruptedError(forKey: .parallaxTravel, in: container, debugDescription: "Parallax values must be finite")
         }
@@ -963,6 +1284,8 @@ struct SceneDocument: Codable, Equatable {
         guard scripts.count <= SceneScript.maximumCount, Set(scripts.map(\.id)).count == scripts.count else {
             throw DecodingError.dataCorruptedError(forKey: .scripts, in: container, debugDescription: "Too many scripts or duplicate script IDs")
         }
+        properties = try container.decodeIfPresent([LocalWebProperty].self, forKey: .properties)
+        authorSourceDirectory = try container.decodeIfPresent(String.self, forKey: .authorSourceDirectory)
     }
 
     var isAnimated: Bool {
@@ -992,6 +1315,8 @@ struct SceneDocument: Codable, Equatable {
     var requiresRealTimePlayback: Bool {
         runsInRealTime || layers.contains { layer in
             layer.activeEffects.contains { $0.kind.runsOnRealTime } || (layer.isVisible && (layer.renderGraph != nil || layer.placement != nil || layer.usesMediaArtwork))
+                // A recorded motion keeps its own period, not the loop's.
+                || (layer.isVisible && layer.motion != nil)
         }
     }
 

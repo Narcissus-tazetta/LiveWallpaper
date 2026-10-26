@@ -9,10 +9,21 @@ final class LocalWebIntegration: ObservableObject {
     @Published private(set) var audioRunning = false
 
     struct Subscription {
-        var spectrum: Bool
+        /// The web wallpapers' spectrum; scenes take `sceneSpectrum`, analysed the way
+        /// imported scenes expect.
+        var spectrum = false
+        var sceneSpectrum = false
         var media: Bool
-        var receiveSpectrum: ([Float]) -> Void
+        var receiveSpectrum: ([Float]) -> Void = { _ in }
+        var receiveSceneSpectrum: ([Float]) -> Void = { _ in }
         var receiveMedia: (WebNowPlaying, Bool) -> Void
+
+        var needsAudio: Bool { spectrum || sceneSpectrum }
+
+        func receiveSilence() {
+            if spectrum { receiveSpectrum([Float](repeating: 0, count: 128)) }
+            if sceneSpectrum { receiveSceneSpectrum([Float](repeating: 0, count: 128)) }
+        }
     }
 
     private var subscriptions: [UUID: Subscription] = [:]
@@ -47,10 +58,12 @@ final class LocalWebIntegration: ObservableObject {
     }
 
     private func reconcileAudio() {
-        let needsAudio = subscriptions.values.contains { $0.spectrum }
+        let needsAudio = subscriptions.values.contains(where: \.needsAudio)
         if needsAudio, capture == nil, audioTask == nil, audioError == nil {
             let capture = WebSystemAudioCapture(onSpectrum: { [weak self] values in
                 Task { @MainActor in self?.deliverSpectrum(values) }
+            }, onSceneSpectrum: { [weak self] values in
+                Task { @MainActor in self?.deliverSceneSpectrum(values) }
             }, onFailure: { [weak self] error in
                 Task { @MainActor in self?.audioFailed(error) }
             })
@@ -155,14 +168,7 @@ final class LocalWebIntegration: ObservableObject {
                        Date().timeIntervalSince(lastSpectrumAt) > 0.2
                     {
                         sentSilence = true
-                        for item in subscriptions.values
-                            where item.spectrum
-                        {
-                            item.receiveSpectrum([Float](
-                                repeating: 0,
-                                count: 128
-                            ))
-                        }
+                        for item in subscriptions.values { item.receiveSilence() }
                     }
                 }
             } catch is CancellationError {
@@ -183,12 +189,7 @@ final class LocalWebIntegration: ObservableObject {
         silenceTask = nil
         AppLog.externalWallpapers
             .error("system audio capture failed: \(error.localizedDescription, privacy: .public)")
-        for item in subscriptions.values where item.spectrum {
-            item.receiveSpectrum([Float](
-                repeating: 0,
-                count: 128
-            ))
-        }
+        for item in subscriptions.values { item.receiveSilence() }
         if let capture {
             self.capture = nil
             Task {
@@ -201,6 +202,14 @@ final class LocalWebIntegration: ObservableObject {
                         )
                 }
             }
+        }
+    }
+
+    private func deliverSceneSpectrum(_ values: [Float]) {
+        lastSpectrumAt = Date()
+        sentSilence = false
+        for item in subscriptions.values where item.sceneSpectrum {
+            item.receiveSceneSpectrum(values)
         }
     }
 

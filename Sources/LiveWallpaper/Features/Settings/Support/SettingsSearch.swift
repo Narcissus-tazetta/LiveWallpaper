@@ -15,6 +15,7 @@ extension SettingsView {
         case focusFilter
         case language
         case cache
+        case reconversion
         case reset
         case support
         case update
@@ -41,6 +42,7 @@ extension SettingsView {
         case .focusFilter: return focusFilterSearchKeywords
         case .language: return languageSearchKeywords
         case .cache: return cacheSearchKeywords
+        case .reconversion: return reconversionSearchKeywords
         case .reset: return resetSearchKeywords
         case .support: return supportSearchKeywords
         case .update: return updateSearchKeywords

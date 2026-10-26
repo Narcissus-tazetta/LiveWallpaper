@@ -1,4 +1,5 @@
 import Foundation
+import simd
 
 struct SceneScript: Codable, Equatable, Identifiable {
     static let apiVersion = 4
@@ -46,8 +47,8 @@ struct SceneScript: Codable, Equatable, Identifiable {
         layerIDs = try c.decode([UUID].self, forKey: .layerIDs)
         targetsAllLayers = try c.decodeIfPresent(Bool.self, forKey: .targetsAllLayers) ?? false
         params = try c.decode([String: Double].self, forKey: .params)
-        guard (modules?.count ?? 0) <= 256,
-              (modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 1048576,
+        guard (modules?.count ?? 0) <= 2048,
+              (modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 4194304,
               modules?.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }) != false,
               source.utf8.count <= 65536, layerIDs.count <= 512, params.count <= 64,
               params.allSatisfy({ $0.key.utf8.count <= 128 && $0.value.isFinite })
@@ -62,16 +63,22 @@ struct SceneScript: Codable, Equatable, Identifiable {
         guard canRun else { return false }
         guard usesCursor || usesMedia || usesTimeOfDay else { return false }
         guard let modules, !modules.isEmpty else { return true }
-        // The imported runtime bridge declares cursor and media stubs even when
-        // the scene's actual bindings only animate over time.
-        let runtimeModules: Set<String> = [
-            "scene-bridge", "scene-types", "scene-config", "WEColor", "WEMath", "WEVector"
-        ]
-        let userCode = source + "\n" + modules.filter { !runtimeModules.contains($0.key) }.values.joined(separator: "\n")
         let needsCursor = usesCursor && (userCode.contains("cursor") || userCode.contains("pointer") || userCode.contains("mouse"))
         let needsMedia = usesMedia && (userCode.contains("media") || userCode.contains("mediaThumbnail"))
         let needsClock = usesTimeOfDay && userCode.contains("wallClock")
         return needsCursor || needsMedia || needsClock
+    }
+
+    /// Registers audio buffers, so it reads the system audio every frame.
+    var usesAudio: Bool { canRun && userCode.contains("registerAudioBuffers") }
+
+    /// The script and its modules without the imported runtime bridge, which declares
+    /// cursor, media and audio stubs even when the scene's own code uses none of them.
+    private var userCode: String {
+        let runtimeModules: Set<String> = [
+            "scene-bridge", "scene-types", "scene-config", "WEColor", "WEMath", "WEVector"
+        ]
+        return source + "\n" + (modules ?? [:]).filter { !runtimeModules.contains($0.key) }.values.joined(separator: "\n")
     }
 
     func targetLayerIDs(in layers: [SceneLayer]) -> [UUID] {
@@ -96,6 +103,31 @@ struct SceneScriptOutput {
     /// Parts of the script that failed while the rest kept running.
     var warnings: [String]
     var meshes: [SceneMeshFrame] = []
+    var models: [SceneModelLayerFrame] = []
+    var camera: SceneCameraState?
+    var instances: [SceneScriptInstance] = []
+}
+
+/// A layer a script made from one of the scene's: drawn like `template`, adjusted on
+/// its own.
+struct SceneScriptInstance {
+    var id: UUID
+    var template: UUID
+    var adjustment: SceneScriptAdjustment
+}
+
+/// The camera as scripts left it this frame.
+struct SceneCameraState: Equatable {
+    var eye: SIMD3<Float>
+    var center: SIMD3<Float>
+    var up: SIMD3<Float>
+    var zoom: Float
+    /// Vertical, in degrees.
+    var fov: Float
+    var nearZ: Float
+    var farZ: Float
+    /// A script moved the camera; otherwise its place is the scene's own, which a path may move.
+    var isPlacedByScript = true
 }
 
 struct SceneScriptAdjustment {
@@ -105,7 +137,10 @@ struct SceneScriptAdjustment {
     var appearance: SceneScriptAppearanceValues?
     var effects: [UUID: SceneScriptEffectValues] = [:]
     var particles: SceneScriptParticleValues?
+    var particleControl: SceneParticleSimulator.Control?
     var text: SceneScriptTextValues?
+    /// In a scene seen through its camera: the layer's placement now (column-major).
+    var world: simd_float4x4?
 }
 
 struct SceneScriptEffectValues: Decodable {

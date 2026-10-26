@@ -21,6 +21,14 @@ extension SettingsView {
                 chooseSceneLayerImage(path: path)
             }
             Section(model.localizedString("粒子")) {
+                Button(model.localizedString("動きを細かく決められる粒子")) {
+                    if let id = model.addSceneParticleSystemLayer(
+                        name: model.localizedString("粒子"), path: path
+                    ) {
+                        selectSceneLayer(id)
+                    }
+                }
+                Divider()
                 ForEach(SceneParticlePreset.allCases, id: \.self) { preset in
                     Button(sceneParticleName(preset)) {
                         if let id = model.addSceneParticleLayer(preset, name: sceneParticleName(preset), path: path) {

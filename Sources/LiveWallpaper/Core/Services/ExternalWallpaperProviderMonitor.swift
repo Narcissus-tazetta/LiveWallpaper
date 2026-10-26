@@ -20,6 +20,7 @@ struct ExternalWallpaper: Identifiable, Equatable, Sendable {
     var sceneRevision: Date?
     var webSource: WebWallpaperSource?
     var providerPID: pid_t? = nil
+    var properties: [LocalWebProperty]? = nil
 
     var isScene: Bool {
         sceneFolderPath != nil
@@ -151,11 +152,12 @@ final class ExternalWallpaperProviderMonitor {
                 } else if let scene = item.scene, item.path == nil, item.web == nil,
                           let revision = Self.sceneRevision(folder: scene)
                 {
+                    let properties = Self.loadSceneProperties(folder: scene)
                     wallpapers.append(ExternalWallpaper(
                         id: id, providerName: manifest.name, name: item.name,
                         path: Self.bakedScenePath(forID: id), thumbnailPath: thumbnail,
                         sceneFolderPath: scene, sceneRevision: revision,
-                        providerPID: pid
+                        providerPID: pid, properties: properties
                     ))
                 } else if let web = item.web, item.path == nil, item.scene == nil {
                     do {
@@ -172,7 +174,7 @@ final class ExternalWallpaperProviderMonitor {
                         wallpapers.append(ExternalWallpaper(
                             id: id, providerName: manifest.name, name: item.name, path: "",
                             thumbnailPath: thumbnail ?? source.thumbnailPath, webSource: source,
-                            providerPID: pid
+                            providerPID: pid, properties: package.properties
                         ))
                     } catch {
                         AppLog.externalWallpapers.error("invalid web package of \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
@@ -243,6 +245,18 @@ final class ExternalWallpaperProviderMonitor {
         }
         let document = URL(fileURLWithPath: folder, isDirectory: true).appendingPathComponent("scene.json")
         return try? FileManager.default.attributesOfItem(atPath: document.path)[.modificationDate] as? Date
+    }
+
+    private static func loadSceneProperties(folder: String) -> [LocalWebProperty]? {
+        let folderURL = URL(fileURLWithPath: folder, isDirectory: true)
+        let propURL = folderURL.appendingPathComponent("properties.json")
+        guard FileManager.default.fileExists(atPath: propURL.path),
+              let data = try? Data(contentsOf: propURL),
+              let properties = try? JSONDecoder().decode([LocalWebProperty].self, from: data),
+              !properties.isEmpty else {
+            return nil
+        }
+        return properties
     }
 
     private static func isAlive(_ pid: pid_t) -> Bool {

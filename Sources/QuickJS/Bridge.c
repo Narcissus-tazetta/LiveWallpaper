@@ -27,6 +27,12 @@ struct LWJSProgram {
     uint8_t *meshes;
     size_t mesh_length;
     size_t mesh_capacity;
+    /* The layers made from a script's own geometry, as the bridge packs them. */
+    uint8_t *models;
+    size_t model_length;
+    size_t model_capacity;
+    lwjs_storage_handler storage;
+    void *storage_opaque;
 };
 
 #define LWJS_MAX_MESH_BYTES (32u * 1024 * 1024)
@@ -127,20 +133,24 @@ static JSValue console_log(JSContext *context, JSValueConst this_value, int coun
     return JS_UNDEFINED;
 }
 
-static int append_mesh_bytes(LWJSProgram *program, const void *bytes, size_t length) {
-    if (length > LWJS_MAX_MESH_BYTES - program->mesh_length) return -1;
-    size_t needed = program->mesh_length + length;
-    if (needed > program->mesh_capacity) {
-        size_t capacity = program->mesh_capacity ? program->mesh_capacity : 65536;
+static int append_bytes(uint8_t **buffer, size_t *used, size_t *reserved, const void *bytes, size_t length) {
+    if (length > LWJS_MAX_MESH_BYTES - *used) return -1;
+    size_t needed = *used + length;
+    if (needed > *reserved) {
+        size_t capacity = *reserved ? *reserved : 65536;
         while (capacity < needed) capacity *= 2;
-        uint8_t *grown = realloc(program->meshes, capacity);
+        uint8_t *grown = realloc(*buffer, capacity);
         if (!grown) return -1;
-        program->meshes = grown;
-        program->mesh_capacity = capacity;
+        *buffer = grown;
+        *reserved = capacity;
     }
-    memcpy(program->meshes + program->mesh_length, bytes, length);
-    program->mesh_length = needed;
+    memcpy(*buffer + *used, bytes, length);
+    *used = needed;
     return 0;
+}
+
+static int append_mesh_bytes(LWJSProgram *program, const void *bytes, size_t length) {
+    return append_bytes(&program->meshes, &program->mesh_length, &program->mesh_capacity, bytes, length);
 }
 
 static int append_mesh_string(LWJSProgram *program, JSContext *context, JSValueConst value) {
@@ -177,6 +187,90 @@ static JSValue emit_mesh(JSContext *context, JSValueConst this_value, int count,
     return JS_UNDEFINED;
 }
 
+/* emitModels(uint8Array): the frame's model layers, packed by the bridge. */
+static JSValue emit_models(JSContext *context, JSValueConst this_value, int count, JSValueConst *values) {
+    (void)this_value;
+    LWJSProgram *program = JS_GetContextOpaque(context);
+    if (count != 1) return JS_ThrowTypeError(context, "emitModels expects a Uint8Array");
+    size_t offset, byte_length, element;
+    JSValue buffer = JS_GetTypedArrayBuffer(context, values[0], &offset, &byte_length, &element);
+    if (JS_IsException(buffer)) return JS_EXCEPTION;
+    size_t capacity;
+    uint8_t *data = JS_GetArrayBuffer(context, &capacity, buffer);
+    if (!data || element != 1 || offset + byte_length > capacity) {
+        JS_FreeValue(context, buffer);
+        return JS_ThrowTypeError(context, "emitModels expects a Uint8Array");
+    }
+    int failed = append_bytes(&program->models, &program->model_length, &program->model_capacity, data + offset, byte_length);
+    JS_FreeValue(context, buffer);
+    if (failed) return JS_ThrowRangeError(context, "Model output exceeds its limit");
+    return JS_UNDEFINED;
+}
+
+/* evalModule(name, source): loads one more module into the running bundle (a layer a
+   script made may bring its own script) and returns its namespace. Its imports come
+   from the bundle. */
+static JSValue eval_module(JSContext *context, JSValueConst this_value, int count, JSValueConst *values) {
+    (void)this_value;
+    if (count != 2 || !JS_IsString(values[0]) || !JS_IsString(values[1]))
+        return JS_ThrowTypeError(context, "evalModule expects a name and a source");
+    size_t name_length, source_length;
+    const char *name = JS_ToCStringLen(context, &name_length, values[0]);
+    if (!name) return JS_EXCEPTION;
+    const char *source = JS_ToCStringLen(context, &source_length, values[1]);
+    if (!source) { JS_FreeCString(context, name); return JS_EXCEPTION; }
+    JSValue module = source_length > 65536 ? JS_ThrowRangeError(context, "Module source exceeds its limit")
+        : JS_Eval(context, source, source_length, name, JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+    JS_FreeCString(context, source);
+    JS_FreeCString(context, name);
+    if (JS_IsException(module)) return module;
+    if (JS_ResolveModule(context, module) < 0) { JS_FreeValue(context, module); return JS_EXCEPTION; }
+    JSModuleDef *definition = JS_VALUE_GET_PTR(module);
+    JSValue result = JS_EvalFunction(context, module);
+    if (JS_IsException(result)) return result;
+    if (JS_IsPromise(result)) {
+        int state = JS_PromiseState(context, result);
+        if (state == JS_PROMISE_REJECTED) {
+            JSValue exception = JS_PromiseResult(context, result);
+            JS_FreeValue(context, result);
+            return JS_Throw(context, exception);
+        }
+        if (state == JS_PROMISE_PENDING) {
+            JS_FreeValue(context, result);
+            return JS_ThrowTypeError(context, "Asynchronous module initialization is not supported");
+        }
+    }
+    JS_FreeValue(context, result);
+    return JS_GetModuleNamespace(context, definition);
+}
+
+/* storage(operation, global, key, json): the host's saved values, read and written
+   synchronously so another instance of the scene sees a write in the same frame. */
+static JSValue storage(JSContext *context, JSValueConst this_value, int count, JSValueConst *values) {
+    (void)this_value;
+    LWJSProgram *program = JS_GetContextOpaque(context);
+    if (!program->storage) return JS_ThrowTypeError(context, "This script has no storage");
+    int32_t operation, global;
+    if (count < 3 || JS_ToInt32(context, &operation, values[0]) < 0 || JS_ToInt32(context, &global, values[1]) < 0)
+        return JS_EXCEPTION;
+    size_t key_length = 0, value_length = 0;
+    const char *key = JS_IsString(values[2]) ? JS_ToCStringLen(context, &key_length, values[2]) : NULL;
+    if (JS_IsString(values[2]) && !key) return JS_EXCEPTION;
+    const char *value = count > 3 && JS_IsString(values[3]) ? JS_ToCStringLen(context, &value_length, values[3]) : NULL;
+    char *result = NULL;
+    size_t result_length = 0;
+    int status = program->storage(program->storage_opaque, operation, global, key, key_length, value, value_length,
+                                  &result, &result_length);
+    if (key) JS_FreeCString(context, key);
+    if (value) JS_FreeCString(context, value);
+    if (result) {
+        JSValue text = JS_NewStringLen(context, result, result_length);
+        free(result);
+        return text;
+    }
+    return status < 0 ? JS_UNDEFINED : JS_NewBool(context, status);
+}
+
 static JSContext *new_context(LWJSProgram *program) {
     JSContext *context = JS_NewContextRaw(program->runtime);
     if (!context) return NULL;
@@ -211,6 +305,9 @@ static JSContext *new_context(LWJSProgram *program) {
     JS_SetPropertyStr(context, console, "log", JS_NewCFunction(context, console_log, "log", 1));
     JS_SetPropertyStr(context, global, "console", console);
     JS_SetPropertyStr(context, global, "__lwjs_emitMesh", JS_NewCFunction(context, emit_mesh, "emitMesh", 4));
+    JS_SetPropertyStr(context, global, "__lwjs_emitModels", JS_NewCFunction(context, emit_models, "emitModels", 1));
+    JS_SetPropertyStr(context, global, "__lwjs_evalModule", JS_NewCFunction(context, eval_module, "evalModule", 2));
+    JS_SetPropertyStr(context, global, "__lwjs_storage", JS_NewCFunction(context, storage, "storage", 4));
     JS_FreeValue(context, global);
     return context;
 }
@@ -228,7 +325,7 @@ LWJSProgram *lwjs_compile(const char *source, char **error) {
         *error = strdup("Could not allocate JavaScript runtime");
         return NULL;
     }
-    JS_SetMemoryLimit(program->runtime, 16 * 1024 * 1024);
+    JS_SetMemoryLimit(program->runtime, 64 * 1024 * 1024);
     update_stack_limit(program->runtime);
     JS_SetCanBlock(program->runtime, false);
     JS_SetInterruptHandler(program->runtime, interrupt, program);
@@ -392,19 +489,43 @@ char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_se
     program->log_length = 0;
     program->log_count = 0;
     program->mesh_length = 0;
+    program->model_length = 0;
     update_stack_limit(program->runtime);
     JSContext *context = program->module_context ? program->module_context : new_context(program);
     if (!context) {
         *error = strdup(program->timed_out ? "Execution time limit exceeded" : "Could not initialize JavaScript runtime");
         return NULL;
     }
+    const uint8_t *cursor = input;
+    JSValue argument = decode_input(context, &cursor, 0);
+    if (!JS_IsException(argument)) {
+        const char *guard_source =
+            "c => { for (const key of c._missing || []) Object.defineProperty(c, key,"
+            " {get(){throw new Error('Enable the input dependency: '+key);}, configurable:false});"
+            " delete c._missing; return c; }";
+        JSValue guard_function = JS_Eval(context, guard_source, strlen(guard_source), "inputs.js", JS_EVAL_TYPE_GLOBAL);
+        JSValue guarded = JS_IsException(guard_function) ? JS_EXCEPTION : JS_Call(context, guard_function, JS_UNDEFINED, 1, &argument);
+        JS_FreeValue(context, guard_function);
+        JS_FreeValue(context, argument);
+        argument = guarded;
+    }
     // Only bytecode produced by lwjs_compile is ever read; packages contain source.
     JSValue result = JS_UNDEFINED;
-    if (program->module_context) {
+    if (JS_IsException(argument)) {
+        result = JS_EXCEPTION;
+    } else if (program->module_context) {
         if (!program->module_started) {
             JSValue entry = program->module_entry;
             program->module_started = 1;
+            // Module top-level code runs before the first update(context) yet may read the
+            // clock (Date.now()); it sees this frame's input as __lwjsLoadContext.
+            JSValue load_global = JS_GetGlobalObject(context);
+            JS_SetPropertyStr(context, load_global, "__lwjsLoadContext", JS_DupValue(context, argument));
             result = JS_EvalFunction(context, JS_DupValue(context, entry));
+            JSAtom load_key = JS_NewAtom(context, "__lwjsLoadContext");
+            JS_DeleteProperty(context, load_global, load_key, 0);
+            JS_FreeAtom(context, load_key);
+            JS_FreeValue(context, load_global);
             if (!JS_IsException(result) && JS_IsPromise(result)) {
                 if (JS_PromiseState(context, result) == JS_PROMISE_REJECTED) {
                     JSValue exception = JS_PromiseResult(context, result);
@@ -432,25 +553,13 @@ char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_se
     if (JS_IsException(result)) {
         describe_error(program, context, error);
         JS_FreeValue(context, result);
+        JS_FreeValue(context, argument);
         if (!program->module_context) JS_FreeContext(context);
         return NULL;
     }
     JS_FreeValue(context, result);
     JSValue global = program->module_context ? JS_DupValue(context, program->module_namespace) : JS_GetGlobalObject(context);
     JSValue function = JS_GetPropertyStr(context, global, "update");
-    const uint8_t *cursor = input;
-    JSValue argument = decode_input(context, &cursor, 0);
-    if (!JS_IsException(argument)) {
-        const char *guard_source =
-            "c => { for (const key of c._missing || []) Object.defineProperty(c, key,"
-            " {get(){throw new Error('Enable the input dependency: '+key);}, configurable:false});"
-            " delete c._missing; return c; }";
-        JSValue guard_function = JS_Eval(context, guard_source, strlen(guard_source), "inputs.js", JS_EVAL_TYPE_GLOBAL);
-        JSValue guarded = JS_IsException(guard_function) ? JS_EXCEPTION : JS_Call(context, guard_function, JS_UNDEFINED, 1, &argument);
-        JS_FreeValue(context, guard_function);
-        JS_FreeValue(context, argument);
-        argument = guarded;
-    }
     if (!JS_IsFunction(context, function)) {
         JS_ThrowTypeError(context, "Define function update(context)");
         result = JS_EXCEPTION;
@@ -494,6 +603,7 @@ char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_se
 void lwjs_destroy(LWJSProgram *program) {
     if (!program) return;
     free(program->meshes);
+    free(program->models);
     if (program->module_context) {
         JS_FreeValue(program->module_context, program->module_entry);
         JS_FreeValue(program->module_context, program->module_namespace);
@@ -512,9 +622,17 @@ const uint8_t *lwjs_meshes(LWJSProgram *program, size_t *length) {
     *length = program->mesh_length;
     return program->meshes;
 }
+const uint8_t *lwjs_models(LWJSProgram *program, size_t *length) {
+    *length = program->model_length;
+    return program->models;
+}
 size_t lwjs_memory_usage(LWJSProgram *program) {
     JSMemoryUsage usage;
     JS_ComputeMemoryUsage(program->runtime, &usage);
     return (size_t)usage.malloc_size;
 }
 void lwjs_set_memory_limit(LWJSProgram *program, size_t bytes) { JS_SetMemoryLimit(program->runtime, bytes); }
+void lwjs_set_storage(LWJSProgram *program, lwjs_storage_handler handler, void *opaque) {
+    program->storage = handler;
+    program->storage_opaque = opaque;
+}

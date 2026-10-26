@@ -55,25 +55,24 @@ enum LocalWebHostScript {
             window.__liveWallpaperMediaState = {value, enabled};
             window.dispatchEvent(new CustomEvent('livewallpaper:media', {detail:{value, enabled}}));
         };
+        // The original runs frames at the display's rate whatever its frame rate setting, and
+        // only stops them while paused.
         const nativeRAF = window.requestAnimationFrame.bind(window);
         const nativeCancel = window.cancelAnimationFrame.bind(window);
         const callbacks = new Map();
-        let nextID = 1, scheduled = null, lastFrame = -Infinity;
+        let nextID = 1, scheduled = null;
         function schedule() {
             if (!state.paused && callbacks.size && scheduled === null) scheduled = nativeRAF(tick);
         }
         function tick(time) {
             scheduled = null;
             if (state.paused) return;
-            if (time - lastFrame + 0.5 >= 1000 / state.fps) {
-                lastFrame = time;
-                const ready = [...callbacks.keys()];
-                for (const id of ready) {
-                    const callback = callbacks.get(id);
-                    callbacks.delete(id);
-                    if (callback) {
-                        try { callback(time); } catch (error) { console.error('Wallpaper frame failed', error); }
-                    }
+            const ready = [...callbacks.keys()];
+            for (const id of ready) {
+                const callback = callbacks.get(id);
+                callbacks.delete(id);
+                if (callback) {
+                    try { callback(time); } catch (error) { console.error('Wallpaper frame failed', error); }
                 }
             }
             schedule();
@@ -85,6 +84,38 @@ enum LocalWebHostScript {
             return id;
         };
         window.cancelAnimationFrame = id => { callbacks.delete(id); };
+
+        // The original also holds the page's own timers while paused and runs each one that
+        // came due once on resume, however many times an interval elapsed. Workers keep
+        // running, so only this window's timers are wrapped.
+        const heldTimers = new Map();
+        function holdWhilePaused(callback, args, id) {
+            return () => {
+                if (state.paused) heldTimers.set(id(), () => callback(...args));
+                else callback(...args);
+            };
+        }
+        for (const [set, clear] of [['setTimeout', 'clearTimeout'], ['setInterval', 'clearInterval']]) {
+            const nativeSet = window[set].bind(window);
+            const nativeClear = window[clear].bind(window);
+            window[set] = (callback, delay, ...args) => {
+                if (typeof callback !== 'function') return nativeSet(callback, delay, ...args);
+                let timer;
+                timer = nativeSet(holdWhilePaused(callback, args, () => timer), delay);
+                return timer;
+            };
+            window[clear] = id => {
+                heldTimers.delete(id);
+                nativeClear(id);
+            };
+        }
+        function releaseTimers() {
+            const due = [...heldTimers.values()];
+            heldTimers.clear();
+            for (const run of due) {
+                try { run(); } catch (error) { console.error('Wallpaper timer failed', error); }
+            }
+        }
 
         const contexts = new Set();
         const gains = new WeakMap();
@@ -173,10 +204,13 @@ enum LocalWebHostScript {
         window.__liveWallpaperUpdate = value => {
             Object.assign(state, value);
             if (state.paused && scheduled !== null) { nativeCancel(scheduled); scheduled = null; }
-            if (!state.paused) { lastFrame = -Infinity; schedule(); }
+            if (!state.paused) schedule();
             contexts.forEach(updateContext);
             updateMedia();
             window.dispatchEvent(new CustomEvent('livewallpaper:state', {detail: {...state}}));
+            // After the event, so that the page hears setPaused(false) before its timers run,
+            // as in the original.
+            if (!state.paused) releaseTimers();
         };
     })();
     """#

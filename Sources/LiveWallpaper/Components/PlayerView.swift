@@ -172,6 +172,14 @@ final class PlayerView: NSView {
         sceneLayer?.scriptIssueHandler = handler
     }
 
+    var sceneVideoPath: String? {
+        sceneLayer?.videoPath
+    }
+
+    func updateSceneUserProperties(_ userProperties: [String: WebPropertyValue]?) {
+        sceneLayer?.userProperties = userProperties
+    }
+
     /// `freeClock` animates on wall time instead of the player's position, for while
     /// the baked video does not match the scene yet. Either way the animation only
     /// runs while the player plays, so every pause rule for videos applies.
@@ -180,7 +188,9 @@ final class PlayerView: NSView {
         videoPath: String,
         freeClock: Bool,
         timeOfDay: SceneTimeOfDay,
-        maximumFramesPerSecond: Float?
+        maximumFramesPerSecond: Float?,
+        storageScreen: String,
+        userProperties: [String: WebPropertyValue]? = nil
     ) throws {
         let layer = sceneLayer ?? {
             let layer = SceneMetalLayer()
@@ -206,13 +216,14 @@ final class PlayerView: NSView {
         sceneRunsInRealTime = freeClock && document.requiresRealTimePlayback
         layer.maximumFramesPerSecond = maximumFramesPerSecond
         layer.timeOfDay = timeOfDay
+        layer.storageScreen = storageScreen
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         layer.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
         layer.frame = sceneFrame(aspectRatio: document.aspectRatio)
         layer.isHidden = false
         CATransaction.commit()
-        try layer.show(document, videoPath: videoPath)
+        try layer.show(document, videoPath: videoPath, userProperties: userProperties)
         if isSuspended {
             layer.suspend()
         }

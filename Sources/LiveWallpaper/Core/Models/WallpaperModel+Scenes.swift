@@ -402,6 +402,78 @@ extension WallpaperModel {
         return layer.id
     }
 
+    /// Adds a simulated particle layer that starts as soft lights rising from the
+    /// bottom, drawn with a generated round sprite.
+    func addSceneParticleSystemLayer(name: String, path: String) -> UUID? {
+        guard var document = sceneDocumentsByPath[path] else {
+            return nil
+        }
+        let texture: String
+        do {
+            texture = try SceneStore.writeImage(Self.softDotImage(), prefix: "particle", videoPath: path)
+        } catch {
+            sceneErrorMessage = error.localizedDescription
+            AppLog.windowRefresh.error("writing particle sprite failed: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+        let system = SceneParticleSystem.risingLights(
+            canvasWidth: Double(document.canvasWidth),
+            canvasHeight: Double(document.canvasHeight),
+            textureFile: texture
+        )
+        let layer = SceneLayer(name: name, particleSystem: system)
+        document.layers.append(layer)
+        updateScene(document, path: path, coalescing: false)
+        return layer.id
+    }
+
+    /// Copies an image into the scene folder for a particle system and hands its file
+    /// name to `apply`, which must make the scene name it before anything else edits it.
+    func importSceneParticleImage(from imageURL: URL, path: String, apply: (String) -> Void) async {
+        let stagingVideoPath = Self.sceneStagingVideoPath()
+        let stagingFolder = SceneStore.folderURL(forVideoPath: stagingVideoPath)
+        defer {
+            removeLeftovers(of: [stagingFolder])
+        }
+        do {
+            let layer = try await Task.detached(priority: .userInitiated) {
+                try SceneStore.importImage(at: imageURL, videoPath: stagingVideoPath).0
+            }.value
+            guard sceneDocumentsByPath[path] != nil else {
+                return
+            }
+            try adoptStagedSceneFile(layer.imageFile, from: stagingFolder, path: path)
+            apply(layer.imageFile)
+        } catch {
+            sceneErrorMessage = error.localizedDescription
+            AppLog.windowRefresh.error("importing particle image failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// White, fading from opaque at the centre to clear at the edge.
+    private static func softDotImage() throws -> CGImage {
+        let size = 64
+        guard let context = CGContext(
+            data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ),
+            let gradient = CGGradient(
+                colorsSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+                colors: [CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1), CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0)] as CFArray,
+                locations: [0, 1]
+            )
+        else {
+            throw SceneStore.StoreError.unreadableImage("particle sprite")
+        }
+        let center = CGPoint(x: Double(size) / 2, y: Double(size) / 2)
+        context.drawRadialGradient(gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: Double(size) / 2, options: [])
+        guard let image = context.makeImage() else {
+            throw SceneStore.StoreError.unreadableImage("particle sprite")
+        }
+        return image
+    }
+
     // MARK: - AI
 
     /// Splits the layer into its subject (a new layer above) and the background with
@@ -675,6 +747,7 @@ extension WallpaperModel {
         let folder = SceneStore.folderURL(forVideoPath: path)
         var used = SceneStore.referencedFiles(of: document)
         used.insert("scene.json")
+        used.insert("properties.json")
         for snapshot in (sceneHistories[path]?.snapshots ?? []) + [sceneComparisonSnapshots[path]].compactMap({ $0 }) {
             used.formUnion(SceneStore.referencedFiles(of: snapshot))
         }
@@ -897,8 +970,9 @@ extension WallpaperModel {
             sceneBakeProgress[videoPath] = 0
         }
         let throttle = MediaImportProgressThrottle()
+        let userProps = SceneMetalLayer.loadUserProperties(forVideoPath: videoPath)
         try await SceneVideoBaker.bake(
-            document: document, videoPath: videoPath, timeOfDay: timeOfDay, stillOnly: stillOnly, to: stagedOutput
+            document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProps, stillOnly: stillOnly, to: stagedOutput
         ) { [weak self] value in
             guard throttle.shouldReport(value) else { return }
             Task { @MainActor [weak self] in
@@ -937,6 +1011,15 @@ extension WallpaperModel {
     /// Shows or hides the live scene on each screen to match what it plays. Called
     /// from refreshCursorEffects, which runs on every change of what screens show.
     ///
+    /// Display numbers can change when screens are reconnected; scripts' per-screen
+    /// values follow the display's UUID instead.
+    static func storageScreen(forDisplayID displayID: String) -> String {
+        guard let number = UInt32(displayID), let uuid = CGDisplayCreateUUIDFromDisplayID(number)?.takeRetainedValue() else {
+            return displayID
+        }
+        return CFUUIDCreateString(nil, uuid) as String
+    }
+
     /// The baked video already shows everything that does not react to the cursor,
     /// at the cost of any other video, so the scene is drawn live only when it reacts
     /// to the cursor or its video is out of date.
@@ -976,10 +1059,13 @@ extension WallpaperModel {
                         "scene live display=\(displayID, privacy: .public) stale=\(isStale, privacy: .public) realTime=\(document.requiresRealTimePlayback, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
                     )
                 }
+                let userProps = SceneMetalLayer.loadUserProperties(forVideoPath: path)
                 try view.showScene(
                     document, videoPath: path, freeClock: isStale || document.requiresRealTimePlayback,
                     timeOfDay: document.timeOfDay(at: Date()),
-                    maximumFramesPerSecond: maximumFramesPerSecond
+                    maximumFramesPerSecond: maximumFramesPerSecond,
+                    storageScreen: Self.storageScreen(forDisplayID: displayID),
+                    userProperties: userProps
                 )
                 view.setSceneScriptIssueHandler { [weak self] issues in
                     guard let self, self.sceneScriptIssues[path] != issues else { return }

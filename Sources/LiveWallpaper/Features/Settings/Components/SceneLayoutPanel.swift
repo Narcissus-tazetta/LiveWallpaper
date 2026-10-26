@@ -13,7 +13,7 @@ extension SettingsView {
     /// keyframe's pose, or the fixed placement. nil while locked, or while the layer
     /// moves over time and no keyframe is chosen.
     func sceneEditableTransform(of layer: SceneLayer) -> SceneTransform? {
-        guard !layer.isLocked else {
+        guard !layer.isLocked, layer.motion == nil else {
             return nil
         }
         guard layer.isKeyframed else {
@@ -59,6 +59,26 @@ extension SettingsView {
         Text(model.localizedString("配置"))
             .font(.headline)
 
+        if let motion = layer.motion {
+            settingsFootnote(model.localizedString("読み込んだ動きで動きます。動きを外すと、最初の姿勢で止まり、配置を変えられるようになります。"))
+            Button(model.localizedString("動きを外す")) {
+                updateSceneLayout(path: path, layerID: layer.id) { layer in
+                    let first = motion.pose(at: 0)
+                    layer.transform = first.transform
+                    layer.opacity *= first.opacity
+                    layer.motion = nil
+                }
+            }
+            .disabled(layer.isLocked)
+        } else {
+            sceneEditableLayoutControls(path: path, layer: layer, keyframe: keyframe, loopSeconds: loopSeconds, labelWidth: labelWidth)
+        }
+    }
+
+    @ViewBuilder
+    private func sceneEditableLayoutControls(
+        path: String, layer: SceneLayer, keyframe: SceneKeyframe?, loopSeconds: Double, labelWidth: CGFloat
+    ) -> some View {
         Toggle(
             model.localizedString("時間で動かす"),
             isOn: Binding(

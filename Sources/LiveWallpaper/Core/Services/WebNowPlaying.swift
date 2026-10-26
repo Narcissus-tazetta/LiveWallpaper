@@ -6,6 +6,7 @@ struct WebNowPlaying: Codable, Equatable {
     var title = ""
     var artist = ""
     var album = ""
+    var albumArtist = ""
     var duration: Double = 0
     var position: Double = 0
     var state = "stopped"
@@ -54,6 +55,7 @@ final class WebNowPlayingReader: @unchecked Sendable {
                     inside: track
                 ), target: target).stringValue ?? ""
                 value.album = try get(property("pAlb", inside: track), target: target).stringValue ?? ""
+                value.albumArtist = try get(property("pAlA", inside: track), target: target).stringValue ?? ""
                 value.duration = try get(property("pDur", inside: track), target: target).doubleValue
                 // Spotify's Apple event duration uses milliseconds; Music uses seconds.
                 if spotify { value.duration /= 1000 }

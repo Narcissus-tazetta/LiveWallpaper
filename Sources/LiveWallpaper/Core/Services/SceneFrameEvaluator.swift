@@ -1,11 +1,17 @@
 import Foundation
+import simd
 
 struct SceneEvaluatedFrame {
+    /// Layers scripts made from the scene's own, each to its template; they are in
+    /// `layers` and `order` under their own IDs.
+    var instances: [UUID: UUID] = [:]
     struct Layer {
         var layer: SceneLayer
         var transform: SceneTransform
         var opacity: Double
         var color: SceneLinkValues
+        /// In a scene seen through its camera: where scripts placed the layer, when they did.
+        var world: simd_float4x4?
     }
     var input: SceneFrameInput
     var layers: [UUID: Layer]
@@ -14,6 +20,10 @@ struct SceneEvaluatedFrame {
     var rigPlayback: [UUID: [SceneSkeleton.Playback]] = [:]
     var order: [UUID: Int] = [:]
     var meshes: [SceneMeshFrame] = []
+    var models: [SceneModelLayerFrame] = []
+    var camera: SceneCameraState?
+    /// What scripts asked of simulated particles this frame; carried out once, when drawn.
+    var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
 }
 
 final class SceneFrameEvaluator {
@@ -39,6 +49,13 @@ final class SceneFrameEvaluator {
     /// What each script last returned, shown again for a frame it ran out of time in.
     private var lastOutputs: [UUID: SceneScriptOutput] = [:]
     private var consecutiveTimeouts: [UUID: Int] = [:]
+    /// How many times its normal time a module bundle gets: one that runs out of time
+    /// is given more on the next frame, up to `maximumTimeScale`, so a heavy scene runs
+    /// at a lower frame rate instead of never finishing a frame.
+    private var timeScales: [UUID: Double] = [:]
+    private static let maximumTimeScale = 16.0
+    /// Read for every frame, and scanning a large bundle's code for it takes as long as running it.
+    private var audioScripts: Set<UUID> = []
     /// A script that keeps running out of time is slower than the frame rate allows;
     /// after this many frames in a row it is stopped, as one that cannot run at all.
     private static let maximumHeldFrames = 30
@@ -56,9 +73,31 @@ final class SceneFrameEvaluator {
     private var cachedTemplates: [UUID: LayerTemplate] = [:]
     private var cachedScriptTargets: [UUID: [SceneLayer]] = [:]
 
-    init(budget: Budget = .live, temporaryStopSeconds: TimeInterval = 2) {
+    /// Where scripts' localStorage goes; by default nowhere that outlives this evaluator.
+    var storage: SceneScriptStorage.Session
+
+    init(budget: Budget = .live, temporaryStopSeconds: TimeInterval = 2, storage: SceneScriptStorage.Session = .scratch()) {
         self.budget = budget
         self.temporaryStopSeconds = temporaryStopSeconds
+        self.storage = storage
+    }
+
+    private static func apply(_ adjustment: SceneScriptAdjustment, to layer: inout SceneEvaluatedFrame.Layer) {
+        layer.transform.offsetX += adjustment.values.offsetX
+        layer.transform.offsetY += adjustment.values.offsetY
+        layer.transform.rotation += adjustment.values.rotation
+        if layer.transform.scaleY != nil || adjustment.values.scaleY != nil {
+            layer.transform.scaleY = (layer.transform.scaleY ?? layer.transform.scale) * (adjustment.values.scaleY ?? adjustment.values.scale)
+        }
+        layer.transform.scale *= adjustment.values.scale
+        layer.opacity *= adjustment.values.opacity
+        layer.color = layer.color.combined(with: adjustment.values)
+        adjustment.appearance?.apply(to: &layer.layer)
+        for index in layer.layer.effects.indices {
+            adjustment.effects[layer.layer.effects[index].id]?.apply(to: &layer.layer.effects[index])
+        }
+        if let text = adjustment.text { text.apply(to: &layer.layer.text!) }
+        if let world = adjustment.world { layer.world = world }
     }
 
     func evaluate(_ document: SceneDocument, input: SceneFrameInput, timeOfDay: SceneTimeOfDay, failOnError: Bool = true) throws -> SceneEvaluatedFrame {
@@ -67,6 +106,8 @@ final class SceneFrameEvaluator {
             resumeTimes = [:]
             lastOutputs = [:]
             consecutiveTimeouts = [:]
+            timeScales = [:]
+            audioScripts = Set(document.scripts.filter(\.usesAudio).map(\.id))
             cachedScriptTargets.removeAll(keepingCapacity: true)
             previousScripts = document.scripts
             runtime.retainPrograms(for: Set(document.scripts.map(\.id)))
@@ -83,12 +124,13 @@ final class SceneFrameEvaluator {
                 if failOnError { throw issue }
             }
         }
-        let deadline = ProcessInfo.processInfo.systemUptime + budget.perFrame
+        let allowance = document.scripts.reduce(0) { $0 + budget.perScript * (timeScales[$1.id] ?? 1) }
+        let deadline = ProcessInfo.processInfo.systemUptime + max(budget.perFrame, allowance)
         let phase = (input.time / Double(document.loopSeconds)).truncatingRemainder(dividingBy: 1)
         let normalizedPhase = phase < 0 ? phase + 1 : phase
         var base: [UUID: SceneEvaluatedFrame.Layer] = [:]
         for layer in document.layers {
-            let pose = layer.pose(at: normalizedPhase)
+            let pose = layer.pose(at: normalizedPhase, time: input.time)
             let link = document.linkValues(layerID: layer.id, timeOfDay: timeOfDay,
                                            cursor: SIMD2(Double(input.parallax.x), Double(input.parallax.y)))
             var transform = pose.transform
@@ -107,7 +149,14 @@ final class SceneFrameEvaluator {
         var targetInputs: [UUID: SceneScriptInput] = [:]
         var warnings: [SceneScriptIssue] = []
         var meshes: [SceneMeshFrame] = []
-        for script in document.scripts where script.canRun && !script.targetLayerIDs(in: document.layers).isEmpty {
+        var models: [SceneModelLayerFrame] = []
+        var camera: SceneCameraState?
+        var instances: [UUID: UUID] = [:]
+        var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
+        // A converted bundle runs even with no layer of its own to drive: it may draw
+        // what it makes.
+        for script in document.scripts where script.canRun
+            && (script.modules != nil || !script.targetLayerIDs(in: document.layers).isEmpty) {
             if let issue = stopped[script.id] {
                 if failOnError { throw issue }
                 continue
@@ -158,6 +207,15 @@ final class SceneFrameEvaluator {
                 context.key("aspectRatio")
                 try context.number(document.aspectRatio)
                 context.end(canvasPosition, count: 3)
+                member("screen")
+                if let screen = input.screenSize {
+                    let screenPosition = context.beginObject()
+                    context.key("width")
+                    try context.number(Double(screen.x))
+                    context.key("height")
+                    try context.number(Double(screen.y))
+                    context.end(screenPosition, count: 2)
+                } else { context.null() }
                 var missing: [String] = []
                 if script.usesTime {
                     member("elapsedTime")
@@ -204,29 +262,68 @@ final class SceneFrameEvaluator {
                     member("media")
                     try context.value(Self.mediaInput(input.media))
                 } else { missing.append("media") }
+                if audioScripts.contains(script.id) {
+                    member("audio")
+                    if let audio = input.audio {
+                        let position = context.beginObject()
+                        for (name, values) in [("left", audio.left), ("right", audio.right)] {
+                            context.key(name)
+                            let array = context.beginArray()
+                            for value in values { try context.number(value) }
+                            context.end(array, count: values.count)
+                        }
+                        context.end(position, count: 2)
+                    } else { context.null() }
+                } else { missing.append("audio") }
+                if let userProps = input.userProperties {
+                    member("userProperties")
+                    let position = context.beginObject()
+                    for (k, v) in userProps.sorted(by: { $0.key < $1.key }) {
+                        context.key(k)
+                        switch v {
+                        case let .bool(b): context.bool(b)
+                        case let .number(n): try context.number(n)
+                        case let .string(s): context.string(s)
+                        case .null: context.null()
+                        }
+                    }
+                    context.end(position, count: userProps.count)
+                }
                 member("_missing")
                 try context.value(missing)
                 context.end(contextPosition, count: contextCount)
                 let output: SceneScriptOutput
+                // A held frame repeats the last output, whose particle requests were already carried out.
+                var heldOutput = false
+                let scale = timeScales[script.id] ?? 1
+                let started = ProcessInfo.processInfo.systemUptime
                 do {
                     output = try runtime.evaluate(
-                        script, input: context, elapsedTime: input.time, layers: document.layers, rigs: document.rigs, perScript: budget.perScript, deadline: deadline
+                        script, input: context, elapsedTime: input.time, layers: document.layers, rigs: document.rigs, storage: storage,
+                        perScript: budget.perScript * scale, deadline: deadline
                     )
+                    if scale > 1, ProcessInfo.processInfo.systemUptime - started < budget.perScript * scale / 4 {
+                        timeScales[script.id] = max(scale / 2, 1)
+                    }
                     consecutiveTimeouts[script.id] = nil
                     lastOutputs[script.id] = output
                 } catch let issue as SceneScriptIssue where !failOnError && issue.isTemporary && runtime.isLoaded(script.id) {
                     // A slow frame (other work took the CPU) is skipped: the script keeps its
                     // state, so its animations carry on instead of restarting.
+                    if script.modules != nil { timeScales[script.id] = min(scale * 2, Self.maximumTimeScale) }
                     let count = (consecutiveTimeouts[script.id] ?? 0) + 1
                     guard count <= Self.maximumHeldFrames else { throw issue }
                     consecutiveTimeouts[script.id] = count
                     guard let held = lastOutputs[script.id] else { continue }
                     output = held
+                    heldOutput = true
                 }
                 warnings += output.warnings.map {
                     SceneScriptIssue(scriptID: script.id, name: script.name, message: $0, isPartial: true)
                 }
                 meshes += output.meshes
+                models += output.models
+                camera = output.camera ?? camera
                 for (id, adjustment) in output.adjustments {
                     if let position = adjustment.order { order[id] = position }
                     for (rigID, changes) in adjustment.rigPlayback {
@@ -235,29 +332,29 @@ final class SceneFrameEvaluator {
                         rigPlayback[rigID] = playback
                     }
                     var layer = result[id]!
-                    layer.transform.offsetX += adjustment.values.offsetX
-                    layer.transform.offsetY += adjustment.values.offsetY
-                    layer.transform.rotation += adjustment.values.rotation
-                    if layer.transform.scaleY != nil || adjustment.values.scaleY != nil {
-                        layer.transform.scaleY = (layer.transform.scaleY ?? layer.transform.scale) * (adjustment.values.scaleY ?? adjustment.values.scale)
-                    }
-                    layer.transform.scale *= adjustment.values.scale
-                    layer.opacity *= adjustment.values.opacity
-                    layer.color = layer.color.combined(with: adjustment.values)
-                    adjustment.appearance?.apply(to: &layer.layer)
-                    for index in layer.layer.effects.indices {
-                        adjustment.effects[layer.layer.effects[index].id]?.apply(to: &layer.layer.effects[index])
-                    }
+                    Self.apply(adjustment, to: &layer)
                     if let particles = adjustment.particles { particles.apply(to: &layer.layer.particles!) }
-                    if let text = adjustment.text { text.apply(to: &layer.layer.text!) }
+                    if let control = adjustment.particleControl, !heldOutput { particleControls[id, default: .init()].append(control) }
                     result[id] = layer
+                }
+                // A copy starts from its template as the scene places it, before scripts.
+                for instance in output.instances {
+                    guard var layer = base[instance.template], layer.layer.particleSystem == nil else { continue }
+                    layer.layer.id = instance.id
+                    // An effect with a render graph keeps state under its own ID, which a
+                    // copy would advance a second time each frame.
+                    layer.layer.effects.removeAll { $0.renderGraph != nil }
+                    Self.apply(instance.adjustment, to: &layer)
+                    result[instance.id] = layer
+                    if let position = instance.adjustment.order { order[instance.id] = position }
+                    instances[instance.id] = instance.template
                 }
             } catch let issue as SceneScriptIssue {
                 stop(issue)
                 if failOnError { throw issue }
             }
         }
-        return SceneEvaluatedFrame(input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes)
+        return SceneEvaluatedFrame(instances: instances, input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, camera: camera, particleControls: particleControls)
     }
 
     /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets

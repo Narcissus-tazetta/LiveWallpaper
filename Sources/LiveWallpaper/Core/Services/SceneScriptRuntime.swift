@@ -1,5 +1,6 @@
 import CoreFoundation
 import Foundation
+import simd
 import QuickJS
 import OSLog
 
@@ -18,10 +19,14 @@ final class SceneScriptRuntime {
     /// The first run of a module bundle also loads its modules and runs every init,
     /// once: it gets the time compiling gets instead of one frame's share.
     static let moduleStartSeconds: TimeInterval = 0.1
+    /// A start that ran out of time is tried again with this many times more, up to the cap,
+    /// since a large bundle needs the time to finish loading however often it is retried.
+    private static let maximumStartScale = 10.0
     /// The messages of running out of time: Bridge.c's for one script, and evaluate's
     /// for the frame.
     private static let timeLimitMessages: Set = ["Execution time limit exceeded", "Frame execution time limit exceeded"]
     private var programs: [UUID: Program] = [:]
+    private var startScales: [UUID: Double] = [:]
     private(set) var logs: [UUID: String] = [:]
 
     deinit {
@@ -47,8 +52,8 @@ final class SceneScriptRuntime {
             throw SceneScriptIssue(scriptID: script.id, name: script.name, message: "Script source cannot contain NUL")
         }
         guard script.source.utf8.count <= 65536,
-              (script.modules?.count ?? 0) <= 256,
-              (script.modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 1048576,
+              (script.modules?.count ?? 0) <= 2048,
+              (script.modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 4194304,
               script.modules?.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }) != false
         else { throw issue("Script bundle exceeds supported limits", script: script) }
         if let old = programs.removeValue(forKey: script.id) { destroy(old.pointer, id: script.id, reason: "source changed") }
@@ -74,9 +79,33 @@ final class SceneScriptRuntime {
         programs[script.id] = Program(script: script, pointer: pointer!, memoryBytes: memory)
     }
 
+    /// Reached from Bridge.c's storage(), on the thread running the script.
+    private static let storageHandler: lwjs_storage_handler = { opaque, operation, global, key, keyLength, value, valueLength, result, resultLength in
+        let session = Unmanaged<SceneScriptStorage.Session>.fromOpaque(opaque!).takeUnretainedValue()
+        let name = key.map { Data(bytes: $0, count: keyLength) } ?? Data()
+        let area = session.area(global: global != 0)
+        switch operation {
+        case 0:
+            guard let found = session.store.get(name, in: area) else { return -1 }
+            let buffer = malloc(max(found.count, 1))!
+            found.copyBytes(to: buffer.assumingMemoryBound(to: UInt8.self), count: found.count)
+            result!.pointee = buffer.assumingMemoryBound(to: CChar.self)
+            resultLength!.pointee = found.count
+            return -1
+        case 1:
+            return session.store.set(name, Data(bytes: value!, count: valueLength), in: area) ? 1 : 0
+        case 2:
+            return session.store.delete(name, in: area) ? 1 : 0
+        default:
+            session.store.clear(global == 2 ? [session.area(global: true), session.area(global: false)] : [area])
+            return 1
+        }
+    }
+
     /// Stops the script after `perScript` seconds, or at `deadline` when that comes first.
     func evaluate(
-        _ script: SceneScript, input: SceneScriptInput, elapsedTime: Double, layers: [SceneLayer], rigs: [UUID: SceneSkeleton] = [:], perScript: TimeInterval, deadline: TimeInterval
+        _ script: SceneScript, input: SceneScriptInput, elapsedTime: Double, layers: [SceneLayer], rigs: [UUID: SceneSkeleton] = [:],
+        storage: SceneScriptStorage.Session, perScript: TimeInterval, deadline: TimeInterval
     ) throws -> SceneScriptOutput {
         do {
             if script.modules != nil {
@@ -90,13 +119,17 @@ final class SceneScriptRuntime {
             let starting = script.modules != nil && !programs[script.id]!.hasStarted
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
             guard remaining > 0 || starting else { throw failure("Frame execution time limit exceeded") }
-            let budget = starting ? max(min(remaining, perScript), Self.moduleStartSeconds) : min(remaining, perScript)
+            let startScale = startScales[script.id] ?? 1
+            let budget = starting ? max(min(remaining, perScript), Self.moduleStartSeconds * startScale) : min(remaining, perScript)
             var error: UnsafeMutablePointer<CChar>?
             let otherMemory = programs.keys.filter { $0 != script.id }.reduce(0) { $0 + memoryBytes(of: $1) }
-            lwjs_set_memory_limit(programs[script.id]!.pointer, min(16 * 1024 * 1024, Self.maximumMemoryBytes - otherMemory))
-            let result = input.bytes.withUnsafeBufferPointer {
-                lwjs_evaluate(programs[script.id]!.pointer, $0.baseAddress!, budget, &error)
+            lwjs_set_memory_limit(programs[script.id]!.pointer, min(64 * 1024 * 1024, Self.maximumMemoryBytes - otherMemory))
+            let pointer = programs[script.id]!.pointer
+            lwjs_set_storage(pointer, Self.storageHandler, Unmanaged.passUnretained(storage).toOpaque())
+            let result = withExtendedLifetime(storage) {
+                input.bytes.withUnsafeBufferPointer { lwjs_evaluate(pointer, $0.baseAddress!, budget, &error) }
             }
+            lwjs_set_storage(pointer, nil, nil)
             programs[script.id]?.hasStarted = true
             if let error {
                 defer { lwjs_free_string(error) }
@@ -108,6 +141,9 @@ final class SceneScriptRuntime {
                 // short while the modules were still initializing is half-built, though.
                 if script.modules != nil, !starting, Self.timeLimitMessages.contains(message) {
                     throw failure(message)
+                }
+                if starting, Self.timeLimitMessages.contains(message) {
+                    startScales[script.id] = min(startScale * 2, Self.maximumStartScale)
                 }
                 destroy(programs.removeValue(forKey: script.id)!.pointer, id: script.id,
                         reason: Self.timeLimitMessages.contains(message) ? "time limit" : "script error",
@@ -122,10 +158,15 @@ final class SceneScriptRuntime {
             var output = try JSONSerialization.jsonObject(with: outputData)
             var warnings: [String] = []
             var meshes: [SceneMeshFrame] = []
+            var models: [SceneModelLayerFrame] = []
+            var camera: SceneCameraState?
+            var instances: [SceneScriptInstance] = []
             // A module bundle runs several independent scripts; one that failed is
             // reported here while the rest keep running.
             if script.modules != nil, let wrapped = output as? [String: Any] {
-                try Self.keys(wrapped, allowed: ["adjustments", "warnings"], path: "output")
+                try Self.keys(wrapped, allowed: ["adjustments", "warnings", "camera", "instances"], path: "output")
+                instances = try wrapped["instances"].map { try Self.readInstances($0, script: script, layers: layers, rigs: rigs) } ?? []
+                camera = try wrapped["camera"].map(Self.readCamera)
                 guard let list = wrapped["warnings"] as? [String], list.count <= 16,
                       list.allSatisfy({ $0.utf8.count <= 1024 }) else {
                     throw failure("output.warnings: expected at most 16 messages of at most 1 KiB")
@@ -134,10 +175,13 @@ final class SceneScriptRuntime {
                 var length = 0
                 let bytes = lwjs_meshes(programs[script.id]!.pointer, &length)
                 meshes = try Self.readMeshes(bytes, length: length)
+                let modelBytes = lwjs_models(programs[script.id]!.pointer, &length)
+                models = try Self.readModels(modelBytes, length: length)
                 output = wrapped["adjustments"] as Any
             }
             return SceneScriptOutput(adjustments: try Self.readOutput(output, script: script, layers: layers, rigs: rigs),
-                                     warnings: warnings, meshes: meshes)
+                                     warnings: warnings, meshes: meshes, models: models, camera: camera,
+                                     instances: instances)
         } catch let failure as SceneScriptIssue {
             throw issue(failure.message, script: script)
         } catch {
@@ -169,6 +213,7 @@ final class SceneScriptRuntime {
             destroy(programs.removeValue(forKey: id)!.pointer, id: id, reason: "retain")
         }
         logs = logs.filter { ids.contains($0.key) }
+        startScales = startScales.filter { ids.contains($0.key) }
     }
 
     private func failure(_ message: String) -> SceneScriptIssue {
@@ -234,9 +279,44 @@ final class SceneScriptRuntime {
         try JSONDecoder().decode(type, from: JSONSerialization.data(withJSONObject: value))
     }
 
+    /// For simulated particles: `events` in order, each `{"emit": count}` or
+    /// `{"clear": true}`, and `emitting` to stop or restart the emitters.
+    private static func readParticleControl(_ raw: Any) throws -> SceneParticleSimulator.Control {
+        let particles = try object(raw, path: "particles")
+        try keys(particles, allowed: ["events", "emitting"], path: "particles")
+        var control = SceneParticleSimulator.Control()
+        if let rawEmitting = particles["emitting"] {
+            guard let emitting = rawEmitting as? Bool else { throw failure("particles.emitting: expected a boolean") }
+            control.emitting = emitting
+        }
+        if let rawEvents = particles["events"] {
+            guard let events = rawEvents as? [Any], events.count <= 1000 else {
+                throw failure("particles.events: expected an array of at most 1000 entries")
+            }
+            for rawEvent in events {
+                let event = try object(rawEvent, path: "particles.events")
+                try keys(event, allowed: ["emit", "clear"], path: "particles.events")
+                if event["clear"] != nil {
+                    guard event.count == 1, event["clear"] as? Bool == true else {
+                        throw failure("particles.events: clear must be true and alone")
+                    }
+                    control.events.append(.clear)
+                } else {
+                    try numbers(event, ranges: ["emit": 1 ... 100_000], path: "particles.events")
+                    try integers(event, names: ["emit"], path: "particles.events")
+                    guard let count = (event["emit"] as? NSNumber)?.intValue else {
+                        throw failure("particles.events: expected emit or clear")
+                    }
+                    control.events.append(.emit(count))
+                }
+            }
+        }
+        return control
+    }
+
     /// Built once: readOutput runs for every target of every frame.
     private enum OutputKeys {
-        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text"]
+        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text", "world"]
         static let appearance: Set = ["isVisible", "tint", "blendMode", "parallaxDepth", "depthStrength", "depthFollowsCursor",
                                       "depthAutoMotion", "depthAutoCycles", "cursorMask", "clearCursorMask"]
         static let appearanceRanges: [String: ClosedRange<Double>] = [
@@ -334,6 +414,141 @@ final class SceneScriptRuntime {
         return meshes
     }
 
+    /// Each entry reads as an adjustment of its template, under an ID of its own.
+    private static func readInstances(_ raw: Any, script: SceneScript, layers: [SceneLayer],
+                                      rigs: [UUID: SceneSkeleton]) throws -> [SceneScriptInstance] {
+        guard let entries = raw as? [Any], entries.count <= 4096 else {
+            throw failure("output.instances: expected at most 4096 entries")
+        }
+        let templateIDs = Set(layers.map(\.id))
+        var seen = Set<UUID>()
+        return try entries.map { entry in
+            var item = try object(entry, path: "output.instances")
+            guard let text = item["id"] as? String, let id = UUID(uuidString: text), !templateIDs.contains(id),
+                  seen.insert(id).inserted, let templateText = item.removeValue(forKey: "template") as? String
+            else { throw failure("output.instances: expected a unique ID of its own and a template") }
+            item["id"] = templateText
+            guard let (template, adjustment) = try readOutput([item], script: script, layers: layers, rigs: rigs).first else {
+                throw failure("output.instances: empty")
+            }
+            return SceneScriptInstance(id: id, template: template, adjustment: adjustment)
+        }
+    }
+
+    private static func readCamera(_ raw: Any) throws -> SceneCameraState {
+        guard let object = raw as? [String: Any] else { throw failure("output.camera: expected an object") }
+        try keys(object, allowed: ["eye", "center", "up", "zoom", "fov", "nearZ", "farZ", "placed"], path: "output.camera")
+        func vector(_ key: String) throws -> SIMD3<Float> {
+            guard let list = object[key] as? [NSNumber], list.count == 3 else { throw failure("output.camera.\(key): expected 3 numbers") }
+            return SIMD3(list.map(\.floatValue))
+        }
+        func number(_ key: String) throws -> Float {
+            guard let value = (object[key] as? NSNumber)?.floatValue else { throw failure("output.camera.\(key): expected a number") }
+            return value
+        }
+        var state = SceneCameraState(eye: try vector("eye"), center: try vector("center"), up: try vector("up"),
+                                     zoom: try number("zoom"), fov: try number("fov"), nearZ: try number("nearZ"),
+                                     farZ: try number("farZ"))
+        state.isPlacedByScript = (object["placed"] as? Bool) ?? true
+        // A camera that cannot be drawn through (a NaN from a script) is ignored for the frame.
+        let values = [state.eye, state.center, state.up].flatMap { [$0.x, $0.y, $0.z] } + [state.zoom, state.fov, state.nearZ, state.farZ]
+        guard values.allSatisfy(\.isFinite) else { throw failure("output.camera: values must be finite") }
+        return state
+    }
+
+    /// The model layers the bridge packed, in 32-bit words: the layer count; per layer its
+    /// serial, order, alpha, colour (3), world matrix (16, column-major), flags (bit 0
+    /// perspective) and shape count; per shape its material (all ones for none), components,
+    /// float count, index kind (0 none, 1 u16, 2 u32), index count, the floats and the indices
+    /// (u16 padded to a whole word).
+    static func readModels(_ bytes: UnsafePointer<UInt8>?, length: Int) throws -> [SceneModelLayerFrame] {
+        guard let bytes, length > 0 else { return [] }
+        guard length % 4 == 0 else { throw failure("output.models: truncated") }
+        let data = UnsafeRawBufferPointer(start: bytes, count: length)
+        var offset = 0
+        func word() throws -> UInt32 {
+            guard offset + 4 <= length else { throw failure("output.models: truncated") }
+            defer { offset += 4 }
+            return data.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
+        }
+        func float() throws -> Float { Float(bitPattern: try word()) }
+        func floats(_ count: Int) throws -> [Float] {
+            guard count >= 0, offset + count * 4 <= length else { throw failure("output.models: truncated") }
+            let values = [Float](unsafeUninitializedCapacity: count) { buffer, filled in
+                if count > 0 {
+                    UnsafeMutableRawBufferPointer(buffer).copyMemory(from: UnsafeRawBufferPointer(rebasing: data[offset ..< offset + count * 4]))
+                }
+                filled = count
+            }
+            offset += count * 4
+            return values
+        }
+        let count = Int(try word())
+        guard count <= 4096 else { throw failure("output.models: too many layers") }
+        var layers: [SceneModelLayerFrame] = []
+        var total = 0
+        for _ in 0 ..< count {
+            let serial = try word(), order = Int(try word())
+            let alpha = try float(), color = SIMD3(try float(), try float(), try float())
+            let m = try floats(16)
+            let world = simd_float4x4(columns: (SIMD4(m[0], m[1], m[2], m[3]), SIMD4(m[4], m[5], m[6], m[7]),
+                                                SIMD4(m[8], m[9], m[10], m[11]), SIMD4(m[12], m[13], m[14], m[15])))
+            let flags = try word(), shapeCount = Int(try word())
+            guard shapeCount <= 256, ([alpha] + m + [color.x, color.y, color.z]).allSatisfy(\.isFinite) else {
+                throw failure("output.models: invalid layer")
+            }
+            var shapes: [SceneModelLayerFrame.Shape] = []
+            for _ in 0 ..< shapeCount {
+                let material = try word(), components = try word()
+                let floatCount = Int(try word()), indexKind = try word(), indexCount = Int(try word())
+                total += floatCount + indexCount
+                guard total <= maximumMeshFloats, components & 1 != 0, components < 32, indexKind <= 2 else {
+                    throw failure("output.models: invalid shape")
+                }
+                let vertices = try floats(floatCount)
+                var indices: [UInt32]?
+                switch indexKind {
+                case 1:
+                    let words = (indexCount + 1) / 2
+                    guard offset + words * 4 <= length else { throw failure("output.models: truncated") }
+                    indices = (0 ..< indexCount).map { UInt32(data.loadUnaligned(fromByteOffset: offset + $0 * 2, as: UInt16.self)) }
+                    offset += words * 4
+                case 2:
+                    guard offset + indexCount * 4 <= length else { throw failure("output.models: truncated") }
+                    indices = (0 ..< indexCount).map { data.loadUnaligned(fromByteOffset: offset + $0 * 4, as: UInt32.self) }
+                    offset += indexCount * 4
+                default:
+                    break
+                }
+                var shape = SceneModelLayerFrame.Shape(material: material == .max ? nil : Int(material), components: components,
+                                                       vertices: vertices, indices: indices)
+                guard vertices.allSatisfy(\.isFinite), vertices.count % shape.stride == 0 else {
+                    throw failure("output.models: vertices must be finite and whole")
+                }
+                // An index past the vertices reads memory the shape does not own; such a
+                // triangle is left out.
+                if let list = shape.indices {
+                    let vertexCount = UInt32(vertices.count / shape.stride)
+                    var kept: [UInt32] = []
+                    kept.reserveCapacity(list.count)
+                    var at = 0
+                    while at + 3 <= list.count {
+                        if list[at] < vertexCount, list[at + 1] < vertexCount, list[at + 2] < vertexCount {
+                            kept += list[at ..< at + 3]
+                        }
+                        at += 3
+                    }
+                    shape.indices = kept
+                }
+                shapes.append(shape)
+            }
+            layers.append(.init(serial: serial, order: order, alpha: alpha, color: color, world: world,
+                                perspective: flags & 1 != 0, shapes: shapes))
+        }
+        guard offset == length else { throw failure("output.models: trailing bytes") }
+        return layers
+    }
+
     private static func readText(_ raw: Any, layer: SceneLayer) throws -> SceneScriptTextValues {
         guard layer.text != nil else { throw failure("text: target is not a text layer") }
         let text = try object(raw, path: "text")
@@ -366,9 +581,19 @@ final class SceneScriptRuntime {
             else { throw failure("output.id: expected a unique ID from context.targets") }
             var adjustment = SceneScriptAdjustment()
             if item["order"] != nil {
-                try numbers(item, ranges: ["order": 0 ... Double(max(layers.count - 1, 0))], path: "output")
+                // A sort key shared with the model layers scripts make, not an index.
+                try numbers(item, ranges: ["order": 0 ... 1_000_000_000], path: "output")
                 try integers(item, names: ["order"], path: "output")
                 adjustment.order = (item["order"] as? NSNumber)?.intValue
+            }
+            if let raw = item["world"] {
+                guard let list = raw as? [NSNumber], list.count == 16, layer.space != nil else {
+                    throw failure("output.world: expected 16 numbers for a layer placed in space")
+                }
+                let m = list.map(\.floatValue)
+                guard m.allSatisfy(\.isFinite) else { throw failure("output.world: values must be finite") }
+                adjustment.world = simd_float4x4(columns: (SIMD4(m[0], m[1], m[2], m[3]), SIMD4(m[4], m[5], m[6], m[7]),
+                                                           SIMD4(m[8], m[9], m[10], m[11]), SIMD4(m[12], m[13], m[14], m[15])))
             }
             if let raw = item["rigs"] {
                 guard let entries = raw as? [Any], entries.count <= layer.scriptRigIDs.count else {
@@ -443,13 +668,15 @@ final class SceneScriptRuntime {
                     try choices(effect, values: ["kind": Set(SceneEffectKind.allCases.map(\.rawValue)), "fixedEdge": Set(SceneFixedEdge.allCases.map(\.rawValue))], path: "effects")
                     if let rawValues = effect["values"] {
                         let values = try object(rawValues, path: "effects.values")
-                        guard values.count <= 64 else { throw failure("effects.values: expected at most 64 entries") }
+                        guard values.count <= 256 else { throw failure("effects.values: expected at most 256 entries") }
                         try numbers(values, ranges: Dictionary(uniqueKeysWithValues: values.keys.map { ($0, -1e9 ... 1e9) }), path: "effects.values")
                     }
                     adjustment.effects[effectID] = try decode(SceneScriptEffectValues.self, effect)
                 }
             }
-            if let raw = item["particles"] {
+            if let raw = item["particles"], layer.particleSystem != nil {
+                adjustment.particleControl = try readParticleControl(raw)
+            } else if let raw = item["particles"] {
                 guard layer.particles != nil else { throw failure("particles: target is not a particle layer") }
                 let particles = try object(raw, path: "particles")
                 try choices(particles, values: ["preset": Set(SceneParticlePreset.allCases.map(\.rawValue)), "cursorMode": Set(SceneParticleCursorMode.allCases.map(\.rawValue))], path: "particles")

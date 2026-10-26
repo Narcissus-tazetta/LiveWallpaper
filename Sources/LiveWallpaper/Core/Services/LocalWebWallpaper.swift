@@ -11,6 +11,8 @@ struct LocalWebWallpaperPackage: Codable, Equatable {
     var properties: [LocalWebProperty]?
     var supportsSpectrum: Bool?
     var supportsMedia: Bool?
+    /// Property ids that drive the page's `WebDisplayAdjustment`.
+    var displayAdjustment: [String: String]?
 
     static let fileName = "web-wallpaper.json"
 

@@ -19,6 +19,15 @@ extension SettingsView {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
+                if model.hasAuthorSettings(forExternalWallpaper: active) {
+                    Button(model.localizedString("作品の設定")) {
+                        if let context = model.authorSettingsContext(forExternalWallpaper: active) {
+                            authorSettingsContext = context
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
                 Button(model.localizedString("元の壁紙に戻す")) {
                     model.stopExternalWallpaper()
                 }

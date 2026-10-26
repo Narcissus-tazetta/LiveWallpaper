@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var model: WallpaperModel
+    @StateObject var reconversionController = WallpaperReconversionController.shared
     @State var selectedTab: SettingsTab = .wallpaper
     @State var isAdvancedSettingsPresented: Bool = false
     @State var expandedHelpTopics: Set<HelpTopic> = []
@@ -76,7 +77,7 @@ struct SettingsView: View {
     @State var webURLInput: String = ""
     @State var isWebWallpaperURLPopoverPresented: Bool = false
     @State var isEmptyStateWebPopoverPresented: Bool = false
-    @State var localWebSettingsSource: WebWallpaperSource?
+    @State var authorSettingsContext: WallpaperAuthorSettingsContext?
     @State var webWallpaperNameEdit: InlineNameEdit<UUID>?
     @FocusState var focusedPlaylistID: UUID?
     @FocusState var focusedWallpaperPath: String?
@@ -265,6 +266,13 @@ struct SettingsView: View {
                     fitEditor.invalidateStillImage(path: path)
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .reconvertedWebWallpaper)) { note in
+                if let id = note.object as? UUID,
+                   let source = model.webWallpaperSources.first(where: { $0.id == id }) {
+                    webThumbnailStore.remove(sourceID: id)
+                    webThumbnailStore.loadIfNeeded(for: source)
+                }
+            }
             .onChange(of: model.lockScreenVideoPath) { _ in
                 requestLockScreenWallpaperThumbnailIfNeeded()
             }
@@ -328,8 +336,8 @@ struct SettingsView: View {
 
     private func applyDialogAndSheetModifiers<V: View>(_ view: V) -> some View {
         view
-            .sheet(item: $localWebSettingsSource) { source in
-                LocalWebSettingsSheet(model: model, source: source)
+            .sheet(item: $authorSettingsContext) { context in
+                LocalWebSettingsSheet(model: model, context: context)
             }
             .sheet(isPresented: $isWallpaperShareSheetPresented) {
                 shareWallpaperPickerSheet
@@ -604,6 +612,10 @@ struct SettingsView: View {
                 if settingsSectionVisible(.cache) {
                     cacheSettingsSection
                     settingsSectionMatchHint(.cache)
+                }
+                if settingsSectionVisible(.reconversion) {
+                    reconversionSettingsSection
+                    settingsSectionMatchHint(.reconversion)
                 }
             }
             Group {
