@@ -1237,6 +1237,7 @@ struct SceneDocument: Codable, Equatable {
     var camera: SceneCamera?
     var properties: [LocalWebProperty]?
     var authorSourceDirectory: String?
+    var sounds: [SceneSound] = []
 
     init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer], properties: [LocalWebProperty]? = nil) {
         self.canvasWidth = canvasWidth
@@ -1286,6 +1287,10 @@ struct SceneDocument: Codable, Equatable {
         }
         properties = try container.decodeIfPresent([LocalWebProperty].self, forKey: .properties)
         authorSourceDirectory = try container.decodeIfPresent(String.self, forKey: .authorSourceDirectory)
+        sounds = try container.decodeIfPresent([SceneSound].self, forKey: .sounds) ?? []
+        guard sounds.count <= SceneSound.maximumCount, Set(sounds.map(\.id)).count == sounds.count else {
+            throw DecodingError.dataCorruptedError(forKey: .sounds, in: container, debugDescription: "Too many sounds or duplicate sound IDs")
+        }
     }
 
     var isAnimated: Bool {

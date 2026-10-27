@@ -247,6 +247,7 @@ enum SceneStore {
     /// Every file a scene reads, besides scene.json.
     static func referencedFiles(of document: SceneDocument) -> Set<String> {
         var files = Set<String>()
+        for sound in document.sounds { files.formUnion(sound.files) }
         for material in (document.meshMaterials ?? []).compactMap({ $0 }) {
             files.formUnion(material.images.values)
         }

@@ -54,6 +54,27 @@ final class SceneScriptRenderingTests: XCTestCase {
         XCTAssertEqual(restored.y, uv.y, accuracy: 0.00001)
     }
 
+    func testScriptedTintAboveOneBrightensWhatTheShaderMultipliesInAndStopsAtWhite() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("TintRender-\(UUID())")
+        defer { try! FileManager.default.removeItem(at: directory) }
+        var (document, path) = try fixture(directory)
+        document.scripts[0].source = "function update(c){return [{id:c.targets[0].id,appearance:{tint:{red:1.25,green:1.25,blue:1.25,alpha:1}}}]}"
+        let input = SceneFrameInput(time: 0)
+        let frame = try await Task.detached { [document] in try SceneFrameEvaluator().evaluate(document, input: input, timeOfDay: .day) }.value
+        XCTAssertEqual(frame.layers[document.layers[0].id]!.layer.tint.red, 1.25)
+        let renderer = try SceneRenderer(document: document, videoPath: path)
+        let result = try pixels(renderer, input: input, frame: frame)
+        var plain = document
+        plain.scripts = []
+        let unscripted = try await Task.detached { [plain] in try SceneFrameEvaluator().evaluate(plain, input: input, timeOfDay: .day) }.value
+        let reference = try pixels(try SceneRenderer(document: plain, videoPath: path), input: input, frame: unscripted)
+        // BGRA at the centre: blue and green rise by the tint, red (215 * 1.25 > 255) stops at white.
+        let centre = (24 * 64 + 32) * 4
+        XCTAssertEqual(Double(result[centre]), Double(reference[centre]) * 1.25, accuracy: 1.5)
+        XCTAssertEqual(Double(result[centre + 1]), Double(reference[centre + 1]) * 1.25, accuracy: 1.5)
+        XCTAssertEqual(result[centre + 2], 255)
+    }
+
     func testMediaArtworkChangesAndUnavailableMediaRestoresTheLayerImage() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ArtworkRender-\(UUID())")
         defer { try! FileManager.default.removeItem(at: directory) }

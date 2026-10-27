@@ -32,4 +32,5 @@ enum AppLog {
     static let store = Logger(subsystem: subsystem, category: "store")
     static let automation = Logger(subsystem: subsystem, category: "automation")
     static let sceneScript = Logger(subsystem: subsystem, category: "sceneScript")
+    static let sceneSound = Logger(subsystem: subsystem, category: "sceneSound")
 }

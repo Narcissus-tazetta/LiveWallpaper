@@ -75,6 +75,11 @@ final class WallpaperModel: ObservableObject {
     var spaceTransitionGuardObserver: NSObjectProtocol?
     var playerItemEndObserver: NSObjectProtocol?
     var reduceMotionObserver: NSObjectProtocol?
+    let sceneSoundPlayer = SceneSoundPlayer()
+    var sceneSoundBlockers: Set<SceneSoundBlocker> = []
+    var sceneSoundObservers: [NSObjectProtocol] = []
+    var sceneSoundCancellable: AnyCancellable?
+    var sceneSoundLiveCancellable: AnyCancellable?
     var suspendedDisplayIDs: Set<String> = []
     /// Screens auto-paused because windows cover them, without the forced freezes
     /// (pause, battery, Reduce Motion) that suspendedDisplayIDs also contains.
@@ -527,6 +532,7 @@ final class WallpaperModel: ObservableObject {
         configureWallpaperWindowRefreshMonitoring()
         configureForegroundCoverageMonitoring()
         configureReduceMotionMonitoring()
+        configureSceneSoundMonitoring()
         configureCursorEffectsObservation()
         startAutoFrameRateMonitoring()
         // 復元では実在確認を省いているので、壁紙を出した後で確認して間引く。
@@ -571,6 +577,10 @@ final class WallpaperModel: ObservableObject {
         }
         if let observer = reduceMotionObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        for observer in sceneSoundObservers {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            DistributedNotificationCenter.default().removeObserver(observer)
         }
         if let observer: any NSObjectProtocol = playerItemEndObserver {
             NotificationCenter.default.removeObserver(observer)

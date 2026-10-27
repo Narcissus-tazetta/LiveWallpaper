@@ -15,10 +15,18 @@ final class SceneParticleSimulator {
         var events: [Event] = []
         /// False stops the emitters (not the particles already out); nil leaves it.
         var emitting: Bool?
+        /// A script's instance override of the layer, relative to the factors the system was
+        /// built with; nil leaves the last one.
+        var rateScale: Double?
+        var countScale: Double?
+        var sizeScale: Double?
 
         mutating func append(_ other: Control) {
             events += other.events
             if let emitting = other.emitting { self.emitting = emitting }
+            if let rateScale = other.rateScale { self.rateScale = rateScale }
+            if let countScale = other.countScale { self.countScale = countScale }
+            if let sizeScale = other.sizeScale { self.sizeScale = sizeScale }
         }
     }
 
@@ -98,6 +106,9 @@ final class SceneParticleSimulator {
     private var debts: [Double]
     private var burstsDone: [Bool]
     private var emitting = true
+    private var rateScale = 1.0
+    private var countScale = 1.0
+    private var sizeScale = 1.0
     private let runsEmitters: Bool
     /// Moves the emitters of a child that runs on its own.
     private let originOffset: SIMD3<Double>
@@ -155,6 +166,9 @@ final class SceneParticleSimulator {
             }
         }
         if let emitting = control.emitting { self.emitting = emitting }
+        if let rateScale = control.rateScale { self.rateScale = rateScale }
+        if let countScale = control.countScale { self.countScale = countScale }
+        if let sizeScale = control.sizeScale { self.sizeScale = sizeScale }
     }
 
     func advance(by dt: Double, surroundings: Surroundings) {
@@ -222,7 +236,7 @@ final class SceneParticleSimulator {
                 guard periods[index].on else { continue }
                 if let most = periodic.maxPerBurst { limit = max(most - periods[index].emitted, 0) }
             }
-            debts[index] += emitter.rate * dt
+            debts[index] += emitter.rate * rateScale * countScale * dt
             let owed = min(Int(debts[index]), limit)
             if owed > 0 {
                 debts[index] -= Double(owed)
@@ -449,7 +463,7 @@ final class SceneParticleSimulator {
     /// `point` moves the emitters there (children follow their parent's particles).
     private func spawn(_ count: Int, emitters: Range<Int>, at point: SIMD3<Double>?, parent: Int?) {
         guard count > 0 else { return }
-        let available = max(system.maxCount - particles.count, 0)
+        let available = max(Int((Double(system.maxCount) * countScale).rounded()) - particles.count, 0)
         for number in 0 ..< min(count, available) {
             let emitter = emitters.isEmpty ? nil : system.emitters[emitters.lowerBound + number % emitters.count]
             var particle = makeParticle(emitter: emitter)
@@ -538,7 +552,7 @@ final class SceneParticleSimulator {
             velocity: velocity,
             rotation: sample(initial.rotation),
             angularVelocity: sample(initial.angularVelocity),
-            size: sample(initial.size) * scale.x,
+            size: sample(initial.size) * scale.x * sizeScale,
             color: color,
             alpha: sample(initial.alpha),
             lifetime: sample(initial.lifetime),

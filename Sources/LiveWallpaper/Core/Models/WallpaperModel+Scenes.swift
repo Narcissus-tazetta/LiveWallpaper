@@ -1154,7 +1154,9 @@ extension WallpaperModel {
                 view.hideScene()
                 continue
             }
-            guard document.hasLiveInteraction || isStale else {
+            // Scripts decide when some sounds start and how loud they are, and only a live scene runs them.
+            let scriptsDriveSound = audioEnabled && document.soundsNeedScripts
+            guard document.hasLiveInteraction || isStale || scriptsDriveSound else {
                 if view.isShowingScene {
                     AppLog.windowRefresh.info(
                         "scene video display=\(displayID, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
@@ -1180,6 +1182,10 @@ extension WallpaperModel {
                 view.setSceneScriptIssueHandler { [weak self] issues in
                     guard let self, self.sceneScriptIssues[path] != issues else { return }
                     self.sceneScriptIssues[path] = issues
+                }
+                view.setSceneSoundHandler { [weak self] states in
+                    guard let self, self.sceneSoundPlayer.key == path else { return }
+                    self.sceneSoundPlayer.setScriptedSounds(states)
                 }
             } catch {
                 AppLog.windowRefresh.error("scene show failed: \(error.localizedDescription, privacy: .public)")

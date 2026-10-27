@@ -7,6 +7,7 @@ import AVFoundation
 @MainActor
 extension WallpaperModel {
     func applySuspensionStateToPlayers() {
+        syncSceneSound()
         applyWebSuspensionState()
         // オーバーライド画面の専用プレイヤーは独立に処理し、以降の共有プレイヤー
         // ロジック(フリーズフレーム・deep suspend)は残りの画面だけを対象にする。

@@ -89,6 +89,7 @@ final class SceneMetalLayer: CAMetalLayer {
     }
     private var storage: SceneScriptStorage.Session?
     var scriptIssueHandler: (([SceneScriptIssue]) -> Void)?
+    var soundHandler: (([UUID: SceneScriptedSound]) -> Void)?
     var scriptLogHandler: (([UUID: String]) -> Void)?
 
     var userProperties: [String: WebPropertyValue]? {
@@ -470,6 +471,7 @@ final class SceneMetalLayer: CAMetalLayer {
                     case let .success(frame):
                         self.scriptIssueHandler?(frame.issues)
                         self.scriptLogHandler?(frame.logs)
+                        if !frame.sounds.isEmpty { self.soundHandler?(frame.sounds) }
                         // A script paused for running out of time keeps the clock going, so it can resume.
                         self.stoppedScriptIDs = Set(frame.issues.filter { !$0.isTemporary }.map(\.scriptID))
                         self.draw(input: frame.input, frame: frame)

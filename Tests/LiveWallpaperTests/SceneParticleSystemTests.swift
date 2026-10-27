@@ -81,6 +81,24 @@ final class SceneParticleSystemTests: XCTestCase {
         XCTAssertEqual(simulator.count, 1)
     }
 
+    func testScriptedInstanceFactorsScaleEmissionCapAndSizeFromThenOn() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.maxCount = 1000
+            $0.emitters[0].rate = 30
+            $0.initial.size = .fixed(30)
+        }, seed: 1)
+        run(simulator, seconds: 1)
+        XCTAssertEqual(simulator.count, 30, accuracy: 1)
+        simulator.apply(.init(rateScale: 2, sizeScale: 2))
+        run(simulator, seconds: 1)
+        XCTAssertEqual(simulator.count, 90, accuracy: 2)
+        XCTAssertEqual(simulator.instances(aspect: 1).first!.right.x, 15, accuracy: 0.01)
+        XCTAssertEqual(simulator.instances(aspect: 1).last!.right.x, 30, accuracy: 0.01)
+        simulator.apply(.init(rateScale: 1, countScale: 0.05))
+        run(simulator, seconds: 1)
+        XCTAssertEqual(simulator.count, 90, accuracy: 0)
+    }
+
     func testAlphaFadeHoldsTheHigherFadeWhereTheyOverlap() {
         XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0.5, fadeOut: 0.5, at: 0.25), 0.5, accuracy: 1e-9)
         XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0.5, fadeOut: 0.5, at: 0.75), 0.5, accuracy: 1e-9)

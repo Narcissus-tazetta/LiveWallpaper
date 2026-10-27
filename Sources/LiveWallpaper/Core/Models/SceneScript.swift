@@ -106,6 +106,7 @@ struct SceneScriptOutput {
     var models: [SceneModelLayerFrame] = []
     var camera: SceneCameraState?
     var instances: [SceneScriptInstance] = []
+    var sounds: [UUID: SceneScriptedSound] = [:]
 }
 
 /// A layer a script made from one of the scene's: drawn like `template`, adjusted on

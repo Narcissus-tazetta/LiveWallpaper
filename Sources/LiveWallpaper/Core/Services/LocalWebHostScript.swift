@@ -182,11 +182,53 @@ enum LocalWebHostScript {
                 resumes.get(context)().catch(error => console.error('Wallpaper audio resume failed', error));
             }
         }
+        // Pages often play through `new Audio()`, which is never attached to the document, so a
+        // DOM query alone cannot see it. Elements are collected where they are created or played.
+        const trackedMedia = new WeakSet();
+        const mediaRefs = [];
+        const mutedDescriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'muted');
+        function trackMedia(media) {
+            if (trackedMedia.has(media)) return media;
+            trackedMedia.add(media);
+            mediaRefs.push(new WeakRef(media));
+            if (!state.audioEnabled) mutedDescriptor.set.call(media, true);
+            return media;
+        }
+        // The page unmutes its elements itself right before playing them.
+        Object.defineProperty(HTMLMediaElement.prototype, 'muted', {
+            configurable: true,
+            enumerable: mutedDescriptor.enumerable,
+            get() { return mutedDescriptor.get.call(this); },
+            set(value) { mutedDescriptor.set.call(this, state.audioEnabled ? value : true); }
+        });
+        const nativePlay = HTMLMediaElement.prototype.play;
+        HTMLMediaElement.prototype.play = function(...args) {
+            trackMedia(this);
+            return nativePlay.apply(this, args);
+        };
+        const nativeCreateElement = Document.prototype.createElement;
+        Document.prototype.createElement = function(...args) {
+            const element = nativeCreateElement.apply(this, args);
+            return element instanceof HTMLMediaElement ? trackMedia(element) : element;
+        };
+        window.Audio = new Proxy(window.Audio, {
+            construct(target, args, newTarget) { return trackMedia(Reflect.construct(target, args, newTarget)); }
+        });
+        function allMedia() {
+            const media = new Set(document.querySelectorAll('audio,video'));
+            for (let i = mediaRefs.length - 1; i >= 0; i--) {
+                const element = mediaRefs[i].deref();
+                if (element) media.add(element);
+                else mediaRefs.splice(i, 1);
+            }
+            return media;
+        }
         const pausedMedia = new Set();
         function updateMedia() {
-            document.querySelectorAll('audio,video').forEach(media => {
-                media.muted = !state.audioEnabled;
-                media.volume = state.volume;
+            allMedia().forEach(media => {
+                mutedDescriptor.set.call(media, !state.audioEnabled);
+                // A page's own detached elements keep the volume the page chose.
+                if (media.isConnected) media.volume = state.volume;
                 if (state.paused && !media.paused) {
                     pausedMedia.add(media);
                     media.pause();
@@ -194,7 +236,7 @@ enum LocalWebHostScript {
             });
             if (!state.paused) {
                 for (const media of pausedMedia) {
-                    if (media.isConnected) media.play().catch(error => console.error('Wallpaper media resume failed', error));
+                    media.play().catch(error => console.error('Wallpaper media resume failed', error));
                 }
                 pausedMedia.clear();
             }

@@ -161,10 +161,12 @@ final class SceneScriptRuntime {
             var models: [SceneModelLayerFrame] = []
             var camera: SceneCameraState?
             var instances: [SceneScriptInstance] = []
+            var sounds: [UUID: SceneScriptedSound] = [:]
             // A module bundle runs several independent scripts; one that failed is
             // reported here while the rest keep running.
             if script.modules != nil, let wrapped = output as? [String: Any] {
-                try Self.keys(wrapped, allowed: ["adjustments", "warnings", "camera", "instances"], path: "output")
+                try Self.keys(wrapped, allowed: ["adjustments", "warnings", "camera", "instances", "sounds"], path: "output")
+                sounds = try wrapped["sounds"].map(Self.readSounds) ?? [:]
                 instances = try wrapped["instances"].map { try Self.readInstances($0, script: script, layers: layers, rigs: rigs) } ?? []
                 camera = try wrapped["camera"].map(Self.readCamera)
                 guard let list = wrapped["warnings"] as? [String], list.count <= 16,
@@ -181,7 +183,7 @@ final class SceneScriptRuntime {
             }
             return SceneScriptOutput(adjustments: try Self.readOutput(output, script: script, layers: layers, rigs: rigs),
                                      warnings: warnings, meshes: meshes, models: models, camera: camera,
-                                     instances: instances)
+                                     instances: instances, sounds: sounds)
         } catch let failure as SceneScriptIssue {
             throw issue(failure.message, script: script)
         } catch {
@@ -283,8 +285,12 @@ final class SceneScriptRuntime {
     /// `{"clear": true}`, and `emitting` to stop or restart the emitters.
     private static func readParticleControl(_ raw: Any) throws -> SceneParticleSimulator.Control {
         let particles = try object(raw, path: "particles")
-        try keys(particles, allowed: ["events", "emitting"], path: "particles")
+        try keys(particles, allowed: ["events", "emitting", "rateScale", "countScale", "sizeScale"], path: "particles")
+        try numbers(particles, ranges: ["rateScale": 0 ... 1000, "countScale": 0 ... 1000, "sizeScale": 0 ... 1000], path: "particles")
         var control = SceneParticleSimulator.Control()
+        control.rateScale = (particles["rateScale"] as? NSNumber)?.doubleValue
+        control.countScale = (particles["countScale"] as? NSNumber)?.doubleValue
+        control.sizeScale = (particles["sizeScale"] as? NSNumber)?.doubleValue
         if let rawEmitting = particles["emitting"] {
             guard let emitting = rawEmitting as? Bool else { throw failure("particles.emitting: expected a boolean") }
             control.emitting = emitting
@@ -549,6 +555,27 @@ final class SceneScriptRuntime {
         return layers
     }
 
+    /// What the scripts decided about the sounds of the scene; IDs the scene does not have
+    /// are ignored where they are used.
+    static func readSounds(_ raw: Any) throws -> [UUID: SceneScriptedSound] {
+        guard let entries = raw as? [Any], entries.count <= SceneSound.maximumCount else {
+            throw failure("output.sounds: expected at most \(SceneSound.maximumCount) entries")
+        }
+        var result: [UUID: SceneScriptedSound] = [:]
+        for entry in entries {
+            let item = try object(entry, path: "output.sounds")
+            try keys(item, allowed: ["id", "volume", "playing", "plays", "stops"], path: "output.sounds")
+            try numbers(item, ranges: ["volume": 0 ... 1, "plays": 0 ... 1e9, "stops": 0 ... 1e9], path: "output.sounds")
+            try integers(item, names: ["plays", "stops"], path: "output.sounds")
+            guard let text = item["id"] as? String, let id = UUID(uuidString: text), result[id] == nil,
+                  let volume = (item["volume"] as? NSNumber)?.doubleValue, let playing = item["playing"] as? Bool,
+                  let plays = (item["plays"] as? NSNumber)?.intValue, let stops = (item["stops"] as? NSNumber)?.intValue
+            else { throw failure("output.sounds: expected a unique id, volume, playing, plays and stops") }
+            result[id] = SceneScriptedSound(volume: volume, playing: playing, plays: plays, stops: stops)
+        }
+        return result
+    }
+
     private static func readText(_ raw: Any, layer: SceneLayer) throws -> SceneScriptTextValues {
         guard layer.text != nil else { throw failure("text: target is not a text layer") }
         let text = try object(raw, path: "text")
@@ -635,7 +662,8 @@ final class SceneScriptRuntime {
                 if let rawTint = appearance["tint"] {
                     let tint = try object(rawTint, path: "appearance.tint")
                     try keys(tint, allowed: ["red", "green", "blue", "alpha"], path: "appearance.tint")
-                    try numbers(tint, ranges: ["red": 0 ... 1, "green": 0 ... 1, "blue": 0 ... 1, "alpha": 0 ... 1], path: "appearance.tint")
+                    // rgb above 1 is a brightness factor that the picture's shader multiplies in.
+                    try numbers(tint, ranges: ["red": 0 ... 10, "green": 0 ... 10, "blue": 0 ... 10, "alpha": 0 ... 1], path: "appearance.tint")
                 }
                 if let rawMask = appearance["cursorMask"] {
                     let mask = try object(rawMask, path: "appearance.cursorMask")

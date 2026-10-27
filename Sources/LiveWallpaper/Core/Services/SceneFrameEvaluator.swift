@@ -21,6 +21,7 @@ struct SceneEvaluatedFrame {
     var order: [UUID: Int] = [:]
     var meshes: [SceneMeshFrame] = []
     var models: [SceneModelLayerFrame] = []
+    var sounds: [UUID: SceneScriptedSound] = [:]
     var camera: SceneCameraState?
     /// What scripts asked of simulated particles this frame; carried out once, when drawn.
     var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
@@ -150,6 +151,7 @@ final class SceneFrameEvaluator {
         var warnings: [SceneScriptIssue] = []
         var meshes: [SceneMeshFrame] = []
         var models: [SceneModelLayerFrame] = []
+        var sounds: [UUID: SceneScriptedSound] = [:]
         var camera: SceneCameraState?
         var instances: [UUID: UUID] = [:]
         var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
@@ -323,6 +325,7 @@ final class SceneFrameEvaluator {
                 }
                 meshes += output.meshes
                 models += output.models
+                sounds.merge(output.sounds) { _, new in new }
                 camera = output.camera ?? camera
                 for (id, adjustment) in output.adjustments {
                     if let position = adjustment.order { order[id] = position }
@@ -354,7 +357,7 @@ final class SceneFrameEvaluator {
                 if failOnError { throw issue }
             }
         }
-        return SceneEvaluatedFrame(instances: instances, input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, camera: camera, particleControls: particleControls)
+        return SceneEvaluatedFrame(instances: instances, input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, sounds: sounds, camera: camera, particleControls: particleControls)
     }
 
     /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets

@@ -172,6 +172,10 @@ final class PlayerView: NSView {
         sceneLayer?.scriptIssueHandler = handler
     }
 
+    func setSceneSoundHandler(_ handler: @escaping ([UUID: SceneScriptedSound]) -> Void) {
+        sceneLayer?.soundHandler = handler
+    }
+
     var sceneVideoPath: String? {
         sceneLayer?.videoPath
     }
