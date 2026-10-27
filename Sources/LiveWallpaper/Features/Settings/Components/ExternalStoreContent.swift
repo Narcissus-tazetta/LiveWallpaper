@@ -204,12 +204,7 @@ struct ExternalWallpaperThumbnail: View {
         }
         let image: CGImage?
         if let path = wallpaper.thumbnailPath,
-           let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
-           let generated = CGImageSourceCreateThumbnailAtIndex(source, CGImageSourceGetCount(source) / 2, [
-               kCGImageSourceCreateThumbnailFromImageAlways: true,
-               kCGImageSourceCreateThumbnailWithTransform: true,
-               kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
-           ] as CFDictionary)
+           let generated = VideoThumbnailGenerator.previewImage(from: URL(fileURLWithPath: path), maxPixelSize: maxPixelSize)
         {
             image = generated
         } else if wallpaper.webSource != nil || wallpaper.path.isEmpty || !FileManager.default.fileExists(atPath: wallpaper.path) {

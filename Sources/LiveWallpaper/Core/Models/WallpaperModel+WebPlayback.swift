@@ -210,12 +210,16 @@ extension WallpaperModel {
         if let decoded = UserDefaults.standard.decodedJSON(
             [WebWallpaperSource].self, forKey: PrefsKey.webWallpaperSourcesData
         ) {
-            webWallpaperSources = decoded.filter { source in
+            webWallpaperSources = decoded.compactMap { source in
                 if let folder = source.localFolderPath {
-                    return LocalWebWallpaperPackage.owns(URL(fileURLWithPath: folder))
-                        && (try? LocalWebWallpaperPackage.load(folder: URL(fileURLWithPath: folder))) != nil
+                    let url = URL(fileURLWithPath: folder)
+                    guard LocalWebWallpaperPackage.owns(url),
+                          let package = try? LocalWebWallpaperPackage.load(folder: url) else { return nil }
+                    var restored = source
+                    restored.thumbnailPath = package.preview.map { url.appendingPathComponent($0).path }
+                    return restored
                 }
-                return (try? WebWallpaperURLResolver.validateURL(source.url)) != nil
+                return (try? WebWallpaperURLResolver.validateURL(source.url)) != nil ? source : nil
             }
         }
 

@@ -19,23 +19,7 @@ enum VideoThumbnailGenerator {
 
   @discardableResult
   nonisolated static func saveNormalizedPreview(from sourceURL: URL, to destinationURL: URL) -> Bool {
-    guard let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil) else {
-      return false
-    }
-    let count = CGImageSourceGetCount(source)
-    guard count > 0 else {
-      return false
-    }
-    // フェードインで第0フレームが黒画面になるアニメーションGIFに対応するため中央フレームを採用
-    let targetIndex = count / 2
-    let thumbnailOptions: [CFString: Any] = [
-      kCGImageSourceCreateThumbnailFromImageAlways: true,
-      kCGImageSourceCreateThumbnailWithTransform: true,
-      kCGImageSourceThumbnailMaxPixelSize: 480
-    ]
-    guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, targetIndex, thumbnailOptions as CFDictionary) else {
-      return false
-    }
+    guard let cgImage = previewImage(from: sourceURL) else { return false }
     let mutableData = NSMutableData()
     guard let destination = CGImageDestinationCreateWithData(mutableData as CFMutableData, UTType.jpeg.identifier as CFString, 1, nil) else {
       return false
@@ -53,6 +37,40 @@ enum VideoThumbnailGenerator {
     } catch {
       return false
     }
+  }
+
+  nonisolated static func previewImage(from url: URL, maxPixelSize: Int = 480) -> CGImage? {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+    let count = CGImageSourceGetCount(source)
+    guard count > 0 else { return nil }
+    let options: [CFString: Any] = [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+    ]
+    var selected = 0
+    if count > 1 {
+      // Animated previews can fade to black in the middle as well as at the start.
+      var brightest = -1.0
+      var sampleOptions = options
+      sampleOptions[kCGImageSourceThumbnailMaxPixelSize] = 32
+      for index in Set((0..<min(count, 9)).map { $0 * (count - 1) / (min(count, 9) - 1) }).sorted() {
+        guard let frame = CGImageSourceCreateThumbnailAtIndex(source, index, sampleOptions as CFDictionary) else { continue }
+        var pixels = [UInt8](repeating: 0, count: 32 * 32 * 4)
+        let brightness = pixels.withUnsafeMutableBytes { buffer -> Double in
+          let context = CGContext(data: buffer.baseAddress, width: 32, height: 32, bitsPerComponent: 8,
+                                  bytesPerRow: 32 * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+          context.draw(frame, in: CGRect(x: 0, y: 0, width: 32, height: 32))
+          let bytes = buffer.bindMemory(to: UInt8.self)
+          return stride(from: 0, to: bytes.count, by: 4).reduce(0.0) {
+            $0 + 0.2126 * Double(bytes[$1]) + 0.7152 * Double(bytes[$1 + 1]) + 0.0722 * Double(bytes[$1 + 2])
+          }
+        }
+        if brightness > brightest { brightest = brightness; selected = index }
+      }
+    }
+    return CGImageSourceCreateThumbnailAtIndex(source, selected, options as CFDictionary)
   }
 
   static func generateBestThumbnail(

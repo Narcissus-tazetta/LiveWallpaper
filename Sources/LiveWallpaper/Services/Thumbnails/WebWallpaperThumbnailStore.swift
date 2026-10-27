@@ -22,12 +22,7 @@ final class WebWallpaperThumbnailStore: ObservableObject {
         }
 
         if let path = source.thumbnailPath {
-            if let imageSource = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
-               let image = CGImageSourceCreateThumbnailAtIndex(imageSource, CGImageSourceGetCount(imageSource) / 2, [
-                   kCGImageSourceCreateThumbnailFromImageAlways: true,
-                   kCGImageSourceCreateThumbnailWithTransform: true,
-                   kCGImageSourceThumbnailMaxPixelSize: 480
-               ] as CFDictionary) {
+            if let image = VideoThumbnailGenerator.previewImage(from: URL(fileURLWithPath: path)) {
                 imagesBySourceID[source.id] = NSImage(cgImage: image, size: .zero)
             }
             attempted.insert(source.id)
