@@ -96,6 +96,7 @@ final class SceneRenderer {
         case shaderCompilationFailed(String)
         case imageDecodeFailed(String)
         case textureAllocationFailed
+        case bufferAllocationFailed
 
         var errorDescription: String? {
             switch self {
@@ -107,6 +108,8 @@ final class SceneRenderer {
                 return "Could not decode scene image \(name)"
             case .textureAllocationFailed:
                 return "Could not allocate a scene texture"
+            case .bufferAllocationFailed:
+                return "Could not allocate a particle instance buffer"
             }
         }
     }
@@ -208,6 +211,7 @@ final class SceneRenderer {
     private var captureTargets: [UUID: MTLTexture] = [:]
     private var particleTargets: [UUID: MTLTexture] = [:]
     private var particleSimulators: [UUID: SceneParticleSimulator] = [:]
+    private var particleInstanceBuffers = SceneParticleInstanceBuffers()
     /// The input time the simulators last advanced to.
     private var particleTime: Double?
     /// Script requests from frames that were not drawn, applied with the next one.
@@ -286,6 +290,7 @@ final class SceneRenderer {
     }
 
     func update(document: SceneDocument) throws {
+        particleInstanceBuffers.removeAll()
         self.document = document
         try loadTextures()
     }
@@ -416,8 +421,10 @@ final class SceneRenderer {
         return document.layers.first { $0.id == layerID }.map { $0.opacity * $0.pose(at: lastPhase, time: lastTime).opacity }
     }
 
-    /// Encodes the scene into `target` (bgra8Unorm, renderTarget usage).
+    /// The caller must finish the previous frame on the GPU before encoding another:
+    /// particle uploads overwrite the buffers retained from that frame.
     func encode(into target: MTLTexture, commandBuffer: MTLCommandBuffer, input: SceneFrameInput, frame: SceneEvaluatedFrame? = nil) throws {
+        particleInstanceBuffers.beginFrame()
         var input = input
         // A flat scene's camera shows a window of the canvas: its eye moves the window
         // (y up, from the canvas's bottom left) and its zoom shrinks it about its middle.
@@ -945,10 +952,7 @@ final class SceneRenderer {
             }
             let instances = node.instances(aspect: aspect)
             guard !instances.isEmpty else { return }
-            let length = instances.count * MemoryLayout<SceneParticleSimulator.Instance>.stride
-            guard let buffer = device.makeBuffer(bytes: instances, length: length, options: .storageModeShared) else {
-                throw RendererError.textureAllocationFailed
-            }
+            let buffer = try particleInstanceBuffers.upload(instances, device: device)
             let style = SceneModelRenderer.SpaceParticleStyle(
                 column0: SIMD2(toCanvas.columns.0.x, toCanvas.columns.0.y),
                 column1: SIMD2(toCanvas.columns.1.x, toCanvas.columns.1.y),
@@ -1759,10 +1763,7 @@ final class SceneRenderer {
             }
             let instances = node.instances(aspect: aspect)
             guard !instances.isEmpty else { return }
-            let length = instances.count * MemoryLayout<SceneParticleSimulator.Instance>.stride
-            guard let buffer = device.makeBuffer(bytes: instances, length: length, options: .storageModeShared) else {
-                throw RendererError.textureAllocationFailed
-            }
+            let buffer = try particleInstanceBuffers.upload(instances, device: device)
             let normal = system.refraction?.normalFile.flatMap { particleTextures[$0] }
             var uniforms = ParticleSystemUniforms(
                 column0: SIMD2(toCanvas.columns.0.x, toCanvas.columns.0.y),
