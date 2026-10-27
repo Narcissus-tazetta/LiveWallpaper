@@ -40,8 +40,14 @@ enum SceneVideoBaker {
     /// Longest edge of the baked video; the lock screen does not need more.
     static let maxEdge = 3840
 
+    struct Statistics: Sendable {
+        let holdStats: HoldStats
+        let reducedDisqualifiedAtFrame: Int?
+    }
+
     /// The links see `timeOfDay` (by default the part of the day now) and the cursor
     /// at the centre, as on the lock screen.
+    @discardableResult
     static func bake(
         document: SceneDocument,
         videoPath: String,
@@ -50,22 +56,24 @@ enum SceneVideoBaker {
         stillOnly: Bool = false,
         to outputURL: URL,
         progress: @escaping @Sendable (Double) -> Void
-    ) async throws {
+    ) async throws -> Statistics? {
         let timeOfDay = timeOfDay ?? document.timeOfDay(at: Date())
-        let task = Task.detached(priority: .utility) {
+        let task = Task.detached(priority: .utility) { () async throws -> Statistics? in
             try Task.checkCancellation()
             if document.isAnimated, !stillOnly {
-                try await render(
+                return try await render(
                     document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProperties, outputURL: outputURL, progress: progress
                 )
             } else {
                 try await renderStill(document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProperties, outputURL: outputURL)
+                return nil
             }
         }
-        try await withTaskCancellationHandler {
+        return try await withTaskCancellationHandler {
             do {
-                try await task.value
+                let statistics = try await task.value
                 try Task.checkCancellation()
+                return statistics
             } catch {
                 // The still-image transcoder uses its own cancellation error.
                 try Task.checkCancellation()
@@ -109,7 +117,7 @@ enum SceneVideoBaker {
         userProperties: [String: WebPropertyValue]?,
         outputURL: URL,
         progress: @Sendable (Double) -> Void
-    ) async throws {
+    ) async throws -> Statistics {
         let renderer = try SceneRenderer(document: document, videoPath: videoPath)
         renderer.timeOfDay = timeOfDay
         try await renderer.prepareVideos()
@@ -121,6 +129,7 @@ enum SceneVideoBaker {
         let (width, height) = SceneRenderer.outputSize(for: document, maxEdge: maxEdge)
         let fps = framesPerSecond
         let frameCount = max(document.loopSeconds, 1) * fps
+        let totalOddFrames = frameCount / 2
         // Simulated particles cannot loop; starting with them already spread out
         // keeps the video from opening on an empty sky.
         renderer.warmUpParticles(seconds: renderer.particleWarmUpSeconds, fps: fps)
@@ -136,11 +145,12 @@ enum SceneVideoBaker {
         // Both candidates are encoded from the same rendered frames, so whichever wins
         // is encoded exactly once and no frame is rendered twice.
         let full = try makeSink(url: tmpURL, width: width, height: height, fps: fps)
-        let reduced = try makeSink(url: tmp30URL, width: width, height: height, fps: reducedFramesPerSecond)
+        var reduced: Sink? = try makeSink(url: tmp30URL, width: width, height: height, fps: reducedFramesPerSecond)
 
         var textureCache: CVMetalTextureCache?
         CVMetalTextureCacheCreate(nil, nil, renderer.device, nil, &textureCache)
         var stats = HoldStats()
+        var reducedDisqualifiedAtFrame: Int?
         do {
             guard let textureCache, let pool = full.adaptor.pixelBufferPool else {
                 throw BakeError.writerFailed("No pixel buffer pool")
@@ -149,7 +159,7 @@ enum SceneVideoBaker {
             for frame in 0 ..< frameCount {
                 try Task.checkCancellation()
                 let isEven = frame % 2 == 0
-                while !full.input.isReadyForMoreMediaData || (isEven && !reduced.input.isReadyForMoreMediaData) {
+                while !full.input.isReadyForMoreMediaData || (isEven && (reduced?.input.isReadyForMoreMediaData == false)) {
                     try await Task.sleep(nanoseconds: 2_000_000)
                 }
                 var pixelBuffer: CVPixelBuffer?
@@ -179,30 +189,47 @@ enum SceneVideoBaker {
                 guard full.adaptor.append(pixelBuffer, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: CMTimeScale(fps))) else {
                     throw BakeError.writerFailed(full.writer.error?.localizedDescription ?? "Cannot append frame \(frame)")
                 }
-                if isEven {
-                    guard reduced.adaptor.append(
-                        pixelBuffer,
-                        withPresentationTime: CMTime(value: CMTimeValue(frame / 2), timescale: CMTimeScale(reducedFramesPerSecond))
-                    ) else {
-                        throw BakeError.writerFailed(reduced.writer.error?.localizedDescription ?? "Cannot append reduced frame \(frame)")
+                if let currentReduced = reduced {
+                    if isEven {
+                        guard currentReduced.adaptor.append(
+                            pixelBuffer,
+                            withPresentationTime: CMTime(value: CMTimeValue(frame / 2), timescale: CMTimeScale(reducedFramesPerSecond))
+                        ) else {
+                            throw BakeError.writerFailed(currentReduced.writer.error?.localizedDescription ?? "Cannot append reduced frame \(frame)")
+                        }
+                        previousEven = pixelBuffer
+                    } else if let even = previousEven {
+                        stats.add(even: even, odd: pixelBuffer)
+                        if stats.isDisqualified(totalOddFrames: totalOddFrames) {
+                            currentReduced.input.markAsFinished()
+                            currentReduced.writer.cancelWriting()
+                            reduced = nil
+                            previousEven = nil
+                            reducedDisqualifiedAtFrame = frame
+                        }
                     }
-                    previousEven = pixelBuffer
-                } else if let previousEven {
-                    stats.add(even: previousEven, odd: pixelBuffer)
                 }
                 progress(Double(frame + 1) / Double(frameCount))
             }
         } catch {
             full.writer.cancelWriting()
-            reduced.writer.cancelWriting()
+            reduced?.writer.cancelWriting()
             throw error
         }
 
         try Task.checkCancellation()
-        let chosen = stats.usesReducedRate ? reduced : full
-        let discarded = stats.usesReducedRate ? full : reduced
-        discarded.input.markAsFinished()
-        discarded.writer.cancelWriting()
+        let chosen: Sink
+        if let reduced, stats.usesReducedRate {
+            chosen = reduced
+            full.input.markAsFinished()
+            full.writer.cancelWriting()
+        } else {
+            chosen = full
+            if let reduced {
+                reduced.input.markAsFinished()
+                reduced.writer.cancelWriting()
+            }
+        }
         chosen.input.markAsFinished()
         chosen.writer.endSession(atSourceTime: CMTime(value: CMTimeValue(frameCount * chosen.fps / fps), timescale: CMTimeScale(chosen.fps)))
         await chosen.writer.finishWriting()
@@ -212,6 +239,7 @@ enum SceneVideoBaker {
         try Task.checkCancellation()
         try installVideo(chosen.url, at: outputURL)
         AppLog.windowRefresh.notice("[bake] Selected \(chosen.fps, privacy: .public)fps for \(outputURL.lastPathComponent, privacy: .public) (hold PSNR avg: \(stats.averagePSNR, privacy: .public) dB, min: \(stats.minimumPSNR, privacy: .public) dB, changed max: \(stats.maximumChangedFraction * 100, privacy: .public)%)")
+        return Statistics(holdStats: stats, reducedDisqualifiedAtFrame: reducedDisqualifiedAtFrame)
     }
 
     private struct Sink {
@@ -262,11 +290,11 @@ enum SceneVideoBaker {
 
     /// Compares each odd frame with the even frame shown before it at 30 fps, on the
     /// raw rendered pixels (not on encoded video).
-    struct HoldStats {
-        private var totalMSE = 0.0
-        private var minPSNR = 100.0
-        private var maxChanged = 0.0
-        private var count = 0
+    struct HoldStats: Sendable {
+        private(set) var totalMSE = 0.0
+        private(set) var minPSNR = 100.0
+        private(set) var maxChanged = 0.0
+        private(set) var count = 0
 
         var averagePSNR: Double { count == 0 ? 100 : Self.psnr(totalMSE / Double(count)) }
         var minimumPSNR: Double { minPSNR }
@@ -276,7 +304,20 @@ enum SceneVideoBaker {
                 && minPSNR >= holdPSNRMinimumThreshold && maxChanged <= changedFractionMaximum
         }
 
-        private static func psnr(_ mse: Double) -> Double {
+        init(totalMSE: Double = 0.0, minPSNR: Double = 100.0, maxChanged: Double = 0.0, count: Int = 0) {
+            self.totalMSE = totalMSE
+            self.minPSNR = minPSNR
+            self.maxChanged = maxChanged
+            self.count = count
+        }
+
+        func isDisqualified(totalOddFrames: Int) -> Bool {
+            minPSNR < SceneVideoBaker.holdPSNRMinimumThreshold
+                || maxChanged > SceneVideoBaker.changedFractionMaximum
+                || (totalOddFrames > 0 && Self.psnr(totalMSE / Double(totalOddFrames)) < SceneVideoBaker.holdPSNRAverageThreshold)
+        }
+
+        static func psnr(_ mse: Double) -> Double {
             mse > 1e-10 ? min(100, 10 * log10(255 * 255 / mse)) : 100
         }
 

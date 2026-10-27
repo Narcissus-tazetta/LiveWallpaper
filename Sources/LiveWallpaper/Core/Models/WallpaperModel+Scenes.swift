@@ -12,6 +12,44 @@ extension Notification.Name {
     static let sceneDidBake = Notification.Name("SceneDidBake")
 }
 
+private final class SceneSaveCoordinator: @unchecked Sendable {
+    static let shared = SceneSaveCoordinator()
+    private let lock = NSLock()
+    private var cancelledGenerations: Set<UUID> = []
+    private var generationResults: [UUID: Result<[URL], Error>] = [:]
+
+    func cancel(_ generation: UUID) {
+        lock.withLock {
+            _ = cancelledGenerations.insert(generation)
+        }
+    }
+
+    func isCancelled(_ generation: UUID) -> Bool {
+        lock.withLock {
+            cancelledGenerations.contains(generation)
+        }
+    }
+
+    func cleanup(_ generation: UUID) {
+        lock.withLock {
+            cancelledGenerations.remove(generation)
+            generationResults.removeValue(forKey: generation)
+        }
+    }
+
+    func recordResult(_ generation: UUID, result: Result<[URL], Error>) {
+        lock.withLock {
+            generationResults[generation] = result
+        }
+    }
+
+    func takeResult(_ generation: UUID) -> Result<[URL], Error>? {
+        lock.withLock {
+            generationResults.removeValue(forKey: generation)
+        }
+    }
+}
+
 /// Still-image wallpapers built from layers. A scene is baked into an ordinary video
 /// at its library path, so every feature that plays videos (lock screen, screen
 /// saver, thumbnails, playlists, schedules) uses it unchanged, while the desktop
@@ -246,6 +284,9 @@ extension WallpaperModel {
 
     private func scheduleSceneSave(path: String) {
         sceneSaveWorkItems.removeValue(forKey: path)?.cancel()
+        if let inFlight = sceneSaveGenerations[path] {
+            SceneSaveCoordinator.shared.cancel(inFlight)
+        }
         let workItem = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 self?.writeScene(path: path)
@@ -262,42 +303,71 @@ extension WallpaperModel {
             scenesSaving.remove(path)
             return
         }
+        if let previous = sceneSaveGenerations[path] {
+            SceneSaveCoordinator.shared.cancel(previous)
+        }
         let generation = UUID()
         sceneSaveGenerations[path] = generation
-        let data: Data
-        do {
-            data = try SceneStore.encode(document)
-        } catch {
-            finishSceneSave(path: path, generation: generation, error: error)
-            return
-        }
+
+        let folder = SceneStore.folderURL(forVideoPath: path)
+
         Self.sceneSaveQueue.async { [weak self] in
-            let failure: Error?
+            if SceneSaveCoordinator.shared.isCancelled(generation) {
+                SceneSaveCoordinator.shared.cleanup(generation)
+                return
+            }
+
+            let data: Data
+            do {
+                data = try SceneStore.encode(document)
+            } catch {
+                SceneSaveCoordinator.shared.recordResult(generation, result: .failure(error))
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        self?.finishSceneSave(path: path, generation: generation)
+                    }
+                }
+                return
+            }
+
+            if SceneSaveCoordinator.shared.isCancelled(generation) {
+                SceneSaveCoordinator.shared.cleanup(generation)
+                return
+            }
+
+            let result: Result<[URL], Error>
             do {
                 try SceneStore.write(data, videoPath: path)
-                failure = nil
+                result = .success(Self.scenePruneCandidates(in: folder))
             } catch {
-                failure = error
+                result = .failure(error)
             }
+
+            SceneSaveCoordinator.shared.recordResult(generation, result: result)
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    self?.finishSceneSave(path: path, generation: generation, error: failure)
+                    self?.finishSceneSave(path: path, generation: generation)
                 }
             }
         }
-        pruneSceneFiles(document, path: path)
     }
 
-    private func finishSceneSave(path: String, generation: UUID, error: Error?) {
-        guard sceneSaveGenerations[path] == generation else {
+    private func finishSceneSave(path: String, generation: UUID) {
+        let result = SceneSaveCoordinator.shared.takeResult(generation)
+        SceneSaveCoordinator.shared.cleanup(generation)
+        guard sceneSaveGenerations[path] == generation, let result else {
             return
         }
         sceneSaveGenerations[path] = nil
-        if let error {
+        switch result {
+        case let .failure(error):
             sceneSaveFailures[path] = error.localizedDescription
             AppLog.windowRefresh.error("scene save failed: \(error.localizedDescription, privacy: .public)")
-        } else {
+        case let .success(candidates):
             sceneSaveFailures[path] = nil
+            if sceneSaveWorkItems[path] == nil, let document = sceneDocumentsByPath[path] {
+                pruneSceneFiles(document, path: path, candidates: candidates)
+            }
         }
         if sceneSaveWorkItems[path] == nil {
             scenesSaving.remove(path)
@@ -311,6 +381,9 @@ extension WallpaperModel {
             writeScene(path: path)
         }
         Self.sceneSaveQueue.sync {}
+        if let generation = sceneSaveGenerations[path] {
+            finishSceneSave(path: path, generation: generation)
+        }
     }
 
     func flushAllSceneSaves() {
@@ -319,6 +392,11 @@ extension WallpaperModel {
             writeScene(path: path)
         }
         Self.sceneSaveQueue.sync {}
+        for path in Array(sceneSaveGenerations.keys) {
+            if let generation = sceneSaveGenerations[path] {
+                finishSceneSave(path: path, generation: generation)
+            }
+        }
     }
 
     func retrySceneSave(path: String) {
@@ -334,8 +412,14 @@ extension WallpaperModel {
     /// recreate its folder.
     func discardSceneSave(path: String) {
         sceneSaveWorkItems.removeValue(forKey: path)?.cancel()
-        sceneSaveGenerations[path] = nil
+        let generation = sceneSaveGenerations.removeValue(forKey: path)
+        if let generation {
+            SceneSaveCoordinator.shared.cancel(generation)
+        }
         Self.sceneSaveQueue.sync {}
+        if let generation {
+            SceneSaveCoordinator.shared.cleanup(generation)
+        }
         scenesSaving.remove(path)
         sceneSaveFailures[path] = nil
     }
@@ -744,24 +828,46 @@ extension WallpaperModel {
     /// Deletes images in the scene folder that neither the scene, its undo history,
     /// its comparison state nor a running task uses: removed layers, and masks replaced by a newer stroke.
     func pruneSceneFiles(_ document: SceneDocument, path: String) {
-        let folder = SceneStore.folderURL(forVideoPath: path)
+        // A pending or failed save leaves the disk document owning its old assets.
+        guard sceneSaveGenerations[path] == nil, sceneSaveWorkItems[path] == nil,
+              sceneSaveFailures[path] == nil else { return }
+        let candidates = Self.scenePruneCandidates(in: SceneStore.folderURL(forVideoPath: path))
+        pruneSceneFiles(document, path: path, candidates: candidates)
+    }
+
+    func pruneSceneTrialFiles(_ files: [URL], path: String) {
+        // Trial copies do not belong to the disk document; applying a trial makes
+        // the live document protect them before releasing their retain counts.
+        guard let document = sceneDocumentsByPath[path] else { return }
+        pruneSceneFiles(document, path: path, candidates: files)
+    }
+
+    private func pruneSceneFiles(_ document: SceneDocument, path: String, candidates: [URL]) {
+        // Asset publication and retain/release also run on this actor; no suspension
+        // may separate this protection check from deletion.
         var used = SceneStore.referencedFiles(of: document)
         used.insert("scene.json")
         used.insert("properties.json")
-        for snapshot in (sceneHistories[path]?.snapshots ?? []) + [sceneComparisonSnapshots[path]].compactMap({ $0 }) {
+        let snapshots = (sceneHistories[path]?.snapshots ?? []) + [sceneComparisonSnapshots[path]].compactMap { $0 }
+        for snapshot in snapshots {
             used.formUnion(SceneStore.referencedFiles(of: snapshot))
         }
+        removeLeftovers(of: candidates.filter {
+            !used.contains($0.lastPathComponent) && sceneFilesInUse[$0.path] == nil
+        })
+    }
+
+    nonisolated private static func scenePruneCandidates(in folder: URL) -> [URL] {
         let names: [String]
         do {
             names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
         } catch {
             AppLog.windowRefresh.error("scene folder unreadable: \(error.localizedDescription, privacy: .public)")
-            return
+            return []
         }
         // Dot files are writes in progress (SceneStore.write), possibly on another thread.
-        removeLeftovers(of: names.filter { !used.contains($0) && !$0.hasPrefix(".") }
+        return names.filter { !$0.hasPrefix(".") }
             .map { folder.appendingPathComponent($0) }
-            .filter { sceneFilesInUse[$0.path] == nil })
     }
 
     /// Files written off the main thread go here first, then into the scene folder
@@ -994,7 +1100,7 @@ extension WallpaperModel {
         sceneBakedTimesOfDay[videoPath] = timeOfDay
     }
 
-    func removeLeftovers(of urls: [URL]) {
+    nonisolated static func removeLeftovers(of urls: [URL]) {
         for url in urls where FileManager.default.fileExists(atPath: url.path) {
             do {
                 try FileManager.default.removeItem(at: url)
@@ -1004,6 +1110,10 @@ extension WallpaperModel {
                 )
             }
         }
+    }
+
+    func removeLeftovers(of urls: [URL]) {
+        Self.removeLeftovers(of: urls)
     }
 
     // MARK: - Desktop

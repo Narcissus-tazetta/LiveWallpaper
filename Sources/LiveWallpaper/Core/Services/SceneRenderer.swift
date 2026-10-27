@@ -166,8 +166,12 @@ final class SceneRenderer {
     private var modelRenderer: SceneModelRenderer?
     private var modelImages: [String: MTLTexture] = [:]
     private var modelDepthTexture: MTLTexture?
-    /// The mesh of each layer that is a solid model, read once.
-    private var staticShapes: [UUID: SceneModelLayerFrame.Shape] = [:]
+    struct StaticShapeCache {
+        var model: SceneStaticModel
+        var shape: SceneModelLayerFrame.Shape
+    }
+    /// The mesh and buffers of each layer that is a solid model.
+    private(set) var staticShapes: [UUID: StaticShapeCache] = [:]
     private let graphTexturePool = SceneTexturePool()
     private var graphTextures: [String: MTLTexture] = [:]
     private var graphResources: [UUID: [String: MTLTexture]] = [:]
@@ -517,6 +521,9 @@ final class SceneRenderer {
             layer.model != nil && document.camera?.perspective != true
                 ? .model(staticModelFrame(layer, evaluated: evaluated)) : .layer(layer)
         }
+        if modelRenderer == nil && (!evaluated.models.isEmpty || visibleLayers.contains { $0.model != nil }) {
+            modelRenderer = try SceneModelRenderer(materials: document.meshMaterials ?? [], device: device)
+        }
         let visible = modelRenderer == nil || evaluated.models.isEmpty
             ? placed
             : Self.interleave(visibleLayers, placed: placed, models: evaluated.models, place: { id in
@@ -526,6 +533,9 @@ final class SceneRenderer {
         // The frame's model layers share one depth buffer; the first pass clears it.
         var depthCleared = false
         func drawModels(_ models: [SceneModelLayerFrame], into texture: MTLTexture, clear: Bool) throws {
+            if modelRenderer == nil {
+                modelRenderer = try SceneModelRenderer(materials: document.meshMaterials ?? [], device: device)
+            }
             let pass = MTLRenderPassDescriptor()
             pass.colorAttachments[0].texture = texture
             pass.colorAttachments[0].loadAction = clear ? .clear : .load
@@ -793,7 +803,7 @@ final class SceneRenderer {
         views: (flat: SceneModelRenderer.View, perspective: SceneModelRenderer.View), target: MTLTexture,
         commandBuffer: MTLCommandBuffer, input: SceneFrameInput, targetSize: SIMD2<Float>
     ) throws {
-        if modelRenderer == nil { modelRenderer = try SceneModelRenderer(materials: [], device: device) }
+        if modelRenderer == nil { modelRenderer = try SceneModelRenderer(materials: document.meshMaterials ?? [], device: device) }
         enum Prepared {
             case model(SceneModelLayerFrame), plane(MTLTexture, SceneEvaluatedFrame.Layer, SceneSpace)
             case particles(SceneLayer, SceneEvaluatedFrame.Layer, SceneSpace)
@@ -850,6 +860,8 @@ final class SceneRenderer {
             let shadows = try modelRenderer!.renderShadows(lights: lights, casters: casters, commandBuffer: commandBuffer)
             views.flat.shadows = shadows
             views.perspective.shadows = shadows
+        } else if modelRenderer?.shadowState.targets.isEmpty == false {
+            modelRenderer?.shadowState.targets = [:]
         }
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = target
@@ -893,8 +905,13 @@ final class SceneRenderer {
 
     private func staticModelFrame(_ layer: SceneLayer, evaluated: SceneEvaluatedFrame) -> SceneModelLayerFrame {
         let drawn = evaluated.layers[layer.id]!
-        let shape = staticShapes[layer.id] ?? layer.model!.shape
-        staticShapes[layer.id] = shape
+        let shape = staticShapes[layer.id]?.shape
+            ?? evaluated.instances[layer.id].flatMap { staticShapes[$0]?.shape }
+            ?? staticShapes.values.first { $0.model == layer.model }?.shape
+            ?? layer.model?.shape
+            ?? SceneModelLayerFrame.Shape(
+                material: nil, components: 0, vertices: [], indices: nil
+            )
         let tint = drawn.layer.tint
         return SceneModelLayerFrame(
             serial: 0, order: 0, alpha: Float(drawn.layer.opacity * drawn.opacity),
@@ -2210,8 +2227,9 @@ final class SceneRenderer {
             particleTextures[file] = try mipmapped(image)
         }
         let meshMaterials = document.meshMaterials ?? []
-        if modelRenderer?.materials != meshMaterials {
-            modelRenderer = meshMaterials.isEmpty ? nil : try SceneModelRenderer(materials: meshMaterials, device: device)
+        let hasModelLayers = document.layers.contains { $0.model != nil }
+        if modelRenderer?.materials != meshMaterials || (modelRenderer == nil && hasModelLayers) {
+            modelRenderer = (meshMaterials.isEmpty && !hasModelLayers) ? nil : try SceneModelRenderer(materials: meshMaterials, device: device)
             modelImages = [:]
             for file in modelRenderer?.imageFiles ?? [] {
                 // Materials read the alpha of their images as it was saved.
@@ -2293,6 +2311,46 @@ final class SceneRenderer {
             flowTextures[file] = try Self.cachedTexture(url: fileURL(file), variant: "rgba-\(ImageAlpha.straightDropped)") { url in
                 try Self.decodeRGBA(url: url, device: device, alpha: .straightDropped)
             }
+        }
+
+        solidBackground = nil
+        modelRenderer?.shadowState.targets = [:]
+        if document.finishing == nil {
+            finishingCanvas = nil
+            finishingRenderer = nil
+            finishingImages = [:]
+        }
+
+        let modelLayers = document.layers.filter { $0.model != nil }
+        let modelLayerIDs = Set(modelLayers.map(\.id))
+        staticShapes = staticShapes.filter { modelLayerIDs.contains($0.key) }
+        for layer in modelLayers {
+            guard let model = layer.model else { continue }
+            if let cached = staticShapes[layer.id], cached.model == model {
+                continue
+            }
+            if let existing = staticShapes.values.first(where: { $0.model == model }) {
+                staticShapes[layer.id] = StaticShapeCache(model: model, shape: existing.shape)
+                continue
+            }
+            var shape = model.shape
+            if !shape.vertices.isEmpty {
+                let buffer: (any MTLBuffer)? = shape.vertices.withUnsafeBytes { bytes in
+                    guard let base = bytes.baseAddress, bytes.count > 0 else { return nil }
+                    return device.makeBuffer(bytes: base, length: bytes.count, options: .storageModeShared)
+                }
+                guard let buffer else { throw RendererError.textureAllocationFailed }
+                shape.vertexBuffer = buffer
+            }
+            if let indices = shape.indices, !indices.isEmpty {
+                let buffer: (any MTLBuffer)? = indices.withUnsafeBytes { bytes in
+                    guard let base = bytes.baseAddress, bytes.count > 0 else { return nil }
+                    return device.makeBuffer(bytes: base, length: bytes.count, options: .storageModeShared)
+                }
+                guard let buffer else { throw RendererError.textureAllocationFailed }
+                shape.indexBuffer = buffer
+            }
+            staticShapes[layer.id] = StaticShapeCache(model: model, shape: shape)
         }
     }
 

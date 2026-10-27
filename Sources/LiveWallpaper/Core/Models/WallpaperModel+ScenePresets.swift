@@ -110,9 +110,7 @@ extension WallpaperModel {
         for name in fileNames.values {
             releaseSceneFile(folder.appendingPathComponent(name))
         }
-        if let document = sceneDocumentsByPath[path] {
-            pruneSceneFiles(document, path: path)
-        }
+        pruneSceneTrialFiles(fileNames.values.map { folder.appendingPathComponent($0) }, path: path)
     }
 
     // MARK: - The user's presets

@@ -140,6 +140,7 @@ extension SceneModelRenderer {
     func renderShadows(
         lights: [SceneShadowLight], casters: [SceneModelLayerFrame], commandBuffer: MTLCommandBuffer
     ) throws -> Shadows {
+        shadowState.targets = shadowState.targets.filter { $0.key < lights.count }
         let size = Self.shadowSize
         // Every solid model casts, as measured with models that carry no flag of their own.
         var bounds: (center: SIMD3<Float>, radius: Float)?
@@ -227,7 +228,11 @@ extension SceneModelRenderer {
                 }
                 for layer in casters {
                     for shape in layer.shapes where !shape.vertices.isEmpty && shape.components & 1 != 0 {
-                        if let indices = shape.indices, indices.isEmpty { continue }
+                        if let indices = shape.indices {
+                            if indices.count < 3 { continue }
+                        } else if shape.vertices.count / shape.stride < 3 {
+                            continue
+                        }
                         encoder.setRenderPipelineState(try shadowPipeline(stride: shape.stride * 4))
                         var uniforms = ShadowUniforms(
                             transform: transform, model: layer.world, light: SIMD4(origin, 0),
@@ -235,16 +240,28 @@ extension SceneModelRenderer {
                         )
                         encoder.setVertexBytes(&uniforms, length: MemoryLayout<ShadowUniforms>.stride, index: 0)
                         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<ShadowUniforms>.stride, index: 0)
-                        guard let vertices = shape.vertices.withUnsafeBytes({
-                            device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)
-                        }) else { throw ModelError(detail: "vertex allocation failed") }
-                        encoder.setVertexBuffer(vertices, offset: 0, index: 1)
-                        if let indices = shape.indices {
-                            guard let buffer = indices.withUnsafeBytes({
+                        let vertexBuffer: any MTLBuffer
+                        if let cached = shape.vertexBuffer {
+                            vertexBuffer = cached
+                        } else {
+                            guard let buffer = shape.vertices.withUnsafeBytes({
                                 device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)
-                            }) else { throw ModelError(detail: "index allocation failed") }
+                            }) else { throw ModelError(detail: "vertex allocation failed") }
+                            vertexBuffer = buffer
+                        }
+                        encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 1)
+                        if let indices = shape.indices {
+                            let indexBuffer: any MTLBuffer
+                            if let cached = shape.indexBuffer {
+                                indexBuffer = cached
+                            } else {
+                                guard let buffer = indices.withUnsafeBytes({
+                                    device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)
+                                }) else { throw ModelError(detail: "index allocation failed") }
+                                indexBuffer = buffer
+                            }
                             encoder.drawIndexedPrimitives(type: .triangle, indexCount: indices.count, indexType: .uint32,
-                                                          indexBuffer: buffer, indexBufferOffset: 0)
+                                                          indexBuffer: indexBuffer, indexBufferOffset: 0)
                         } else {
                             let count = shape.vertices.count / shape.stride / 3 * 3
                             if count > 0 { encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: count) }

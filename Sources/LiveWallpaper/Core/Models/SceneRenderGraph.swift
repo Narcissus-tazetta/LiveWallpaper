@@ -1,4 +1,5 @@
 import Foundation
+import Metal
 import simd
 
 struct SceneRenderGraph: Codable, Equatable {
@@ -216,10 +217,35 @@ struct SceneModelLayerFrame: Equatable {
         var vertices: [Float]
         /// Triangles by vertex index; nil draws the vertices three at a time.
         var indices: [UInt32]?
+        var vertexBuffer: (any MTLBuffer)? = nil
+        var indexBuffer: (any MTLBuffer)? = nil
+
+        init(
+            material: Int?,
+            components: UInt32,
+            vertices: [Float],
+            indices: [UInt32]?,
+            vertexBuffer: (any MTLBuffer)? = nil,
+            indexBuffer: (any MTLBuffer)? = nil
+        ) {
+            self.material = material
+            self.components = components
+            self.vertices = vertices
+            self.indices = indices
+            self.vertexBuffer = vertexBuffer
+            self.indexBuffer = indexBuffer
+        }
 
         var stride: Int {
             SceneRenderGraph.Attribute.Semantic.allCases.enumerated()
                 .reduce(0) { $0 + (components & (1 << UInt32($1.offset)) != 0 ? $1.element.floats : 0) }
+        }
+
+        static func == (lhs: Shape, rhs: Shape) -> Bool {
+            lhs.material == rhs.material
+                && lhs.components == rhs.components
+                && lhs.vertices == rhs.vertices
+                && lhs.indices == rhs.indices
         }
     }
     /// Stable for the life of the layer.
