@@ -1245,6 +1245,8 @@ struct SceneDocument: Codable, Equatable {
         self.layers = layers
         self.properties = properties
     }
+    /// Hash of the author's scene file and script modules this scene was converted from.
+    var scriptOrigin: String?
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1295,6 +1297,7 @@ struct SceneDocument: Codable, Equatable {
 
     var isAnimated: Bool {
         layers.contains(where: \.isAnimated) || scripts.contains { $0.canRun && $0.usesTime } || cameraShake != nil
+        scriptOrigin = try container.decodeIfPresent(String.self, forKey: .scriptOrigin)
     }
 
     var aspectRatio: Double {

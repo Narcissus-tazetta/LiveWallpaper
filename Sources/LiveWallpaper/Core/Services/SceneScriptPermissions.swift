@@ -33,6 +33,16 @@ enum SceneScriptPermissions {
         }
     }
 
+    /// A reconversion regenerates the scripts (new bindings, a newer runtime bridge), so
+    /// their code differs even when the wallpaper's own did not. `scriptOrigin` hashes
+    /// what they were made from; the same origin keeps what the user allowed.
+    static func carry(_ document: SceneDocument, replacing previous: SceneDocument?, path: String) {
+        guard let previous, let origin = document.scriptOrigin, origin == previous.scriptOrigin,
+              !previous.scripts.isEmpty, previous.scripts.allSatisfy(\.isAuthorized)
+        else { return }
+        authorizeAll(document, path: path)
+    }
+
     static func revoke(_ document: SceneDocument, path: String) {
         var permissions = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
         for script in document.scripts { permissions.remove(fingerprint(script, path: path)) }

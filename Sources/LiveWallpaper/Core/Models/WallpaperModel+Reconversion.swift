@@ -17,13 +17,16 @@ extension WallpaperModel {
                 if metadata.isScene == true {
                     flushSceneSave(path: path)
                     cancelSceneBake(path: path)
+                    let previous = sceneDocumentsByPath[path]
                     let scene = try await Task.detached(priority: .utility) {
                         try await ReconvertedSceneFiles.replace(source: source.appendingPathComponent("wallpaper.scene"),
                                                                 videoPath: path, backup: backupRoot.appendingPathComponent(id))
                     }.value
                     sceneHistories.removeValue(forKey: path)
                     sceneComparisonSnapshots.removeValue(forKey: path)
+                    SceneScriptPermissions.carry(scene, replacing: previous, path: path)
                     registerImportedScene(scene, path: path)
+                    requestSceneScriptApproval(id: "we-import.json/\(id)", name: registeredVideoDisplayName(for: path), path: path)
                     scheduleSceneBake(path: path)
                     reloadPlayback(forRewrittenPath: path)
                     NotificationCenter.default.post(name: .sceneDidBake, object: path)

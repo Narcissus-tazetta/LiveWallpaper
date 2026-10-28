@@ -17,6 +17,7 @@ final class SceneScriptApprovalTests: XCTestCase {
         for target in [path, copy] {
             SceneScriptPermissions.revoke(scene(), path: target)
             SceneScriptPermissions.revoke(scene(source: "changed"), path: target)
+            for version in ["v1", "v2", "v3", "v4"] { SceneScriptPermissions.revoke(scene(source: version), path: target) }
         }
     }
 
@@ -57,5 +58,36 @@ final class SceneScriptApprovalTests: XCTestCase {
         XCTAssertTrue(model.sceneDocumentsByPath[copy]!.scripts[0].canRun)
         model.registerImportedScene(scene(), path: copy, asksAgain: true)
         XCTAssertFalse(model.sceneDocumentsByPath[copy]!.scripts[0].canRun)
+    }
+
+    private func converted(origin: String?, bridge: String) -> SceneDocument {
+        var document = scene(source: bridge)
+        document.scriptOrigin = origin
+        return document
+    }
+
+    func testReconversionKeepsApprovalWhenTheScriptsComeFromTheSameOrigin() {
+        let previous = converted(origin: "a", bridge: "v1")
+        SceneScriptPermissions.authorizeAll(previous, path: path)
+        let previousApproved = SceneScriptPermissions.restored(previous, path: path)
+
+        let reconverted = converted(origin: "a", bridge: "v2")
+        XCTAssertFalse(SceneScriptPermissions.restored(reconverted, path: path).scripts[0].isAuthorized)
+        SceneScriptPermissions.carry(reconverted, replacing: previousApproved, path: path)
+        XCTAssertTrue(SceneScriptPermissions.restored(reconverted, path: path).scripts[0].isAuthorized)
+    }
+
+    func testReconversionAsksAgainWhenTheOriginChangedOrWasNeverAllowedOrIsUnknown() {
+        let previous = converted(origin: "a", bridge: "v1")
+        SceneScriptPermissions.authorizeAll(previous, path: path)
+        let approved = SceneScriptPermissions.restored(previous, path: path)
+        let notAllowed = converted(origin: "a", bridge: "v1")
+
+        for (reconverted, before) in [(converted(origin: "b", bridge: "v2"), approved),
+                                      (converted(origin: nil, bridge: "v3"), approved),
+                                      (converted(origin: "a", bridge: "v4"), notAllowed)] {
+            SceneScriptPermissions.carry(reconverted, replacing: before, path: path)
+            XCTAssertFalse(SceneScriptPermissions.restored(reconverted, path: path).scripts[0].isAuthorized)
+        }
     }
 }

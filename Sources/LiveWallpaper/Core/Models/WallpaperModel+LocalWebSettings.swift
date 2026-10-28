@@ -341,6 +341,7 @@ extension WallpaperModel {
             }
             self.flushSceneSave(path: path)
             self.cancelSceneBake(path: path)
+            let previousDocument = self.sceneDocumentsByPath[path]
             let backup = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("LiveWallpaper/AuthorSettingsBackups/\(UUID().uuidString)", isDirectory: true)
             let converted = try await Task.detached(priority: .userInitiated) {
@@ -350,6 +351,7 @@ extension WallpaperModel {
             try settings.save(key: "authorSettings.scene." + normalized)
             self.sceneHistories.removeValue(forKey: path)
             self.sceneComparisonSnapshots.removeValue(forKey: path)
+            SceneScriptPermissions.carry(converted, replacing: previousDocument, path: path)
             self.registerImportedScene(converted, path: path)
             try self.applySceneAuthorSettings(forPath: path, settings: settings)
             self.reloadPlayback(forRewrittenPath: path)
