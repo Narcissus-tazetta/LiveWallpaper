@@ -1320,6 +1320,7 @@ struct SceneDocument: Codable, Equatable {
         guard sounds.count <= SceneSound.maximumCount, Set(sounds.map(\.id)).count == sounds.count else {
             throw DecodingError.dataCorruptedError(forKey: .sounds, in: container, debugDescription: "Too many sounds or duplicate sound IDs")
         }
+        scriptOrigin = try container.decodeIfPresent(String.self, forKey: .scriptOrigin)
     }
 
     var isAnimated: Bool {
