@@ -63,9 +63,15 @@ enum VideoThumbnailGenerator {
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
           context.draw(frame, in: CGRect(x: 0, y: 0, width: 32, height: 32))
           let bytes = buffer.bindMemory(to: UInt8.self)
-          return stride(from: 0, to: bytes.count, by: 4).reduce(0.0) {
-            $0 + 0.2126 * Double(bytes[$1]) + 0.7152 * Double(bytes[$1 + 1]) + 0.0722 * Double(bytes[$1 + 2])
+          // Kept as separate statements: the one-line reduce exceeds the compiler's type-check time limit on CI.
+          var sum = 0.0
+          for offset in stride(from: 0, to: bytes.count, by: 4) {
+            let red = Double(bytes[offset])
+            let green = Double(bytes[offset + 1])
+            let blue = Double(bytes[offset + 2])
+            sum += 0.2126 * red + 0.7152 * green + 0.0722 * blue
           }
+          return sum
         }
         if brightness > brightest { brightest = brightness; selected = index }
       }
