@@ -142,6 +142,7 @@ struct SceneScriptAdjustment {
     var text: SceneScriptTextValues?
     /// In a scene seen through its camera: the layer's placement now (column-major).
     var world: simd_float4x4?
+    var modelValues: [String: Double]?
 }
 
 struct SceneScriptEffectValues: Decodable {

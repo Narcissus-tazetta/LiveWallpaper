@@ -13,6 +13,18 @@ extension WallpaperModel {
         guard SceneScript.supports(version: proposed.version) else {
             throw SceneScriptIssue(scriptID: proposed.id, name: proposed.name, message: "Unsupported script API version: \(proposed.version)")
         }
+        if proposed.modules != nil, original.scripts.first(where: { $0.id == proposed.id }) == proposed {
+            // Unchanged imported bundles use the same consent path as the import prompt;
+            // running their initialization as editor validation can exhaust its frame budget.
+            var document = original
+            let index = document.scripts.firstIndex(where: { $0.id == proposed.id })!
+            document.scripts[index].isEnabled = true
+            document.scripts[index].executionRevision += 1
+            SceneScriptPermissions.authorize(document.scripts[index], path: path)
+            sceneScriptIssues[path] = []
+            updateScene(SceneScriptPermissions.restored(document, path: path), path: path, coalescing: false)
+            return
+        }
         let targets = proposed.targetLayerIDs(in: original.layers)
         guard !targets.isEmpty, targets.count <= 128, proposed.source.utf8.count <= 65536, !proposed.source.contains("\0"),
               proposed.params.count <= 64, proposed.params.allSatisfy({ $0.key.utf8.count <= 128 && $0.value.isFinite })

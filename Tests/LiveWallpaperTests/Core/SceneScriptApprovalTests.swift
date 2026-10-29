@@ -60,6 +60,26 @@ final class SceneScriptApprovalTests: XCTestCase {
         XCTAssertFalse(model.sceneDocumentsByPath[copy]!.scripts[0].canRun)
     }
 
+    func testUnchangedImportedBundleCanBeEnabledFromTheEditorWithManyLayers() async throws {
+        let model = WallpaperModel()
+        let layers = (0..<200).map { SceneLayer(name: "layer\($0)", imageFile: "a.png") }
+        var document = SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: layers)
+        var script = SceneScript(source: "export function update(c){return []}", layerIDs: [])
+        script.modules = ["helper": "export const value=1;"]
+        script.targetsAllLayers = true
+        document.scripts = [script]
+        model.registerImportedScene(document, path: path)
+        defer {
+            model.cancelSceneBake(path: path)
+            model.discardSceneSave(path: path)
+            SceneScriptPermissions.revoke(document, path: path)
+        }
+        let imported = try XCTUnwrap(model.sceneDocumentsByPath[path]?.scripts.first)
+        XCTAssertFalse(imported.canRun)
+        try await model.applySceneScript(imported, path: path, input: .rest, timeOfDay: .day)
+        XCTAssertTrue(try XCTUnwrap(model.sceneDocumentsByPath[path]?.scripts.first).canRun)
+    }
+
     private func converted(origin: String?, bridge: String) -> SceneDocument {
         var document = scene(source: bridge)
         document.scriptOrigin = origin

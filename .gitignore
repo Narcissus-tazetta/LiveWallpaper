@@ -42,3 +42,7 @@ store-worker/node_modules/
 store-worker/.wrangler/
 store-worker/.dev.vars
 store-worker/packages/
+
+# private working notes (the canonical memory lives outside the repo)
+/memory/
+/docs/memory/

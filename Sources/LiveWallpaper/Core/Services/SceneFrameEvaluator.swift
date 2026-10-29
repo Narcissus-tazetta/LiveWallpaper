@@ -99,6 +99,7 @@ final class SceneFrameEvaluator {
         }
         if let text = adjustment.text { text.apply(to: &layer.layer.text!) }
         if let world = adjustment.world { layer.world = world }
+        if let modelValues = adjustment.modelValues { layer.layer.modelValues = modelValues }
     }
 
     func evaluate(_ document: SceneDocument, input: SceneFrameInput, timeOfDay: SceneTimeOfDay, failOnError: Bool = true) throws -> SceneEvaluatedFrame {

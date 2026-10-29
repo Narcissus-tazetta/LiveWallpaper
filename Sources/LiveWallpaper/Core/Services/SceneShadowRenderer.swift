@@ -140,9 +140,9 @@ extension SceneModelRenderer {
     func renderShadows(
         lights: [SceneShadowLight], casters: [SceneModelLayerFrame], commandBuffer: MTLCommandBuffer
     ) throws -> Shadows {
+        let casters = casters.filter(\.castsShadow)
         shadowState.targets = shadowState.targets.filter { $0.key < lights.count }
         let size = Self.shadowSize
-        // Every solid model casts, as measured with models that carry no flag of their own.
         var bounds: (center: SIMD3<Float>, radius: Float)?
         if lights.contains(where: { $0.kind == .directional }) {
             var low = SIMD3<Float>(repeating: .infinity), high = SIMD3<Float>(repeating: -.infinity)

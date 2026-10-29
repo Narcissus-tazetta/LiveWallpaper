@@ -205,6 +205,7 @@ struct SceneMeshMaterial: Codable, Equatable {
     var draw: SceneRenderGraph.Draw
     /// Resource name to a plain file name in the scene folder.
     var images: [String: String]
+    var values: [String: Double]? = nil
 }
 
 /// A layer a script made from its own geometry, as it should look this frame.
@@ -258,6 +259,8 @@ struct SceneModelLayerFrame: Equatable {
     var world: simd_float4x4
     var perspective: Bool
     var shapes: [Shape]
+    var materialValues: [String: Double] = [:]
+    var castsShadow = true
 }
 
 /// One mesh a script made, as it should look this frame.

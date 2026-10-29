@@ -181,6 +181,44 @@ final class SceneStaticModelTests: XCTestCase {
         XCTAssertEqual(modelRenderer.shadowState.targets.count, 0)
     }
 
+    func testNonCastingModelDoesNotChangeDirectionalShadow() throws {
+        let device = try XCTUnwrap(MTLCreateSystemDefaultDevice())
+        let queue = try XCTUnwrap(device.makeCommandQueue())
+        let light = SceneShadowLight(kind: .directional, origin: [0, 0, 100], axis: [0, 0, -1], outerCone: 30, cascadeDistance: 100)
+        let caster = SceneModelLayerFrame(serial: 0, order: 0, alpha: 1, color: .one,
+            world: matrix_identity_float4x4, perspective: false, shapes: [model(indices: [0, 1, 2]).shape])
+        var background = caster
+        background.world.columns.3 = SIMD4(10000, 10000, 10000, 1)
+        background.castsShadow = false
+        func snapshot(_ layers: [SceneModelLayerFrame]) throws -> (simd_float4x4, Data) {
+            let renderer = try SceneModelRenderer(materials: [], device: device)
+            let command = try XCTUnwrap(queue.makeCommandBuffer())
+            let result = try renderer.renderShadows(lights: [light], casters: layers, commandBuffer: command)
+            let texture = try XCTUnwrap(result.textures.first)
+            let buffer = try XCTUnwrap(device.makeBuffer(length: texture.width * texture.height * 4, options: .storageModeShared))
+            let blit = try XCTUnwrap(command.makeBlitCommandEncoder())
+            blit.copy(from: texture, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(),
+                sourceSize: MTLSize(width: texture.width, height: texture.height, depth: 1),
+                to: buffer, destinationOffset: 0, destinationBytesPerRow: texture.width * 4,
+                destinationBytesPerImage: texture.width * texture.height * 4)
+            blit.endEncoding()
+            command.commit()
+            command.waitUntilCompleted()
+            if let error = command.error { throw error }
+            return (result.matrices[0], Data(bytes: buffer.contents(), count: buffer.length))
+        }
+        let baseline = try snapshot([caster])
+        let withBackground = try snapshot([caster, background])
+        XCTAssertEqual(baseline.0, withBackground.0)
+        XCTAssertEqual(baseline.1, withBackground.1)
+        background.castsShadow = true
+        XCTAssertNotEqual(try snapshot([caster, background]).0, baseline.0)
+        var encodedLayer = layer(model(indices: [0, 1, 2]))
+        encodedLayer.castsShadow = false
+        let decoded = try JSONDecoder().decode(SceneLayer.self, from: JSONEncoder().encode(encodedLayer))
+        XCTAssertEqual(decoded.castsShadow, false)
+    }
+
     func testMultipleLayersSharingSameModelReuseBuffers() throws {
         let m = model(indices: [0, 1, 2])
         let l1 = layer(m)
@@ -289,5 +327,32 @@ final class SceneStaticModelTests: XCTestCase {
         try renderer.encode(into: target, commandBuffer: cmd2, input: .rest)
         cmd2.commit()
         cmd2.waitUntilCompleted()
+    }
+
+    func testCapturingLayerInASceneSeenThroughItsCameraKeepsWhatWasDrawnBefore() throws {
+        var capture = SceneLayer(name: "Post", imageFile: "")
+        capture.capturesCanvas = true
+        var doc = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [layer(model(indices: [0, 1, 2])), capture])
+        doc.backgroundColor = [0.2, 0.4, 0.6]
+        doc.camera = SceneCamera(
+            perspective: true, eye: [0, 0, 100], center: [0, 0, 0], up: [0, 1, 0], fov: 60, nearZ: 0.1, farZ: 1000,
+            ambientColor: [0.1, 0.1, 0.1], skylightColor: [0.2, 0.2, 0.2]
+        )
+        let renderer = try SceneRenderer(document: doc, videoPath: "/tmp/fake.mp4")
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 64, height: 64, mipmapped: false)
+        descriptor.usage = [.renderTarget, .shaderRead]
+        descriptor.storageMode = .shared
+        let target = try XCTUnwrap(renderer.device.makeTexture(descriptor: descriptor))
+        let command = try XCTUnwrap(renderer.commandQueue.makeCommandBuffer())
+        try renderer.encode(into: target, commandBuffer: command, input: .rest)
+        command.commit()
+        command.waitUntilCompleted()
+        XCTAssertNil(command.error)
+        var pixel = [UInt8](repeating: 0, count: 4)
+        target.getBytes(&pixel, bytesPerRow: 4, from: MTLRegionMake2D(60, 60, 1, 1), mipmapLevel: 0)
+        // BGRA: the background survives the copy through the capture.
+        XCTAssertEqual(Int(pixel[2]), 51, accuracy: 2)
+        XCTAssertEqual(Int(pixel[1]), 102, accuracy: 2)
+        XCTAssertEqual(Int(pixel[0]), 153, accuracy: 2)
     }
 }

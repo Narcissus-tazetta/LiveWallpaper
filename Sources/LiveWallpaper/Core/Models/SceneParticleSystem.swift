@@ -79,6 +79,9 @@ struct SceneParticleSystem: Codable, Equatable {
         var directions: [Double] = [1, 1, 1]
         /// Per axis: 0 either side, above 0 only positive, below 0 only negative.
         var sign: [Double] = [0, 0, 0]
+        /// Sphere only: the emission direction stays within a half angle of pi * (1 - cone)
+        /// around +X; nil or 0 is the whole sphere.
+        var cone: Double?
         /// Particles per second.
         var rate: Double = 0
         /// Particles released at once when the emitter starts.

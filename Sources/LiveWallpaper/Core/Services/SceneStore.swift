@@ -249,7 +249,7 @@ enum SceneStore {
         var files = Set<String>()
         for sound in document.sounds { files.formUnion(sound.files) }
         for material in (document.meshMaterials ?? []).compactMap({ $0 }) {
-            files.formUnion(material.images.values)
+            files.formUnion(material.images.values.filter { SceneModelRenderer.layerObjectID($0) == nil })
         }
         for layer in document.layers {
             if layer.kind == .image {

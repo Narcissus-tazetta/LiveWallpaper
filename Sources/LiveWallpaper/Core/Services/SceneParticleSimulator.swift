@@ -793,6 +793,20 @@ final class SceneParticleSimulator {
         case .sphere:
             let inner = max(emitter.distanceMin.first ?? 0, 0)
             let outer = max(emitter.distanceMax.first ?? 0, inner)
+            if let cone = emitter.cone, cone != 0 {
+                // Measured (Windows, fixed radius): the cone bounds the direction before the
+                // directions are applied, and the result is renormalised, so cone 1 is a
+                // point on +X whatever the directions are. Radius is rmin + (rmax - rmin) * cbrt(u).
+                let lowX = -cos(Double.pi * min(max(cone, 0), 1))
+                let x = lowX + (1 - lowX) * random.unit()
+                let ring = (1 - x * x).squareRoot()
+                let angle = 2 * Double.pi * random.unit()
+                let stretched = SIMD3(x, ring * cos(angle), ring * sin(angle)) * directions
+                let length = simd_length(stretched)
+                var point = length > 1e-12 ? stretched / length * (inner + (outer - inner) * cbrt(random.unit())) : .zero
+                for axis in 0 ..< 3 where signs[axis] != 0 { point[axis] = signed(point[axis], axis) }
+                return point
+            }
             var direction: SIMD3<Double>
             repeat {
                 direction = SIMD3(random.unit() * 2 - 1, random.unit() * 2 - 1, random.unit() * 2 - 1)

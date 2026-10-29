@@ -42,7 +42,7 @@ final class SceneSoundPlayer {
         var wantsToPlay: Bool {
             if let script { return script.playing }
             if sound.volumeIsScripted { return false }
-            return sound.mode == .random ? true : !sound.startsSilent
+            return !sound.startsSilent
         }
 
         func audioPlayerDidFinishPlaying(_: AVAudioPlayer, successfully _: Bool) {
@@ -151,7 +151,7 @@ final class SceneSoundPlayer {
         case .loop:
             begin(voice)
         case .random:
-            voice.started || (voice.sound.startsSilent && voice.script == nil) ? waitThenPlay(voice) : begin(voice)
+            voice.started ? waitThenPlay(voice) : begin(voice)
         case .single:
             if !voice.started { begin(voice) }
         }

@@ -322,7 +322,7 @@ final class SceneScriptRuntime {
 
     /// Built once: readOutput runs for every target of every frame.
     private enum OutputKeys {
-        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text", "world"]
+        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text", "world", "modelValues"]
         static let appearance: Set = ["isVisible", "tint", "blendMode", "parallaxDepth", "depthStrength", "depthFollowsCursor",
                                       "depthAutoMotion", "depthAutoCycles", "cursorMask", "clearCursorMask"]
         static let appearanceRanges: [String: ClosedRange<Double>] = [
@@ -718,6 +718,13 @@ final class SceneScriptRuntime {
                     try numbers(color, ranges: ["red": 0 ... 1, "green": 0 ... 1, "blue": 0 ... 1, "alpha": 0 ... 1], path: "particles.color")
                 }
                 adjustment.particles = try decode(SceneScriptParticleValues.self, particles)
+            }
+            if let raw = item["modelValues"] {
+                guard layer.model != nil else { throw failure("modelValues: target is not a model layer") }
+                let values = try object(raw, path: "modelValues")
+                guard values.count <= 256 else { throw failure("modelValues: expected at most 256 entries") }
+                try numbers(values, ranges: Dictionary(uniqueKeysWithValues: values.keys.map { ($0, -1e9 ... 1e9) }), path: "modelValues")
+                adjustment.modelValues = try decode([String: Double].self, values)
             }
             if let raw = item["text"] { adjustment.text = try readText(raw, layer: layer) }
             var drawable = layer

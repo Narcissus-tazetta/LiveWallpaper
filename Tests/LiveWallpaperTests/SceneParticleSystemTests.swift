@@ -1,4 +1,5 @@
 @testable import LiveWallpaper
+import simd
 import XCTest
 
 /// The behaviours measured in the scenes this follows, at their 30 updates a second.
@@ -19,6 +20,31 @@ final class SceneParticleSystemTests: XCTestCase {
         for _ in 0 ..< Int((seconds / step).rounded()) {
             simulator.advance(by: step, surroundings: .init())
         }
+    }
+
+    func testSphereConeBoundsTheDirectionAroundPlusXBeforeTheDirectionsApply() {
+        func born(cone: Double, directions: [Double]) -> [SIMD2<Double>] {
+            let simulator = SceneParticleSimulator(system: system {
+                $0.emitters = [.init(shape: .sphere)]
+                $0.emitters[0].distanceMin = [70, 70, 70]
+                $0.emitters[0].distanceMax = [70, 70, 70]
+                $0.emitters[0].directions = directions
+                $0.emitters[0].cone = cone
+                $0.maxCount = 400
+            }, seed: 3)
+            simulator.apply(.init(events: [.emit(400)]))
+            return simulator.instances(aspect: 1).map { SIMD2(Double($0.center.x), Double($0.center.y)) }
+        }
+        for point in born(cone: 1, directions: [0.1, 0.1, 1]) {
+            XCTAssertEqual(point.x, 70, accuracy: 1e-3)
+            XCTAssertEqual(point.y, 0, accuracy: 1e-3)
+        }
+        let half = born(cone: 0.5, directions: [1, 1, 1])
+        XCTAssertTrue(half.allSatisfy { $0.x >= -1e-3 })
+        XCTAssertTrue(half.contains { $0.x < 5 })
+        let quarter = born(cone: 0.25, directions: [1, 1, 0])
+        XCTAssertTrue(quarter.allSatisfy { abs(simd_length($0) - 70) < 1e-3 })
+        XCTAssertEqual(quarter.map(\.x).min() ?? 0, -70, accuracy: 1)
     }
 
     func testEmitAddsClearRemovesAndTheLimitHolds() {
