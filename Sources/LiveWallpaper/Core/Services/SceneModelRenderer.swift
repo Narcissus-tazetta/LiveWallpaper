@@ -50,6 +50,7 @@ final class SceneModelRenderer {
                 let descriptor = MTLSamplerDescriptor()
                 descriptor.minFilter = texture.linear ? .linear : .nearest
                 descriptor.magFilter = texture.linear ? .linear : .nearest
+                descriptor.mipFilter = texture.linear ? .linear : .nearest
                 let mode: MTLSamplerAddressMode = texture.repeats ? .repeat : .clampToEdge
                 descriptor.sAddressMode = mode
                 descriptor.tAddressMode = mode
@@ -71,7 +72,23 @@ final class SceneModelRenderer {
 
     /// Image files the materials sample, by resource name.
     var imageFiles: Set<String> {
-        Set(materials.compactMap { $0 }.flatMap(\.images.values))
+        Set(materials.compactMap { $0 }.flatMap(\.images.values).filter { Self.layerObjectID($0) == nil })
+    }
+
+    /// The object ids of the layers whose pictures the materials sample (`layer:<id>`).
+    var sampledLayerObjectIDs: Set<Int> {
+        Set(materials.compactMap { $0 }.flatMap(\.images.values).compactMap(Self.layerObjectID))
+    }
+
+    private lazy var blackTexture: MTLTexture = {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: 1, height: 1, mipmapped: false)
+        let texture = device.makeTexture(descriptor: descriptor)!
+        texture.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: [0, 0, 0, 255] as [UInt8], bytesPerRow: 4)
+        return texture
+    }()
+
+    static func layerObjectID(_ source: String) -> Int? {
+        source.hasPrefix("layer:") ? Int(source.dropFirst(6)) : nil
     }
 
     /// The shadow map a texture source names (`_shadow0`...).
@@ -85,17 +102,23 @@ final class SceneModelRenderer {
               !draw.attributes.isEmpty, draw.attributes.allSatisfy({ $0.semantic != nil }),
               Set(draw.attributes.map(\.location)).count == draw.attributes.count,
               draw.textures.allSatisfy({
-                  (0 ..< 16).contains($0.index) && (material.images[$0.source] != nil || shadowSlot($0.source) != nil)
+                  (0 ..< 16).contains($0.index) && (material.images[$0.source] != nil || shadowSlot($0.source) != nil || $0.source == Self.mipHistorySource)
               })
         else { throw ModelError(detail: "material \(material.path) is invalid") }
         for stage in [draw.vertex, draw.fragment] {
             for update in stage.updates {
+                if update.value == .effectValue {
+                    guard (1...4).contains(update.components ?? 1), update.key != nil else {
+                        throw ModelError(detail: "material \(material.path) has an invalid property update")
+                    }
+                }
                 let bytes: Int = switch update.value {
                 case .modelViewProjection, .model, .viewProjection, .shadowMatrix: 64
-                case .layerAlpha, .time, .frameTime: 4
+                case .layerAlpha, .time, .frameTime, .mipLevels: 4
                 case .normalModel: 48
-                case .layerColor, .eyePosition, .ambientColor, .skylightColor: 12
+                case .layerColor, .eyePosition, .ambientColor, .skylightColor, .screen, .lightOrigin, .lightAxis, .lightColor: 12
                 case .textureSize: 16
+                case .effectValue: 4 * (update.components ?? 1)
                 default: throw ModelError(detail: "material \(material.path) reads \(update.value.rawValue)")
                 }
                 guard update.offset >= 0, update.offset + bytes <= stage.uniforms.count else {
@@ -177,12 +200,25 @@ final class SceneModelRenderer {
 
     /// How a frame's model layers are seen: `viewProjection` takes scene units to the
     /// target's clip space.
+    /// The resource name of the previous frame's finished picture, which materials read as
+    /// `_rt_MipMappedFrameBuffer`.
+    static let mipHistorySource = "mipHistory"
+
+    /// A light a script moves, as of this frame.
+    struct DynamicLight: Equatable {
+        var origin: SIMD3<Float>
+        var axis: SIMD3<Float>
+        var color: SIMD3<Float>
+    }
+
     struct View {
         var viewProjection: simd_float4x4
         var eye: SIMD3<Float>
         var ambient: SIMD3<Float>
         var skylight: SIMD3<Float>
         var shadows: Shadows?
+        var lights: [DynamicLight] = []
+        var screen = SIMD3<Float>(1, 1, 1)
         /// The camera's axes in the scene; particles face them.
         var cameraRight = SIMD3<Float>(1, 0, 0)
         var cameraUp = SIMD3<Float>(0, 1, 0)
@@ -209,14 +245,15 @@ final class SceneModelRenderer {
 
     /// Draws `layer` into the encoder's target, which has a depth attachment of `depthFormat`.
     func draw(
-        _ layer: SceneModelLayerFrame, view: View, images: [String: MTLTexture],
+        _ layer: SceneModelLayerFrame, view: View, images: [String: MTLTexture], layerPictures: [Int: MTLTexture] = [:],
         frame: SceneRenderGraphRenderer.FrameValues, time: Double, cursor: SIMD2<Float>?,
-        audio: SceneAudioSpectrum?, format: MTLPixelFormat, encoder: MTLRenderCommandEncoder
+        audio: SceneAudioSpectrum?, format: MTLPixelFormat, encoder: MTLRenderCommandEncoder,
+        mipHistory: MTLTexture? = nil
     ) throws {
         let values = SceneRenderGraphRenderer.ModelValues(
             modelViewProjection: view.viewProjection * layer.world, model: layer.world, viewProjection: view.viewProjection,
             alpha: layer.alpha, color: layer.color, eye: view.eye, ambient: view.ambient, skylight: view.skylight,
-            shadowMatrices: view.shadows?.matrices ?? []
+            shadowMatrices: view.shadows?.matrices ?? [], lights: view.lights, screen: view.screen
         )
         for shape in layer.shapes {
             guard let index = shape.material, let material = compiled[index], !shape.vertices.isEmpty, shape.stride > 0 else { continue }
@@ -226,8 +263,13 @@ final class SceneModelRenderer {
                 continue
             }
             let draw = material.source.draw
-            var resources: [String: MTLTexture] = [:]
+            var resources: [String: MTLTexture] = [Self.mipHistorySource: mipHistory ?? blackTexture]
             for (name, file) in material.source.images {
+                if let id = Self.layerObjectID(file) {
+                    // A layer that is not drawn this frame leaves its slot black.
+                    resources[name] = layerPictures[id] ?? blackTexture
+                    continue
+                }
                 guard let texture = images[file] else { throw ModelError(detail: "image \(file) is missing") }
                 resources[name] = texture
             }
@@ -245,7 +287,7 @@ final class SceneModelRenderer {
             for (stage, isVertex) in [(draw.vertex, true), (draw.fragment, false)] {
                 let data = SceneRenderGraphRenderer.updatedUniforms(
                     stage, frame: frame, model: values, resources: resources, time: time, cursor: cursor, pose: nil,
-                    effectValues: [:], audio: audio
+                    effectValues: (material.source.values ?? [:]).merging(layer.materialValues) { _, new in new }, audio: audio
                 ) ?? stage.uniforms
                 guard !data.isEmpty else { continue }
                 try data.withUnsafeBytes { bytes in

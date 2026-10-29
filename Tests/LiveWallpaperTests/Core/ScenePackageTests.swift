@@ -69,6 +69,30 @@ final class ScenePackageTests: XCTestCase {
         }
     }
 
+    func testModelMaterialLayerReferenceSurvivesPackageRoundTrip() throws {
+        let original = workingDirectory.appendingPathComponent("a.mp4").path
+        var document = try makeScene(at: original)
+        let image = document.layers[0].imageFile
+        document.meshMaterials = [SceneMeshMaterial(
+            path: "planet",
+            draw: .init(vertex: .init(source: "", entryPoint: "vertexMain"),
+                        fragment: .init(source: "", entryPoint: "fragmentMain"),
+                        vertices: Data(), vertexStride: 0, vertexCount: 0,
+                        attributes: [], textures: []),
+            images: ["planet": "layer:929", "surface": image]
+        )]
+        try SceneStore.save(document, videoPath: original)
+        let packaged = workingDirectory.appendingPathComponent("package", isDirectory: true)
+        try SceneStore.copyScene(videoPath: original, to: packaged)
+        let imported = workingDirectory.appendingPathComponent("b.mp4").path
+        FileManager.default.createFile(atPath: imported, contents: Data())
+        let restored = try SceneStore.importScene(from: packaged, videoPath: imported)
+        XCTAssertEqual(restored, document)
+        XCTAssertEqual(try Data(contentsOf: SceneStore.folderURL(forVideoPath: imported).appendingPathComponent(image)),
+                       try Data(contentsOf: packaged.appendingPathComponent(image)))
+        XCTAssertFalse(SceneStore.referencedFiles(of: restored).contains("layer:929"))
+    }
+
     func testImportRejectsNamesOutsideTheSceneFolder() throws {
         let original = workingDirectory.appendingPathComponent("a.mp4").path
         var document = try makeScene(at: original)

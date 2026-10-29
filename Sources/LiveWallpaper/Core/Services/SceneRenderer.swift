@@ -536,7 +536,9 @@ final class SceneRenderer {
             : Self.interleave(visibleLayers, placed: placed, models: evaluated.models, place: { id in
                 evaluated.order[id] ?? document.layers.firstIndex { $0.id == id } ?? 0
             })
-        let views = modelViews(camera: evaluated.camera, input: input, target: target)
+        let lights = currentLights(evaluated.lights)
+        let views = modelViews(camera: evaluated.camera, input: input, target: target, lights: lights)
+        let layerPictures = try modelLayerPictures(evaluated: evaluated, commandBuffer: commandBuffer, input: input, targetSize: targetSize)
         // The frame's model layers share one depth buffer; the first pass clears it.
         var depthCleared = false
         func drawModels(_ models: [SceneModelLayerFrame], into texture: MTLTexture, clear: Bool) throws {
@@ -559,14 +561,17 @@ final class SceneRenderer {
             defer { encoder.endEncoding() }
             for model in models {
                 try modelRenderer!.draw(
-                    model, view: model.perspective ? views.perspective : views.flat, images: modelImages, frame: .init(),
-                    time: input.time, cursor: input.cursor, audio: input.audio, format: texture.pixelFormat, encoder: encoder
+                    model, view: model.perspective ? views.perspective : views.flat, images: modelImages,
+                    layerPictures: layerPictures, frame: .init(),
+                    time: input.time, cursor: input.cursor, audio: input.audio, format: texture.pixelFormat, encoder: encoder,
+                    mipHistory: mipHistory
                 )
             }
         }
         if document.camera?.perspective == true {
-            try compositeInSpace(visible, evaluated: evaluated, views: views, target: target,
+            try compositeInSpace(visible, evaluated: evaluated, views: views, layerPictures: layerPictures, target: target,
                                  commandBuffer: commandBuffer, input: input, targetSize: targetSize)
+            try keepMipHistory(of: target, commandBuffer: commandBuffer)
             return
         }
         if allowsSinglePassComposite, let fetch = pipeline.compositeFetch(for: target.pixelFormat) {
@@ -797,6 +802,43 @@ final class SceneRenderer {
         )
     }
 
+    /// A rectangle's part of the frame, as the picture the effects start from.
+    private struct CaptureRegion {
+        var uniforms: LayerUniforms
+        var width: Int
+        var height: Int
+    }
+
+    /// The target UV box a rectangle in the scene projects to. nil when a corner is behind the eye.
+    private func screenFootprint(
+        of space: SceneSpace, world: simd_float4x4, viewProjection: simd_float4x4
+    ) -> (origin: SIMD2<Float>, size: SIMD2<Float>)? {
+        var low = SIMD2<Float>(repeating: .infinity), high = SIMD2<Float>(repeating: -.infinity)
+        for (cx, cy) in [(-0.5, -0.5), (0.5, -0.5), (-0.5, 0.5), (0.5, 0.5)] as [(Float, Float)] {
+            let local = SIMD4(cx * Float(space.width) + Float(space.offsetX), cy * Float(space.height) + Float(space.offsetY), 0, 1)
+            let clip = viewProjection * world * local
+            guard clip.w > 1e-6 else { return nil }
+            let uv = SIMD2((clip.x / clip.w) * 0.5 + 0.5, 0.5 - (clip.y / clip.w) * 0.5)
+            low = simd_min(low, uv)
+            high = simd_max(high, uv)
+        }
+        let size = high - low
+        guard size.x > 1e-6, size.y > 1e-6, size.x.isFinite, size.y.isFinite else { return nil }
+        return (low, size)
+    }
+
+    /// The effects run at the layer's own size, not at the size it is shown: a small layer gets a coarse picture.
+    private static func captureRegion(_ footprint: (origin: SIMD2<Float>, size: SIMD2<Float>), space: SceneSpace) -> CaptureRegion {
+        var uniforms = passThroughUniforms
+        // The capture pass reads target UV = (UV - viewOrigin) / viewSize.
+        uniforms.viewSize = 1 / footprint.size
+        uniforms.viewOrigin = -footprint.origin / footprint.size
+        let edge = Double(maxTextureEdge)
+        return CaptureRegion(
+            uniforms: uniforms, width: Int(min(max(space.width.rounded(), 1), edge)), height: Int(min(max(space.height.rounded(), 1), edge))
+        )
+    }
+
     private struct PreparedLayer {
         let layerTexture: MTLTexture
         let uniforms: LayerUniforms
@@ -807,13 +849,17 @@ final class SceneRenderer {
     /// a plane in the scene; planes and model layers draw in order over one depth buffer.
     private func compositeInSpace(
         _ items: [Drawn], evaluated: SceneEvaluatedFrame,
-        views: (flat: SceneModelRenderer.View, perspective: SceneModelRenderer.View), target: MTLTexture,
+        views: (flat: SceneModelRenderer.View, perspective: SceneModelRenderer.View),
+        layerPictures: [Int: MTLTexture], target: MTLTexture,
         commandBuffer: MTLCommandBuffer, input: SceneFrameInput, targetSize: SIMD2<Float>
     ) throws {
         if modelRenderer == nil { modelRenderer = try SceneModelRenderer(materials: document.meshMaterials ?? [], device: device) }
         enum Prepared {
             case model(SceneModelLayerFrame), plane(MTLTexture, SceneEvaluatedFrame.Layer, SceneSpace)
             case particles(SceneLayer, SceneEvaluatedFrame.Layer, SceneSpace)
+            /// Runs its effects over everything drawn before it: the whole frame, or, with a
+            /// space, the part of the frame that rectangle stands over.
+            case capture(SceneLayer, SceneEvaluatedFrame.Layer, SceneSpace?)
         }
         var prepared: [Prepared] = []
         for item in items {
@@ -822,6 +868,10 @@ final class SceneRenderer {
             case let .layer(layer):
                 if layer.model != nil {
                     prepared.append(.model(staticModelFrame(layer, evaluated: evaluated)))
+                    continue
+                }
+                if layer.capturesCanvas {
+                    prepared.append(.capture(layer, evaluated.layers[layer.id]!, layer.space))
                     continue
                 }
                 guard var space = layer.space else { continue }
@@ -850,16 +900,27 @@ final class SceneRenderer {
                 let world: simd_float4x4 = switch item {
                 case let .model(model): model.world
                 case let .plane(_, drawn, space), let .particles(_, drawn, space): drawn.world ?? space.matrix
+                case .capture: matrix_identity_float4x4
                 }
                 return (views.flat.viewProjection * SIMD4(world.columns.3.x, world.columns.3.y, world.columns.3.z, 1)).w
             }
+            // A capturing layer reads what the sorted ones drew, so it stays after them.
             var keyed: [(distance: Float, index: Int, item: Prepared)] = []
-            for (index, item) in prepared.enumerated() { keyed.append((distance(item), index, item)) }
+            var captures: [Prepared] = []
+            for (index, item) in prepared.enumerated() {
+                if case .capture = item { captures.append(item) } else { keyed.append((distance(item), index, item)) }
+            }
             keyed.sort { $0.distance == $1.distance ? $0.index < $1.index : $0.distance > $1.distance }
-            prepared = keyed.map(\.item)
+            prepared = keyed.map(\.item) + captures
         }
         var views = views
-        if let lights = document.camera?.shadowLights, !lights.isEmpty {
+        if var lights = document.camera?.shadowLights, !lights.isEmpty {
+            for index in lights.indices {
+                guard let moving = lights[index].dynamicLight, views.flat.lights.indices.contains(moving) else { continue }
+                let light = views.flat.lights[moving]
+                lights[index].origin = [Double(light.origin.x), Double(light.origin.y), Double(light.origin.z)]
+                lights[index].axis = [Double(light.axis.x), Double(light.axis.y), Double(light.axis.z)]
+            }
             let casters = prepared.compactMap { item -> SceneModelLayerFrame? in
                 if case let .model(model) = item { return model }
                 return nil
@@ -870,29 +931,41 @@ final class SceneRenderer {
         } else if modelRenderer?.shadowState.targets.isEmpty == false {
             modelRenderer?.shadowState.targets = [:]
         }
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = target
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = backgroundClearColor
-        pass.colorAttachments[0].storeAction = .store
-        pass.depthAttachment.texture = try modelDepth(width: target.width, height: target.height)
-        pass.depthAttachment.loadAction = .clear
-        pass.depthAttachment.clearDepth = 1
-        pass.depthAttachment.storeAction = .dontCare
-        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
-            throw RendererError.textureAllocationFailed
+        let hasCapture = prepared.contains { if case .capture = $0 { true } else { false } }
+        var drewBefore = false
+        func openPass() throws -> MTLRenderCommandEncoder {
+            let pass = MTLRenderPassDescriptor()
+            pass.colorAttachments[0].texture = target
+            pass.colorAttachments[0].loadAction = drewBefore ? .load : .clear
+            pass.colorAttachments[0].clearColor = backgroundClearColor
+            pass.colorAttachments[0].storeAction = .store
+            pass.depthAttachment.texture = try modelDepth(width: target.width, height: target.height)
+            pass.depthAttachment.loadAction = drewBefore ? .load : .clear
+            pass.depthAttachment.clearDepth = 1
+            // Kept only so the models drawn after a capturing layer test against those before it.
+            pass.depthAttachment.storeAction = hasCapture ? .store : .dontCare
+            drewBefore = true
+            guard let opened = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
+                throw RendererError.textureAllocationFailed
+            }
+            return opened
         }
-        defer { encoder.endEncoding() }
+        var encoder: MTLRenderCommandEncoder? = try openPass()
+        defer { encoder?.endEncoding() }
         for item in prepared {
             switch item {
             case let .model(model):
                 try modelRenderer!.draw(
-                    model, view: model.perspective ? views.perspective : views.flat, images: modelImages, frame: .init(),
-                    time: input.time, cursor: input.cursor, audio: input.audio, format: target.pixelFormat, encoder: encoder
+                    model, view: model.perspective ? views.perspective : views.flat, images: modelImages,
+                    layerPictures: layerPictures, frame: .init(),
+                    time: input.time, cursor: input.cursor, audio: input.audio, format: target.pixelFormat, encoder: encoder!,
+                    mipHistory: mipHistory
                 )
             case let .plane(picture, drawn, space):
                 let tint = drawn.layer.tint
                 let opacity = Float(min(max(drawn.layer.opacity * tint.alpha * drawn.opacity, 0), 1))
+                // A fully transparent plane still writes depth, which would cut a hole in whatever is drawn after it.
+                guard opacity > 0 else { break }
                 let local = simd_float4x4(columns: (
                     SIMD4(Float(space.width), 0, 0, 0), SIMD4(0, Float(space.height), 0, 0), SIMD4(0, 0, 1, 0),
                     SIMD4(Float(space.offsetX), Float(space.offsetY), 0, 1)
@@ -900,14 +973,64 @@ final class SceneRenderer {
                 try modelRenderer!.drawPlane(
                     picture, transform: views.flat.viewProjection * (drawn.world ?? space.matrix) * local,
                     color: SIMD4(Float(tint.red), Float(tint.green), Float(tint.blue), opacity), space: space,
-                    format: target.pixelFormat, encoder: encoder
+                    format: target.pixelFormat, encoder: encoder!
                 )
             case let .particles(layer, drawn, space):
                 try drawParticlesInSpace(
-                    layer, drawn: drawn, space: space, view: views.flat, format: target.pixelFormat, encoder: encoder
+                    layer, drawn: drawn, space: space, view: views.flat, format: target.pixelFormat, encoder: encoder!
                 )
+            case let .capture(layer, drawn, space):
+                encoder?.endEncoding()
+                encoder = nil
+                try ensureAccumulation(width: target.width, height: target.height, format: target.pixelFormat)
+                // Without a rectangle the layer covers the whole frame and needs no placement of its own.
+                var uniforms = Self.passThroughUniforms
+                uniforms.opacity = Float(min(max(layer.opacity * layer.tint.alpha * drawn.opacity, 0), 1))
+                uniforms.blendMode = Int32(SceneBlendMode.allCases.firstIndex(of: layer.blendMode) ?? 0)
+                // passThroughUniforms leaves hasLayer 0, which makes the composite return the base untouched.
+                uniforms.hasLayer = 1
+                var region: CaptureRegion?
+                if let space {
+                    guard let footprint = screenFootprint(
+                        of: space, world: drawn.world ?? space.matrix, viewProjection: views.flat.viewProjection
+                    ) else {
+                        encoder = try openPass()
+                        continue
+                    }
+                    region = Self.captureRegion(footprint, space: space)
+                    // The picture the effects made stands over the footprint, its UV running across it.
+                    uniforms.uvScale = 1 / footprint.size
+                    uniforms.placementOffset = footprint.origin + 0.5 * footprint.size - 0.5
+                }
+                let layerTexture = try applyEffects(
+                    to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize,
+                    canvasSource: target, compositeUniforms: uniforms, captureRegion: region
+                )
+                try compositePass(
+                    commandBuffer: commandBuffer, destination: accumulation[0], base: target,
+                    layerTexture: layerTexture, uniforms: uniforms
+                )
+                guard let blit = commandBuffer.makeBlitCommandEncoder() else { throw RendererError.textureAllocationFailed }
+                blit.copy(from: accumulation[0], to: target)
+                blit.endEncoding()
+                encoder = try openPass()
             }
         }
+    }
+
+    /// The pictures of the layers model materials sample, effects applied even where the layer itself
+    /// is hidden. Encoded before any pass of the frame opens.
+    private func modelLayerPictures(
+        evaluated: SceneEvaluatedFrame, commandBuffer: MTLCommandBuffer, input: SceneFrameInput, targetSize: SIMD2<Float>
+    ) throws -> [Int: MTLTexture] {
+        guard let sampled = modelRenderer?.sampledLayerObjectIDs, !sampled.isEmpty else { return [:] }
+        var pictures: [Int: MTLTexture] = [:]
+        for layer in document.layers {
+            guard let id = layer.objectID, sampled.contains(id), var drawn = evaluated.layers[layer.id]?.layer else { continue }
+            drawn.isVisible = true
+            pictures[id] = try applyEffects(to: drawn, commandBuffer: commandBuffer, input: input, targetSize: targetSize)
+        }
+        return pictures
     }
 
     private func staticModelFrame(_ layer: SceneLayer, evaluated: SceneEvaluatedFrame) -> SceneModelLayerFrame {
@@ -923,7 +1046,8 @@ final class SceneRenderer {
         return SceneModelLayerFrame(
             serial: 0, order: 0, alpha: Float(drawn.layer.opacity * drawn.opacity),
             color: SIMD3(Float(tint.red), Float(tint.green), Float(tint.blue)),
-            world: drawn.world ?? layer.space?.matrix ?? matrix_identity_float4x4, perspective: false, shapes: [shape]
+            world: drawn.world ?? layer.space?.matrix ?? matrix_identity_float4x4, perspective: false, shapes: [shape],
+            materialValues: drawn.layer.modelValues ?? [:], castsShadow: drawn.layer.castsShadow ?? true
         )
     }
 
@@ -974,7 +1098,49 @@ final class SceneRenderer {
     /// How model layers are seen this frame: `flat` for those laid out on the canvas,
     /// `perspective` for those marked perspective. In a scene seen through its camera
     /// the unmarked ones go through the camera.
-    private func modelViews(camera: SceneCameraState?, input: SceneFrameInput, target: MTLTexture)
+    /// The previous frame's finished picture, which materials sample as `_rt_MipMappedFrameBuffer`.
+    /// Measured: it holds what lies before and behind the model, and the model itself comes back
+    /// into it; one frame of delay is the reading that fits, its length was not measured.
+    private var mipHistory: MTLTexture?
+
+    private lazy var readsMipHistory: Bool = (document.meshMaterials ?? []).contains {
+        $0?.draw.textures.contains { $0.source == SceneModelRenderer.mipHistorySource } ?? false
+    }
+
+    /// The number of levels measured for 1280x720, 1600x900 and 512x512 (7, 7, 6) and for 640x360
+    /// and 1024x256 (6, 5): halved until the short side is 16 or less, the base included.
+    static func mipLevelCount(width: Int, height: Int) -> Int {
+        max(1, Int(ceil(log2(Double(min(width, height)) / 16))) + 1)
+    }
+
+    private func keepMipHistory(of target: MTLTexture, commandBuffer: MTLCommandBuffer) throws {
+        guard readsMipHistory else { return }
+        if mipHistory?.width != target.width || mipHistory?.height != target.height || mipHistory?.pixelFormat != target.pixelFormat {
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: target.pixelFormat, width: target.width, height: target.height, mipmapped: false
+            )
+            descriptor.mipmapLevelCount = Self.mipLevelCount(width: target.width, height: target.height)
+            descriptor.usage = .shaderRead
+            descriptor.storageMode = .private
+            guard let texture = device.makeTexture(descriptor: descriptor) else { throw RendererError.textureAllocationFailed }
+            mipHistory = texture
+        }
+        guard let blit = commandBuffer.makeBlitCommandEncoder() else { throw RendererError.textureAllocationFailed }
+        blit.copy(from: target, to: mipHistory!)
+        blit.generateMipmaps(for: mipHistory!)
+        blit.endEncoding()
+    }
+
+    /// The scripted lights as scripts left them, the scene file's values where they left none.
+    private func currentLights(_ scripted: [Int: SceneLightState]) -> [SceneModelRenderer.DynamicLight] {
+        (document.camera?.dynamicLights ?? []).map { base in
+            if let state = scripted[base.objectID] { return .init(origin: state.origin, axis: state.axis, color: state.color) }
+            return .init(origin: SIMD3(base.origin.map(Float.init)), axis: SIMD3(base.axis.map(Float.init)),
+                         color: SIMD3(base.color.map(Float.init)))
+        }
+    }
+
+    private func modelViews(camera: SceneCameraState?, input: SceneFrameInput, target: MTLTexture, lights: [SceneModelRenderer.DynamicLight])
         -> (flat: SceneModelRenderer.View, perspective: SceneModelRenderer.View)
     {
         let scene = document.camera
@@ -999,7 +1165,8 @@ final class SceneRenderer {
             viewProjection: SceneModelRenderer.canvasProjection(
                 width: Double(document.canvasWidth), height: Double(document.canvasHeight), viewport: input.viewport
             ),
-            eye: eye, ambient: ambient, skylight: skylight
+            eye: eye, ambient: ambient, skylight: skylight, lights: lights,
+            screen: SIMD3(Float(target.width), Float(target.height), Float(target.width) / Float(target.height))
         )
         guard let state, scene?.perspective == true else { return (canvas, canvas) }
         // A camera scene fills the target, whatever its shape.
@@ -1296,18 +1463,19 @@ final class SceneRenderer {
         input: SceneFrameInput,
         targetSize: SIMD2<Float>,
         canvasSource: MTLTexture? = nil,
-        compositeUniforms: LayerUniforms? = nil
+        compositeUniforms: LayerUniforms? = nil,
+        captureRegion: CaptureRegion? = nil
     ) throws -> MTLTexture {
         let viewSize = SIMD2(input.viewport.z, input.viewport.w)
         let shown = targetSize / viewSize / layerUVScale(for: layer) * effectResolutionScale
         var source: MTLTexture
         if layer.capturesCanvas {
-            let width = max(Int((targetSize.x * effectResolutionScale).rounded()), 16)
-            let height = max(Int((targetSize.y * effectResolutionScale).rounded()), 16)
+            let width = captureRegion?.width ?? max(Int((targetSize.x * effectResolutionScale).rounded()), 16)
+            let height = captureRegion?.height ?? max(Int((targetSize.y * effectResolutionScale).rounded()), 16)
             let capture = try captureTexture(for: layer.id, width: width, height: height)
             try capturePass(
                 commandBuffer: commandBuffer, destination: capture, base: canvasSource ?? blackTexture,
-                uniforms: compositeUniforms ?? Self.passThroughUniforms
+                uniforms: captureRegion?.uniforms ?? compositeUniforms ?? Self.passThroughUniforms
             )
             source = capture
         } else if layer.kind == .particles, layer.particleSystem != nil {
@@ -1678,6 +1846,7 @@ final class SceneRenderer {
             if let requested = evaluated.particleControls[layer.id] { control.append(requested) }
             let toCanvas = particleLocalToCanvas(evaluated.layers[layer.id]?.transform ?? layer.transform)
             var surroundings = SceneParticleSimulator.Surroundings()
+            surroundings.audio = input.audio
             let determinant = simd_determinant(toCanvas)
             if abs(determinant) > 1e-12 {
                 let toLayer = simd_inverse(toCanvas)

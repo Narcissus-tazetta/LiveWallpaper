@@ -162,13 +162,15 @@ final class SceneScriptRuntime {
             var camera: SceneCameraState?
             var instances: [SceneScriptInstance] = []
             var sounds: [UUID: SceneScriptedSound] = [:]
+            var lights: [SceneLightState] = []
             // A module bundle runs several independent scripts; one that failed is
             // reported here while the rest keep running.
             if script.modules != nil, let wrapped = output as? [String: Any] {
-                try Self.keys(wrapped, allowed: ["adjustments", "warnings", "camera", "instances", "sounds"], path: "output")
+                try Self.keys(wrapped, allowed: ["adjustments", "warnings", "camera", "instances", "sounds", "lights"], path: "output")
                 sounds = try wrapped["sounds"].map(Self.readSounds) ?? [:]
                 instances = try wrapped["instances"].map { try Self.readInstances($0, script: script, layers: layers, rigs: rigs) } ?? []
                 camera = try wrapped["camera"].map(Self.readCamera)
+                lights = try wrapped["lights"].map(Self.readLights) ?? []
                 guard let list = wrapped["warnings"] as? [String], list.count <= 16,
                       list.allSatisfy({ $0.utf8.count <= 1024 }) else {
                     throw failure("output.warnings: expected at most 16 messages of at most 1 KiB")
@@ -183,7 +185,7 @@ final class SceneScriptRuntime {
             }
             return SceneScriptOutput(adjustments: try Self.readOutput(output, script: script, layers: layers, rigs: rigs),
                                      warnings: warnings, meshes: meshes, models: models, camera: camera,
-                                     instances: instances, sounds: sounds)
+                                     instances: instances, sounds: sounds, lights: lights)
         } catch let failure as SceneScriptIssue {
             throw issue(failure.message, script: script)
         } catch {
@@ -322,7 +324,7 @@ final class SceneScriptRuntime {
 
     /// Built once: readOutput runs for every target of every frame.
     private enum OutputKeys {
-        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text", "world"]
+        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text", "world", "modelValues"]
         static let appearance: Set = ["isVisible", "tint", "blendMode", "parallaxDepth", "depthStrength", "depthFollowsCursor",
                                       "depthAutoMotion", "depthAutoCycles", "cursorMask", "clearCursorMask"]
         static let appearanceRanges: [String: ClosedRange<Double>] = [
@@ -438,6 +440,20 @@ final class SceneScriptRuntime {
                 throw failure("output.instances: empty")
             }
             return SceneScriptInstance(id: id, template: template, adjustment: adjustment)
+        }
+    }
+
+    private static func readLights(_ raw: Any) throws -> [SceneLightState] {
+        guard let list = raw as? [[String: Any]], list.count <= 256 else { throw failure("output.lights: expected at most 256 objects") }
+        return try list.map { object in
+            try keys(object, allowed: ["id", "origin", "axis", "color"], path: "output.lights")
+            func vector(_ key: String) throws -> SIMD3<Float> {
+                guard let numbers = object[key] as? [NSNumber], numbers.count == 3, numbers.allSatisfy({ $0.doubleValue.isFinite })
+                else { throw failure("output.lights.\(key): expected 3 finite numbers") }
+                return SIMD3(numbers.map(\.floatValue))
+            }
+            guard let id = (object["id"] as? NSNumber)?.intValue else { throw failure("output.lights.id: expected an integer") }
+            return SceneLightState(objectID: id, origin: try vector("origin"), axis: try vector("axis"), color: try vector("color"))
         }
     }
 
@@ -718,6 +734,13 @@ final class SceneScriptRuntime {
                     try numbers(color, ranges: ["red": 0 ... 1, "green": 0 ... 1, "blue": 0 ... 1, "alpha": 0 ... 1], path: "particles.color")
                 }
                 adjustment.particles = try decode(SceneScriptParticleValues.self, particles)
+            }
+            if let raw = item["modelValues"] {
+                guard layer.model != nil else { throw failure("modelValues: target is not a model layer") }
+                let values = try object(raw, path: "modelValues")
+                guard values.count <= 256 else { throw failure("modelValues: expected at most 256 entries") }
+                try numbers(values, ranges: Dictionary(uniqueKeysWithValues: values.keys.map { ($0, -1e9 ... 1e9) }), path: "modelValues")
+                adjustment.modelValues = try decode([String: Double].self, values)
             }
             if let raw = item["text"] { adjustment.text = try readText(raw, layer: layer) }
             var drawable = layer

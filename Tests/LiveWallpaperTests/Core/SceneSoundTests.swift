@@ -114,7 +114,7 @@ final class SceneSoundTests: XCTestCase {
         XCTAssertEqual(player.playingSoundIDs, [other.id], "A different scene replaces the sounds")
     }
 
-    func testRandomSoundWaitsItsPauseBeforeThePlayStarts() throws {
+    func testRandomSoundThatStartsSilentStaysQuietUntilAScriptPlaysIt() throws {
         try writeTone("tone.wav")
         var sound = SceneSound(name: "Ambient", files: ["tone.wav"])
         sound.mode = .random
@@ -125,9 +125,23 @@ final class SceneSoundTests: XCTestCase {
         player.randomPause = { $0.lowerBound }
         player.configure(key: "a", folder: folder, sounds: [sound])
         player.isActive = true
-        XCTAssertEqual(player.playingSoundIDs, [])
-        XCTAssertEqual(player.waitingSoundIDs, [sound.id])
         wait(0.5)
+        XCTAssertEqual(player.playingSoundIDs, [])
+        XCTAssertEqual(player.waitingSoundIDs, [])
+        player.setScriptedSounds([sound.id: SceneScriptedSound(volume: 1, playing: true, plays: 1, stops: 0)])
+        XCTAssertEqual(player.playingSoundIDs, [sound.id], "The first play comes without a random wait")
+    }
+
+    func testRandomSoundThatDoesNotStartSilentPlaysAtOnceAndThenWaitsItsPause() throws {
+        try writeTone("tone.wav")
+        var sound = SceneSound(name: "Ambient", files: ["tone.wav"])
+        sound.mode = .random
+        sound.minimumPause = 5
+        sound.maximumPause = 5
+        let player = player()
+        player.randomPause = { $0.lowerBound }
+        player.configure(key: "a", folder: folder, sounds: [sound])
+        player.isActive = true
         XCTAssertEqual(player.playingSoundIDs, [sound.id])
         player.isActive = false
         XCTAssertEqual(player.waitingSoundIDs, [])

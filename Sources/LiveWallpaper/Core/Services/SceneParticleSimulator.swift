@@ -34,6 +34,8 @@ final class SceneParticleSimulator {
     struct Surroundings {
         var pointer: SIMD3<Double>?
         var canvasCorner: SIMD3<Double> = .zero
+        /// The system audio; nil is silence.
+        var audio: SceneAudioSpectrum?
     }
 
     /// One sprite as the renderer draws it, in the layer's space.
@@ -93,7 +95,7 @@ final class SceneParticleSimulator {
             probability = child.probability
             simulator = SceneParticleSimulator(system: child.system.value, seed: seed, runsEmitters: child.trigger == .start,
                                                originOffset: child.trigger == .start ? origin : .zero,
-                                               scale: SceneParticleSimulator.vector(child.scale, fill: 1))
+                                               scale: SceneParticleSimulator.vector(child.scale, fill: 1), turn: child.angleZ)
         }
     }
 
@@ -112,6 +114,8 @@ final class SceneParticleSimulator {
     private let runsEmitters: Bool
     /// Moves the emitters of a child that runs on its own.
     private let originOffset: SIMD3<Double>
+    /// The child's angle about z, radians.
+    private let turn: Double
     /// A child's scale: on where its particles start (around the spawn point), their
     /// size and speed.
     private let scale: SIMD3<Double>
@@ -129,8 +133,9 @@ final class SceneParticleSimulator {
     }
 
     init(system: SceneParticleSystem, seed: UInt64, runsEmitters: Bool = true, originOffset: SIMD3<Double> = .zero,
-         scale: SIMD3<Double> = .one) {
+         scale: SIMD3<Double> = .one, turn: Double = 0) {
         self.system = system
+        self.turn = turn
         self.runsEmitters = runsEmitters
         self.originOffset = originOffset
         self.scale = scale
@@ -194,6 +199,7 @@ final class SceneParticleSimulator {
             kept += 1
         }
         particles.removeLast(particles.count - kept)
+        keepDistances(surroundings: surroundings)
         for child in children {
             child.simulator.advance(by: dt, surroundings: surroundings)
             if child.trigger == .follow { child.simulator.carry(moved) }
@@ -236,7 +242,8 @@ final class SceneParticleSimulator {
                 guard periods[index].on else { continue }
                 if let most = periodic.maxPerBurst { limit = max(most - periods[index].emitted, 0) }
             }
-            debts[index] += emitter.rate * rateScale * countScale * dt
+            let heard = emitter.audio?.response(surroundings.audio) ?? 1
+            debts[index] += emitter.rate * heard * rateScale * countScale * dt
             let owed = min(Int(debts[index]), limit)
             if owed > 0 {
                 debts[index] -= Double(owed)
@@ -531,6 +538,13 @@ final class SceneParticleSimulator {
             }
         }
         velocity *= scale
+        if turn != 0 {
+            func turned(_ vector: SIMD3<Double>) -> SIMD3<Double> {
+                SIMD3(vector.x * cos(turn) - vector.y * sin(turn), vector.x * sin(turn) + vector.y * cos(turn), vector.z)
+            }
+            position = originOffset + turned(position - originOffset)
+            velocity = turned(velocity)
+        }
         var color: SIMD3<Double>
         if !initial.colorChoices.isEmpty {
             color = Self.vector(initial.colorChoices[Int(random.unit() * Double(initial.colorChoices.count)) % initial.colorChoices.count])
@@ -746,6 +760,31 @@ final class SceneParticleSimulator {
         return low + (high - low) * SIMD3(shaped(0), shaped(17.3), shaped(41.9))
     }
 
+    /// The two control points of each maintain-distance behavior as of the last frame.
+    private var maintained: [Int: (SIMD3<Double>, SIMD3<Double>)] = [:]
+
+    /// Measured on a still particle while the points were moved: the particle keeps its
+    /// residual and its share u along the old line is recomputed from where it is now. A new
+    /// line of zero length leaves the particles where they were.
+    private func keepDistances(surroundings: Surroundings) {
+        for (index, behavior) in system.behaviors.enumerated() {
+            guard case let .maintainDistance(first, second) = behavior,
+                  let start = controlPoint(first, surroundings: surroundings),
+                  let end = controlPoint(second, surroundings: surroundings)
+            else { continue }
+            defer { maintained[index] = (start, end) }
+            guard let (oldStart, oldEnd) = maintained[index] else { continue }
+            let oldLine = oldEnd - oldStart
+            let newLine = end - start
+            let length = simd_length_squared(oldLine)
+            guard simd_length_squared(newLine) > 1e-12, length > 1e-12 else { continue }
+            for slot in particles.indices {
+                let u = simd_dot(particles[slot].position - oldStart, oldLine) / length
+                particles[slot].position += (start - oldStart) + u * (newLine - oldLine)
+            }
+        }
+    }
+
     private func controlPoint(_ index: Int, surroundings: Surroundings) -> SIMD3<Double>? {
         guard let point = system.controlPoints.first(where: { $0.index == index }) else {
             return .zero
@@ -793,6 +832,20 @@ final class SceneParticleSimulator {
         case .sphere:
             let inner = max(emitter.distanceMin.first ?? 0, 0)
             let outer = max(emitter.distanceMax.first ?? 0, inner)
+            if let cone = emitter.cone, cone != 0 {
+                // Measured (Windows, fixed radius): the cone bounds the direction before the
+                // directions are applied, and the result is renormalised, so cone 1 is a
+                // point on +X whatever the directions are. Radius is rmin + (rmax - rmin) * cbrt(u).
+                let lowX = -cos(Double.pi * min(max(cone, 0), 1))
+                let x = lowX + (1 - lowX) * random.unit()
+                let ring = (1 - x * x).squareRoot()
+                let angle = 2 * Double.pi * random.unit()
+                let stretched = SIMD3(x, ring * cos(angle), ring * sin(angle)) * directions
+                let length = simd_length(stretched)
+                var point = length > 1e-12 ? stretched / length * (inner + (outer - inner) * cbrt(random.unit())) : .zero
+                for axis in 0 ..< 3 where signs[axis] != 0 { point[axis] = signed(point[axis], axis) }
+                return point
+            }
             var direction: SIMD3<Double>
             repeat {
                 direction = SIMD3(random.unit() * 2 - 1, random.unit() * 2 - 1, random.unit() * 2 - 1)

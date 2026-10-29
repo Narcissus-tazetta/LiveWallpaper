@@ -100,6 +100,9 @@ final class SceneRenderGraphRenderer {
         var ambient: SIMD3<Float>
         var skylight: SIMD3<Float>
         var shadowMatrices: [simd_float4x4] = []
+        /// The scripted lights, by index.
+        var lights: [SceneModelRenderer.DynamicLight] = []
+        var screen = SIMD3<Float>(1, 1, 1)
     }
 
     /// `uv` (canvas UV → layer UV, origin top-left) as the same map between clip spaces
@@ -764,6 +767,17 @@ final class SceneRenderGraphRenderer {
                 var matrix = model.shadowMatrices[index]
                 withUnsafeBytes(of: &matrix) { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
                 continue
+            case .lightOrigin, .lightAxis, .lightColor:
+                guard let model, let index = update.key.flatMap(Int.init), model.lights.indices.contains(index) else { continue }
+                let light = model.lights[index]
+                let value: SIMD3<Float> = switch update.value {
+                case .lightOrigin: light.origin
+                case .lightAxis: light.axis
+                default: light.color
+                }
+                values = [value.x, value.y, value.z]
+            case .screen: values = model.map { [$0.screen.x, $0.screen.y, $0.screen.z] } ?? [1, 1, 1]
+            case .mipLevels: values = [Float(resources[update.texture!]!.mipmapLevelCount)]
             case .layerAlpha: values = [model?.alpha ?? 1]
             case .layerColor: values = model.map { [$0.color.x, $0.color.y, $0.color.z] } ?? [1, 1, 1]
             case .eyePosition, .ambientColor, .skylightColor:
@@ -966,7 +980,7 @@ final class SceneRenderGraphRenderer {
                 case .texelOffsets: bytes = 16
                 case .textureSize: bytes = 16
                 case .modelViewProjection, .model, .normalModel, .viewProjection, .layerAlpha, .layerColor, .eyePosition,
-                     .ambientColor, .skylightColor, .shadowMatrix:
+                     .ambientColor, .skylightColor, .shadowMatrix, .lightOrigin, .lightAxis, .lightColor, .mipLevels, .screen:
                     throw GraphError(detail: "model layer values outside a model layer")
                 case .boneMatrices, .boneOpacity:
                     let count = (draw.skeleton ?? draw.skeletonID.flatMap { rigs.skeletons[$0] })?

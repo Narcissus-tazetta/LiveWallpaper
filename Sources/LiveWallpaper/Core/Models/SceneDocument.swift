@@ -827,6 +827,9 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var usesMediaArtwork = false
     /// Reads the canvas below as its input instead of an image file.
     var capturesCanvas = false
+    /// The id of the imported scene's object, which a model material names (`layer:<id>`) to
+    /// sample this layer's picture with its effects applied.
+    var objectID: Int?
     var isVisible = true
     /// Editor only: keeps the layer from being picked, moved or changed.
     var isLocked = false
@@ -850,6 +853,8 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var space: SceneSpace?
     /// What a layer of kind `model` draws.
     var model: SceneStaticModel?
+    var castsShadow: Bool?
+    var modelValues: [String: Double]?
     var text: SceneText?
     /// Grayscale depth map (white = near) in the scene folder; shifts each pixel by
     /// its depth for a 3D look.
@@ -904,6 +909,7 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         videoFile = try container.decodeIfPresent(String.self, forKey: .videoFile)
         usesMediaArtwork = try container.decodeIfPresent(Bool.self, forKey: .usesMediaArtwork) ?? false
         capturesCanvas = (try? container.decode(Bool.self, forKey: .capturesCanvas)) ?? false
+        objectID = try container.decodeIfPresent(Int.self, forKey: .objectID)
         particles = try? container.decodeIfPresent(SceneParticles.self, forKey: .particles)
         particleSystem = try container.decodeIfPresent(SceneParticleSystem.self, forKey: .particleSystem)
         space = try container.decodeIfPresent(SceneSpace.self, forKey: .space)
@@ -911,6 +917,8 @@ struct SceneLayer: Codable, Equatable, Identifiable {
             throw DecodingError.dataCorruptedError(forKey: .space, in: container, debugDescription: "Invalid placement in space")
         }
         model = try container.decodeIfPresent(SceneStaticModel.self, forKey: .model)
+        castsShadow = try container.decodeIfPresent(Bool.self, forKey: .castsShadow)
+        modelValues = try container.decodeIfPresent([String: Double].self, forKey: .modelValues)
         guard model.map({ $0.isValid }) ?? true else {
             throw DecodingError.dataCorruptedError(forKey: .model, in: container, debugDescription: "Invalid model")
         }
@@ -1082,6 +1090,8 @@ struct SceneCamera: Codable, Equatable {
     var skylightColor: [Double]
     /// The lights that cast a shadow, in the order of the shadow maps materials read.
     var shadowLights: [SceneShadowLight]?
+    /// The lights a script moves, in the order of the uniforms materials read them through.
+    var dynamicLights: [SceneDynamicLight]?
     /// Moves the camera on its own from the moment the scene is shown.
     var path: SceneCameraPath?
     /// Draws the scene's layers far to near, by their distance from the eye, instead of in
@@ -1094,7 +1104,7 @@ struct SceneCamera: Codable, Equatable {
     var isValid: Bool {
         [eye, center, up, ambientColor, skylightColor].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
             && [fov, nearZ, farZ].allSatisfy(\.isFinite)
-            && (shadowLights ?? []).allSatisfy(\.isValid)
+            && (shadowLights ?? []).allSatisfy(\.isValid) && (dynamicLights ?? []).allSatisfy(\.isValid)
             && (fog?.isValid ?? true)
             && (path?.isValid ?? true)
     }
@@ -1178,6 +1188,20 @@ struct SceneCameraPath: Codable, Equatable {
         return (point(\.eye), point(\.center), point(\.up), point(\.zoomAxis).x)
     }}
 
+/// A light a script moves, as the scene file gives it.
+struct SceneDynamicLight: Codable, Equatable {
+    /// The scene object the scripts address it by.
+    var objectID: Int
+    var origin: [Double]
+    var axis: [Double]
+    /// The light's colour times its intensity.
+    var color: [Double]
+
+    var isValid: Bool {
+        [origin, axis, color].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
+    }
+}
+
 /// A light whose shadow the scene draws.
 struct SceneShadowLight: Codable, Equatable {
     enum Kind: String, Codable { case point, spot, directional }
@@ -1189,6 +1213,8 @@ struct SceneShadowLight: Codable, Equatable {
     var outerCone: Double
     /// How far from the camera a directional light's shadow reaches.
     var cascadeDistance: Double
+    /// The index in `SceneCamera.dynamicLights` of the light that moves this one; nil when it stays.
+    var dynamicLight: Int?
 
     var isValid: Bool {
         origin.count == 3 && axis.count == 3 && (origin + axis + [outerCone, cascadeDistance]).allSatisfy(\.isFinite)
@@ -1237,6 +1263,8 @@ struct SceneDocument: Codable, Equatable {
     var camera: SceneCamera?
     var properties: [LocalWebProperty]?
     var authorSourceDirectory: String?
+    /// Hash of the author's scene file and script modules this scene was converted from.
+    var scriptOrigin: String?
     var sounds: [SceneSound] = []
 
     init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer], properties: [LocalWebProperty]? = nil) {
@@ -1245,8 +1273,6 @@ struct SceneDocument: Codable, Equatable {
         self.layers = layers
         self.properties = properties
     }
-    /// Hash of the author's scene file and script modules this scene was converted from.
-    var scriptOrigin: String?
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1289,6 +1315,7 @@ struct SceneDocument: Codable, Equatable {
         }
         properties = try container.decodeIfPresent([LocalWebProperty].self, forKey: .properties)
         authorSourceDirectory = try container.decodeIfPresent(String.self, forKey: .authorSourceDirectory)
+        scriptOrigin = try container.decodeIfPresent(String.self, forKey: .scriptOrigin)
         sounds = try container.decodeIfPresent([SceneSound].self, forKey: .sounds) ?? []
         guard sounds.count <= SceneSound.maximumCount, Set(sounds.map(\.id)).count == sounds.count else {
             throw DecodingError.dataCorruptedError(forKey: .sounds, in: container, debugDescription: "Too many sounds or duplicate sound IDs")

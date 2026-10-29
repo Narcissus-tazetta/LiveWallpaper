@@ -44,13 +44,19 @@ struct SceneRenderGraph: Codable, Equatable {
         /// clip space, `model` to scene pixels and `viewProjection` scene pixels to clip
         /// space; `layerAlpha` and `layerColor` are the layer's own; `eyePosition` is the
         /// camera's and `ambientColor` and `skylightColor` the scene's light all round;
-        /// `shadowMatrix` takes scene pixels to the clip space of the shadow map `key`.
+        /// `shadowMatrix` takes scene pixels to the clip space of the shadow map `key`;
+        /// `lightOrigin`, `lightAxis` and `lightColor` are those of the scripted light `key`.
         enum Value: String, Codable {
             case time, cursor, textureSize, boneMatrices, boneOpacity, effectValue, audioSpectrum
             case pointer, previousPointer, layerFromCanvas, canvasFromLayer, screenFromLayer, frameTime, pointerState
             case parallaxPosition, texelSize, texelOffsets
             case modelViewProjection, model, normalModel, viewProjection, layerAlpha, layerColor
             case eyePosition, ambientColor, skylightColor, shadowMatrix
+            case lightOrigin, lightAxis, lightColor
+            /// The number of mip levels of the texture named by `texture`.
+            case mipLevels
+            /// The size of what is drawn and its aspect ratio (width over height). Inferred, not measured.
+            case screen
         }
         var offset: Int
         var value: Value
@@ -205,6 +211,7 @@ struct SceneMeshMaterial: Codable, Equatable {
     var draw: SceneRenderGraph.Draw
     /// Resource name to a plain file name in the scene folder.
     var images: [String: String]
+    var values: [String: Double]? = nil
 }
 
 /// A layer a script made from its own geometry, as it should look this frame.
@@ -258,6 +265,8 @@ struct SceneModelLayerFrame: Equatable {
     var world: simd_float4x4
     var perspective: Bool
     var shapes: [Shape]
+    var materialValues: [String: Double] = [:]
+    var castsShadow = true
 }
 
 /// One mesh a script made, as it should look this frame.

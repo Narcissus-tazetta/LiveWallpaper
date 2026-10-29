@@ -10,8 +10,11 @@ extension SettingsView {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button(model.localizedString("壁紙をすべて再変換")) {
-                    reconversionController.start(itemIDs: model.importedExternalWallpaperPaths.keys.compactMap {
-                        $0.hasPrefix("we-import.json/") ? String($0.dropFirst("we-import.json/".count)) : nil
+                    // Deleting a wallpaper removes its file but leaves the import record behind, so the
+                    // record alone does not mean there is a file to replace.
+                    reconversionController.start(itemIDs: model.importedExternalWallpaperPaths.compactMap { id, path in
+                        id.hasPrefix("we-import.json/") && FileManager.default.fileExists(atPath: path)
+                            ? String(id.dropFirst("we-import.json/".count)) : nil
                     }) { status in
                         await model.refreshReconvertedWallpapers(itemIDs: status.updatedIDs, backupPath: status.backupPath)
                     }

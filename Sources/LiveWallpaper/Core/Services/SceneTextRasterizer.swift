@@ -67,22 +67,11 @@ enum SceneTextRasterizer {
         let fit = min(1, Double(maxTextureEdge) / max(size.x, size.y, 1))
         let width = max(Int((size.x * fit).rounded(.up)), 1)
         let height = max(Int((size.y * fit).rounded(.up)), 1)
-        var bytes = [UInt8](repeating: 0, count: width * height * 4)
-        let drew: Bool = bytes.withUnsafeMutableBytes { buffer in
-            guard let context = CGContext(
-                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            ) else { return false }
+        func drawGlyphs(into context: CGContext) {
             context.setShouldAntialias(true)
             context.setShouldSmoothFonts(false)
             context.setAllowsFontSubpixelPositioning(true)
             context.setShouldSubpixelPositionFonts(true)
-            if let bg = text.backgroundColor, bg.alpha > 0 {
-                context.setFillColor(bg.nsColor.cgColor)
-                context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-            }
-            context.setFillColor(text.color.nsColor.withAlphaComponent(1).cgColor)
             context.translateBy(x: Double(width) / 2, y: Double(height) / 2)
             context.scaleBy(x: text.scaleX * fit, y: text.scaleY * fit)
             context.translateBy(x: -layout.center.x, y: -layout.center.y)
@@ -91,7 +80,42 @@ enum SceneTextRasterizer {
                 guard !glyphs.isEmpty else { continue }
                 CTFontDrawGlyphs(font, glyphs.map(\.glyph), glyphs.map { CGPoint(x: $0.x, y: $0.y) }, glyphs.count, context)
             }
-            return true
+        }
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        let drew: Bool
+        if let style = text.style, !style.isEmpty {
+            // Outline, blur and shadow are read off a distance field of the glyphs, as the shader does.
+            var coverage = [UInt8](repeating: 0, count: width * height)
+            drew = coverage.withUnsafeMutableBytes { buffer in
+                guard let context = CGContext(
+                    data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                    bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue
+                ) else { return false }
+                context.setFillColor(gray: 1, alpha: 1)
+                drawGlyphs(into: context)
+                return true
+            }
+            guard drew else { throw Failure.drawingFailed }
+            bytes = SceneTextEffects.render(
+                coverage: coverage, width: width, height: height, style: style, fill: text.color,
+                background: text.backgroundColor, pointSize: min(max(text.pointSize, 1), 256),
+                pixelsPerTextPixel: (scale.x * scale.y).squareRoot() * fit
+            )
+        } else {
+            drew = bytes.withUnsafeMutableBytes { buffer in
+                guard let context = CGContext(
+                    data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                    bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                ) else { return false }
+                if let bg = text.backgroundColor, bg.alpha > 0 {
+                    context.setFillColor(bg.nsColor.cgColor)
+                    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+                }
+                context.setFillColor(text.color.nsColor.withAlphaComponent(1).cgColor)
+                drawGlyphs(into: context)
+                return true
+            }
         }
         guard drew else { throw Failure.drawingFailed }
         return Raster(

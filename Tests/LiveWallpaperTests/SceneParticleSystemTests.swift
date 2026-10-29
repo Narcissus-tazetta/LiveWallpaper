@@ -1,4 +1,5 @@
 @testable import LiveWallpaper
+import simd
 import XCTest
 
 /// The behaviours measured in the scenes this follows, at their 30 updates a second.
@@ -19,6 +20,108 @@ final class SceneParticleSystemTests: XCTestCase {
         for _ in 0 ..< Int((seconds / step).rounded()) {
             simulator.advance(by: step, surroundings: .init())
         }
+    }
+
+    func testSphereConeBoundsTheDirectionAroundPlusXBeforeTheDirectionsApply() {
+        func born(cone: Double, directions: [Double]) -> [SIMD2<Double>] {
+            let simulator = SceneParticleSimulator(system: system {
+                $0.emitters = [.init(shape: .sphere)]
+                $0.emitters[0].distanceMin = [70, 70, 70]
+                $0.emitters[0].distanceMax = [70, 70, 70]
+                $0.emitters[0].directions = directions
+                $0.emitters[0].cone = cone
+                $0.maxCount = 400
+            }, seed: 3)
+            simulator.apply(.init(events: [.emit(400)]))
+            return simulator.instances(aspect: 1).map { SIMD2(Double($0.center.x), Double($0.center.y)) }
+        }
+        for point in born(cone: 1, directions: [0.1, 0.1, 1]) {
+            XCTAssertEqual(point.x, 70, accuracy: 1e-3)
+            XCTAssertEqual(point.y, 0, accuracy: 1e-3)
+        }
+        let half = born(cone: 0.5, directions: [1, 1, 1])
+        XCTAssertTrue(half.allSatisfy { $0.x >= -1e-3 })
+        XCTAssertTrue(half.contains { $0.x < 5 })
+        let quarter = born(cone: 0.25, directions: [1, 1, 0])
+        XCTAssertTrue(quarter.allSatisfy { abs(simd_length($0) - 70) < 1e-3 })
+        XCTAssertEqual(quarter.map(\.x).min() ?? 0, -70, accuracy: 1)
+    }
+
+    func testAnEmittersAudioResponseScalesItsRateByTheLoudestBandInRange() {
+        func born(channel: SceneParticleSystem.AudioResponse.Channel, exponent: Double = 1, left: Float, right: Float) -> Int {
+            let simulator = SceneParticleSimulator(system: system {
+                $0.maxCount = 10000
+                $0.emitters[0].rate = 20
+                $0.emitters[0].audio = .init(channel: channel, firstBand: 0, lastBand: 15, low: 0, high: 1, exponent: exponent)
+            }, seed: 1)
+            var bands = Array(repeating: Float(0), count: SceneAudioSpectrum.bandCount)
+            bands[0] = left
+            var other = Array(repeating: Float(0), count: SceneAudioSpectrum.bandCount)
+            other[0] = right
+            var surroundings = SceneParticleSimulator.Surroundings()
+            surroundings.audio = SceneAudioSpectrum(left: bands, right: other)
+            for _ in 0 ..< 300 { simulator.advance(by: step, surroundings: surroundings) }
+            return simulator.instances(aspect: 1).count
+        }
+        XCTAssertEqual(born(channel: .left, left: 1, right: 0), 200, accuracy: 1)
+        XCTAssertEqual(born(channel: .right, left: 1, right: 0), 0)
+        XCTAssertEqual(born(channel: .both, left: 1, right: 0), 100, accuracy: 3)
+        // smoothstep(0.5) = 0.5, then the exponent.
+        XCTAssertEqual(born(channel: .left, exponent: 2, left: 0.5, right: 0), 50, accuracy: 2)
+    }
+
+    func testAChildsZAngleTurnsTheDirectionItsParticlesMove() {
+        func childPosition(angleZ: Double) -> SIMD2<Float> {
+            var child = system {
+                $0.initial.velocity = .init([10, 0, 0], [10, 0, 0])
+            }
+            child.emitters[0].burst = 1
+            let parent = system {
+                $0.emitters[0].burst = 1
+                $0.children = [.init(trigger: .birth, origin: [20, 0, 0], angleZ: angleZ, system: .init(child))]
+            }
+            let simulator = SceneParticleSimulator(system: parent, seed: 1)
+            run(simulator, seconds: 1)
+            var centers: [SIMD2<Float>] = []
+            simulator.forEach { centers += $0.instances(aspect: 1).map(\.center) }
+            return centers.max { $0.x + $0.y < $1.x + $1.y }!
+        }
+        let straight = childPosition(angleZ: 0)
+        let turned = childPosition(angleZ: .pi / 2)
+        XCTAssertEqual(straight.x, 30, accuracy: 1)
+        XCTAssertEqual(straight.y, 0, accuracy: 0.5)
+        XCTAssertEqual(turned.x, 20, accuracy: 1)
+        XCTAssertEqual(turned.y, 10, accuracy: 1)
+    }
+
+    func testMaintainDistanceKeepsTheResidualAndRecomputesTheShareOnTheNewLine() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.emitters = [.init(shape: .box)]
+            $0.controlPoints = [.init(index: 0, anchor: .layer, offset: [0, 0, 0]), .init(index: 1, anchor: .pointer, offset: [0, 0, 0])]
+            $0.behaviors.append(.maintainDistance(first: 0, second: 1))
+        }, seed: 1)
+        // A particle at (50, 30) beside the line from (0,0) to (200,0).
+        var line = SceneParticleSimulator.Surroundings()
+        line.pointer = SIMD3(200, 0, 0)
+        simulator.advance(by: step, surroundings: line)
+        simulator.apply(.init(events: [.emit(1)]))
+        var moved = line
+        moved.pointer = SIMD3(0, 200, 0)
+        simulator.advance(by: step, surroundings: moved)
+        var sprites: [SceneParticleSimulator.Instance] = []
+        simulator.forEach { sprites += $0.instances(aspect: 1) }
+        // Born at the origin: u = 0, so a new line of the same start leaves it in place.
+        XCTAssertEqual(sprites[0].center.x, 0, accuracy: 0.01)
+        XCTAssertEqual(sprites[0].center.y, 0, accuracy: 0.01)
+    }
+
+    func testAnAudioEmitterIsSilentWithoutAudio() {
+        let simulator = SceneParticleSimulator(system: system {
+            $0.emitters[0].rate = 20
+            $0.emitters[0].audio = .init(channel: .both, firstBand: 0, lastBand: 15, low: 0, high: 1, exponent: 1)
+        }, seed: 1)
+        run(simulator, seconds: 5)
+        XCTAssertEqual(simulator.instances(aspect: 1).count, 0)
     }
 
     func testEmitAddsClearRemovesAndTheLimitHolds() {

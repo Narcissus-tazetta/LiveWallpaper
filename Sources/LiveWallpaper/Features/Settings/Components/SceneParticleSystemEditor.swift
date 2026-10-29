@@ -601,6 +601,7 @@ private struct ParticleSystemForm: View {
         case .colorChange: t("色の変化")
         case .oscillatePosition: t("位置の揺れ")
         case .attract: t("制御点への引き寄せ")
+        case .maintainDistance: t("制御点間の距離を保つ")
         case .oscillateAlpha: t("不透明度の揺れ")
         case .oscillateSize: t("大きさの揺れ")
         case .turbulence: t("乱流")

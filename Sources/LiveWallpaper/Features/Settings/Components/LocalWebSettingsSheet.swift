@@ -168,26 +168,23 @@ struct LocalWebSettingsSheet: View {
                 let minimum = property.minimum ?? 0
                 let maximum = property.maximum ?? 100
                 if maximum > minimum {
-                    if let step = property.step, step > 0 {
-                        Slider(
-                            value: binding(
-                                property,
-                                read: { min(max($0.number, minimum), maximum) },
-                                write: WebPropertyValue.number
-                            ),
-                            in: minimum ... maximum,
-                            step: step
-                        )
-                    } else {
-                        Slider(
-                            value: binding(
-                                property,
-                                read: { min(max($0.number, minimum), maximum) },
-                                write: WebPropertyValue.number
-                            ),
-                            in: minimum ... maximum
-                        )
-                    }
+                    // Huge stepped ranges stall native slider layout, so snap values without native stops.
+                    Slider(
+                        value: binding(
+                            property,
+                            read: { min(max($0.number, minimum), maximum) },
+                            write: { value in
+                                let snapped: Double
+                                if let step = property.step, step > 0 {
+                                    snapped = minimum + ((value - minimum) / step).rounded() * step
+                                } else {
+                                    snapped = value
+                                }
+                                return .number(min(max(snapped, minimum), maximum))
+                            }
+                        ),
+                        in: minimum ... maximum
+                    )
                 }
             }
         case "combo":

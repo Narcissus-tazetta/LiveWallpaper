@@ -1289,6 +1289,7 @@
 "制御点に沿って順に生まれる" = "Kontrol Noktaları Boyunca Sırayla Doğ";
 "制御点のまわり" = "Bir Kontrol Noktası Etrafında";
 "制御点の近くで減速" = "Kontrol Noktası Yakınında Yavaşla";
+"制御点間の距離を保つ" = "Kontrol Noktaları Arasındaki Mesafeyi Koru";
 "制御点への引き寄せ" = "Kontrol Noktasına Çek";
 "制御点までの距離" = "Kontrol Noktasına Uzaklık";
 "制御点を追加" = "Kontrol Noktası Ekle";

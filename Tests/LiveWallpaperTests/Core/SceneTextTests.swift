@@ -157,4 +157,33 @@ final class SceneTextTests: XCTestCase {
         XCTAssertGreaterThan(bounds.maxX, bounds.minX)
         XCTAssertGreaterThan(bounds.maxY, bounds.minY)
     }
+
+    func testOutlineAndShadowDrawBeyondTheGlyphs() throws {
+        var plain = text("H")
+        plain.pointSize = 32
+        plain.paddingX = 32
+        plain.paddingY = 32
+        func ink(_ text: SceneText) throws -> (Int, Int) {
+            let raster = try XCTUnwrap(SceneTextRasterizer.render(text, fontURL: nil))
+            let alphas = stride(from: 3, to: raster.bytes.count, by: 4).map { raster.bytes[$0] }
+            let columns = (0 ..< raster.width).filter { x in (0 ..< raster.height).contains { alphas[$0 * raster.width + x] > 0 } }
+            let rows = (0 ..< raster.height).filter { y in (0 ..< raster.width).contains { alphas[y * raster.width + $0] > 0 } }
+            return (columns.count, rows.count)
+        }
+        let base = try ink(plain)
+        var outlined = plain
+        outlined.style = SceneTextStyle(outline: .init(color: RGBAColor(red: 1, green: 0, blue: 0, alpha: 1), thickness: 4))
+        let outlinedInk = try ink(outlined)
+        // The outline grows the ink by its thickness on each side.
+        XCTAssertEqual(Double(outlinedInk.0 - base.0), 8, accuracy: 2)
+        XCTAssertEqual(Double(outlinedInk.1 - base.1), 8, accuracy: 2)
+        var shadowed = plain
+        shadowed.style = SceneTextStyle(shadow: .init(
+            color: RGBAColor(red: 0, green: 1, blue: 0, alpha: 1), size: 2, offsetX: 10, offsetY: 0, opacity: 1
+        ))
+        // The shadow lies to the right, so the ink gets wider by about the offset and no taller.
+        let shadowedInk = try ink(shadowed)
+        XCTAssertGreaterThan(shadowedInk.0 - base.0, 8)
+        XCTAssertLessThanOrEqual(shadowedInk.1 - base.1, 4)
+    }
 }

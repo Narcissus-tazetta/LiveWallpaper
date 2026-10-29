@@ -107,6 +107,17 @@ struct SceneScriptOutput {
     var camera: SceneCameraState?
     var instances: [SceneScriptInstance] = []
     var sounds: [UUID: SceneScriptedSound] = [:]
+    var lights: [SceneLightState] = []
+}
+
+/// A scripted light as the scripts left it this frame.
+struct SceneLightState: Equatable {
+    /// The scene object, as `SceneDynamicLight.objectID`.
+    var objectID: Int
+    var origin: SIMD3<Float>
+    var axis: SIMD3<Float>
+    /// The colour times the intensity; black while the light is hidden.
+    var color: SIMD3<Float>
 }
 
 /// A layer a script made from one of the scene's: drawn like `template`, adjusted on
@@ -142,6 +153,7 @@ struct SceneScriptAdjustment {
     var text: SceneScriptTextValues?
     /// In a scene seen through its camera: the layer's placement now (column-major).
     var world: simd_float4x4?
+    var modelValues: [String: Double]?
 }
 
 struct SceneScriptEffectValues: Decodable {
