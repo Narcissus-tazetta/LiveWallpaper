@@ -964,6 +964,8 @@ final class SceneRenderer {
             case let .plane(picture, drawn, space):
                 let tint = drawn.layer.tint
                 let opacity = Float(min(max(drawn.layer.opacity * tint.alpha * drawn.opacity, 0), 1))
+                // A fully transparent plane still writes depth, which would cut a hole in whatever is drawn after it.
+                guard opacity > 0 else { break }
                 let local = simd_float4x4(columns: (
                     SIMD4(Float(space.width), 0, 0, 0), SIMD4(0, Float(space.height), 0, 0), SIMD4(0, 0, 1, 0),
                     SIMD4(Float(space.offsetX), Float(space.offsetY), 0, 1)
