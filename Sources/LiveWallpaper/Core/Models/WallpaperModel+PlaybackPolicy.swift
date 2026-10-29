@@ -27,7 +27,8 @@ extension WallpaperModel {
         entryCount: Int,
         pinCurrentVideo: Bool,
         playlistPlaybackEnabled: Bool,
-        videoLoopEnabled: Bool
+        videoLoopEnabled: Bool,
+        currentRunsInRealTime: Bool = false
     ) -> PlaybackEndBehavior {
         if entryCount <= 1 {
             return .loopCurrent
@@ -38,7 +39,9 @@ extension WallpaperModel {
         if playlistPlaybackEnabled {
             return .advancePlaylist
         }
-        if videoLoopEnabled {
+        // A real-time scene's clock follows the baked clip, so stopping at its
+        // end freezes the whole scene.
+        if videoLoopEnabled || currentRunsInRealTime {
             return .loopCurrent
         }
         return .playOnce
@@ -49,7 +52,8 @@ extension WallpaperModel {
             entryCount: registeredPlaybackEntries.count,
             pinCurrentVideo: pinCurrentVideo,
             playlistPlaybackEnabled: playlistPlaybackEnabled,
-            videoLoopEnabled: videoLoopEnabled
+            videoLoopEnabled: videoLoopEnabled,
+            currentRunsInRealTime: currentVideoPath.flatMap { sceneDocumentsByPath[$0]?.requiresRealTimePlayback } ?? false
         )
     }
 

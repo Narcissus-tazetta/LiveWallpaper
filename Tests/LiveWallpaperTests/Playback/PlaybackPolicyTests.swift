@@ -17,6 +17,32 @@ final class PlaybackPolicyTests: XCTestCase {
         )
     }
 
+    func testRealTimeSceneLoopsEvenWhenLoopIsOff() {
+        XCTAssertEqual(
+            WallpaperModel.playbackEndBehavior(
+                entryCount: 5,
+                pinCurrentVideo: false,
+                playlistPlaybackEnabled: false,
+                videoLoopEnabled: false,
+                currentRunsInRealTime: true
+            ),
+            Behavior.loopCurrent
+        )
+    }
+
+    func testRealTimeSceneStillAdvancesPlaylist() {
+        XCTAssertEqual(
+            WallpaperModel.playbackEndBehavior(
+                entryCount: 5,
+                pinCurrentVideo: false,
+                playlistPlaybackEnabled: true,
+                videoLoopEnabled: false,
+                currentRunsInRealTime: true
+            ),
+            Behavior.advancePlaylist
+        )
+    }
+
     func testPinnedVideoLoopsRegardlessOfOtherSettings() {
         XCTAssertEqual(
             WallpaperModel.playbackEndBehavior(
