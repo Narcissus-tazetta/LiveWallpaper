@@ -1293,11 +1293,11 @@ struct SceneDocument: Codable, Equatable {
         guard sounds.count <= SceneSound.maximumCount, Set(sounds.map(\.id)).count == sounds.count else {
             throw DecodingError.dataCorruptedError(forKey: .sounds, in: container, debugDescription: "Too many sounds or duplicate sound IDs")
         }
+        scriptOrigin = try container.decodeIfPresent(String.self, forKey: .scriptOrigin)
     }
 
     var isAnimated: Bool {
         layers.contains(where: \.isAnimated) || scripts.contains { $0.canRun && $0.usesTime } || cameraShake != nil
-        scriptOrigin = try container.decodeIfPresent(String.self, forKey: .scriptOrigin)
     }
 
     var aspectRatio: Double {
