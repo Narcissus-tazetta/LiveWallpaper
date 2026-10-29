@@ -33,7 +33,9 @@ final class SceneSoundPlayer {
             self.owner = owner
         }
 
-        var volume: Float {
+        // Voice is a nested class, so it does not inherit the player's main-actor isolation; reading
+        // the owner's masterVolume needs it spelled out or newer compilers reject the access.
+        @MainActor var volume: Float {
             Float(min(max(script?.volume ?? sound.volume, 0), 1)) * owner.masterVolume
         }
 
