@@ -84,12 +84,12 @@ final class VideoThumbnailSidecarTests: XCTestCase {
         XCTAssertLessThan(color.redComponent, 0.3)
     }
 
-    func testSaveNormalizedPreviewAnimatedGIFChoosesCenterFrame() throws {
+    func testSaveNormalizedPreviewAnimatedGIFChoosesBrightestFrame() throws {
         let sourceURL = tempDirectory.appendingPathComponent("animated.gif")
         let destinationURL = tempDirectory.appendingPathComponent("animated.preview.jpg")
 
-        // 3 frames: 0: Black (simulating fade-in), 1: Red (middle representative), 2: White
-        guard let gifData = createMultiFrameGIF(colors: [.black, .red, .white], size: CGSize(width: 200, height: 200)) else {
+        // 3 frames: 0: Black (fade-in), 1: Red (the only visible frame), 2: Black (fade-out)
+        guard let gifData = createMultiFrameGIF(colors: [.black, .red, .black], size: CGSize(width: 200, height: 200)) else {
             XCTFail("Failed to build multi-frame test GIF")
             return
         }
@@ -103,9 +103,9 @@ final class VideoThumbnailSidecarTests: XCTestCase {
             return
         }
 
-        // Center frame should be Red, confirming frame 0 (black fade-in) was skipped
+        // Red is the brightest frame, confirming both black fades were skipped
         let color = pixelColor(of: outputImage)
-        XCTAssertGreaterThan(color.redComponent, 0.7, "Expected center frame to be red, but got: \(color)")
+        XCTAssertGreaterThan(color.redComponent, 0.7, "Expected the brightest frame to be red, but got: \(color)")
         XCTAssertLessThan(color.greenComponent, 0.3)
         XCTAssertLessThan(color.blueComponent, 0.3)
     }

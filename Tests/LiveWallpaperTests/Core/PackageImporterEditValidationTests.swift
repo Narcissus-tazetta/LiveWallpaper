@@ -165,6 +165,8 @@ final class PackageImporterEditValidationTests: XCTestCase {
             XCTFail("symlinked package video must be rejected")
         } catch PackageImporter.ImportError.unsafeFileReference {
             // expected
+        } catch PackageImporter.ImportError.extractionFailed {
+            // Newer macOS unzip refuses a symlink that leaves the extraction root before our own check runs.
         }
     }
 
