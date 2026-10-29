@@ -9,7 +9,7 @@ extension WallpaperModel {
         let root = support.appendingPathComponent("we-import/Wallpapers")
         let backupRoot = URL(fileURLWithPath: backupPath).appendingPathComponent("Library", isDirectory: true)
         for id in itemIDs {
-            guard let path = importedExternalWallpaperPaths["we-import.json/\(id)"] else { continue }
+            guard let path = importedExternalWallpaperPaths["we-import.json/\(id)"], fm.fileExists(atPath: path) else { continue }
             let source = root.appendingPathComponent("we-\(id)")
             do {
                 struct Metadata: Decodable { let isScene: Bool?; let isWeb: Bool? }
