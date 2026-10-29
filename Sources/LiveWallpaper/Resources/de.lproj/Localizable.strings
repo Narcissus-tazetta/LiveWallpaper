@@ -1289,6 +1289,7 @@
 "制御点に沿って順に生まれる" = "Nacheinander entlang von Kontrollpunkten entstehen";
 "制御点のまわり" = "Um einen Kontrollpunkt";
 "制御点の近くで減速" = "Nahe einem Kontrollpunkt verlangsamen";
+"制御点間の距離を保つ" = "Abstand zwischen Kontrollpunkten halten";
 "制御点への引き寄せ" = "Zu einem Kontrollpunkt ziehen";
 "制御点までの距離" = "Abstand zum Kontrollpunkt";
 "制御点を追加" = "Kontrollpunkt hinzufügen";

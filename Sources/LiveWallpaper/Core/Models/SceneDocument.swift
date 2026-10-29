@@ -1090,6 +1090,8 @@ struct SceneCamera: Codable, Equatable {
     var skylightColor: [Double]
     /// The lights that cast a shadow, in the order of the shadow maps materials read.
     var shadowLights: [SceneShadowLight]?
+    /// The lights a script moves, in the order of the uniforms materials read them through.
+    var dynamicLights: [SceneDynamicLight]?
     /// Moves the camera on its own from the moment the scene is shown.
     var path: SceneCameraPath?
     /// Draws the scene's layers far to near, by their distance from the eye, instead of in
@@ -1102,7 +1104,7 @@ struct SceneCamera: Codable, Equatable {
     var isValid: Bool {
         [eye, center, up, ambientColor, skylightColor].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
             && [fov, nearZ, farZ].allSatisfy(\.isFinite)
-            && (shadowLights ?? []).allSatisfy(\.isValid)
+            && (shadowLights ?? []).allSatisfy(\.isValid) && (dynamicLights ?? []).allSatisfy(\.isValid)
             && (fog?.isValid ?? true)
             && (path?.isValid ?? true)
     }
@@ -1186,6 +1188,20 @@ struct SceneCameraPath: Codable, Equatable {
         return (point(\.eye), point(\.center), point(\.up), point(\.zoomAxis).x)
     }}
 
+/// A light a script moves, as the scene file gives it.
+struct SceneDynamicLight: Codable, Equatable {
+    /// The scene object the scripts address it by.
+    var objectID: Int
+    var origin: [Double]
+    var axis: [Double]
+    /// The light's colour times its intensity.
+    var color: [Double]
+
+    var isValid: Bool {
+        [origin, axis, color].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
+    }
+}
+
 /// A light whose shadow the scene draws.
 struct SceneShadowLight: Codable, Equatable {
     enum Kind: String, Codable { case point, spot, directional }
@@ -1197,6 +1213,8 @@ struct SceneShadowLight: Codable, Equatable {
     var outerCone: Double
     /// How far from the camera a directional light's shadow reaches.
     var cascadeDistance: Double
+    /// The index in `SceneCamera.dynamicLights` of the light that moves this one; nil when it stays.
+    var dynamicLight: Int?
 
     var isValid: Bool {
         origin.count == 3 && axis.count == 3 && (origin + axis + [outerCone, cascadeDistance]).allSatisfy(\.isFinite)

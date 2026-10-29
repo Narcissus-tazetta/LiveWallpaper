@@ -44,13 +44,19 @@ struct SceneRenderGraph: Codable, Equatable {
         /// clip space, `model` to scene pixels and `viewProjection` scene pixels to clip
         /// space; `layerAlpha` and `layerColor` are the layer's own; `eyePosition` is the
         /// camera's and `ambientColor` and `skylightColor` the scene's light all round;
-        /// `shadowMatrix` takes scene pixels to the clip space of the shadow map `key`.
+        /// `shadowMatrix` takes scene pixels to the clip space of the shadow map `key`;
+        /// `lightOrigin`, `lightAxis` and `lightColor` are those of the scripted light `key`.
         enum Value: String, Codable {
             case time, cursor, textureSize, boneMatrices, boneOpacity, effectValue, audioSpectrum
             case pointer, previousPointer, layerFromCanvas, canvasFromLayer, screenFromLayer, frameTime, pointerState
             case parallaxPosition, texelSize, texelOffsets
             case modelViewProjection, model, normalModel, viewProjection, layerAlpha, layerColor
             case eyePosition, ambientColor, skylightColor, shadowMatrix
+            case lightOrigin, lightAxis, lightColor
+            /// The number of mip levels of the texture named by `texture`.
+            case mipLevels
+            /// The size of what is drawn and its aspect ratio (width over height). Inferred, not measured.
+            case screen
         }
         var offset: Int
         var value: Value

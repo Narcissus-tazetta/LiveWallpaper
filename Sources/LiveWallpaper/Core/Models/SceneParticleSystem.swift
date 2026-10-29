@@ -94,6 +94,47 @@ struct SceneParticleSystem: Codable, Equatable {
         var duration: Double?
         /// Emits in bursts of random length separated by random pauses.
         var periodic: Periodic?
+        /// Scales the continuous rate by the system audio; nil ignores it.
+        var audio: AudioResponse?
+    }
+
+    /// Measured on an emitter's rate only; the same attributes on an initializer act differently.
+    struct AudioResponse: Codable, Equatable {
+        enum Channel: Int, Codable {
+            case left = 1, right, both
+        }
+
+        var channel: Channel
+        /// First and last of the 16 bands, both included.
+        var firstBand: Int
+        var lastBand: Int
+        var low: Double
+        var high: Double
+        var exponent: Double
+
+        /// The share of the rate that is emitted for this loudness.
+        func response(_ audio: SceneAudioSpectrum?) -> Double {
+            let first = max(0, min(firstBand, lastBand)), last = min(15, max(firstBand, lastBand))
+            var loudness = 0.0
+            if let audio, first <= last {
+                let left = audio.bands(16, right: false)
+                let right = audio.bands(16, right: true)
+                loudness = (first ... last).map { band -> Double in
+                    switch channel {
+                    case .left: Double(left[band])
+                    case .right: Double(right[band])
+                    case .both: Double(left[band] + right[band]) / 2
+                    }
+                }.max()!
+            }
+            return Self.shaped(loudness, low: low, high: high, exponent: exponent)
+        }
+
+        private static func shaped(_ loudness: Double, low: Double, high: Double, exponent: Double) -> Double {
+            // low == high is unmeasured; a step at the bound is the only reading that stays finite.
+            let t = high == low ? (loudness >= high ? 1 : 0) : min(max((loudness - low) / (high - low), 0), 1)
+            return pow(t * t * (3 - 2 * t), exponent)
+        }
     }
 
     struct Periodic: Codable, Equatable {
@@ -221,6 +262,10 @@ struct SceneParticleSystem: Codable, Equatable {
         /// Accelerates particles within `threshold` towards a control point, the
         /// harder the nearer (negative `scale` pushes away).
         case attract(controlPoint: Int, scale: Double, threshold: Double)
+        /// Keeps each particle's place relative to the line between two control points: when
+        /// the points move, a particle follows the first and its share along the line follows
+        /// the line's change. Only a static update was measured, not one with speed or turbulence.
+        case maintainDistance(first: Int, second: Int)
         /// Multiplies the alpha by a sine between the amplitude's min and max.
         case oscillateAlpha(Oscillation)
         /// Multiplies the size the same way.
@@ -362,6 +407,9 @@ struct SceneParticleSystem: Codable, Equatable {
         var scale: [Double] = [1, 1, 1]
         /// The chance that each trigger releases anything.
         var probability: Double = 1
+        /// Radians about z. Measured on a z turn only; the child's spawn offsets and velocities
+        /// turn, the forces on them do not.
+        var angleZ: Double = 0
         var system: Box
     }
 

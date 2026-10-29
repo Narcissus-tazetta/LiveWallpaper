@@ -1289,6 +1289,7 @@
 "制御点に沿って順に生まれる" = "Born in Turn Along Control Points";
 "制御点のまわり" = "Around a Control Point";
 "制御点の近くで減速" = "Slow Near a Control Point";
+"制御点間の距離を保つ" = "Keep Distance Between Control Points";
 "制御点への引き寄せ" = "Attract to a Control Point";
 "制御点までの距離" = "Distance to Control Point";
 "制御点を追加" = "Add Control Point";

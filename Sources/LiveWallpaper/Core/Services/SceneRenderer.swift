@@ -536,7 +536,8 @@ final class SceneRenderer {
             : Self.interleave(visibleLayers, placed: placed, models: evaluated.models, place: { id in
                 evaluated.order[id] ?? document.layers.firstIndex { $0.id == id } ?? 0
             })
-        let views = modelViews(camera: evaluated.camera, input: input, target: target)
+        let lights = currentLights(evaluated.lights)
+        let views = modelViews(camera: evaluated.camera, input: input, target: target, lights: lights)
         let layerPictures = try modelLayerPictures(evaluated: evaluated, commandBuffer: commandBuffer, input: input, targetSize: targetSize)
         // The frame's model layers share one depth buffer; the first pass clears it.
         var depthCleared = false
@@ -562,13 +563,15 @@ final class SceneRenderer {
                 try modelRenderer!.draw(
                     model, view: model.perspective ? views.perspective : views.flat, images: modelImages,
                     layerPictures: layerPictures, frame: .init(),
-                    time: input.time, cursor: input.cursor, audio: input.audio, format: texture.pixelFormat, encoder: encoder
+                    time: input.time, cursor: input.cursor, audio: input.audio, format: texture.pixelFormat, encoder: encoder,
+                    mipHistory: mipHistory
                 )
             }
         }
         if document.camera?.perspective == true {
             try compositeInSpace(visible, evaluated: evaluated, views: views, layerPictures: layerPictures, target: target,
                                  commandBuffer: commandBuffer, input: input, targetSize: targetSize)
+            try keepMipHistory(of: target, commandBuffer: commandBuffer)
             return
         }
         if allowsSinglePassComposite, let fetch = pipeline.compositeFetch(for: target.pixelFormat) {
@@ -873,7 +876,13 @@ final class SceneRenderer {
             prepared = keyed.map(\.item) + captures
         }
         var views = views
-        if let lights = document.camera?.shadowLights, !lights.isEmpty {
+        if var lights = document.camera?.shadowLights, !lights.isEmpty {
+            for index in lights.indices {
+                guard let moving = lights[index].dynamicLight, views.flat.lights.indices.contains(moving) else { continue }
+                let light = views.flat.lights[moving]
+                lights[index].origin = [Double(light.origin.x), Double(light.origin.y), Double(light.origin.z)]
+                lights[index].axis = [Double(light.axis.x), Double(light.axis.y), Double(light.axis.z)]
+            }
             let casters = prepared.compactMap { item -> SceneModelLayerFrame? in
                 if case let .model(model) = item { return model }
                 return nil
@@ -911,7 +920,8 @@ final class SceneRenderer {
                 try modelRenderer!.draw(
                     model, view: model.perspective ? views.perspective : views.flat, images: modelImages,
                     layerPictures: layerPictures, frame: .init(),
-                    time: input.time, cursor: input.cursor, audio: input.audio, format: target.pixelFormat, encoder: encoder!
+                    time: input.time, cursor: input.cursor, audio: input.audio, format: target.pixelFormat, encoder: encoder!,
+                    mipHistory: mipHistory
                 )
             case let .plane(picture, drawn, space):
                 let tint = drawn.layer.tint
@@ -1033,7 +1043,49 @@ final class SceneRenderer {
     /// How model layers are seen this frame: `flat` for those laid out on the canvas,
     /// `perspective` for those marked perspective. In a scene seen through its camera
     /// the unmarked ones go through the camera.
-    private func modelViews(camera: SceneCameraState?, input: SceneFrameInput, target: MTLTexture)
+    /// The previous frame's finished picture, which materials sample as `_rt_MipMappedFrameBuffer`.
+    /// Measured: it holds what lies before and behind the model, and the model itself comes back
+    /// into it; one frame of delay is the reading that fits, its length was not measured.
+    private var mipHistory: MTLTexture?
+
+    private lazy var readsMipHistory: Bool = (document.meshMaterials ?? []).contains {
+        $0?.draw.textures.contains { $0.source == SceneModelRenderer.mipHistorySource } ?? false
+    }
+
+    /// The number of levels measured for 1280x720, 1600x900 and 512x512 (7, 7, 6) and for 640x360
+    /// and 1024x256 (6, 5): halved until the short side is 16 or less, the base included.
+    static func mipLevelCount(width: Int, height: Int) -> Int {
+        max(1, Int(ceil(log2(Double(min(width, height)) / 16))) + 1)
+    }
+
+    private func keepMipHistory(of target: MTLTexture, commandBuffer: MTLCommandBuffer) throws {
+        guard readsMipHistory else { return }
+        if mipHistory?.width != target.width || mipHistory?.height != target.height || mipHistory?.pixelFormat != target.pixelFormat {
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: target.pixelFormat, width: target.width, height: target.height, mipmapped: false
+            )
+            descriptor.mipmapLevelCount = Self.mipLevelCount(width: target.width, height: target.height)
+            descriptor.usage = .shaderRead
+            descriptor.storageMode = .private
+            guard let texture = device.makeTexture(descriptor: descriptor) else { throw RendererError.textureAllocationFailed }
+            mipHistory = texture
+        }
+        guard let blit = commandBuffer.makeBlitCommandEncoder() else { throw RendererError.textureAllocationFailed }
+        blit.copy(from: target, to: mipHistory!)
+        blit.generateMipmaps(for: mipHistory!)
+        blit.endEncoding()
+    }
+
+    /// The scripted lights as scripts left them, the scene file's values where they left none.
+    private func currentLights(_ scripted: [Int: SceneLightState]) -> [SceneModelRenderer.DynamicLight] {
+        (document.camera?.dynamicLights ?? []).map { base in
+            if let state = scripted[base.objectID] { return .init(origin: state.origin, axis: state.axis, color: state.color) }
+            return .init(origin: SIMD3(base.origin.map(Float.init)), axis: SIMD3(base.axis.map(Float.init)),
+                         color: SIMD3(base.color.map(Float.init)))
+        }
+    }
+
+    private func modelViews(camera: SceneCameraState?, input: SceneFrameInput, target: MTLTexture, lights: [SceneModelRenderer.DynamicLight])
         -> (flat: SceneModelRenderer.View, perspective: SceneModelRenderer.View)
     {
         let scene = document.camera
@@ -1058,7 +1110,8 @@ final class SceneRenderer {
             viewProjection: SceneModelRenderer.canvasProjection(
                 width: Double(document.canvasWidth), height: Double(document.canvasHeight), viewport: input.viewport
             ),
-            eye: eye, ambient: ambient, skylight: skylight
+            eye: eye, ambient: ambient, skylight: skylight, lights: lights,
+            screen: SIMD3(Float(target.width), Float(target.height), Float(target.width) / Float(target.height))
         )
         guard let state, scene?.perspective == true else { return (canvas, canvas) }
         // A camera scene fills the target, whatever its shape.
@@ -1737,6 +1790,7 @@ final class SceneRenderer {
             if let requested = evaluated.particleControls[layer.id] { control.append(requested) }
             let toCanvas = particleLocalToCanvas(evaluated.layers[layer.id]?.transform ?? layer.transform)
             var surroundings = SceneParticleSimulator.Surroundings()
+            surroundings.audio = input.audio
             let determinant = simd_determinant(toCanvas)
             if abs(determinant) > 1e-12 {
                 let toLayer = simd_inverse(toCanvas)

@@ -1289,6 +1289,7 @@
 "制御点に沿って順に生まれる" = "Sinh lần lượt theo điểm điều khiển";
 "制御点のまわり" = "Quanh một điểm điều khiển";
 "制御点の近くで減速" = "Chậm lại gần điểm điều khiển";
+"制御点間の距離を保つ" = "Giữ khoảng cách giữa các điểm điều khiển";
 "制御点への引き寄せ" = "Hút về điểm điều khiển";
 "制御点までの距離" = "Khoảng cách đến điểm điều khiển";
 "制御点を追加" = "Thêm điểm điều khiển";

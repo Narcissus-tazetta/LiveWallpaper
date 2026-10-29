@@ -25,6 +25,8 @@ struct SceneEvaluatedFrame {
     var camera: SceneCameraState?
     /// What scripts asked of simulated particles this frame; carried out once, when drawn.
     var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
+    /// The lights scripts move, by scene object.
+    var lights: [Int: SceneLightState] = [:]
 }
 
 final class SceneFrameEvaluator {
@@ -156,6 +158,7 @@ final class SceneFrameEvaluator {
         var camera: SceneCameraState?
         var instances: [UUID: UUID] = [:]
         var particleControls: [UUID: SceneParticleSimulator.Control] = [:]
+        var lights: [Int: SceneLightState] = [:]
         // A converted bundle runs even with no layer of its own to drive: it may draw
         // what it makes.
         for script in document.scripts where script.canRun
@@ -328,6 +331,7 @@ final class SceneFrameEvaluator {
                 models += output.models
                 sounds.merge(output.sounds) { _, new in new }
                 camera = output.camera ?? camera
+                for light in output.lights { lights[light.objectID] = light }
                 for (id, adjustment) in output.adjustments {
                     if let position = adjustment.order { order[id] = position }
                     for (rigID, changes) in adjustment.rigPlayback {
@@ -358,7 +362,7 @@ final class SceneFrameEvaluator {
                 if failOnError { throw issue }
             }
         }
-        return SceneEvaluatedFrame(instances: instances, input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, sounds: sounds, camera: camera, particleControls: particleControls)
+        return SceneEvaluatedFrame(instances: instances, input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, sounds: sounds, camera: camera, particleControls: particleControls, lights: lights)
     }
 
     /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets
