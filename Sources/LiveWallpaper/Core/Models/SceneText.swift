@@ -12,6 +12,39 @@ enum SceneTextVerticalAlignment: String, Codable, CaseIterable {
     case bottom
 }
 
+/// The outline, blur and drop shadow of Wallpaper Engine's text shader. Sizes are in text pixels.
+struct SceneTextStyle: Codable, Equatable {
+    struct Outline: Codable, Equatable {
+        var color: RGBAColor
+        var thickness: Double
+    }
+
+    struct Shadow: Codable, Equatable {
+        var color: RGBAColor
+        var size: Double
+        /// Positive x is right, positive y is down.
+        var offsetX: Double
+        var offsetY: Double
+        var opacity: Double
+    }
+
+    var outline: Outline?
+    var blur: Double?
+    var shadow: Shadow?
+
+    var isEmpty: Bool { outline == nil && blur == nil && shadow == nil }
+
+    /// Packages come from anyone: out-of-range values fail the layer instead of reaching the drawing code.
+    func validate(in container: KeyedDecodingContainer<SceneText.CodingKeys>) throws {
+        var values = [blur ?? 0]
+        if let outline { values.append(outline.thickness) }
+        if let shadow { values += [shadow.size, shadow.offsetX, shadow.offsetY, shadow.opacity] }
+        guard values.allSatisfy({ $0.isFinite && (-1000 ... 1000).contains($0) }) else {
+            throw DecodingError.dataCorruptedError(forKey: .style, in: container, debugDescription: "Out of range")
+        }
+    }
+}
+
 /// A text layer's content and style. Sizes are in text pixels, which `scaleX` and
 /// `scaleY` turn into canvas pixels.
 struct SceneText: Codable, Equatable {
@@ -51,6 +84,7 @@ struct SceneText: Codable, Equatable {
     /// Canvas pixels per text pixel at rest; a negative value mirrors that axis.
     var scaleX: Double = 1
     var scaleY: Double = 1
+    var style: SceneTextStyle?
 
     init(string: String) {
         self.string = string
@@ -60,7 +94,7 @@ struct SceneText: Codable, Equatable {
         case string, fontFile, systemFont, pointSize, color, backgroundColor
         case horizontalAlignment, verticalAlignment, horizontalAnchor, verticalAnchor
         case letterSpacing, lineSpacing, paddingX, paddingY, maxWidth, maxRows, truncatesWithEllipsis
-        case justifies, scaleX, scaleY
+        case justifies, scaleX, scaleY, style
     }
 
     init(from decoder: Decoder) throws {
@@ -102,6 +136,8 @@ struct SceneText: Codable, Equatable {
         justifies = try container.decodeIfPresent(Bool.self, forKey: .justifies) ?? false
         scaleX = try finite(.scaleX, 1, in: -1000 ... 1000)
         scaleY = try finite(.scaleY, 1, in: -1000 ... 1000)
+        style = try container.decodeIfPresent(SceneTextStyle.self, forKey: .style)
+        try style?.validate(in: container)
         guard scaleX != 0, scaleY != 0 else {
             throw DecodingError.dataCorruptedError(forKey: .scaleX, in: container, debugDescription: "Zero scale")
         }

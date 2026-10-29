@@ -802,6 +802,43 @@ final class SceneRenderer {
         )
     }
 
+    /// A rectangle's part of the frame, as the picture the effects start from.
+    private struct CaptureRegion {
+        var uniforms: LayerUniforms
+        var width: Int
+        var height: Int
+    }
+
+    /// The target UV box a rectangle in the scene projects to. nil when a corner is behind the eye.
+    private func screenFootprint(
+        of space: SceneSpace, world: simd_float4x4, viewProjection: simd_float4x4
+    ) -> (origin: SIMD2<Float>, size: SIMD2<Float>)? {
+        var low = SIMD2<Float>(repeating: .infinity), high = SIMD2<Float>(repeating: -.infinity)
+        for (cx, cy) in [(-0.5, -0.5), (0.5, -0.5), (-0.5, 0.5), (0.5, 0.5)] as [(Float, Float)] {
+            let local = SIMD4(cx * Float(space.width) + Float(space.offsetX), cy * Float(space.height) + Float(space.offsetY), 0, 1)
+            let clip = viewProjection * world * local
+            guard clip.w > 1e-6 else { return nil }
+            let uv = SIMD2((clip.x / clip.w) * 0.5 + 0.5, 0.5 - (clip.y / clip.w) * 0.5)
+            low = simd_min(low, uv)
+            high = simd_max(high, uv)
+        }
+        let size = high - low
+        guard size.x > 1e-6, size.y > 1e-6, size.x.isFinite, size.y.isFinite else { return nil }
+        return (low, size)
+    }
+
+    /// The effects run at the layer's own size, not at the size it is shown: a small layer gets a coarse picture.
+    private static func captureRegion(_ footprint: (origin: SIMD2<Float>, size: SIMD2<Float>), space: SceneSpace) -> CaptureRegion {
+        var uniforms = passThroughUniforms
+        // The capture pass reads target UV = (UV - viewOrigin) / viewSize.
+        uniforms.viewSize = 1 / footprint.size
+        uniforms.viewOrigin = -footprint.origin / footprint.size
+        let edge = Double(maxTextureEdge)
+        return CaptureRegion(
+            uniforms: uniforms, width: Int(min(max(space.width.rounded(), 1), edge)), height: Int(min(max(space.height.rounded(), 1), edge))
+        )
+    }
+
     private struct PreparedLayer {
         let layerTexture: MTLTexture
         let uniforms: LayerUniforms
@@ -820,8 +857,9 @@ final class SceneRenderer {
         enum Prepared {
             case model(SceneModelLayerFrame), plane(MTLTexture, SceneEvaluatedFrame.Layer, SceneSpace)
             case particles(SceneLayer, SceneEvaluatedFrame.Layer, SceneSpace)
-            /// Runs its effects over everything drawn before it, whole frame.
-            case capture(SceneLayer, SceneEvaluatedFrame.Layer)
+            /// Runs its effects over everything drawn before it: the whole frame, or, with a
+            /// space, the part of the frame that rectangle stands over.
+            case capture(SceneLayer, SceneEvaluatedFrame.Layer, SceneSpace?)
         }
         var prepared: [Prepared] = []
         for item in items {
@@ -833,7 +871,7 @@ final class SceneRenderer {
                     continue
                 }
                 if layer.capturesCanvas {
-                    prepared.append(.capture(layer, evaluated.layers[layer.id]!))
+                    prepared.append(.capture(layer, evaluated.layers[layer.id]!, layer.space))
                     continue
                 }
                 guard var space = layer.space else { continue }
@@ -939,17 +977,32 @@ final class SceneRenderer {
                 try drawParticlesInSpace(
                     layer, drawn: drawn, space: space, view: views.flat, format: target.pixelFormat, encoder: encoder!
                 )
-            case let .capture(layer, drawn):
+            case let .capture(layer, drawn, space):
                 encoder?.endEncoding()
                 encoder = nil
                 try ensureAccumulation(width: target.width, height: target.height, format: target.pixelFormat)
-                // The layer covers the whole frame, so it needs no placement of its own.
+                // Without a rectangle the layer covers the whole frame and needs no placement of its own.
                 var uniforms = Self.passThroughUniforms
                 uniforms.opacity = Float(min(max(layer.opacity * layer.tint.alpha * drawn.opacity, 0), 1))
                 uniforms.blendMode = Int32(SceneBlendMode.allCases.firstIndex(of: layer.blendMode) ?? 0)
+                // passThroughUniforms leaves hasLayer 0, which makes the composite return the base untouched.
+                uniforms.hasLayer = 1
+                var region: CaptureRegion?
+                if let space {
+                    guard let footprint = screenFootprint(
+                        of: space, world: drawn.world ?? space.matrix, viewProjection: views.flat.viewProjection
+                    ) else {
+                        encoder = try openPass()
+                        continue
+                    }
+                    region = Self.captureRegion(footprint, space: space)
+                    // The picture the effects made stands over the footprint, its UV running across it.
+                    uniforms.uvScale = 1 / footprint.size
+                    uniforms.placementOffset = footprint.origin + 0.5 * footprint.size - 0.5
+                }
                 let layerTexture = try applyEffects(
                     to: drawn.layer, commandBuffer: commandBuffer, input: input, targetSize: targetSize,
-                    canvasSource: target, compositeUniforms: uniforms
+                    canvasSource: target, compositeUniforms: uniforms, captureRegion: region
                 )
                 try compositePass(
                     commandBuffer: commandBuffer, destination: accumulation[0], base: target,
@@ -1408,18 +1461,19 @@ final class SceneRenderer {
         input: SceneFrameInput,
         targetSize: SIMD2<Float>,
         canvasSource: MTLTexture? = nil,
-        compositeUniforms: LayerUniforms? = nil
+        compositeUniforms: LayerUniforms? = nil,
+        captureRegion: CaptureRegion? = nil
     ) throws -> MTLTexture {
         let viewSize = SIMD2(input.viewport.z, input.viewport.w)
         let shown = targetSize / viewSize / layerUVScale(for: layer) * effectResolutionScale
         var source: MTLTexture
         if layer.capturesCanvas {
-            let width = max(Int((targetSize.x * effectResolutionScale).rounded()), 16)
-            let height = max(Int((targetSize.y * effectResolutionScale).rounded()), 16)
+            let width = captureRegion?.width ?? max(Int((targetSize.x * effectResolutionScale).rounded()), 16)
+            let height = captureRegion?.height ?? max(Int((targetSize.y * effectResolutionScale).rounded()), 16)
             let capture = try captureTexture(for: layer.id, width: width, height: height)
             try capturePass(
                 commandBuffer: commandBuffer, destination: capture, base: canvasSource ?? blackTexture,
-                uniforms: compositeUniforms ?? Self.passThroughUniforms
+                uniforms: captureRegion?.uniforms ?? compositeUniforms ?? Self.passThroughUniforms
             )
             source = capture
         } else if layer.kind == .particles, layer.particleSystem != nil {
