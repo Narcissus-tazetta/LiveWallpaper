@@ -476,6 +476,34 @@ extension WallpaperModel {
         return added.last?.id
     }
 
+    /// Adds a video that loops in place of a picture, above the existing layers.
+    func addSceneVideoLayer(from videoURL: URL, path: String) async -> UUID? {
+        guard sceneDocumentsByPath[path] != nil else {
+            return nil
+        }
+        let stagingVideoPath = Self.sceneStagingVideoPath()
+        let stagingFolder = SceneStore.folderURL(forVideoPath: stagingVideoPath)
+        defer {
+            removeLeftovers(of: [stagingFolder])
+        }
+        do {
+            try FileManager.default.createDirectory(at: stagingFolder, withIntermediateDirectories: true)
+            let layer = try await SceneStore.importVideo(at: videoURL, videoPath: stagingVideoPath)
+            guard var document = sceneDocumentsByPath[path] else {
+                return nil
+            }
+            try adoptStagedSceneFile(layer.imageFile, from: stagingFolder, path: path)
+            try adoptStagedSceneFile(layer.videoFile!, from: stagingFolder, path: path)
+            document.layers.append(layer)
+            updateScene(document, path: path, coalescing: false)
+            return layer.id
+        } catch {
+            AppLog.windowRefresh.error("adding scene video layer failed: \(error.localizedDescription, privacy: .public)")
+            sceneErrorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
     func addSceneParticleLayer(_ preset: SceneParticlePreset, name: String, path: String) -> UUID? {
         guard var document = sceneDocumentsByPath[path] else {
             return nil
@@ -506,6 +534,16 @@ extension WallpaperModel {
             textureFile: texture
         )
         let layer = SceneLayer(name: name, particleSystem: system)
+        document.layers.append(layer)
+        updateScene(document, path: path, coalescing: false)
+        return layer.id
+    }
+
+    func addSceneTextLayer(string: String, name: String, path: String) -> UUID? {
+        guard var document = sceneDocumentsByPath[path] else {
+            return nil
+        }
+        let layer = SceneLayer(name: name, text: SceneText(string: string))
         document.layers.append(layer)
         updateScene(document, path: path, coalescing: false)
         return layer.id

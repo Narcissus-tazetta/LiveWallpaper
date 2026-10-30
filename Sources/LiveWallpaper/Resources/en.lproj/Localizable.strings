@@ -1472,3 +1472,101 @@
 "作品の設定を読み取れませんでした" = "Could not read the wallpaper settings.";
 
 "壁紙の準備が終わってから、もう一度適用してください。" = "Wait for the wallpaper to finish preparing, then apply the settings again.";
+
+"焼き込みカラー" = "Color Burn";
+
+"減算" = "Subtract";
+
+"覆い焼きカラー" = "Color Dodge";
+
+"ハードライト" = "Hard Light";
+
+"ビビッドライト" = "Vivid Light";
+
+"リニアライト" = "Linear Light";
+
+"ピンライト" = "Pin Light";
+
+"ハードミックス" = "Hard Mix";
+
+"除外" = "Exclusion";
+
+"リフレクト" = "Reflect";
+
+"グロー" = "Glow";
+
+"フェニックス" = "Phoenix";
+
+"平均" = "Average";
+
+"ネゲーション" = "Negation";
+
+"色相" = "Hue";
+
+"カラー" = "Color";
+
+"輝度" = "Luminosity";
+
+"ティント" = "Tint";
+
+"加算(アルファ)" = "Add by Alpha";
+
+"加算(下地乗算)" = "Add by Backdrop";
+
+"暗くする系" = "Darken";
+
+"明るくする系" = "Lighten";
+
+"コントラスト系" = "Contrast";
+
+"差・反転系" = "Difference & Invert";
+
+"色の合成" = "Color Components";
+
+"文字" = "Text";
+
+"フォント" = "Font";
+
+"既定のフォント" = "Default font";
+
+"寄せ" = "Alignment";
+
+"字間" = "Letter spacing";
+
+"行間" = "Line spacing";
+
+"折り返し" = "Wrap text";
+
+"折り返す幅" = "Wrap width";
+
+"縁取り" = "Outline";
+
+"縁の色" = "Outline color";
+
+"縁の太さ" = "Outline thickness";
+
+"影" = "Shadow";
+
+"影の色" = "Shadow color";
+
+"影のぼかし" = "Shadow blur";
+
+"影の横位置" = "Shadow offset X";
+
+"影の縦位置" = "Shadow offset Y";
+
+"影の濃さ" = "Shadow opacity";
+
+"文字のぼかし" = "Text blur";
+
+"テキスト" = "Text";
+
+"動画…" = "Video…";
+
+"再生中の曲のジャケットを表示" = "Show the playing track’s cover";
+
+"画像の透明な部分でジャケットの形を切り抜きます。曲が無いときは画像そのものを表示します。この設定のシーンは、書き出した動画ではなくリアルタイムで描画します。" = "The image’s transparent areas cut out the cover’s shape. With no track playing, the image itself is shown. A scene with this setting is drawn in real time instead of from the exported video.";
+
+"下のレイヤーを入力にする" = "Use the layers below as input";
+
+"画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Uses the picture below this layer as the input instead of an image. Combined with a motion, it can shake or distort what is below.";

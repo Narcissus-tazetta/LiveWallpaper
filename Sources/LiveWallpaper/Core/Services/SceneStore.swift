@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -125,6 +126,29 @@ enum SceneStore {
         let fileName = "layer-\(UUID().uuidString).\(ext)"
         try FileManager.default.copyItem(at: sourceURL, to: folder.appendingPathComponent(fileName))
         return (SceneLayer(name: name, imageFile: fileName), size)
+    }
+
+    /// Copies a video into the scene folder and writes its first frame as the layer's
+    /// picture, which stands in wherever the video is not decoded yet.
+    static func importVideo(at originalURL: URL, videoPath: String) async throws -> SceneLayer {
+        let sourceURL = originalURL.resolvingSymlinksInPath()
+        let asset = AVURLAsset(url: sourceURL)
+        guard try await asset.loadTracks(withMediaType: .video).first != nil else {
+            throw SceneVideoFrames.FramesError.noVideoTrack(sourceURL.lastPathComponent)
+        }
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: SceneRenderer.maxTextureEdge, height: SceneRenderer.maxTextureEdge)
+        let frame = try await generator.image(at: .zero).image
+        let imageFile = try writeImage(frame, prefix: "layer", videoPath: videoPath)
+        let ext = sourceURL.pathExtension.isEmpty ? "mp4" : sourceURL.pathExtension.lowercased()
+        let videoFile = "video-\(UUID().uuidString).\(ext)"
+        try FileManager.default.copyItem(
+            at: sourceURL, to: folderURL(forVideoPath: videoPath).appendingPathComponent(videoFile)
+        )
+        var layer = SceneLayer(name: sourceURL.deletingPathExtension().lastPathComponent, imageFile: imageFile)
+        layer.videoFile = videoFile
+        return layer
     }
 
     /// Writes the image at most `maxEdge` on its long side, EXIF orientation applied.

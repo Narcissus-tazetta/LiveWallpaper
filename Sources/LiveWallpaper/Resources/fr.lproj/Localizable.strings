@@ -1472,3 +1472,101 @@
 "作品の設定を読み取れませんでした" = "Impossible de lire les réglages du fond.";
 
 "壁紙の準備が終わってから、もう一度適用してください。" = "Attendez que le fond soit prêt, puis appliquez à nouveau les réglages.";
+
+"焼き込みカラー" = "Color Burn";
+
+"減算" = "Subtract";
+
+"覆い焼きカラー" = "Color Dodge";
+
+"ハードライト" = "Hard Light";
+
+"ビビッドライト" = "Vivid Light";
+
+"リニアライト" = "Linear Light";
+
+"ピンライト" = "Pin Light";
+
+"ハードミックス" = "Hard Mix";
+
+"除外" = "Exclusion";
+
+"リフレクト" = "Reflect";
+
+"グロー" = "Glow";
+
+"フェニックス" = "Phoenix";
+
+"平均" = "Average";
+
+"ネゲーション" = "Negation";
+
+"色相" = "Hue";
+
+"カラー" = "Color";
+
+"輝度" = "Luminosity";
+
+"ティント" = "Tint";
+
+"加算(アルファ)" = "Add by Alpha";
+
+"加算(下地乗算)" = "Add by Backdrop";
+
+"暗くする系" = "Darken";
+
+"明るくする系" = "Lighten";
+
+"コントラスト系" = "Contrast";
+
+"差・反転系" = "Difference & Invert";
+
+"色の合成" = "Color Components";
+
+"文字" = "Texte";
+
+"フォント" = "Police";
+
+"既定のフォント" = "Police par défaut";
+
+"寄せ" = "Alignement";
+
+"字間" = "Espacement des lettres";
+
+"行間" = "Interligne";
+
+"折り返し" = "Retour à la ligne";
+
+"折り返す幅" = "Largeur de retour";
+
+"縁取り" = "Contour";
+
+"縁の色" = "Couleur du contour";
+
+"縁の太さ" = "Épaisseur du contour";
+
+"影" = "Ombre";
+
+"影の色" = "Couleur de l’ombre";
+
+"影のぼかし" = "Flou de l’ombre";
+
+"影の横位置" = "Décalage X de l’ombre";
+
+"影の縦位置" = "Décalage Y de l’ombre";
+
+"影の濃さ" = "Opacité de l’ombre";
+
+"文字のぼかし" = "Flou du texte";
+
+"テキスト" = "Texte";
+
+"動画…" = "Vidéo…";
+
+"再生中の曲のジャケットを表示" = "Afficher la pochette du titre en cours";
+
+"画像の透明な部分でジャケットの形を切り抜きます。曲が無いときは画像そのものを表示します。この設定のシーンは、書き出した動画ではなくリアルタイムで描画します。" = "Les zones transparentes de l’image découpent la forme de la pochette. Sans titre en cours, l’image elle-même s’affiche. Une scène avec ce réglage est dessinée en temps réel, et non à partir de la vidéo exportée.";
+
+"下のレイヤーを入力にする" = "Utiliser les calques du dessous comme entrée";
+
+"画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Utilise l’image située sous ce calque comme entrée à la place d’une image. Combiné à un mouvement, cela peut faire trembler ou déformer ce qui se trouve dessous.";

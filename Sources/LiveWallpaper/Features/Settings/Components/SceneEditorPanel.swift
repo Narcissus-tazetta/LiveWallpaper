@@ -553,6 +553,9 @@ extension SettingsView {
             if let particles = layer.particles {
                 sceneParticleControls(path: path, layer: layer, particles: particles)
             }
+            if let text = layer.text {
+                sceneTextControls(path: path, layer: layer, text: text)
+            }
             sceneLayoutSlider(
                 title: model.localizedString("不透明度"),
                 value: sceneLayerBinding(path: path, layer: layer, \.opacity),
@@ -568,15 +571,15 @@ extension SettingsView {
                     .frame(width: sceneRowLabelWidth, alignment: .leading)
                 Spacer(minLength: 0)
                 Picker(model.localizedString("合成"), selection: sceneLayerBinding(path: path, layer: layer, \.blendMode)) {
-                    Text(model.localizedString("通常")).tag(SceneBlendMode.normal)
-                    Text(model.localizedString("乗算")).tag(SceneBlendMode.multiply)
-                    Text(model.localizedString("スクリーン")).tag(SceneBlendMode.screen)
-                    Text(model.localizedString("オーバーレイ")).tag(SceneBlendMode.overlay)
-                    Text(model.localizedString("加算")).tag(SceneBlendMode.add)
+                    sceneBlendModePickerContent()
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .fixedSize()
+            }
+
+            if layer.kind == .image {
+                sceneLayerSourceToggles(path: path, layer: layer)
             }
 
             sceneSliderRow(
@@ -790,6 +793,25 @@ extension SettingsView {
             selectedScenePinID = nil
         }
         selectedSceneLayerID = id
+    }
+
+    func chooseSceneLayerVideo(path: String) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.movie]
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+        Task {
+            guard let id = await model.addSceneVideoLayer(from: url, path: path),
+                  fitEditor.resolvedVideoPath() == path
+            else {
+                return
+            }
+            selectSceneLayer(id)
+        }
     }
 
     func chooseSceneLayerImage(path: String) {

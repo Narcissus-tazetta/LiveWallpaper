@@ -51,6 +51,13 @@ final class SceneTextTests: XCTestCase {
         return result
     }
 
+    func testJapaneseTextWithTheDefaultFontDraws() throws {
+        var text = SceneText(string: "こんにちは")
+        text.pointSize = 24
+        let lit = try litBounds(text)
+        XCTAssertGreaterThan(lit.maxX - lit.minX, 20)
+    }
+
     func testAlignedEdgeStaysOnThePositionWhenTheTextGrows() throws {
         let leftShort = try litBounds(text("12:00", horizontal: .left))
         let leftLong = try litBounds(text("12:00:00", horizontal: .left))

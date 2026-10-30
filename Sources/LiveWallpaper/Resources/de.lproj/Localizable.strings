@@ -1472,3 +1472,101 @@
 "作品の設定を読み取れませんでした" = "Die Einstellungen konnten nicht gelesen werden.";
 
 "壁紙の準備が終わってから、もう一度適用してください。" = "Warte, bis das Hintergrundbild bereit ist, und wende die Einstellungen erneut an.";
+
+"焼き込みカラー" = "Color Burn";
+
+"減算" = "Subtract";
+
+"覆い焼きカラー" = "Color Dodge";
+
+"ハードライト" = "Hard Light";
+
+"ビビッドライト" = "Vivid Light";
+
+"リニアライト" = "Linear Light";
+
+"ピンライト" = "Pin Light";
+
+"ハードミックス" = "Hard Mix";
+
+"除外" = "Exclusion";
+
+"リフレクト" = "Reflect";
+
+"グロー" = "Glow";
+
+"フェニックス" = "Phoenix";
+
+"平均" = "Average";
+
+"ネゲーション" = "Negation";
+
+"色相" = "Hue";
+
+"カラー" = "Color";
+
+"輝度" = "Luminosity";
+
+"ティント" = "Tint";
+
+"加算(アルファ)" = "Add by Alpha";
+
+"加算(下地乗算)" = "Add by Backdrop";
+
+"暗くする系" = "Darken";
+
+"明るくする系" = "Lighten";
+
+"コントラスト系" = "Contrast";
+
+"差・反転系" = "Difference & Invert";
+
+"色の合成" = "Color Components";
+
+"文字" = "Text";
+
+"フォント" = "Schrift";
+
+"既定のフォント" = "Standardschrift";
+
+"寄せ" = "Ausrichtung";
+
+"字間" = "Zeichenabstand";
+
+"行間" = "Zeilenabstand";
+
+"折り返し" = "Umbrechen";
+
+"折り返す幅" = "Umbruchbreite";
+
+"縁取り" = "Kontur";
+
+"縁の色" = "Konturfarbe";
+
+"縁の太さ" = "Konturstärke";
+
+"影" = "Schatten";
+
+"影の色" = "Schattenfarbe";
+
+"影のぼかし" = "Schattenunschärfe";
+
+"影の横位置" = "Schatten horizontal";
+
+"影の縦位置" = "Schatten vertikal";
+
+"影の濃さ" = "Schattendeckkraft";
+
+"文字のぼかし" = "Textunschärfe";
+
+"テキスト" = "Text";
+
+"動画…" = "Video…";
+
+"再生中の曲のジャケットを表示" = "Cover des laufenden Titels zeigen";
+
+"画像の透明な部分でジャケットの形を切り抜きます。曲が無いときは画像そのものを表示します。この設定のシーンは、書き出した動画ではなくリアルタイムで描画します。" = "Die transparenten Bereiche des Bilds schneiden die Form des Covers aus. Läuft kein Titel, wird das Bild selbst gezeigt. Eine Szene mit dieser Einstellung wird in Echtzeit gezeichnet, nicht aus dem exportierten Video.";
+
+"下のレイヤーを入力にする" = "Ebenen darunter als Eingabe verwenden";
+
+"画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Verwendet das Bild unter dieser Ebene statt einer Bilddatei als Eingabe. Zusammen mit einer Bewegung lässt sich das Darunterliegende wackeln oder verzerren.";

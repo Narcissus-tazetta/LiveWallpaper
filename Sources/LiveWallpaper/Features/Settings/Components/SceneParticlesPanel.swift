@@ -20,6 +20,16 @@ extension SettingsView {
             Button(model.localizedString("画像…")) {
                 chooseSceneLayerImage(path: path)
             }
+            Button(model.localizedString("テキスト")) {
+                if let id = model.addSceneTextLayer(
+                    string: model.localizedString("テキスト"), name: model.localizedString("テキスト"), path: path
+                ) {
+                    selectSceneLayer(id)
+                }
+            }
+            Button(model.localizedString("動画…")) {
+                chooseSceneLayerVideo(path: path)
+            }
             Section(model.localizedString("粒子")) {
                 Button(model.localizedString("動きを細かく決められる粒子")) {
                     if let id = model.addSceneParticleSystemLayer(

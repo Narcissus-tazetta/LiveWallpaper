@@ -1472,3 +1472,101 @@
 "作品の設定を読み取れませんでした" = "Không thể đọc cài đặt tác phẩm.";
 
 "壁紙の準備が終わってから、もう一度適用してください。" = "Hãy đợi hình nền chuẩn bị xong rồi áp dụng lại cài đặt.";
+
+"焼き込みカラー" = "Color Burn";
+
+"減算" = "Subtract";
+
+"覆い焼きカラー" = "Color Dodge";
+
+"ハードライト" = "Hard Light";
+
+"ビビッドライト" = "Vivid Light";
+
+"リニアライト" = "Linear Light";
+
+"ピンライト" = "Pin Light";
+
+"ハードミックス" = "Hard Mix";
+
+"除外" = "Exclusion";
+
+"リフレクト" = "Reflect";
+
+"グロー" = "Glow";
+
+"フェニックス" = "Phoenix";
+
+"平均" = "Average";
+
+"ネゲーション" = "Negation";
+
+"色相" = "Hue";
+
+"カラー" = "Color";
+
+"輝度" = "Luminosity";
+
+"ティント" = "Tint";
+
+"加算(アルファ)" = "Add by Alpha";
+
+"加算(下地乗算)" = "Add by Backdrop";
+
+"暗くする系" = "Darken";
+
+"明るくする系" = "Lighten";
+
+"コントラスト系" = "Contrast";
+
+"差・反転系" = "Difference & Invert";
+
+"色の合成" = "Color Components";
+
+"文字" = "Văn bản";
+
+"フォント" = "Phông chữ";
+
+"既定のフォント" = "Phông chữ mặc định";
+
+"寄せ" = "Căn lề";
+
+"字間" = "Khoảng cách chữ";
+
+"行間" = "Khoảng cách dòng";
+
+"折り返し" = "Ngắt dòng";
+
+"折り返す幅" = "Chiều rộng ngắt dòng";
+
+"縁取り" = "Viền";
+
+"縁の色" = "Màu viền";
+
+"縁の太さ" = "Độ dày viền";
+
+"影" = "Bóng đổ";
+
+"影の色" = "Màu bóng";
+
+"影のぼかし" = "Độ mờ bóng";
+
+"影の横位置" = "Lệch bóng theo X";
+
+"影の縦位置" = "Lệch bóng theo Y";
+
+"影の濃さ" = "Độ đậm bóng";
+
+"文字のぼかし" = "Làm mờ chữ";
+
+"テキスト" = "Văn bản";
+
+"動画…" = "Video…";
+
+"再生中の曲のジャケットを表示" = "Hiện ảnh bìa bài đang phát";
+
+"画像の透明な部分でジャケットの形を切り抜きます。曲が無いときは画像そのものを表示します。この設定のシーンは、書き出した動画ではなくリアルタイムで描画します。" = "Vùng trong suốt của ảnh sẽ cắt hình dạng ảnh bìa. Khi không có bài nào phát, ảnh gốc được hiển thị. Cảnh dùng cài đặt này được vẽ theo thời gian thực thay vì từ video đã xuất.";
+
+"下のレイヤーを入力にする" = "Dùng các lớp bên dưới làm đầu vào";
+
+"画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Dùng hình ảnh bên dưới lớp này làm đầu vào thay cho ảnh. Kết hợp với chuyển động, bạn có thể làm rung hoặc méo hình bên dưới.";

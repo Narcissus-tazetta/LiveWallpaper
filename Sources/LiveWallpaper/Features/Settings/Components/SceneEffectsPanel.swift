@@ -173,7 +173,8 @@ extension SettingsView {
                         sceneAddEffectButton(.pulse, path: path, layerID: layer.id)
                     }
                     Section(model.localizedString("細かく設定できる動き")) {
-                        ForEach(SceneEffectKind.allCases.filter(\.runsOnRealTime), id: \.self) { kind in
+                        // A shader effect needs a renderGraph only an import supplies; added by hand it would be empty.
+                        ForEach(SceneEffectKind.allCases.filter { $0.runsOnRealTime && $0 != .shader }, id: \.self) { kind in
                             sceneAddEffectButton(kind, path: path, layerID: layer.id)
                         }
                     }

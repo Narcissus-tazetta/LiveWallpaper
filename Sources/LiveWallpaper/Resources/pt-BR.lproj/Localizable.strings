@@ -1472,3 +1472,101 @@
 "作品の設定を読み取れませんでした" = "Não foi possível ler os ajustes da obra.";
 
 "壁紙の準備が終わってから、もう一度適用してください。" = "Aguarde a preparação do papel de parede e aplique os ajustes novamente.";
+
+"焼き込みカラー" = "Color Burn";
+
+"減算" = "Subtract";
+
+"覆い焼きカラー" = "Color Dodge";
+
+"ハードライト" = "Hard Light";
+
+"ビビッドライト" = "Vivid Light";
+
+"リニアライト" = "Linear Light";
+
+"ピンライト" = "Pin Light";
+
+"ハードミックス" = "Hard Mix";
+
+"除外" = "Exclusion";
+
+"リフレクト" = "Reflect";
+
+"グロー" = "Glow";
+
+"フェニックス" = "Phoenix";
+
+"平均" = "Average";
+
+"ネゲーション" = "Negation";
+
+"色相" = "Hue";
+
+"カラー" = "Color";
+
+"輝度" = "Luminosity";
+
+"ティント" = "Tint";
+
+"加算(アルファ)" = "Add by Alpha";
+
+"加算(下地乗算)" = "Add by Backdrop";
+
+"暗くする系" = "Darken";
+
+"明るくする系" = "Lighten";
+
+"コントラスト系" = "Contrast";
+
+"差・反転系" = "Difference & Invert";
+
+"色の合成" = "Color Components";
+
+"文字" = "Texto";
+
+"フォント" = "Fonte";
+
+"既定のフォント" = "Fonte padrão";
+
+"寄せ" = "Alinhamento";
+
+"字間" = "Espaçamento entre letras";
+
+"行間" = "Espaçamento entre linhas";
+
+"折り返し" = "Quebrar texto";
+
+"折り返す幅" = "Largura da quebra";
+
+"縁取り" = "Contorno";
+
+"縁の色" = "Cor do contorno";
+
+"縁の太さ" = "Espessura do contorno";
+
+"影" = "Sombra";
+
+"影の色" = "Cor da sombra";
+
+"影のぼかし" = "Desfoque da sombra";
+
+"影の横位置" = "Deslocamento X da sombra";
+
+"影の縦位置" = "Deslocamento Y da sombra";
+
+"影の濃さ" = "Opacidade da sombra";
+
+"文字のぼかし" = "Desfoque do texto";
+
+"テキスト" = "Texto";
+
+"動画…" = "Vídeo…";
+
+"再生中の曲のジャケットを表示" = "Mostrar a capa da faixa em reprodução";
+
+"画像の透明な部分でジャケットの形を切り抜きます。曲が無いときは画像そのものを表示します。この設定のシーンは、書き出した動画ではなくリアルタイムで描画します。" = "As áreas transparentes da imagem recortam o formato da capa. Sem faixa em reprodução, a própria imagem é exibida. Uma cena com esta opção é desenhada em tempo real, e não a partir do vídeo exportado.";
+
+"下のレイヤーを入力にする" = "Usar as camadas abaixo como entrada";
+
+"画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Usa a imagem abaixo desta camada como entrada, no lugar de uma imagem. Combinado com um movimento, pode balançar ou distorcer o que está abaixo.";

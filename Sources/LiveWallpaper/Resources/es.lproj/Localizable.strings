@@ -1472,3 +1472,101 @@
 "作品の設定を読み取れませんでした" = "No se pudieron leer los ajustes de la obra.";
 
 "壁紙の準備が終わってから、もう一度適用してください。" = "Espera a que termine la preparación del fondo y vuelve a aplicar los ajustes.";
+
+"焼き込みカラー" = "Color Burn";
+
+"減算" = "Subtract";
+
+"覆い焼きカラー" = "Color Dodge";
+
+"ハードライト" = "Hard Light";
+
+"ビビッドライト" = "Vivid Light";
+
+"リニアライト" = "Linear Light";
+
+"ピンライト" = "Pin Light";
+
+"ハードミックス" = "Hard Mix";
+
+"除外" = "Exclusion";
+
+"リフレクト" = "Reflect";
+
+"グロー" = "Glow";
+
+"フェニックス" = "Phoenix";
+
+"平均" = "Average";
+
+"ネゲーション" = "Negation";
+
+"色相" = "Hue";
+
+"カラー" = "Color";
+
+"輝度" = "Luminosity";
+
+"ティント" = "Tint";
+
+"加算(アルファ)" = "Add by Alpha";
+
+"加算(下地乗算)" = "Add by Backdrop";
+
+"暗くする系" = "Darken";
+
+"明るくする系" = "Lighten";
+
+"コントラスト系" = "Contrast";
+
+"差・反転系" = "Difference & Invert";
+
+"色の合成" = "Color Components";
+
+"文字" = "Texto";
+
+"フォント" = "Fuente";
+
+"既定のフォント" = "Fuente predeterminada";
+
+"寄せ" = "Alineación";
+
+"字間" = "Espaciado de letras";
+
+"行間" = "Interlineado";
+
+"折り返し" = "Ajustar texto";
+
+"折り返す幅" = "Ancho de ajuste";
+
+"縁取り" = "Contorno";
+
+"縁の色" = "Color del contorno";
+
+"縁の太さ" = "Grosor del contorno";
+
+"影" = "Sombra";
+
+"影の色" = "Color de la sombra";
+
+"影のぼかし" = "Desenfoque de la sombra";
+
+"影の横位置" = "Desplazamiento X de la sombra";
+
+"影の縦位置" = "Desplazamiento Y de la sombra";
+
+"影の濃さ" = "Opacidad de la sombra";
+
+"文字のぼかし" = "Desenfoque del texto";
+
+"テキスト" = "Texto";
+
+"動画…" = "Vídeo…";
+
+"再生中の曲のジャケットを表示" = "Mostrar la portada de la canción en reproducción";
+
+"画像の透明な部分でジャケットの形を切り抜きます。曲が無いときは画像そのものを表示します。この設定のシーンは、書き出した動画ではなくリアルタイムで描画します。" = "Las zonas transparentes de la imagen recortan la forma de la portada. Sin canción en reproducción se muestra la propia imagen. Una escena con este ajuste se dibuja en tiempo real, no desde el vídeo exportado.";
+
+"下のレイヤーを入力にする" = "Usar las capas inferiores como entrada";
+
+"画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Usa la imagen situada debajo de esta capa como entrada en lugar de una imagen. Combinado con un movimiento, puede agitar o distorsionar lo que hay debajo.";

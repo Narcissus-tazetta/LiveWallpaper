@@ -155,7 +155,7 @@ function update(ctx) {
 | --- | --- |
 | `isVisible` | boolean。表示のオン／オフ |
 | `tint` | `{red,green,blue,alpha}`。全項目が必要で、各値0〜1 |
-| `blendMode` | `normal/multiply/screen/overlay/add` |
+| `blendMode` | `normal/multiply/screen/overlay/add/darken/colorBurn/subtract/minimum/lighten/colorDodge/maximum/softLight/hardLight/vividLight/linearLight/pinLight/hardMix/difference/exclusion/reflect/glow/phoenix/average/negation/hue/saturation/color/luminosity/tint/plus/brighten` |
 | `parallaxDepth` | 0〜1。レイヤー全体の視差 |
 | `depthStrength` | 0〜1。既存の深度マップの強さ |
 | `depthFollowsCursor` | boolean。深度による視差をカーソルへ連動 |

@@ -48,6 +48,17 @@ final class SceneVideoFramesTests: XCTestCase {
         return url
     }
 
+    func testImportedVideoKeepsItsFileAndFirstFrameInTheSceneFolder() async throws {
+        let clip = try await writeVideo()
+        let videoPath = directory.appendingPathComponent("wallpaper.mp4").path
+        let layer = try await SceneStore.importVideo(at: clip, videoPath: videoPath)
+        let folder = SceneStore.folderURL(forVideoPath: videoPath)
+        XCTAssertEqual(layer.name, "clip")
+        let videoFile = try XCTUnwrap(layer.videoFile)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent(videoFile).path))
+        XCTAssertEqual(try SceneStore.pixelSize(of: folder.appendingPathComponent(layer.imageFile)), CGSize(width: 64, height: 64))
+    }
+
     private func grey(_ frames: SceneVideoFrames) throws -> Int {
         let texture = try XCTUnwrap(frames.frame?.texture)
         var pixel = [UInt8](repeating: 0, count: 4)
