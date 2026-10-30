@@ -29,10 +29,24 @@ extension WallpaperModel {
                 $0.value
             ) }, uniquingKeysWith: { _, last in last })
             values.merge(settings.values) { _, new in new }
+            var directories: [String: LocalWebUserDirectory.Selection] = [:]
+            var pageValues = values
+            for property in package.properties ?? [] where property.kind == "directory" {
+                let path = values[property.id]?.string ?? ""
+                pageValues[property.id] = .string(LocalWebUserDirectory.pageValue(path: path))
+                if !path.isEmpty {
+                    directories[property.id] = .init(path: path, fileType: property.fileType)
+                }
+            }
+            let folder = URL(fileURLWithPath: source.localFolderPath!)
+            localWebWallpaperServer.setUserFolders(
+                directories.values.map { URL(fileURLWithPath: $0.path, isDirectory: true) }, folder: folder
+            )
             view.setLocalConfiguration(
-                values: values,
+                values: pageValues,
                 settings: settings,
-                assets: (package.properties ?? []).filter { $0.kind == "file" }.map(\.id)
+                assets: (package.properties ?? []).filter { $0.kind == "file" }.map(\.id),
+                directories: directories
             )
             view.setDisplayAdjustment(WebDisplayAdjustment(keys: package.displayAdjustment, values: values))
         } catch {

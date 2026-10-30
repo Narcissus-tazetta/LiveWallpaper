@@ -229,6 +229,25 @@ struct LocalWebSettingsSheet: View {
                 }
                 Button(localized("ファイルを選択")) { selectFile(property) }.disabled(importingFile || context.importFile == nil)
             }
+        case "directory":
+            let path = (values[property.id] ?? property.value).string
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(label)
+                    Spacer()
+                    if !path.isEmpty {
+                        Button(localized("リセット")) {
+                            settings.values[property.id] = property.value; save()
+                        }
+                    }
+                    Button(localized("フォルダを選択")) { selectFolder(property) }
+                }
+                if !path.isEmpty {
+                    Text((path as NSString).abbreviatingWithTildeInPath)
+                        .font(.caption).foregroundColor(.secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                }
+            }
         case "group":
             Divider()
             Text(label).font(.headline)
@@ -254,6 +273,18 @@ struct LocalWebSettingsSheet: View {
                     save()
                 } catch { self.error = error.localizedDescription }
             }
+        }
+    }
+
+    private func selectFolder(_ property: LocalWebProperty) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            settings.values[property.id] = .string(url.path)
+            save()
         }
     }
 

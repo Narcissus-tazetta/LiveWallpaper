@@ -54,6 +54,8 @@ struct LocalWebProperty: Codable, Identifiable, Equatable {
     var step: Double?
     var options: [Option]?
     var condition: String?
+    /// For `directory` properties: which files the folder lists (`image`, `video`, or all).
+    var fileType: String?
 
     static func text(_ translations: [String: String], locale: Locale) -> String {
         let language = locale.language.languageCode?.identifier ?? "en"

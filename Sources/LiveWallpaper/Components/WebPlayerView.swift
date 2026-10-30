@@ -203,12 +203,16 @@ final class WebPlayerView: NSView {
     private var lastMediaArtwork: String?
     private var spectrumInFlight = false
     private var assetProperties: [String] = []
+    private var directoryWatchers: [String: (LocalWebUserDirectory.Selection, LocalWebDirectoryWatcher)] = [:]
+    private var directoryListings: [String: [String: Date]] = [:]
 
     func setLocalConfiguration(
         values: [String: WebPropertyValue],
         settings: LocalWebSettings,
-        assets: [String] = []
+        assets: [String] = [],
+        directories: [String: LocalWebUserDirectory.Selection] = [:]
     ) {
+        updateDirectories(directories)
         let changed = localProperties != values || assetProperties != assets
         localProperties = values
         assetProperties = assets
@@ -230,6 +234,37 @@ final class WebPlayerView: NSView {
                 }
         }
         refreshIntegration()
+    }
+
+    private func updateDirectories(_ directories: [String: LocalWebUserDirectory.Selection]) {
+        for (property, (selection, watcher)) in directoryWatchers where directories[property] != selection {
+            watcher.stop()
+            directoryWatchers[property] = nil
+            directoryListings[property] = [:]
+            sendDirectory(property)
+        }
+        for (property, selection) in directories where directoryWatchers[property] == nil {
+            let watcher = LocalWebDirectoryWatcher(selection: selection) { [weak self] files in
+                self?.directoryListings[property] = files
+                self?.sendDirectory(property)
+            }
+            directoryWatchers[property] = (selection, watcher)
+        }
+    }
+
+    private func sendDirectory(_ property: String) {
+        guard currentRequest?.isLocalPackage == true else { return }
+        let entries = (directoryListings[property] ?? [:]).map { [
+            WebPropertyValue.string($0.key), .number($0.value.timeIntervalSince1970),
+        ] }
+        webView.evaluateJavaScript(
+            "window.__liveWallpaperSetDirectory && window.__liveWallpaperSetDirectory(\(LocalWebHostScript.json(property)), \(LocalWebHostScript.json(entries)));"
+        ) { _, error in
+            if let error {
+                AppLog.externalWallpapers
+                    .error("web folder listing failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     private func refreshIntegration() {
@@ -836,6 +871,11 @@ final class WebPlayerView: NSView {
                       owner?.currentRequest?.isLocalPackage == true else { return }
                 owner?.wantsMedia = true
                 owner?.refreshIntegration()
+            case "directories":
+                // A new page starts with no listings; it asks for them as its document starts.
+                guard message.frameInfo.isMainFrame, let owner,
+                      owner.currentRequest?.isLocalPackage == true else { return }
+                for property in owner.directoryListings.keys { owner.sendDirectory(property) }
             case "ready":
                 owner?.handleEmbedPlayerReady()
             case "error":

@@ -30,6 +30,7 @@ struct LocalWebWallpaperPackage: Codable, Equatable {
                       "color",
                       "textinput",
                       "file",
+                      "directory",
                       "group",
                       "text"
                   ].contains($0.kind) })
@@ -89,6 +90,7 @@ final class LocalWebWallpaperServer {
     private let persistPorts: Bool
     private var engines: [String: Engine] = [:]
     private var startups: [String: Task<UInt16, Error>] = [:]
+    private var userFolders: [String: [URL]] = [:]
     private static let portsKey = "localWebWallpaperPorts"
 
     init(persistPorts: Bool = false) {
@@ -115,6 +117,7 @@ final class LocalWebWallpaperServer {
         let previousToken = (stored?["token"] as? String).flatMap(UUID.init(uuidString:))?
             .uuidString
         let token = await engine.register(folder: folder, token: previousToken)
+        engine.setUserFolders(userFolders[path] ?? [], folder: folder)
         if persistPorts {
             var ports = UserDefaults.standard.dictionary(forKey: Self.portsKey) ?? [:]
             ports[key] = ["port": Int(port), "token": token]
@@ -124,6 +127,13 @@ final class LocalWebWallpaperServer {
         // extra segment lets that resolve inside the token instead of escaping to the server root.
         return URL(string: "http://127.0.0.1:\(port)/\(token)/\(Client.entryDirectory)/")!
             .appendingPathComponent(package.entryPoint)
+    }
+
+    /// The folders the package's directory properties point at, which its page may read.
+    func setUserFolders(_ folders: [URL], folder: URL) {
+        let path = folder.standardizedFileURL.path
+        userFolders[path] = folders
+        engines[path]?.setUserFolders(folders, folder: folder)
     }
 
     func remove(folder: URL) {
@@ -137,6 +147,7 @@ final class LocalWebWallpaperServer {
         private var listener: NWListener?
         private var roots: [String: URL] = [:]
         private var tokens: [String: String] = [:]
+        private var userFolders: [String: [URL]] = [:]
 
         deinit { listener?.cancel() }
 
@@ -176,7 +187,7 @@ final class LocalWebWallpaperServer {
                         }
                         listener.newConnectionHandler = { [weak self] connection in
                             guard let self else { connection.cancel(); return }
-                            let client = Client(connection: connection, roots: roots)
+                            let client = Client(connection: connection, roots: roots, userFolders: userFolders)
                             client.start(on: queue)
                         }
                         listener.start(queue: queue)
@@ -198,6 +209,13 @@ final class LocalWebWallpaperServer {
                 }
             }
         }
+
+        func setUserFolders(_ folders: [URL], folder: URL) {
+            queue.async {
+                guard let token = self.tokens[folder.standardizedFileURL.path] else { return }
+                self.userFolders[token] = folders
+            }
+        }
     }
 
     /// Network callbacks and the timeout mutate client state only on Engine.queue.
@@ -206,14 +224,16 @@ final class LocalWebWallpaperServer {
 
         private let connection: NWConnection
         private let roots: [String: URL]
+        private let userFolders: [String: [URL]]
         private var request = Data()
         private var file: FileHandle?
         private var remaining = 0
         private var timeout: DispatchWorkItem?
 
-        init(connection: NWConnection, roots: [String: URL]) {
+        init(connection: NWConnection, roots: [String: URL], userFolders: [String: [URL]]) {
             self.connection = connection
             self.roots = roots
+            self.userFolders = userFolders
         }
 
         func start(on queue: DispatchQueue) {
@@ -266,8 +286,17 @@ final class LocalWebWallpaperServer {
             let prefix = Self.entryDirectory + "/"
             let relative = components[1].hasPrefix(prefix)
                 ? String(components[1].dropFirst(prefix.count)) : components[1]
+            let served = LocalWebUserDirectory.servedPrefix + "/"
             do {
-                let url = try LocalWebWallpaperPackage.file(relative, inside: root)
+                let url: URL
+                if relative.hasPrefix(served) {
+                    guard let file = LocalWebUserDirectory.file(
+                        "/" + relative.dropFirst(served.count), inside: userFolders[components[0]] ?? []
+                    ) else { send(status: "404 Not Found"); return }
+                    url = file
+                } else {
+                    url = try LocalWebWallpaperPackage.file(relative, inside: root)
+                }
                 let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize!
                 let rangeHeader = lines.dropFirst().first { $0.lowercased().hasPrefix("range:") }
                 let range = Self.byteRange(

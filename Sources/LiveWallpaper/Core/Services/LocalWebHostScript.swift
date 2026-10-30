@@ -49,6 +49,71 @@ enum LocalWebHostScript {
             window.dispatchEvent(new CustomEvent('livewallpaper:properties', {detail:window.__liveWallpaperPropertyValues}));
         };
         window.__liveWallpaperSubscribe = feature => window.webkit.messageHandlers.liveWallpaper.postMessage(feature);
+
+        // Folder listings: the host sends each property's whole listing ([file, modified] pairs)
+        // and the page hears what was added, changed or removed.
+        const directoryDates = {};
+        window.__liveWallpaperDirectoryFiles = {};
+        window.__liveWallpaperSetDirectory = (property, entries) => {
+            const previous = directoryDates[property] || {};
+            const next = Object.fromEntries(entries);
+            const added = entries.filter(([file, date]) => previous[file] !== date).map(([file]) => file);
+            const removed = Object.keys(previous).filter(file => !(file in next));
+            directoryDates[property] = next;
+            window.__liveWallpaperDirectoryFiles[property] = Object.keys(next);
+            if (added.length || removed.length) window.dispatchEvent(new CustomEvent('livewallpaper:directory', {detail:{property, added, removed}}));
+        };
+        // Pages load listed files as file:///Z:/… (or file:///Z%3A/…), which a page served over
+        // http may not read, so those go to the local server, which serves only the chosen folders.
+        const userFile = /^file:\/{2,3}z(?::|%3a)(\/[^?#]*)/i;
+        const userFileBase = location.origin + '/' + location.pathname.split('/')[1] + '/_userdir';
+        function servedURL(value) {
+            const match = typeof value === 'string' ? userFile.exec(value.trim()) : null;
+            if (!match) return value;
+            let path;
+            try { path = decodeURIComponent(match[1]); } catch { return value; }
+            return userFileBase + path.split('/').map(encodeURIComponent).join('/');
+        }
+        // The page keeps reading back the address it set, as it would in the original.
+        const requested = new WeakMap();
+        for (const type of [HTMLImageElement, HTMLMediaElement, HTMLSourceElement]) {
+            const descriptor = Object.getOwnPropertyDescriptor(type.prototype, 'src');
+            Object.defineProperty(type.prototype, 'src', {
+                configurable: true,
+                enumerable: descriptor.enumerable,
+                get() {
+                    const value = descriptor.get.call(this);
+                    const original = requested.get(this);
+                    return original && original.resolved === value ? original.value : value;
+                },
+                set(value) {
+                    const text = String(value), served = servedURL(text);
+                    descriptor.set.call(this, served);
+                    if (served === text) requested.delete(this);
+                    else requested.set(this, {value: text, attribute: served, resolved: descriptor.get.call(this)});
+                }
+            });
+        }
+        const nativeSetAttribute = Element.prototype.setAttribute;
+        const nativeGetAttribute = Element.prototype.getAttribute;
+        const servesSource = element => element instanceof HTMLImageElement || element instanceof HTMLMediaElement || element instanceof HTMLSourceElement;
+        Element.prototype.setAttribute = function(name, value) {
+            if (servesSource(this) && String(name).toLowerCase() === 'src') { this.src = value; return; }
+            return nativeSetAttribute.call(this, name, value);
+        };
+        Element.prototype.getAttribute = function(name) {
+            const value = nativeGetAttribute.call(this, name);
+            if (!servesSource(this) || String(name).toLowerCase() !== 'src') return value;
+            const original = requested.get(this);
+            return original && original.attribute === value ? original.value : value;
+        };
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = (input, init) => nativeFetch(typeof input === 'string' || input instanceof URL ? servedURL(String(input)) : input, init);
+        const nativeOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            return nativeOpen.call(this, method, typeof url === 'string' || url instanceof URL ? servedURL(String(url)) : url, ...rest);
+        };
+        window.webkit?.messageHandlers?.liveWallpaper?.postMessage('directories');
         window.__liveWallpaperSpectrum = values => window.dispatchEvent(new CustomEvent('livewallpaper:spectrum', {detail:values}));
         window.__liveWallpaperMedia = (value, enabled, artworkUnchanged) => {
             if (artworkUnchanged) value.artwork = window.__liveWallpaperMediaState?.value.artwork || '';
