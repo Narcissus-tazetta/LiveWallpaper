@@ -564,7 +564,7 @@ final class SceneRenderer {
                     model, view: model.perspective ? views.perspective : views.flat, images: modelImages,
                     layerPictures: layerPictures, frame: .init(),
                     time: input.time, cursor: input.cursor, audio: input.audio, format: texture.pixelFormat, encoder: encoder,
-                    mipHistory: mipHistory
+                    mipHistory: mipHistory, rigs: rigs
                 )
             }
         }
@@ -959,7 +959,7 @@ final class SceneRenderer {
                     model, view: model.perspective ? views.perspective : views.flat, images: modelImages,
                     layerPictures: layerPictures, frame: .init(),
                     time: input.time, cursor: input.cursor, audio: input.audio, format: target.pixelFormat, encoder: encoder!,
-                    mipHistory: mipHistory
+                    mipHistory: mipHistory, rigs: rigs
                 )
             case let .plane(picture, drawn, space):
                 let tint = drawn.layer.tint
@@ -1047,7 +1047,10 @@ final class SceneRenderer {
             serial: 0, order: 0, alpha: Float(drawn.layer.opacity * drawn.opacity),
             color: SIMD3(Float(tint.red), Float(tint.green), Float(tint.blue)),
             world: drawn.world ?? layer.space?.matrix ?? matrix_identity_float4x4, perspective: false, shapes: [shape],
-            materialValues: drawn.layer.modelValues ?? [:], castsShadow: drawn.layer.castsShadow ?? true
+            materialValues: drawn.layer.modelValues ?? [:],
+            // The shadow pass draws the shape unposed, so a skinned model casts none.
+            castsShadow: layer.model?.skeleton == nil && (drawn.layer.castsShadow ?? true),
+            rig: layer.model?.skeleton
         )
     }
 
@@ -2518,6 +2521,11 @@ final class SceneRenderer {
         staticShapes = staticShapes.filter { modelLayerIDs.contains($0.key) }
         for layer in modelLayers {
             guard let model = layer.model else { continue }
+            if let skeleton = model.skeleton {
+                guard let rig = document.rigs[skeleton], model.maxJoint < rig.bones.count else {
+                    throw SceneSkeletonEvaluator.InvalidSkeleton(detail: "model layer \(layer.name) skins with a missing rig or bone")
+                }
+            }
             if let cached = staticShapes[layer.id], cached.model == model {
                 continue
             }

@@ -78,12 +78,15 @@ struct SceneRenderGraph: Codable, Equatable {
         /// A vertex component of a model a script made, which lays its vertices out itself.
         enum Semantic: String, Codable, CaseIterable {
             case position, normal, tangentSigned, uv, color
+            /// Bone indices as four 32-bit words (not floats), then their weights; they come last so the
+            /// bit positions of the components above stay as they were.
+            case joints, weights
 
             /// Floats per vertex; the components come in this order in a vertex.
             var floats: Int {
                 switch self {
                 case .position, .normal: 3
-                case .tangentSigned, .color: 4
+                case .tangentSigned, .color, .joints, .weights: 4
                 case .uv: 2
                 }
             }
@@ -267,6 +270,8 @@ struct SceneModelLayerFrame: Equatable {
     var shapes: [Shape]
     var materialValues: [String: Double] = [:]
     var castsShadow = true
+    /// The rig whose pose skins the shapes' vertices.
+    var rig: UUID?
 }
 
 /// One mesh a script made, as it should look this frame.

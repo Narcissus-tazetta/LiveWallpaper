@@ -282,6 +282,7 @@ struct SceneScriptPlaybackValues: Decodable {
 
 extension SceneLayer {
     var scriptRigIDs: Set<UUID> {
-        Set((placement?.steps.compactMap(\.skeletonID) ?? []) + (renderGraph?.passes.compactMap { $0.draw?.skeletonID } ?? []))
+        Set((placement?.steps.compactMap(\.skeletonID) ?? []) + (renderGraph?.passes.compactMap { $0.draw?.skeletonID } ?? [])
+            + (model?.skeleton.map { [$0] } ?? []))
     }
 }

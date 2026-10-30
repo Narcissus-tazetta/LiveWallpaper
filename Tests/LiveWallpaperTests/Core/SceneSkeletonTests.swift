@@ -87,6 +87,26 @@ final class SceneSkeletonTests: XCTestCase {
         XCTAssertEqual(pose.opacity[0], 0.75)
     }
 
+    func testLayersBlendWithNormalizedLerpAndFlipToTheShortArc() throws {
+        func turn(_ angle: Float, sign: Float = 1) -> SceneSkeleton.Transform {
+            let q = simd_quatf(angle: angle, axis: [0, 0, 1]).vector * sign
+            return .init(rotation: [q.x, q.y, q.z, q.w])
+        }
+        let skeleton = SceneSkeleton(
+            bones: [.init(name: "root", rest: .init(), inverseBind: identity)],
+            clips: [
+                .init(name: "a", framesPerSecond: 1, frameCount: 1, tracks: [.init(bone: 0, transforms: [turn(0), turn(0)])]),
+                // The same quarter-pitch turn stored as the negated quaternion.
+                .init(name: "b", framesPerSecond: 1, frameCount: 1, tracks: [.init(bone: 0, transforms: [turn(.pi, sign: -1), turn(.pi, sign: -1)])])
+            ],
+            playback: [.init(clip: 0), .init(clip: 1, weight: 0.25)]
+        )
+        let matrix = try SceneSkeletonEvaluator(skeleton).evaluate(time: 0).matrices[0]
+        // normalize(0.75 * (0,0,0,1) + 0.25 * (0,0,1,0)) is the angle 2 * atan(1/3), not a quarter of pi.
+        let expected = 2 * atan(Float(1) / 3)
+        XCTAssertEqual(atan2(matrix.columns.0.y, matrix.columns.0.x), expected, accuracy: 1e-5)
+    }
+
     func testMalformedHierarchyAndTracksAreRejectedBeforePlayback() throws {
         var skeleton = SceneSkeleton(
             bones: [.init(name: "root", parent: 0, rest: .init(), inverseBind: identity)],

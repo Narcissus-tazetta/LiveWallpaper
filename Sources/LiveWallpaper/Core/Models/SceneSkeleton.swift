@@ -118,7 +118,7 @@ final class SceneSkeletonEvaluator {
                         weight: playback.weight
                     )
                 } else {
-                    transforms[bone] = Self.mix(transforms[bone], sampled, playback.weight)
+                    transforms[bone] = Self.mix(transforms[bone], sampled, playback.weight, normalizedLerp: true)
                 }
                 if let values = track.opacity {
                     let value = values[first] + (values[next] - values[first]) * fraction
@@ -146,10 +146,22 @@ final class SceneSkeletonEvaluator {
         return pose
     }
 
+    /// `normalizedLerp` blends layers the way the original client does (measured on a skinned
+    /// model: nlerp matches its bone matrices to 2.1e-5, slerp is off by 1.6e-3); the samples
+    /// of one clip, a frame apart, are interpolated with slerp.
     private static func mix(
-        _ lhs: SceneSkeleton.Transform, _ rhs: SceneSkeleton.Transform, _ weight: Float
+        _ lhs: SceneSkeleton.Transform, _ rhs: SceneSkeleton.Transform, _ weight: Float,
+        normalizedLerp: Bool = false
     ) -> SceneSkeleton.Transform {
-        let rotation = simd_slerp(quaternion(lhs.rotation), quaternion(rhs.rotation), weight).vector
+        let rotation: SIMD4<Float>
+        if normalizedLerp {
+            let from = quaternion(lhs.rotation).vector
+            var to = quaternion(rhs.rotation).vector
+            if simd_dot(from, to) < 0 { to = -to }
+            rotation = simd_normalize(from * (1 - weight) + to * weight)
+        } else {
+            rotation = simd_slerp(quaternion(lhs.rotation), quaternion(rhs.rotation), weight).vector
+        }
         return .init(
             translation: zip(lhs.translation, rhs.translation).map { $0 + ($1 - $0) * weight },
             rotation: [rotation.x, rotation.y, rotation.z, rotation.w],

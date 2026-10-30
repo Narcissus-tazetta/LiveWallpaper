@@ -113,7 +113,7 @@ final class SceneModelRenderer {
                     }
                 }
                 let bytes: Int = switch update.value {
-                case .modelViewProjection, .model, .viewProjection, .shadowMatrix: 64
+                case .modelViewProjection, .model, .viewProjection, .shadowMatrix, .boneMatrices: 64
                 case .layerAlpha, .time, .frameTime, .mipLevels: 4
                 case .normalModel: 48
                 case .layerColor, .eyePosition, .ambientColor, .skylightColor, .screen, .lightOrigin, .lightAxis, .lightColor: 12
@@ -155,10 +155,16 @@ final class SceneModelRenderer {
         for attribute in draw.attributes {
             let semantic = attribute.semantic!
             let element = vertices.attributes[attribute.location]!
-            element.format = switch semantic.floats {
-            case 2: .float2
-            case 3: .float3
-            default: .float4
+            element.format = switch semantic {
+            case .joints: .uint4
+            default: switch semantic.floats {
+                case 2: .float2
+                case 3: .float3
+                default: .float4
+                }
+            }
+            if semantic == .joints || semantic == .weights, offsets[semantic] == nil {
+                throw ModelError(detail: "material \(material.source.path) skins vertices that have no bone data")
             }
             if let offset = offsets[semantic] {
                 element.offset = offset
@@ -248,8 +254,12 @@ final class SceneModelRenderer {
         _ layer: SceneModelLayerFrame, view: View, images: [String: MTLTexture], layerPictures: [Int: MTLTexture] = [:],
         frame: SceneRenderGraphRenderer.FrameValues, time: Double, cursor: SIMD2<Float>?,
         audio: SceneAudioSpectrum?, format: MTLPixelFormat, encoder: MTLRenderCommandEncoder,
-        mipHistory: MTLTexture? = nil
+        mipHistory: MTLTexture? = nil, rigs: SceneSkeletonRegistry? = nil
     ) throws {
+        let pose = try layer.rig.map { id in
+            guard let rigs else { throw ModelError(detail: "skinned model without rigs") }
+            return try rigs.evaluator(id).evaluate(time: time)
+        }
         let values = SceneRenderGraphRenderer.ModelValues(
             modelViewProjection: view.viewProjection * layer.world, model: layer.world, viewProjection: view.viewProjection,
             alpha: layer.alpha, color: layer.color, eye: view.eye, ambient: view.ambient, skylight: view.skylight,
@@ -285,8 +295,13 @@ final class SceneModelRenderer {
             }
             encoder.setCullMode(cull)
             for (stage, isVertex) in [(draw.vertex, true), (draw.fragment, false)] {
+                for update in stage.updates where update.value == .boneMatrices {
+                    guard let pose, update.offset + pose.matrices.count * (update.stride ?? 64) <= stage.uniforms.count,
+                          (update.stride ?? 64) >= 64
+                    else { throw ModelError(detail: "material \(material.source.path) needs a pose that fits its bone array") }
+                }
                 let data = SceneRenderGraphRenderer.updatedUniforms(
-                    stage, frame: frame, model: values, resources: resources, time: time, cursor: cursor, pose: nil,
+                    stage, frame: frame, model: values, resources: resources, time: time, cursor: cursor, pose: pose,
                     effectValues: (material.source.values ?? [:]).merging(layer.materialValues) { _, new in new }, audio: audio
                 ) ?? stage.uniforms
                 guard !data.isEmpty else { continue }

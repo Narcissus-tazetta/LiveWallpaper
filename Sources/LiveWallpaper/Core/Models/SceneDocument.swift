@@ -689,6 +689,8 @@ struct SceneStaticModel: Codable, Equatable {
     var vertices: Data
     /// Little-endian 32-bit vertex indices, three to a triangle.
     var indices: Data
+    /// The rig whose pose skins the vertices; their components then include joints and weights.
+    var skeleton: UUID?
 
     private var floatsPerVertex: Int {
         SceneRenderGraph.Attribute.Semantic.allCases.enumerated()
@@ -703,6 +705,26 @@ struct SceneStaticModel: Codable, Equatable {
             (0 ..< indices.count / 4).allSatisfy { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian < count }
         }
     }
+
+    /// The highest bone index any vertex names; -1 without joints.
+    var maxJoint: Int {
+        guard components & Self.jointsBit != 0 else { return -1 }
+        let semantics = SceneRenderGraph.Attribute.Semantic.allCases
+        let jointsIndex = semantics.firstIndex(of: .joints)!
+        let before = semantics.prefix(jointsIndex).enumerated()
+            .reduce(0) { $0 + (components & (1 << UInt32($1.offset)) != 0 ? $1.element.floats : 0) }
+        let stride = floatsPerVertex
+        return vertices.withUnsafeBytes { bytes in
+            (0 ..< vertices.count / (stride * 4)).reduce(-1) { highest, vertex in
+                (0 ..< 4).reduce(highest) { highest, slot in
+                    let word = bytes.loadUnaligned(fromByteOffset: (vertex * stride + before + slot) * 4, as: UInt32.self).littleEndian
+                    return max(highest, Int(min(word, UInt32(Int32.max))))
+                }
+            }
+        }
+    }
+
+    private static let jointsBit = UInt32(1) << UInt32(SceneRenderGraph.Attribute.Semantic.allCases.firstIndex(of: .joints)!)
 
     var shape: SceneModelLayerFrame.Shape {
         let floats = vertices.withUnsafeBytes { bytes in
