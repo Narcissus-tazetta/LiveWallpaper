@@ -35,6 +35,13 @@ extension WallpaperModel {
                     sceneComparisonSnapshots.removeValue(forKey: path)
                     SceneScriptPermissions.carry(scene, replacing: previous, path: path)
                     registerImportedScene(scene, path: path)
+                    let unapproved = sceneDocumentsByPath[path]?.scripts.filter { !$0.isAuthorized }.count ?? -1
+                    AppLog.externalWallpapers.info("""
+                    reconverted \(id, privacy: .public): previous \(previous == nil ? "none" : "found", privacy: .public), \
+                    previous scripts \(previous?.scripts.count ?? -1, privacy: .public) allowed \(previous?.scripts.allSatisfy(\.isAuthorized) == true, privacy: .public), \
+                    origin \(scene.scriptOrigin == nil ? "none" : (scene.scriptOrigin == previous?.scriptOrigin ? "same" : "changed"), privacy: .public), \
+                    unapproved after \(unapproved, privacy: .public)
+                    """)
                     requestSceneScriptApproval(id: "we-import.json/\(id)", name: registeredVideoDisplayName(for: path), path: path)
                     scheduleSceneBake(path: path)
                     reloadPlayback(forRewrittenPath: path)

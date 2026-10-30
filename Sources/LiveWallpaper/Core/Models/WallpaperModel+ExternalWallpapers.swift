@@ -138,6 +138,7 @@ extension WallpaperModel {
         if let scene {
             SceneScriptPermissions.carry(scene, from: wallpaper.path, to: localURL.path)
             registerImportedScene(scene, path: localURL.path)
+            requestSceneScriptApproval(id: id, name: wallpaper.name, path: localURL.path)
             let extKey = "authorSettings.external." + id
             if let saved = try? LocalWebSettings.load(key: extKey), !saved.values.isEmpty {
                 let sceneKey = "authorSettings.scene." + localURL.standardizedFileURL.path
@@ -165,6 +166,10 @@ extension WallpaperModel {
             return
         }
         pendingShowExternalWallpaperID = nil
+        // Asked when the scene is about to be shown, not when it is prepared: preparing runs
+        // for every scene of the store after each reconversion, and asking for all of them
+        // buries the user in questions about wallpapers they are not using.
+        requestSceneScriptApproval(id: id, name: wallpaper.name, path: wallpaper.path)
         guard activeExternalWallpaperID != id else { return }
         let previousPath = activeExternalWallpaper?.path
         let changesWeb = isWebWallpaperActive || wallpaper.webSource != nil
@@ -326,16 +331,27 @@ extension WallpaperModel {
         let task = Task { @MainActor [weak self] in
             do {
                 // Copying tens of megabytes of images stays off the main thread.
-                var document = try await Task.detached(priority: .utility) {
+                // The previous scene goes with the folder below; its allowed scripts are what a
+                // rewritten copy of the same package must keep.
+                let (imported, previous) = try await Task.detached(priority: .utility) {
                     let bakeFolder = URL(fileURLWithPath: videoPath).deletingLastPathComponent()
+                    var previous: SceneDocument?
                     if FileManager.default.fileExists(atPath: bakeFolder.path) {
+                        do {
+                            previous = try SceneStore.load(videoPath: videoPath).map { SceneScriptPermissions.restored($0, path: videoPath) }
+                        } catch {
+                            AppLog.externalWallpapers.error("previous scene of \(id, privacy: .public) not read: \(error.localizedDescription, privacy: .public)")
+                        }
                         try FileManager.default.removeItem(at: bakeFolder)
                     }
                     try FileManager.default.createDirectory(at: bakeFolder, withIntermediateDirectories: true)
-                    return try SceneStore.importScene(from: URL(fileURLWithPath: folder, isDirectory: true), videoPath: videoPath)
+                    let document = try SceneStore.importScene(from: URL(fileURLWithPath: folder, isDirectory: true), videoPath: videoPath)
+                    return (document, previous)
                 }.value
+                var document = imported
                 try Task.checkCancellation()
                 guard let self else { return }
+                SceneScriptPermissions.carry(document, replacing: previous ?? self.sceneDocumentsByPath[videoPath], path: videoPath)
                 let settings = try LocalWebSettings.load(key: "authorSettings.external." + id)
                 if !settings.values.isEmpty {
                     let sourceDirectory = document.authorSourceDirectory
@@ -355,7 +371,6 @@ extension WallpaperModel {
                 }
                 try Task.checkCancellation()
                 self.registerImportedScene(document, path: videoPath)
-                self.requestSceneScriptApproval(id: id, name: wallpaper.name, path: videoPath)
                 let meta = ExternalWallpaperProviderMonitor.BakedSceneMeta(
                     sceneRevision: revision,
                     appSignature: ExternalWallpaperProviderMonitor.currentAppSignature
