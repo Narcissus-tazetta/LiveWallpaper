@@ -133,6 +133,7 @@ final class WallpaperModel: ObservableObject {
     var webInteractionObserver: NSObjectProtocol?
     /// The page that got the last press, so the drag and release go to it too.
     var webInteractionPressTarget: WebPlayerView?
+    var webInteractionLastHover: TimeInterval = 0
     var webInteractionWheelProbe: (location: CGPoint, time: TimeInterval, accepted: Bool)?
     @Published var displayMode: DisplayMode = .mainOnly
     @Published var fitMode: VideoFitMode = .fill

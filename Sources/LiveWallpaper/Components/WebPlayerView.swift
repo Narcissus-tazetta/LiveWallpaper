@@ -23,8 +23,9 @@ final class WebPlayerView: NSView {
     })();
     """
 
-    /// The wallpaper window ignores the mouse, so desktop clicks are replayed into the
-    /// page as synthetic events. Only elements that look clickable take a press;
+    /// The wallpaper window ignores the mouse, so desktop pointer events are replayed into the
+    /// page as synthetic events. A press goes to the clickable element under it, else to
+    /// whatever element is there (a canvas listens for presses without looking clickable);
     /// range inputs ignore synthetic events and are driven by value instead.
     private static let pointerForwardScript = """
     (function() {
@@ -39,11 +40,20 @@ final class WebPlayerView: NSView {
         }
         return null;
       }
-      function fire(el, name, x, y, buttons, pointer) {
+      var lastX = null, lastY = null;
+      // Pages measure pointer speed with movementX/Y, which a synthetic event only carries if given.
+      function fire(el, name, x, y, buttons, pointer, mx, my) {
         var o = { bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y,
                   screenX: x, screenY: y, button: 0, buttons: buttons, detail: 1,
+                  movementX: mx || 0, movementY: my || 0,
                   pointerId: 1, pointerType: 'mouse', isPrimary: true };
         el.dispatchEvent(pointer ? new PointerEvent(name, o) : new MouseEvent(name, o));
+      }
+      function fireMove(el, x, y, buttons) {
+        var mx = lastX === null ? 0 : x - lastX, my = lastY === null ? 0 : y - lastY;
+        lastX = x; lastY = y;
+        fire(el, 'pointermove', x, y, buttons, true, mx, my);
+        fire(el, 'mousemove', x, y, buttons, false, mx, my);
       }
       function setRange(el, x) {
         var r = el.getBoundingClientRect();
@@ -53,6 +63,11 @@ final class WebPlayerView: NSView {
         el.dispatchEvent(new Event('input', { bubbles: true }));
       }
       window.__liveWallpaperPointer = function(phase, x, y, dx, dy) {
+        if (phase === 'hover') {
+          var over = document.elementFromPoint(x, y) || document.body;
+          fireMove(over, x, y, 0);
+          return true;
+        }
         if (phase === 'wheel') {
           for (var el = document.elementFromPoint(x, y); el; el = el.parentElement) {
             if (/(auto|scroll)/.test(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight) {
@@ -63,10 +78,12 @@ final class WebPlayerView: NSView {
           return false;
         }
         if (phase === 'down') {
-          target = interactive(document.elementFromPoint(x, y));
+          var hit = document.elementFromPoint(x, y);
+          target = interactive(hit) || hit;
           if (!target) return false;
           isRange = target.matches('input[type=range]');
           if (isRange) { setRange(target, x); return true; }
+          lastX = x; lastY = y;
           fire(target, 'pointerdown', x, y, 1, true);
           fire(target, 'mousedown', x, y, 1, false);
           return true;
@@ -74,8 +91,7 @@ final class WebPlayerView: NSView {
         if (!target) return false;
         if (phase === 'move') {
           if (isRange) { setRange(target, x); return true; }
-          fire(target, 'pointermove', x, y, 1, true);
-          fire(target, 'mousemove', x, y, 1, false);
+          fireMove(target, x, y, 1);
           return true;
         }
         var t = target;
@@ -91,11 +107,11 @@ final class WebPlayerView: NSView {
     """
 
     enum PointerPhase: String {
-        case down, move, up, wheel
+        case down, move, up, wheel, hover
     }
 
     /// `point` is in page coordinates (top-left origin). `onDeclined` runs when the page
-    /// had nothing clickable there, so the rest of that press is not forwarded.
+    /// had no element there, so the rest of that press is not forwarded.
     func forwardPointer(
         _ phase: PointerPhase, at point: CGPoint, scroll: CGVector = .zero, onDeclined: (() -> Void)? = nil
     ) {

@@ -120,7 +120,9 @@ final class LocalWebWallpaperServer {
             ports[key] = ["port": Int(port), "token": token]
             UserDefaults.standard.set(ports, forKey: Self.portsKey)
         }
-        return URL(string: "http://127.0.0.1:\(port)/\(token)/")!
+        // Pages written for a site layout reference siblings of their folder as `../assets/…`; the
+        // extra segment lets that resolve inside the token instead of escaping to the server root.
+        return URL(string: "http://127.0.0.1:\(port)/\(token)/\(Client.entryDirectory)/")!
             .appendingPathComponent(package.entryPoint)
     }
 
@@ -200,6 +202,8 @@ final class LocalWebWallpaperServer {
 
     /// Network callbacks and the timeout mutate client state only on Engine.queue.
     private final class Client: @unchecked Sendable {
+        static let entryDirectory = "_entry"
+
         private let connection: NWConnection
         private let roots: [String: URL]
         private var request = Data()
@@ -259,8 +263,11 @@ final class LocalWebWallpaperServer {
             guard components.count == 2, let root = roots[components[0]] else {
                 send(status: "404 Not Found"); return
             }
+            let prefix = Self.entryDirectory + "/"
+            let relative = components[1].hasPrefix(prefix)
+                ? String(components[1].dropFirst(prefix.count)) : components[1]
             do {
-                let url = try LocalWebWallpaperPackage.file(components[1], inside: root)
+                let url = try LocalWebWallpaperPackage.file(relative, inside: root)
                 let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize!
                 let rangeHeader = lines.dropFirst().first { $0.lowercased().hasPrefix("range:") }
                 let range = Self.byteRange(

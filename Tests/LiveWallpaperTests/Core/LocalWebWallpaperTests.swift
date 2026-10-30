@@ -68,6 +68,16 @@ final class LocalWebWallpaperTests: XCTestCase {
         XCTAssertEqual(mime.mimeType, "text/javascript")
     }
 
+    func testParentRelativeAssetsResolveInsideThePackage() async throws {
+        try Data("skel".utf8).write(to: folder.appendingPathComponent("model.skel"))
+        let server = LocalWebWallpaperServer()
+        let url = try await server.url(folder: folder)
+        let sibling = try XCTUnwrap(URL(string: "../model.skel", relativeTo: url)).absoluteURL
+        let (data, response) = try await URLSession.shared.data(from: sibling)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        XCTAssertEqual(data, Data("skel".utf8))
+    }
+
     func testCopiedPackageSurvivesItsProviderFolderBeingRemoved() async throws {
         let saved = directory.appendingPathComponent("saved")
         try LocalWebWallpaperPackage.copy(from: folder, to: saved)

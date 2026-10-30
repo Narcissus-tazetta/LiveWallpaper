@@ -5,8 +5,8 @@ import ApplicationServices
 ///
 /// Files and folders on the desktop always win: a press only reaches the page when
 /// Finder reports empty desktop under the cursor (needs the Accessibility
-/// permission), nothing else is in front of the desktop, and the page has
-/// something clickable there.
+/// permission) and nothing else is in front of the desktop. Button-less movement and
+/// the move/up of a press that started on the page are delivered regardless.
 @MainActor
 extension WallpaperModel {
     func setWebInteractionEnabled(_ enabled: Bool) {
@@ -40,7 +40,7 @@ extension WallpaperModel {
         let active = webInteractionEnabled && clickThrough && hasWebDisplay && AXIsProcessTrusted()
         if active, webInteractionMonitor == nil {
             webInteractionMonitor = NSEvent.addGlobalMonitorForEvents(
-                matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp, .scrollWheel]
+                matching: [.mouseMoved, .leftMouseDown, .leftMouseDragged, .leftMouseUp, .scrollWheel]
             ) { [weak self] event in
                 let type = event.type
                 // scrollingDelta* raises for any other event type.
@@ -64,6 +64,14 @@ extension WallpaperModel {
     private func handleWebInteraction(type: NSEvent.EventType, scroll: CGVector) {
         let location = NSEvent.mouseLocation
         switch type {
+        case .mouseMoved:
+            // A pointer-move burst is coalesced to ~60 Hz so evaluateJavaScript calls do not pile up.
+            let now = ProcessInfo.processInfo.systemUptime
+            guard now - webInteractionLastHover >= 1.0 / 60, let (view, point) = webViewUnderCursor(at: location) else {
+                return
+            }
+            webInteractionLastHover = now
+            view.forwardPointer(.hover, at: point)
         case .leftMouseDown:
             webInteractionPressTarget = nil
             guard let (view, point) = webViewUnderCursor(at: location), isEmptyDesktop(at: location) else {
