@@ -280,6 +280,42 @@ final class LocalWebWallpaperTests: XCTestCase {
         XCTAssertFalse(bytes.isEmpty)
     }
 
+    func testFolderWithoutManifestUsesIndexHTMLAndOffersOnlySubscribedFeatures() throws {
+        let bare = directory.appendingPathComponent("bare")
+        try FileManager.default.createDirectory(at: bare, withIntermediateDirectories: true)
+        XCTAssertThrowsError(try LocalWebWallpaperPackage.load(folder: bare))
+        try "<script>liveWallpaper.subscribe( 'spectrum' )</script>".write(
+            to: bare.appendingPathComponent("index.html"), atomically: true, encoding: .utf8
+        )
+        let package = try LocalWebWallpaperPackage.load(folder: bare)
+        XCTAssertEqual(package.entryPoint, "index.html")
+        XCTAssertEqual(package.supportsSpectrum, true)
+        XCTAssertEqual(package.supportsMedia, false)
+    }
+
+    func testHandWrittenPageReadsCurrentValuesThroughLiveWallpaper() async throws {
+        let server = LocalWebWallpaperServer()
+        let url = try await server.url(folder: folder)
+        let view = WebPlayerView(frame: NSRect(x: 0, y: 0, width: 320, height: 180))
+        let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = view
+        window.orderFront(nil)
+        defer { view.tearDown(); window.close() }
+        let loaded = expectation(description: "loaded")
+        view.onLoadStateChanged = { state in if state == .loaded { loaded.fulfill() } }
+        view.setLocalConfiguration(values: ["speed": .number(3)], settings: LocalWebSettings())
+        view.load(
+            request: .init(loadContent: .url(url), layoutMode: .generic, canonicalKey: "api", isLocalPackage: true),
+            audioEnabled: false
+        )
+        await fulfillment(of: [loaded], timeout: 10)
+        let result = try await view.webView.evaluateJavaScript(
+            "JSON.stringify([liveWallpaper.properties.speed, liveWallpaper.state.paused, liveWallpaper.media.state, (() => { try { liveWallpaper.subscribe('x'); } catch (e) { return e.name; } })()])"
+        ) as? String
+        XCTAssertEqual(result, "[3,false,\"stopped\",\"RangeError\"]")
+    }
+
     func testLocalPageAnimationPausesResumesAndReceivesHostSettings() async throws {
         let html = """
         <html><body style="background:#245b82"><script>

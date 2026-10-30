@@ -49,6 +49,17 @@ enum LocalWebHostScript {
             window.dispatchEvent(new CustomEvent('livewallpaper:properties', {detail:window.__liveWallpaperPropertyValues}));
         };
         window.__liveWallpaperSubscribe = feature => window.webkit.messageHandlers.liveWallpaper.postMessage(feature);
+        // Hand-written pages read their current values here; the events carry later changes.
+        window.liveWallpaper = Object.freeze({
+            get properties() { return window.__liveWallpaperPropertyValues; },
+            get state() { return {...state}; },
+            get media() { return window.__liveWallpaperMediaState?.value || null; },
+            get directories() { return window.__liveWallpaperDirectoryFiles; },
+            subscribe: feature => {
+                if (feature !== 'spectrum' && feature !== 'media') throw new RangeError('Unknown feature: ' + feature);
+                window.__liveWallpaperSubscribe(feature);
+            }
+        });
 
         // Folder listings: the host sends each property's whole listing ([file, modified] pairs)
         // and the page hears what was added, changed or removed.

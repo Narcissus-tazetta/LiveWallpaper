@@ -1672,3 +1672,6 @@
 "ずれの向き(度)" = "Hướng lệch (°)";
 
 "ブロックの大きさ" = "Kích thước khối";
+
+"index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Sao chép nội dung thư mục có index.html và dùng làm hình nền web.";
+"フォルダから追加…" = "Thêm từ thư mục…";

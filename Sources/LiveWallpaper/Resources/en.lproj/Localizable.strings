@@ -1672,3 +1672,6 @@
 "ずれの向き(度)" = "Offset direction (°)";
 
 "ブロックの大きさ" = "Block size";
+
+"index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Copies the contents of a folder that contains index.html and uses it as a web wallpaper.";
+"フォルダから追加…" = "Add from Folder…";

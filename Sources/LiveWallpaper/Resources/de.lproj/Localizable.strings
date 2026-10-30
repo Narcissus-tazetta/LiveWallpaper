@@ -1672,3 +1672,6 @@
 "ずれの向き(度)" = "Versatzrichtung (°)";
 
 "ブロックの大きさ" = "Blockgröße";
+
+"index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Kopiert den Inhalt eines Ordners mit index.html und verwendet ihn als Web-Hintergrundbild.";
+"フォルダから追加…" = "Aus Ordner hinzufügen …";

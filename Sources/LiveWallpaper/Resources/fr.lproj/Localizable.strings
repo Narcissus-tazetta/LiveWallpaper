@@ -1672,3 +1672,6 @@
 "ずれの向き(度)" = "Direction du décalage (°)";
 
 "ブロックの大きさ" = "Taille des blocs";
+
+"index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Copie le contenu d’un dossier contenant index.html et l’utilise comme fond d’écran web.";
+"フォルダから追加…" = "Ajouter depuis un dossier…";
