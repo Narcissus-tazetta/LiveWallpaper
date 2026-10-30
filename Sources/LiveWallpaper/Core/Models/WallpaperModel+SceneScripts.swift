@@ -58,6 +58,7 @@ extension WallpaperModel {
         script.usesTime = sample.usesTime
         script.usesCursor = sample.usesCursor
         script.usesTimeOfDay = sample.usesTimeOfDay
+        script.readsAudio = sample.readsAudio
         if sample == .blank { script.params = [:] }
         script.targetsAllLayers = sample == .blank || sample == .master
         document.scripts.append(script)

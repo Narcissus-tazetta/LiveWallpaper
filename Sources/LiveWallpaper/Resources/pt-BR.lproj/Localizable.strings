@@ -1570,3 +1570,11 @@
 "下のレイヤーを入力にする" = "Usar as camadas abaixo como entrada";
 
 "画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Usa a imagem abaixo desta camada como entrada, no lugar de uma imagem. Combinado com um movimento, pode balançar ou distorcer o que está abaixo.";
+
+"音に合わせて拡大" = "Ampliar com o som";
+
+"音に合わせて粒子の色を変更" = "Mudar a cor das partículas com o som";
+
+"システム音" = "Áudio do sistema";
+
+"システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Lê a intensidade das faixas de frequência do áudio do sistema em ctx.audio. Os valores só chegam quando “Reagir ao áudio do sistema” é permitido para o plano de fundo.";

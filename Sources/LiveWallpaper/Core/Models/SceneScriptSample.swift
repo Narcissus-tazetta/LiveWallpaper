@@ -5,9 +5,11 @@ enum SceneScriptSample: String, CaseIterable, Identifiable {
     case cursor, cursorTilt, cursorDistance, cursorMask
     case timeOfDay, dayVisibility, dayParticles
     case effects, effectOrbit, effectKinds, particles, palette, particleWind, particleCursor, depthPulse, blendCycle
+    case audioPulse, audioColor
     var id: String { rawValue }
-    var usesTime: Bool { ![.blank, .cursor, .cursorTilt, .cursorDistance, .cursorMask, .timeOfDay, .dayVisibility, .dayParticles, .particleCursor].contains(self) }
+    var usesTime: Bool { ![.blank, .audioPulse, .audioColor, .cursor, .cursorTilt, .cursorDistance, .cursorMask, .timeOfDay, .dayVisibility, .dayParticles, .particleCursor].contains(self) }
     var usesCursor: Bool { [.master, .cursor, .cursorTilt, .cursorDistance, .cursorMask, .particleCursor].contains(self) }
+    var readsAudio: Bool { [.audioPulse, .audioColor].contains(self) }
     var usesTimeOfDay: Bool { [.master, .timeOfDay, .dayVisibility, .dayParticles].contains(self) }
     var title: String {
         switch self {
@@ -39,6 +41,8 @@ enum SceneScriptSample: String, CaseIterable, Identifiable {
         case .particleCursor: "粒子をカーソルに集める"
         case .depthPulse: "立体感をゆっくり変える"
         case .blendCycle: "合成モードを切り替え"
+        case .audioPulse: "音に合わせて拡大"
+        case .audioColor: "音に合わせて粒子の色を変更"
         }
     }
     var source: String {
@@ -121,6 +125,27 @@ enum SceneScriptSample: String, CaseIterable, Identifiable {
               return ctx.targets.filter(layer => layer.appearance.hasDepthMap).map(layer => ({
                 id: layer.id,
                 appearance: { depthStrength: (wave(ctx.phase) + 1) * 0.4, depthAutoMotion: 0.3 }
+              }));
+            }
+            """
+        case .audioPulse:
+            """
+            function update(ctx) {
+              // ctx.audio is null while nothing plays or the sound reaction is not allowed.
+              const low = ctx.audio ? ctx.audio.left.slice(0, 8).reduce((sum, v) => sum + v, 0) / 8 : 0;
+              return ctx.targets.map(layer => ({
+                id: layer.id,
+                values: { scale: 1 + low * ctx.params.amount * 4 }
+              }));
+            }
+            """
+        case .audioColor:
+            """
+            function update(ctx) {
+              const high = ctx.audio ? ctx.audio.left.slice(32, 64).reduce((sum, v) => sum + v, 0) / 32 : 0;
+              return ctx.targets.filter(layer => layer.particles).map(layer => ({
+                id: layer.id,
+                particles: { color: hsv(0.55 + high * 0.4, 0.7, 1), opacity: 0.4 + high * 0.6 }
               }));
             }
             """

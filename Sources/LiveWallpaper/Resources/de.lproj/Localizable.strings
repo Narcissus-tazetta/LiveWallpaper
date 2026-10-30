@@ -1570,3 +1570,11 @@
 "下のレイヤーを入力にする" = "Ebenen darunter als Eingabe verwenden";
 
 "画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Verwendet das Bild unter dieser Ebene statt einer Bilddatei als Eingabe. Zusammen mit einer Bewegung lässt sich das Darunterliegende wackeln oder verzerren.";
+
+"音に合わせて拡大" = "Mit dem Klang skalieren";
+
+"音に合わせて粒子の色を変更" = "Partikelfarbe mit dem Klang ändern";
+
+"システム音" = "Systemton";
+
+"システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Liest die Stärke der Frequenzbänder des Systemtons als ctx.audio. Werte kommen nur an, wenn „Auf Systemton reagieren“ für den Hintergrund erlaubt ist.";

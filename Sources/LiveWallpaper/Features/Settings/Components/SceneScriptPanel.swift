@@ -81,6 +81,8 @@ struct SceneScriptPanel: View {
             Toggle(model.localizedString("カーソル"), isOn: boolBinding(script, \.usesCursor))
             Toggle(model.localizedString("曲情報"), isOn: boolBinding(script, \.usesMedia))
                 .help(model.localizedString("起動中のアプリから曲名・ジャケット・再生状態を取得します。初回はオートメーションの許可が必要です。"))
+            Toggle(model.localizedString("システム音"), isOn: boolBinding(script, \.readsAudio))
+                .help(model.localizedString("システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。"))
         }.toggleStyle(.checkbox)
         Toggle(model.localizedString("全レイヤーを管理（追加したレイヤーも含む）"), isOn: boolBinding(script, \.targetsAllLayers))
             .toggleStyle(.checkbox)

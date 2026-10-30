@@ -1570,3 +1570,11 @@
 "下のレイヤーを入力にする" = "Dùng các lớp bên dưới làm đầu vào";
 
 "画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Dùng hình ảnh bên dưới lớp này làm đầu vào thay cho ảnh. Kết hợp với chuyển động, bạn có thể làm rung hoặc méo hình bên dưới.";
+
+"音に合わせて拡大" = "Phóng to theo âm thanh";
+
+"音に合わせて粒子の色を変更" = "Đổi màu hạt theo âm thanh";
+
+"システム音" = "Âm thanh hệ thống";
+
+"システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Đọc cường độ các dải tần của âm thanh hệ thống qua ctx.audio. Chỉ có giá trị khi cho phép “Phản ứng với âm thanh hệ thống” cho hình nền này.";

@@ -1570,3 +1570,11 @@
 "下のレイヤーを入力にする" = "Alttaki katmanları girdi olarak kullan";
 
 "画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Bir görüntü yerine bu katmanın altındaki resmi girdi olarak kullanır. Bir hareketle birleştirildiğinde alttakini sallayabilir veya bozabilir.";
+
+"音に合わせて拡大" = "Sese göre büyüt";
+
+"音に合わせて粒子の色を変更" = "Sese göre parçacık rengini değiştir";
+
+"システム音" = "Sistem sesi";
+
+"システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Sistem sesinin frekans bantlarının şiddetini ctx.audio ile okur. Değerler yalnızca duvar kâğıdı için “Sistem sesine tepki ver” izni verildiğinde gelir.";

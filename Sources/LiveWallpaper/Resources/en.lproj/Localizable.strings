@@ -1570,3 +1570,11 @@
 "下のレイヤーを入力にする" = "Use the layers below as input";
 
 "画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Uses the picture below this layer as the input instead of an image. Combined with a motion, it can shake or distort what is below.";
+
+"音に合わせて拡大" = "Scale with the sound";
+
+"音に合わせて粒子の色を変更" = "Change particle color with the sound";
+
+"システム音" = "System audio";
+
+"システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Read the strength of the system audio’s frequency bands as ctx.audio. Values arrive only when “React to system audio” is allowed for the wallpaper.";
