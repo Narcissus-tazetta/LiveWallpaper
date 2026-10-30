@@ -1650,3 +1650,25 @@
 "視差の移動量" = "Parallax travel";
 
 "視差の追従の速さ" = "Parallax follow speed";
+
+"画像エフェクト" = "Image effects";
+
+"色調補正" = "Color adjustment";
+
+"ぼかし(画像)" = "Blur";
+
+"色ずれ" = "Chromatic aberration";
+
+"モザイク" = "Pixelate";
+
+"グリッチ" = "Glitch";
+
+"コントラスト" = "Contrast";
+
+"ぼかしの半径" = "Blur radius";
+
+"ずれの大きさ" = "Offset amount";
+
+"ずれの向き(度)" = "Offset direction (°)";
+
+"ブロックの大きさ" = "Block size";

@@ -13,6 +13,13 @@ extension SettingsView {
         132
     }
 
+    func sceneEffectDisplayName(_ effect: SceneEffect) -> String {
+        if let builtIn = effect.builtIn.flatMap(SceneBuiltInEffect.init(rawValue:)) {
+            return model.localizedString(builtIn.title)
+        }
+        return sceneEffectName(effect.kind)
+    }
+
     func sceneEffectName(_ kind: SceneEffectKind) -> String {
         switch kind {
         case .shake: model.localizedString("揺れ")
@@ -172,6 +179,15 @@ extension SettingsView {
                         sceneAddEffectButton(.twirl, path: path, layerID: layer.id)
                         sceneAddEffectButton(.pulse, path: path, layerID: layer.id)
                     }
+                    Section(model.localizedString("画像エフェクト")) {
+                        ForEach(SceneBuiltInEffect.allCases) { builtIn in
+                            Button(model.localizedString(builtIn.title)) {
+                                let effect = builtIn.makeEffect()
+                                updateSceneLayerEffects(path: path, layerID: layer.id) { $0.append(effect) }
+                                selectedSceneEffectID = effect.id
+                            }
+                        }
+                    }
                     Section(model.localizedString("細かく設定できる動き")) {
                         // A shader effect needs a renderGraph only an import supplies; added by hand it would be empty.
                         ForEach(SceneEffectKind.allCases.filter { $0.runsOnRealTime && $0 != .shader }, id: \.self) { kind in
@@ -267,7 +283,7 @@ extension SettingsView {
                 selectedSceneEffectID = effect.id
             } label: {
                 HStack(spacing: 6) {
-                    Text(sceneEffectName(effect.kind))
+                    Text(sceneEffectDisplayName(effect))
                         .foregroundColor(effect.isEnabled ? .primary : .secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if effect.maskFile != nil {
@@ -296,7 +312,29 @@ extension SettingsView {
     private func sceneEffectInspector(path: String, layerID: UUID, effect: SceneEffect) -> some View {
         let loopSeconds = model.sceneDocumentsByPath[path]?.loopSeconds ?? 20
         VStack(alignment: .leading, spacing: 8) {
-            if effect.kind == .shader {
+            if effect.kind == .shader, let builtIn = effect.builtIn.flatMap(SceneBuiltInEffect.init(rawValue:)) {
+                ForEach(builtIn.parameters, id: \.key) { parameter in
+                    HStack(spacing: 12) {
+                        Text(model.localizedString(parameter.title))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(width: sceneEffectLabelWidth, alignment: .leading)
+                        Slider(
+                            value: Binding(
+                                get: { effect.values[parameter.key] ?? parameter.initial },
+                                set: { value in
+                                    updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) { $0.values[parameter.key] = value }
+                                }
+                            ),
+                            in: parameter.range
+                        )
+                        .accessibilityLabel(model.localizedString(parameter.title))
+                        Text(String(format: "%.2f", locale: model.appLocale, effect.values[parameter.key] ?? parameter.initial))
+                            .font(.caption.monospacedDigit())
+                            .foregroundColor(.secondary)
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+            } else if effect.kind == .shader {
                 settingsFootnote(model.localizedString("この効果は作品に含まれるシェーダーで描画します。範囲の描き直しには未対応です。"))
             } else {
             if effect.kind == .opacityMask {

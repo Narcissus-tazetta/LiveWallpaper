@@ -1650,3 +1650,25 @@
 "視差の移動量" = "Parallaxenweg";
 
 "視差の追従の速さ" = "Parallaxen-Folgegeschwindigkeit";
+
+"画像エフェクト" = "Bildeffekte";
+
+"色調補正" = "Farbkorrektur";
+
+"ぼかし(画像)" = "Weichzeichner";
+
+"色ずれ" = "Chromatische Aberration";
+
+"モザイク" = "Verpixeln";
+
+"グリッチ" = "Glitch";
+
+"コントラスト" = "Kontrast";
+
+"ぼかしの半径" = "Unschärferadius";
+
+"ずれの大きさ" = "Versatz";
+
+"ずれの向き(度)" = "Versatzrichtung (°)";
+
+"ブロックの大きさ" = "Blockgröße";

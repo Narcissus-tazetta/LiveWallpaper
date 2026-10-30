@@ -14,7 +14,7 @@ struct SceneBloom: Codable, Equatable {
     /// The blur's reach in texels of the half-size copy the blur runs on.
     var radius = 2.5
 
-    private static let vertex = """
+    static let vertex = """
     #include <metal_stdlib>
     using namespace metal;
     struct V { float4 position [[position]]; float2 uv; };
@@ -24,7 +24,7 @@ struct SceneBloom: Codable, Equatable {
     }
     """
 
-    private static let brightPass = """
+    static let brightPass = """
     #include <metal_stdlib>
     using namespace metal;
     struct V { float4 position [[position]]; float2 uv; };
@@ -36,7 +36,7 @@ struct SceneBloom: Codable, Equatable {
     }
     """
 
-    private static let blurPass = """
+    static let blurPass = """
     #include <metal_stdlib>
     using namespace metal;
     struct V { float4 position [[position]]; float2 uv; };
@@ -54,7 +54,7 @@ struct SceneBloom: Codable, Equatable {
     }
     """
 
-    private static let compositePass = """
+    static let compositePass = """
     #include <metal_stdlib>
     using namespace metal;
     struct V { float4 position [[position]]; float2 uv; };

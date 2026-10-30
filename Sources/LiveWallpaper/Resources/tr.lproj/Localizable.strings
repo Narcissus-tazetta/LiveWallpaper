@@ -1650,3 +1650,25 @@
 "視差の移動量" = "Paralaks mesafesi";
 
 "視差の追従の速さ" = "Paralaks takip hızı";
+
+"画像エフェクト" = "Görüntü efektleri";
+
+"色調補正" = "Renk düzeltme";
+
+"ぼかし(画像)" = "Bulanıklık";
+
+"色ずれ" = "Renk sapması";
+
+"モザイク" = "Piksel yap";
+
+"グリッチ" = "Glitch";
+
+"コントラスト" = "Karşıtlık";
+
+"ぼかしの半径" = "Bulanıklık yarıçapı";
+
+"ずれの大きさ" = "Kayma miktarı";
+
+"ずれの向き(度)" = "Kayma yönü (°)";
+
+"ブロックの大きさ" = "Blok boyutu";

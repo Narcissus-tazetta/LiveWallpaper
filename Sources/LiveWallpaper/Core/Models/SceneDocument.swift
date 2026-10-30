@@ -239,6 +239,8 @@ struct SceneEffect: Codable, Equatable, Identifiable {
     var id = UUID()
     var kind: SceneEffectKind
     var renderGraph: SceneRenderGraph?
+    /// The `SceneBuiltInEffect` this shader effect was made from; nil for one an import brought.
+    var builtIn: String?
     var isEnabled = true
     var cycles = 1
     /// 0...1
@@ -289,6 +291,7 @@ struct SceneEffect: Codable, Equatable, Identifiable {
         id = try container.decode(UUID.self, forKey: .id)
         kind = try container.decode(SceneEffectKind.self, forKey: .kind)
         renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
+        builtIn = try? container.decodeIfPresent(String.self, forKey: .builtIn)
         let defaults = SceneEffect(kind: kind)
         isEnabled = (try? container.decode(Bool.self, forKey: .isEnabled)) ?? defaults.isEnabled
         cycles = (try? container.decode(Int.self, forKey: .cycles)) ?? defaults.cycles

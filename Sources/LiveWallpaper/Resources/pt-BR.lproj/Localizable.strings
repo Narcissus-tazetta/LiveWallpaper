@@ -1650,3 +1650,25 @@
 "視差の移動量" = "Deslocamento da paralaxe";
 
 "視差の追従の速さ" = "Velocidade de acompanhamento da paralaxe";
+
+"画像エフェクト" = "Efeitos de imagem";
+
+"色調補正" = "Ajuste de cor";
+
+"ぼかし(画像)" = "Desfoque";
+
+"色ずれ" = "Aberração cromática";
+
+"モザイク" = "Pixelizar";
+
+"グリッチ" = "Glitch";
+
+"コントラスト" = "Contraste";
+
+"ぼかしの半径" = "Raio do desfoque";
+
+"ずれの大きさ" = "Quantidade de deslocamento";
+
+"ずれの向き(度)" = "Direção do deslocamento (°)";
+
+"ブロックの大きさ" = "Tamanho do bloco";
