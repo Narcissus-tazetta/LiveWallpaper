@@ -1602,3 +1602,21 @@
 "選択肢（カンマ区切り）" = "Lựa chọn (cách nhau bằng dấu phẩy)";
 
 "項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Sau khi thêm, người xem có thể đổi giá trị trong “Cài đặt tác phẩm”. Script đọc qua ctx.userProperties.<ID>.";
+
+"効果音" = "Hiệu ứng âm thanh";
+
+"効果音を追加…" = "Thêm âm thanh…";
+
+"鳴らし方" = "Cách phát";
+
+"繰り返す" = "Lặp lại";
+
+"ときどき鳴らす" = "Thỉnh thoảng";
+
+"効果音を削除" = "Xóa âm thanh";
+
+"間隔の最短(秒)" = "Khoảng nghỉ ngắn nhất (giây)";
+
+"間隔の最長(秒)" = "Khoảng nghỉ dài nhất (giây)";
+
+"音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Thêm tệp âm thanh để phát trên màn hình nền. Chỉ phát khi bật âm thanh hình nền trong cài đặt ứng dụng.";

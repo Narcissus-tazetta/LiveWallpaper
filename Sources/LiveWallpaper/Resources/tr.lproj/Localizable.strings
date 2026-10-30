@@ -1602,3 +1602,21 @@
 "選択肢（カンマ区切り）" = "Seçenekler (virgülle ayrılmış)";
 
 "項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Bir ayar eklediğinizde izleyiciler değerini “Duvar kâğıdı ayarları”ndan değiştirebilir. Betikler bunu ctx.userProperties.<ID> olarak okur.";
+
+"効果音" = "Ses efektleri";
+
+"効果音を追加…" = "Ses ekle…";
+
+"鳴らし方" = "Çalma biçimi";
+
+"繰り返す" = "Tekrarla";
+
+"ときどき鳴らす" = "Ara sıra";
+
+"効果音を削除" = "Sesi sil";
+
+"間隔の最短(秒)" = "En kısa ara (sn)";
+
+"間隔の最長(秒)" = "En uzun ara (sn)";
+
+"音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Masaüstünde çalmak için ses dosyaları ekleyin. Yalnızca uygulama ayarlarında duvar kâğıdı sesi açıksa çalar.";

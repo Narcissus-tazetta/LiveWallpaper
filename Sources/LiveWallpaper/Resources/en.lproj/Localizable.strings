@@ -1602,3 +1602,21 @@
 "選択肢（カンマ区切り）" = "Choices (comma-separated)";
 
 "項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Add a setting and viewers can change its value in “Wallpaper Settings”. Scripts read it as ctx.userProperties.<ID>.";
+
+"効果音" = "Sound effects";
+
+"効果音を追加…" = "Add sound…";
+
+"鳴らし方" = "Playback";
+
+"繰り返す" = "Loop";
+
+"ときどき鳴らす" = "Now and then";
+
+"効果音を削除" = "Delete sound";
+
+"間隔の最短(秒)" = "Shortest pause (s)";
+
+"間隔の最長(秒)" = "Longest pause (s)";
+
+"音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Add audio files to play them on the desktop. They play only when wallpaper sound is turned on in the app’s settings.";

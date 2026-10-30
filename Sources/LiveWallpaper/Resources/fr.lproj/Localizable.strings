@@ -1602,3 +1602,21 @@
 "選択肢（カンマ区切り）" = "Choix (séparés par des virgules)";
 
 "項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Une fois un réglage ajouté, les utilisateurs peuvent modifier sa valeur dans « Réglages de l’œuvre ». Les scripts le lisent via ctx.userProperties.<ID>.";
+
+"効果音" = "Effets sonores";
+
+"効果音を追加…" = "Ajouter un son…";
+
+"鳴らし方" = "Lecture";
+
+"繰り返す" = "Répéter";
+
+"ときどき鳴らす" = "De temps en temps";
+
+"効果音を削除" = "Supprimer le son";
+
+"間隔の最短(秒)" = "Pause minimale (s)";
+
+"間隔の最長(秒)" = "Pause maximale (s)";
+
+"音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Ajoutez des fichiers audio pour les lire sur le bureau. Ils ne sont lus que si le son du fond d’écran est activé dans les réglages de l’app.";
