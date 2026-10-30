@@ -1578,3 +1578,27 @@
 "システム音" = "Audio del sistema";
 
 "システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Lee la intensidad de las bandas de frecuencia del audio del sistema con ctx.audio. Solo hay valores cuando se permite «Reaccionar al audio del sistema» para el fondo.";
+
+"ユーザー設定項目" = "Ajustes del usuario";
+
+"設定項目を追加" = "Añadir ajuste";
+
+"スライダー" = "Control deslizante";
+
+"オン／オフ" = "Activado/Desactivado";
+
+"選択肢" = "Opciones";
+
+"文字入力" = "Entrada de texto";
+
+"表示名" = "Nombre visible";
+
+"ID" = "ID";
+
+"設定項目を削除" = "Eliminar ajuste";
+
+"初期値" = "Valor inicial";
+
+"選択肢（カンマ区切り）" = "Opciones (separadas por comas)";
+
+"項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Al añadir un ajuste, los usuarios pueden cambiar su valor en «Ajustes de la obra». Los scripts lo leen como ctx.userProperties.<ID>.";

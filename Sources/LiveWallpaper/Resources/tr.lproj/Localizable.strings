@@ -1578,3 +1578,27 @@
 "システム音" = "Sistem sesi";
 
 "システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Sistem sesinin frekans bantlarının şiddetini ctx.audio ile okur. Değerler yalnızca duvar kâğıdı için “Sistem sesine tepki ver” izni verildiğinde gelir.";
+
+"ユーザー設定項目" = "Kullanıcı ayarları";
+
+"設定項目を追加" = "Ayar ekle";
+
+"スライダー" = "Kaydırıcı";
+
+"オン／オフ" = "Açık/Kapalı";
+
+"選択肢" = "Seçenekler";
+
+"文字入力" = "Metin girişi";
+
+"表示名" = "Görünen ad";
+
+"ID" = "ID";
+
+"設定項目を削除" = "Ayarı sil";
+
+"初期値" = "Başlangıç değeri";
+
+"選択肢（カンマ区切り）" = "Seçenekler (virgülle ayrılmış)";
+
+"項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Bir ayar eklediğinizde izleyiciler değerini “Duvar kâğıdı ayarları”ndan değiştirebilir. Betikler bunu ctx.userProperties.<ID> olarak okur.";

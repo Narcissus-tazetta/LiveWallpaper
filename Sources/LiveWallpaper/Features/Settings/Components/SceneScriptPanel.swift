@@ -9,6 +9,14 @@ struct SceneScriptPanel: View {
     @State private var selectedID: UUID?
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            scriptsSection
+            SceneUserPropertiesPanel(model: model, path: path)
+        }
+    }
+
+    @ViewBuilder
+    private var scriptsSection: some View {
         if let document = model.sceneDocumentsByPath[path] {
             DisclosureGroup {
                 VStack(alignment: .leading, spacing: 10) {

@@ -1578,3 +1578,27 @@
 "システム音" = "Âm thanh hệ thống";
 
 "システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Đọc cường độ các dải tần của âm thanh hệ thống qua ctx.audio. Chỉ có giá trị khi cho phép “Phản ứng với âm thanh hệ thống” cho hình nền này.";
+
+"ユーザー設定項目" = "Cài đặt người dùng";
+
+"設定項目を追加" = "Thêm cài đặt";
+
+"スライダー" = "Thanh trượt";
+
+"オン／オフ" = "Bật/Tắt";
+
+"選択肢" = "Lựa chọn";
+
+"文字入力" = "Nhập văn bản";
+
+"表示名" = "Tên hiển thị";
+
+"ID" = "ID";
+
+"設定項目を削除" = "Xóa cài đặt";
+
+"初期値" = "Giá trị ban đầu";
+
+"選択肢（カンマ区切り）" = "Lựa chọn (cách nhau bằng dấu phẩy)";
+
+"項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Sau khi thêm, người xem có thể đổi giá trị trong “Cài đặt tác phẩm”. Script đọc qua ctx.userProperties.<ID>.";

@@ -1578,3 +1578,27 @@
 "システム音" = "Systemton";
 
 "システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Liest die Stärke der Frequenzbänder des Systemtons als ctx.audio. Werte kommen nur an, wenn „Auf Systemton reagieren“ für den Hintergrund erlaubt ist.";
+
+"ユーザー設定項目" = "Benutzereinstellungen";
+
+"設定項目を追加" = "Einstellung hinzufügen";
+
+"スライダー" = "Schieberegler";
+
+"オン／オフ" = "Ein/Aus";
+
+"選択肢" = "Auswahl";
+
+"文字入力" = "Texteingabe";
+
+"表示名" = "Anzeigename";
+
+"ID" = "ID";
+
+"設定項目を削除" = "Einstellung löschen";
+
+"初期値" = "Anfangswert";
+
+"選択肢（カンマ区切り）" = "Auswahl (durch Kommas getrennt)";
+
+"項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Nach dem Hinzufügen können Betrachter den Wert unter „Einstellungen des Hintergrunds“ ändern. Skripte lesen ihn als ctx.userProperties.<ID>.";

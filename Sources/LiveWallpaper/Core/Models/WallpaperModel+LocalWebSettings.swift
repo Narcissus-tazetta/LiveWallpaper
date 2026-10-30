@@ -308,6 +308,9 @@ extension WallpaperModel {
         let title = registeredVideoDisplayName(for: path)
         let normalizedPath = URL(fileURLWithPath: path).standardizedFileURL.path
         let settingsKey = "authorSettings.scene." + normalizedPath
+        let document = sceneDocumentsByPath[path]
+        let isHandMade = document != nil && document?.authorSourceDirectory == nil
+            && !importedExternalWallpaperPaths.values.contains(path)
         return WallpaperAuthorSettingsContext(
             id: path,
             title: title,
@@ -320,7 +323,8 @@ extension WallpaperModel {
                 try newSettings.save(key: settingsKey)
                 try self.applySceneAuthorSettings(forPath: path, settings: newSettings)
             },
-            applySettings: { [weak self] newSettings in
+            // A scene made here has no source to convert again: its scripts read the values live.
+            applySettings: isHandMade ? nil : { [weak self] newSettings in
                 guard let self else { return }
                 try await self.reconvertSceneAuthorSettings(path: path, settings: newSettings)
             }

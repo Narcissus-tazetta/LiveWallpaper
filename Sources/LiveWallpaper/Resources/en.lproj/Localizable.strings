@@ -1578,3 +1578,27 @@
 "システム音" = "System audio";
 
 "システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Read the strength of the system audio’s frequency bands as ctx.audio. Values arrive only when “React to system audio” is allowed for the wallpaper.";
+
+"ユーザー設定項目" = "User settings";
+
+"設定項目を追加" = "Add setting";
+
+"スライダー" = "Slider";
+
+"オン／オフ" = "On/Off";
+
+"選択肢" = "Choices";
+
+"文字入力" = "Text input";
+
+"表示名" = "Display name";
+
+"ID" = "ID";
+
+"設定項目を削除" = "Delete setting";
+
+"初期値" = "Default value";
+
+"選択肢（カンマ区切り）" = "Choices (comma-separated)";
+
+"項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Add a setting and viewers can change its value in “Wallpaper Settings”. Scripts read it as ctx.userProperties.<ID>.";

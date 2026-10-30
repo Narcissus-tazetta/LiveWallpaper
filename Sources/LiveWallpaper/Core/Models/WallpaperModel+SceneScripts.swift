@@ -66,6 +66,14 @@ extension WallpaperModel {
         return script.id
     }
 
+    func updateSceneProperties(path: String, _ change: (inout [LocalWebProperty]) -> Void) {
+        guard var document = sceneDocumentsByPath[path] else { return }
+        var properties = document.properties ?? []
+        change(&properties)
+        document.properties = properties.isEmpty ? nil : properties
+        updateScene(document, path: path)
+    }
+
     func removeSceneScript(_ id: UUID, path: String) {
         guard var document = sceneDocumentsByPath[path] else { return }
         document.scripts.removeAll { $0.id == id }
