@@ -1675,3 +1675,35 @@
 
 "index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Kopiert den Inhalt eines Ordners mit index.html und verwendet ihn als Web-Hintergrundbild.";
 "フォルダから追加…" = "Aus Ordner hinzufügen …";
+
+"3Dモデル(glTF)…" = "3D-Modell (glTF)…";
+"傾き" = "Neigung";
+"手前へ" = "Nach vorne";
+"影を落とす" = "Schatten werfen";
+"アニメーション" = "Animation";
+"止める" = "Anhalten";
+"再生の速さ" = "Wiedergabegeschwindigkeit";
+"1回 %.1f 秒。ループの長さで割り切れないと、ロック画面などの書き出しでつなぎ目がずれます。" = "Ein Durchlauf dauert %.1f s. Teilt er die Schleifenlänge nicht, zeigen Sperrbildschirm und andere Exporte eine Nahtstelle.";
+"画角" = "Bildwinkel";
+"0° では遠近なし(平行投影)で表示します。" = "Bei 0° werden die Modelle ohne Perspektive (Parallelprojektion) gezeigt.";
+"大きいほど遠近が強くなります。画像レイヤーの見え方は変わりません。" = "Größere Werte verstärken die Perspektive. Bildebenen sehen gleich aus.";
+"視点の左右" = "Blickwinkel links/rechts";
+"視点の上下" = "Blickwinkel oben/unten";
+"空からの光" = "Licht vom Himmel";
+"地面からの照り返し" = "Vom Boden reflektiertes Licht";
+"光を追加" = "Licht hinzufügen";
+"3Dモデルの見え方" = "3D-Modell-Ansicht";
+"光の種類" = "Lichtart";
+"平行光(太陽)" = "Richtungslicht (Sonne)";
+"点光源" = "Punktlicht";
+"光の色" = "Lichtfarbe";
+"この光を削除" = "Dieses Licht entfernen";
+"光の向き(左右)" = "Lichtrichtung (links/rechts)";
+"光の向き(高さ)" = "Lichtrichtung (Höhe)";
+"位置(左右)" = "Position (links/rechts)";
+"位置(上下)" = "Position (oben/unten)";
+"位置(手前)" = "Position (Tiefe)";
+"点光源は影を落としません。" = "Punktlichter werfen keine Schatten.";
+"影を受ける床" = "Schattenfänger-Boden";
+"見えない床で、モデルの影だけを下の絵に落とします。" = "Ein unsichtbarer Boden, der nur die Schatten der Modelle auf das Bild darunter wirft.";
+"床の高さ" = "Bodenhöhe";

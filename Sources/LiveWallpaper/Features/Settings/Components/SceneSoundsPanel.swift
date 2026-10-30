@@ -62,8 +62,13 @@ struct SceneSoundsPanel: View {
             }
             if sound.mode == .random {
                 HStack {
-                    pause(model.localizedString("間隔の最短(秒)"), sound.minimumPause) { value in update(id) { $0.minimumPause = value } }
-                    pause(model.localizedString("間隔の最長(秒)"), sound.maximumPause) { value in update(id) { $0.maximumPause = value } }
+                    // The player draws each pause from minimum...maximum, a range that must not run backward.
+                    pause(model.localizedString("間隔の最短(秒)"), sound.minimumPause) { value in
+                        update(id) { $0.minimumPause = value; $0.maximumPause = max($0.maximumPause, value) }
+                    }
+                    pause(model.localizedString("間隔の最長(秒)"), sound.maximumPause) { value in
+                        update(id) { $0.maximumPause = value; $0.minimumPause = min($0.minimumPause, value) }
+                    }
                 }
             }
             Text(sound.files.joined(separator: ", "))

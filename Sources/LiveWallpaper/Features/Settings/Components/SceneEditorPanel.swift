@@ -432,6 +432,9 @@ extension SettingsView {
                     } else if layer.kind == .text {
                         Image(systemName: "textformat")
                             .foregroundColor(.secondary)
+                    } else if layer.kind == .model {
+                        Image(systemName: "cube")
+                            .foregroundColor(.secondary)
                     }
                     Text(layer.name)
                         .lineLimit(1)
@@ -556,6 +559,9 @@ extension SettingsView {
             if let text = layer.text {
                 sceneTextControls(path: path, layer: layer, text: text)
             }
+            if let placement = layer.modelPlacement {
+                sceneModelControls(path: path, layer: layer, placement: placement)
+            }
             sceneLayoutSlider(
                 title: model.localizedString("不透明度"),
                 value: sceneLayerBinding(path: path, layer: layer, \.opacity),
@@ -565,84 +571,9 @@ extension SettingsView {
                 labelWidth: sceneRowLabelWidth
             )
 
-            HStack(spacing: 12) {
-                Text(model.localizedString("合成"))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(width: sceneRowLabelWidth, alignment: .leading)
-                Spacer(minLength: 0)
-                Picker(model.localizedString("合成"), selection: sceneLayerBinding(path: path, layer: layer, \.blendMode)) {
-                    sceneBlendModePickerContent()
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-            }
-
-            if layer.kind == .image {
-                sceneLayerSourceToggles(path: path, layer: layer)
-            }
-
-            sceneSliderRow(
-                title: model.localizedString("奥行き"),
-                value: sceneLayerBinding(path: path, layer: layer, \.parallaxDepth),
-                range: 0 ... 1,
-                valueText: layer.parallaxDepth <= 0
-                    ? model.localizedString("動かさない")
-                    : "\(Int((layer.parallaxDepth * 100).rounded()))%"
-            )
-            settingsFootnote(
-                model.localizedString("値が大きいレイヤーほど、カーソルに合わせて大きく動きます。手前のものほど大きくすると奥行きが出ます。")
-            )
-
-            HStack(spacing: 12) {
-                Text(model.localizedString("カーソルで透かす"))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(width: sceneRowLabelWidth, alignment: .leading)
-                Spacer(minLength: 0)
-                Picker(
-                    model.localizedString("カーソルで透かす"),
-                    selection: Binding<SceneCursorMaskMode?>(
-                        get: { layer.cursorMask?.mode },
-                        set: { mode in
-                            updateSceneLayer(path: path, id: layer.id) { layer in
-                                if let mode {
-                                    var mask = layer.cursorMask ?? SceneCursorMask()
-                                    mask.mode = mode
-                                    layer.cursorMask = mask
-                                } else {
-                                    layer.cursorMask = nil
-                                }
-                            }
-                        }
-                    )
-                ) {
-                    Text(model.localizedString("オフ")).tag(SceneCursorMaskMode?.none)
-                    Text(model.localizedString("カーソルの周りを透かす")).tag(SceneCursorMaskMode?.some(.hide))
-                    Text(model.localizedString("カーソルの周りだけ表示")).tag(SceneCursorMaskMode?.some(.show))
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-            }
-
-            if let mask = layer.cursorMask {
-                sceneSliderRow(
-                    title: model.localizedString("大きさ"),
-                    value: sceneMaskBinding(path: path, layer: layer, \.radius),
-                    range: 0.03 ... 0.5,
-                    valueText: "\(Int((mask.radius * 100).rounded()))%"
-                )
-                sceneSliderRow(
-                    title: model.localizedString("ぼかし"),
-                    value: sceneMaskBinding(path: path, layer: layer, \.softness),
-                    range: 0 ... 1,
-                    valueText: "\(Int((mask.softness * 100).rounded()))%"
-                )
-                settingsFootnote(
-                    mask.mode == .hide
-                        ? model.localizedString("カーソルの周りだけ、下のレイヤーが見えます。上下に構図の同じ画像を重ねると、X 線で透かしたような表現になります。")
-                        : model.localizedString("このレイヤーは、カーソルの周りにだけ表示されます。")
-                )
+            // A model is drawn into the canvas with its own material, which no blend mode, parallax or mask reaches.
+            if layer.kind != .model {
+                sceneLayerCompositingControls(path: path, layer: layer)
             }
             sceneLayoutControls(path: path, layer: layer)
             // The cut-out and depth work on one still picture; a video layer has none.
@@ -652,6 +583,89 @@ extension SettingsView {
         }
         // Locked means the same in the inspector as on the preview.
         .disabled(layer.isLocked)
+    }
+
+    @ViewBuilder
+    private func sceneLayerCompositingControls(path: String, layer: SceneLayer) -> some View {
+        HStack(spacing: 12) {
+            Text(model.localizedString("合成"))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: sceneRowLabelWidth, alignment: .leading)
+            Spacer(minLength: 0)
+            Picker(model.localizedString("合成"), selection: sceneLayerBinding(path: path, layer: layer, \.blendMode)) {
+                sceneBlendModePickerContent()
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+        }
+
+        if layer.kind == .image {
+            sceneLayerSourceToggles(path: path, layer: layer)
+        }
+
+        sceneSliderRow(
+            title: model.localizedString("奥行き"),
+            value: sceneLayerBinding(path: path, layer: layer, \.parallaxDepth),
+            range: 0 ... 1,
+            valueText: layer.parallaxDepth <= 0
+                ? model.localizedString("動かさない")
+                : "\(Int((layer.parallaxDepth * 100).rounded()))%"
+        )
+        settingsFootnote(
+            model.localizedString("値が大きいレイヤーほど、カーソルに合わせて大きく動きます。手前のものほど大きくすると奥行きが出ます。")
+        )
+
+        HStack(spacing: 12) {
+            Text(model.localizedString("カーソルで透かす"))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: sceneRowLabelWidth, alignment: .leading)
+            Spacer(minLength: 0)
+            Picker(
+                model.localizedString("カーソルで透かす"),
+                selection: Binding<SceneCursorMaskMode?>(
+                    get: { layer.cursorMask?.mode },
+                    set: { mode in
+                        updateSceneLayer(path: path, id: layer.id) { layer in
+                            if let mode {
+                                var mask = layer.cursorMask ?? SceneCursorMask()
+                                mask.mode = mode
+                                layer.cursorMask = mask
+                            } else {
+                                layer.cursorMask = nil
+                            }
+                        }
+                    }
+                )
+            ) {
+                Text(model.localizedString("オフ")).tag(SceneCursorMaskMode?.none)
+                Text(model.localizedString("カーソルの周りを透かす")).tag(SceneCursorMaskMode?.some(.hide))
+                Text(model.localizedString("カーソルの周りだけ表示")).tag(SceneCursorMaskMode?.some(.show))
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+        }
+
+        if let mask = layer.cursorMask {
+            sceneSliderRow(
+                title: model.localizedString("大きさ"),
+                value: sceneMaskBinding(path: path, layer: layer, \.radius),
+                range: 0.03 ... 0.5,
+                valueText: "\(Int((mask.radius * 100).rounded()))%"
+            )
+            sceneSliderRow(
+                title: model.localizedString("ぼかし"),
+                value: sceneMaskBinding(path: path, layer: layer, \.softness),
+                range: 0 ... 1,
+                valueText: "\(Int((mask.softness * 100).rounded()))%"
+            )
+            settingsFootnote(
+                mask.mode == .hide
+                    ? model.localizedString("カーソルの周りだけ、下のレイヤーが見えます。上下に構図の同じ画像を重ねると、X 線で透かしたような表現になります。")
+                    : model.localizedString("このレイヤーは、カーソルの周りにだけ表示されます。")
+            )
+        }
     }
 
     private func sceneParticleSystemSection(path: String, layer: SceneLayer) -> some View {

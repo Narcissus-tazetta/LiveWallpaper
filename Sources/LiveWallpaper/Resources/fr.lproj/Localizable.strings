@@ -1675,3 +1675,35 @@
 
 "index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Copie le contenu d’un dossier contenant index.html et l’utilise comme fond d’écran web.";
 "フォルダから追加…" = "Ajouter depuis un dossier…";
+
+"3Dモデル(glTF)…" = "Modèle 3D (glTF)…";
+"傾き" = "Inclinaison";
+"手前へ" = "Vers l’avant";
+"影を落とす" = "Projeter une ombre";
+"アニメーション" = "Animation";
+"止める" = "Arrêter";
+"再生の速さ" = "Vitesse de lecture";
+"1回 %.1f 秒。ループの長さで割り切れないと、ロック画面などの書き出しでつなぎ目がずれます。" = "Un cycle dure %.1f s. S’il ne divise pas la durée de la boucle, l’écran verrouillé et les autres exports montrent une coupure.";
+"画角" = "Champ de vision";
+"0° では遠近なし(平行投影)で表示します。" = "À 0°, les modèles s’affichent sans perspective (projection parallèle).";
+"大きいほど遠近が強くなります。画像レイヤーの見え方は変わりません。" = "Plus la valeur est grande, plus la perspective est forte. Les calques d’image ne changent pas.";
+"視点の左右" = "Vue gauche/droite";
+"視点の上下" = "Vue haut/bas";
+"空からの光" = "Lumière du ciel";
+"地面からの照り返し" = "Lumière renvoyée par le sol";
+"光を追加" = "Ajouter une lumière";
+"3Dモデルの見え方" = "Affichage des modèles 3D";
+"光の種類" = "Type de lumière";
+"平行光(太陽)" = "Directionnelle (soleil)";
+"点光源" = "Lumière ponctuelle";
+"光の色" = "Couleur de la lumière";
+"この光を削除" = "Supprimer cette lumière";
+"光の向き(左右)" = "Direction de la lumière (gauche/droite)";
+"光の向き(高さ)" = "Direction de la lumière (hauteur)";
+"位置(左右)" = "Position (gauche/droite)";
+"位置(上下)" = "Position (haut/bas)";
+"位置(手前)" = "Position (profondeur)";
+"点光源は影を落としません。" = "Les lumières ponctuelles ne projettent pas d’ombre.";
+"影を受ける床" = "Sol qui reçoit les ombres";
+"見えない床で、モデルの影だけを下の絵に落とします。" = "Un sol invisible qui ne projette que les ombres des modèles sur l’image en dessous.";
+"床の高さ" = "Hauteur du sol";

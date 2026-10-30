@@ -1675,3 +1675,35 @@
 
 "index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Sao chép nội dung thư mục có index.html và dùng làm hình nền web.";
 "フォルダから追加…" = "Thêm từ thư mục…";
+
+"3Dモデル(glTF)…" = "Mô hình 3D (glTF)…";
+"傾き" = "Độ nghiêng";
+"手前へ" = "Về phía người xem";
+"影を落とす" = "Đổ bóng";
+"アニメーション" = "Hoạt ảnh";
+"止める" = "Dừng";
+"再生の速さ" = "Tốc độ phát";
+"1回 %.1f 秒。ループの長さで割り切れないと、ロック画面などの書き出しでつなぎ目がずれます。" = "Một vòng dài %.1f giây. Nếu không chia hết độ dài vòng lặp, màn hình khóa và các bản xuất khác sẽ có chỗ nối.";
+"画角" = "Góc nhìn";
+"0° では遠近なし(平行投影)で表示します。" = "Ở 0°, mô hình hiển thị không có phối cảnh (chiếu song song).";
+"大きいほど遠近が強くなります。画像レイヤーの見え方は変わりません。" = "Giá trị càng lớn, phối cảnh càng mạnh. Lớp hình ảnh không thay đổi.";
+"視点の左右" = "Góc nhìn trái/phải";
+"視点の上下" = "Góc nhìn lên/xuống";
+"空からの光" = "Ánh sáng từ bầu trời";
+"地面からの照り返し" = "Ánh sáng phản chiếu từ mặt đất";
+"光を追加" = "Thêm ánh sáng";
+"3Dモデルの見え方" = "Hiển thị mô hình 3D";
+"光の種類" = "Loại ánh sáng";
+"平行光(太陽)" = "Ánh sáng song song (mặt trời)";
+"点光源" = "Đèn điểm";
+"光の色" = "Màu ánh sáng";
+"この光を削除" = "Xóa ánh sáng này";
+"光の向き(左右)" = "Hướng ánh sáng (trái/phải)";
+"光の向き(高さ)" = "Hướng ánh sáng (độ cao)";
+"位置(左右)" = "Vị trí (trái/phải)";
+"位置(上下)" = "Vị trí (lên/xuống)";
+"位置(手前)" = "Vị trí (độ sâu)";
+"点光源は影を落としません。" = "Đèn điểm không đổ bóng.";
+"影を受ける床" = "Mặt sàn nhận bóng";
+"見えない床で、モデルの影だけを下の絵に落とします。" = "Một mặt sàn vô hình chỉ đổ bóng của mô hình lên hình bên dưới.";
+"床の高さ" = "Độ cao mặt sàn";

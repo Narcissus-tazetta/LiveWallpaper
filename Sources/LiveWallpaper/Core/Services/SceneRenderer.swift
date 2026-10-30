@@ -175,6 +175,18 @@ final class SceneRenderer {
     }
     /// The mesh and buffers of each layer that is a solid model.
     private(set) var staticShapes: [UUID: StaticShapeCache] = [:]
+    /// The materials model layers draw with: the scene's mesh materials, then those of the
+    /// models the editor imported, then the floor's.
+    private var allMeshMaterials: [SceneMeshMaterial?] = []
+    struct ImportedShapeCache {
+        var parts: [SceneStaticModel]
+        var materials: [Int]
+        /// `parts` in order, each with its material and buffers.
+        var shapes: [SceneModelLayerFrame.Shape]
+    }
+    /// The shapes of each model the editor imported, `model` then `modelParts`.
+    private var importedShapes: [UUID: ImportedShapeCache] = [:]
+    private var floorMaterialIndex: Int?
     private let graphTexturePool = SceneTexturePool()
     private var graphTextures: [String: MTLTexture] = [:]
     private var graphResources: [UUID: [String: MTLTexture]] = [:]
@@ -529,21 +541,35 @@ final class SceneRenderer {
                 ? .model(staticModelFrame(layer, evaluated: evaluated)) : .layer(layer)
         }
         if modelRenderer == nil && (!evaluated.models.isEmpty || visibleLayers.contains { $0.model != nil }) {
-            modelRenderer = try SceneModelRenderer(materials: document.meshMaterials ?? [], device: device)
+            modelRenderer = try SceneModelRenderer(materials: allMeshMaterials, device: device)
         }
-        let visible = modelRenderer == nil || evaluated.models.isEmpty
+        var visible = modelRenderer == nil || evaluated.models.isEmpty
             ? placed
             : Self.interleave(visibleLayers, placed: placed, models: evaluated.models, place: { id in
                 evaluated.order[id] ?? document.layers.firstIndex { $0.id == id } ?? 0
             })
         let lights = currentLights(evaluated.lights)
-        let views = modelViews(camera: evaluated.camera, input: input, target: target, lights: lights)
+        var views = modelViews(camera: evaluated.camera, input: input, target: target, lights: lights)
+        if document.modelStage != nil, document.camera?.perspective != true, modelRenderer != nil {
+            if let floor = floorFrame(), let first = visible.firstIndex(where: { if case .model = $0 { true } else { false } }) {
+                visible.insert(.model(floor), at: first)
+            }
+            if let shadowLights = modelCamera?.shadowLights, !shadowLights.isEmpty {
+                let casters = visible.compactMap { item -> SceneModelLayerFrame? in
+                    if case let .model(model) = item { return model }
+                    return nil
+                }
+                views.flat.shadows = try modelRenderer!.renderShadows(
+                    lights: shadowLights, casters: casters, commandBuffer: commandBuffer, rigs: rigs, time: input.time
+                )
+            }
+        }
         let layerPictures = try modelLayerPictures(evaluated: evaluated, commandBuffer: commandBuffer, input: input, targetSize: targetSize)
         // The frame's model layers share one depth buffer; the first pass clears it.
         var depthCleared = false
         func drawModels(_ models: [SceneModelLayerFrame], into texture: MTLTexture, clear: Bool) throws {
             if modelRenderer == nil {
-                modelRenderer = try SceneModelRenderer(materials: document.meshMaterials ?? [], device: device)
+                modelRenderer = try SceneModelRenderer(materials: allMeshMaterials, device: device)
             }
             let pass = MTLRenderPassDescriptor()
             pass.colorAttachments[0].texture = texture
@@ -853,7 +879,7 @@ final class SceneRenderer {
         layerPictures: [Int: MTLTexture], target: MTLTexture,
         commandBuffer: MTLCommandBuffer, input: SceneFrameInput, targetSize: SIMD2<Float>
     ) throws {
-        if modelRenderer == nil { modelRenderer = try SceneModelRenderer(materials: document.meshMaterials ?? [], device: device) }
+        if modelRenderer == nil { modelRenderer = try SceneModelRenderer(materials: allMeshMaterials, device: device) }
         enum Prepared {
             case model(SceneModelLayerFrame), plane(MTLTexture, SceneEvaluatedFrame.Layer, SceneSpace)
             case particles(SceneLayer, SceneEvaluatedFrame.Layer, SceneSpace)
@@ -914,7 +940,7 @@ final class SceneRenderer {
             prepared = keyed.map(\.item) + captures
         }
         var views = views
-        if var lights = document.camera?.shadowLights, !lights.isEmpty {
+        if var lights = modelCamera?.shadowLights, !lights.isEmpty {
             for index in lights.indices {
                 guard let moving = lights[index].dynamicLight, views.flat.lights.indices.contains(moving) else { continue }
                 let light = views.flat.lights[moving]
@@ -1035,6 +1061,19 @@ final class SceneRenderer {
 
     private func staticModelFrame(_ layer: SceneLayer, evaluated: SceneEvaluatedFrame) -> SceneModelLayerFrame {
         let drawn = evaluated.layers[layer.id]!
+        if let placement = drawn.layer.modelPlacement, let shapes = importedShapes[layer.id]?.shapes {
+            let tint = drawn.layer.tint
+            return SceneModelLayerFrame(
+                serial: 0, order: 0, alpha: Float(drawn.layer.opacity * drawn.opacity),
+                color: SIMD3(Float(tint.red), Float(tint.green), Float(tint.blue)),
+                world: placement.world(
+                    transform: drawn.transform, canvasWidth: Double(document.canvasWidth), canvasHeight: Double(document.canvasHeight)
+                ),
+                perspective: false, shapes: shapes,
+                materialValues: document.modelStage?.materialValues(canvasHeight: Double(document.canvasHeight)) ?? [:],
+                castsShadow: drawn.layer.castsShadow ?? true, rig: layer.model?.skeleton
+            )
+        }
         let shape = staticShapes[layer.id]?.shape
             ?? evaluated.instances[layer.id].flatMap { staticShapes[$0]?.shape }
             ?? staticShapes.values.first { $0.model == layer.model }?.shape
@@ -1051,6 +1090,20 @@ final class SceneRenderer {
             // The shadow pass draws the shape unposed, so a skinned model casts none.
             castsShadow: layer.model?.skeleton == nil && (drawn.layer.castsShadow ?? true),
             rig: layer.model?.skeleton
+        )
+    }
+
+    /// The stage's floor: a wide level square at its height, centred under the canvas.
+    private func floorFrame() -> SceneModelLayerFrame? {
+        guard let stage = document.modelStage, let floor = stage.floor, let material = floorMaterialIndex else { return nil }
+        let width = Float(document.canvasWidth), height = Float(document.canvasHeight)
+        let y = Float(1 - floor.height) * height, reach = max(width, height) * 4, x = width / 2
+        let corners: [SIMD2<Float>] = [SIMD2(x - reach, -reach), SIMD2(x + reach, -reach), SIMD2(x + reach, reach), SIMD2(x - reach, reach)]
+        let vertices: [Float] = corners.flatMap { corner -> [Float] in [corner.x, y, corner.y, 0, 1, 0] }
+        let shape = SceneModelLayerFrame.Shape(material: material, components: 0b11, vertices: vertices, indices: [0, 2, 1, 0, 3, 2])
+        return SceneModelLayerFrame(
+            serial: 0, order: 0, alpha: 1, color: SIMD3(repeating: 1), world: matrix_identity_float4x4, perspective: false,
+            shapes: [shape], materialValues: stage.materialValues(canvasHeight: Double(height)), castsShadow: false
         )
     }
 
@@ -1134,9 +1187,16 @@ final class SceneRenderer {
         blit.endEncoding()
     }
 
+    /// Where model layers are seen from and lit by: the editor's stage for imported models
+    /// when the scene has one, else the scene's camera.
+    private var modelCamera: SceneCamera? {
+        document.modelStage.map { $0.camera(canvasWidth: Double(document.canvasWidth), canvasHeight: Double(document.canvasHeight)) }
+            ?? document.camera
+    }
+
     /// The scripted lights as scripts left them, the scene file's values where they left none.
     private func currentLights(_ scripted: [Int: SceneLightState]) -> [SceneModelRenderer.DynamicLight] {
-        (document.camera?.dynamicLights ?? []).map { base in
+        (modelCamera?.dynamicLights ?? []).map { base in
             if let state = scripted[base.objectID] { return .init(origin: state.origin, axis: state.axis, color: state.color) }
             return .init(origin: SIMD3(base.origin.map(Float.init)), axis: SIMD3(base.axis.map(Float.init)),
                          color: SIMD3(base.color.map(Float.init)))
@@ -1146,7 +1206,7 @@ final class SceneRenderer {
     private func modelViews(camera: SceneCameraState?, input: SceneFrameInput, target: MTLTexture, lights: [SceneModelRenderer.DynamicLight])
         -> (flat: SceneModelRenderer.View, perspective: SceneModelRenderer.View)
     {
-        let scene = document.camera
+        let scene = modelCamera
         let ambient = SIMD3((scene?.ambientColor ?? [0, 0, 0]).map(Float.init))
         let skylight = SIMD3((scene?.skylightColor ?? [0, 0, 0]).map(Float.init))
         var state = camera ?? scene.map { scene in
@@ -1164,13 +1224,18 @@ final class SceneRenderer {
         // 2000 in front of the canvas's centre, not from the camera's eye.
         let eye: SIMD3<Float> = scene?.perspective != true && document.layers.contains { $0.model != nil }
             ? SIMD3(Float(document.canvasWidth) / 2, Float(document.canvasHeight) / 2, 2000) : state?.eye ?? .zero
-        let canvas = SceneModelRenderer.View(
+        var canvas = SceneModelRenderer.View(
             viewProjection: SceneModelRenderer.canvasProjection(
                 width: Double(document.canvasWidth), height: Double(document.canvasHeight), viewport: input.viewport
             ),
             eye: eye, ambient: ambient, skylight: skylight, lights: lights,
             screen: SIMD3(Float(target.width), Float(target.height), Float(target.width) / Float(target.height))
         )
+        if let stage = document.modelStage, document.camera?.perspective != true {
+            (canvas.viewProjection, canvas.eye) = stage.viewProjection(
+                canvasWidth: Double(document.canvasWidth), canvasHeight: Double(document.canvasHeight), viewport: input.viewport
+            )
+        }
         guard let state, scene?.perspective == true else { return (canvas, canvas) }
         // A camera scene fills the target, whatever its shape.
         let aspect = Float(target.width) / Float(target.height)
@@ -2117,6 +2182,11 @@ final class SceneRenderer {
     private func layerUVScale(for layer: SceneLayer) -> SIMD2<Float> {
         let canvasAspect = Float(document.aspectRatio)
         let layerAspect: Float
+        if let placement = layer.modelPlacement {
+            // An imported model is selected by its footprint, which its placement gives in pixels.
+            let size = SIMD2(max(Float(placement.size[0]), 1), max(Float(placement.size[1]), 1))
+            return SIMD2(Float(document.canvasWidth) / size.x, Float(document.canvasHeight) / size.y)
+        }
         if layer.kind == .text {
             // Text keeps its pixel size instead of filling the canvas, and does not
             // move with the parallax zoom.
@@ -2421,16 +2491,38 @@ final class SceneRenderer {
             }
             particleTextures[file] = try mipmapped(image)
         }
-        let meshMaterials = document.meshMaterials ?? []
+        var meshMaterials = document.meshMaterials ?? []
+        var importedMaterials: [UUID: [Int]] = [:]
+        for layer in document.layers {
+            guard layer.modelPlacement != nil, let model = layer.model else { continue }
+            let bones = model.skeleton.flatMap { document.rigs[$0]?.bones.count }
+            importedMaterials[layer.id] = ([model] + (layer.modelParts ?? [])).map { part in
+                let material = SceneModelShading.material(surface: part.surface ?? SceneModelSurface(), boneCount: bones)
+                if let index = meshMaterials.firstIndex(of: material) { return index }
+                meshMaterials.append(material)
+                return meshMaterials.count - 1
+            }
+        }
+        floorMaterialIndex = nil
+        if document.modelStage?.floor != nil, !importedMaterials.isEmpty {
+            meshMaterials.append(SceneModelShading.floorMaterial())
+            floorMaterialIndex = meshMaterials.count - 1
+        }
+        allMeshMaterials = meshMaterials
         let hasModelLayers = document.layers.contains { $0.model != nil }
         if modelRenderer?.materials != meshMaterials || (modelRenderer == nil && hasModelLayers) {
             modelRenderer = (meshMaterials.isEmpty && !hasModelLayers) ? nil : try SceneModelRenderer(materials: meshMaterials, device: device)
             modelImages = [:]
+            let surfaceImages = Set(document.layers.flatMap { layer in
+                ([layer.model].compactMap { $0 } + (layer.modelParts ?? [])).compactMap(\.surface).flatMap(\.images)
+            })
             for file in modelRenderer?.imageFiles ?? [] {
                 // Materials read the alpha of their images as it was saved.
-                modelImages[file] = try Self.cachedTexture(url: fileURL(file), variant: "rgba-\(ImageAlpha.straightKept)") { url in
+                let texture = try Self.cachedTexture(url: fileURL(file), variant: "rgba-\(ImageAlpha.straightKept)") { url in
                     try Self.decodeRGBA(url: url, device: device, alpha: .straightKept)
                 }
+                // Imported models are seen far smaller than their images, which alias without mipmaps.
+                modelImages[file] = surfaceImages.contains(file) ? try mipmapped(texture) : texture
             }
         }
         var graphs: [UUID: SceneRenderGraph] = [:]
@@ -2519,7 +2611,40 @@ final class SceneRenderer {
         let modelLayers = document.layers.filter { $0.model != nil }
         let modelLayerIDs = Set(modelLayers.map(\.id))
         staticShapes = staticShapes.filter { modelLayerIDs.contains($0.key) }
-        for layer in modelLayers {
+        importedShapes = importedShapes.filter { importedMaterials[$0.key] != nil }
+        for layer in modelLayers where layer.modelPlacement != nil {
+            let parts = [layer.model!] + (layer.modelParts ?? [])
+            let materials = importedMaterials[layer.id]!
+            if let skeleton = layer.model!.skeleton, document.rigs[skeleton] == nil {
+                throw SceneSkeletonEvaluator.InvalidSkeleton(detail: "model layer \(layer.name) skins with a missing rig")
+            }
+            // Every edit of the scene comes through here; decoding and uploading the vertices again is the slow part.
+            if let cached = importedShapes[layer.id], cached.parts == parts, cached.materials == materials {
+                continue
+            }
+            if let skeleton = layer.model!.skeleton {
+                guard let rig = document.rigs[skeleton], parts.allSatisfy({ $0.maxJoint < rig.bones.count }) else {
+                    throw SceneSkeletonEvaluator.InvalidSkeleton(detail: "model layer \(layer.name) skins with a missing rig or bone")
+                }
+            }
+            let shapes = try zip(parts, materials).map { part, material in
+                var shape = part.shape
+                shape.material = material
+                shape.vertexBuffer = try shape.vertices.withUnsafeBytes { bytes in
+                    guard let buffer = device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+                    else { throw RendererError.textureAllocationFailed }
+                    return buffer
+                }
+                shape.indexBuffer = try shape.indices!.withUnsafeBytes { bytes in
+                    guard let buffer = device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+                    else { throw RendererError.textureAllocationFailed }
+                    return buffer
+                }
+                return shape
+            }
+            importedShapes[layer.id] = ImportedShapeCache(parts: parts, materials: materials, shapes: shapes)
+        }
+        for layer in modelLayers where layer.modelPlacement == nil {
             guard let model = layer.model else { continue }
             if let skeleton = model.skeleton {
                 guard let rig = document.rigs[skeleton], model.maxJoint < rig.bones.count else {

@@ -365,8 +365,6 @@ final class SceneFrameEvaluator {
         return SceneEvaluatedFrame(instances: instances, input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, sounds: sounds, camera: camera, particleControls: particleControls, lights: lights)
     }
 
-    /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets
-    /// the clock as it will read when that frame plays, counted from the first one.
     /// A hand-made scene reads its properties' defaults until the viewer changes one; an
     /// imported scene gets only what was set, as its scripts expect.
     private static func userProperties(_ document: SceneDocument, input: SceneFrameInput) -> [String: WebPropertyValue]? {
@@ -380,6 +378,8 @@ final class SceneFrameEvaluator {
         return merged
     }
 
+    /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets
+    /// the clock as it will read when that frame plays, counted from the first one.
     private func clock(_ input: SceneFrameInput) -> Date {
         if input.isRealTime { return Date() }
         let origin = clockOrigin ?? Date().addingTimeInterval(-input.time)

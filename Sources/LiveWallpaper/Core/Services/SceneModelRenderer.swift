@@ -325,7 +325,11 @@ final class SceneModelRenderer {
                 let texture: MTLTexture
                 if let slot = Self.shadowSlot(binding.source) {
                     // Light reaches everywhere when the frame holds no shadow map.
-                    if let mapped = view.shadows?.textures[slot] { texture = mapped } else { texture = try openShadow() }
+                    if let shadows = view.shadows, shadows.textures.indices.contains(slot) {
+                        texture = shadows.textures[slot]
+                    } else {
+                        texture = try openShadow()
+                    }
                 } else {
                     texture = resources[binding.source]!
                 }

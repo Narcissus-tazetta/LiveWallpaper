@@ -1675,3 +1675,35 @@
 
 "index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "index.html içeren bir klasörün içeriğini kopyalar ve web duvar kâğıdı olarak kullanır.";
 "フォルダから追加…" = "Klasörden ekle…";
+
+"3Dモデル(glTF)…" = "3B Model (glTF)…";
+"傾き" = "Eğim";
+"手前へ" = "İzleyiciye doğru";
+"影を落とす" = "Gölge düşür";
+"アニメーション" = "Animasyon";
+"止める" = "Durdur";
+"再生の速さ" = "Oynatma hızı";
+"1回 %.1f 秒。ループの長さで割り切れないと、ロック画面などの書き出しでつなぎ目がずれます。" = "Bir döngü %.1f sn sürer. Döngü uzunluğunu tam bölmezse kilit ekranı ve diğer dışa aktarmalarda ek yeri görünür.";
+"画角" = "Görüş açısı";
+"0° では遠近なし(平行投影)で表示します。" = "0° iken modeller perspektifsiz (paralel izdüşüm) gösterilir.";
+"大きいほど遠近が強くなります。画像レイヤーの見え方は変わりません。" = "Değer büyüdükçe perspektif güçlenir. Görüntü katmanları değişmez.";
+"視点の左右" = "Görünüm sol/sağ";
+"視点の上下" = "Görünüm yukarı/aşağı";
+"空からの光" = "Gökyüzünden gelen ışık";
+"地面からの照り返し" = "Zeminden yansıyan ışık";
+"光を追加" = "Işık Ekle";
+"3Dモデルの見え方" = "3B model görünümü";
+"光の種類" = "Işık türü";
+"平行光(太陽)" = "Yönlü ışık (güneş)";
+"点光源" = "Nokta ışık";
+"光の色" = "Işık rengi";
+"この光を削除" = "Bu Işığı Kaldır";
+"光の向き(左右)" = "Işık yönü (sol/sağ)";
+"光の向き(高さ)" = "Işık yönü (yükseklik)";
+"位置(左右)" = "Konum (sol/sağ)";
+"位置(上下)" = "Konum (yukarı/aşağı)";
+"位置(手前)" = "Konum (derinlik)";
+"点光源は影を落としません。" = "Nokta ışıklar gölge düşürmez.";
+"影を受ける床" = "Gölge alan zemin";
+"見えない床で、モデルの影だけを下の絵に落とします。" = "Yalnızca modellerin gölgesini alttaki resme düşüren görünmez bir zemin.";
+"床の高さ" = "Zemin yüksekliği";

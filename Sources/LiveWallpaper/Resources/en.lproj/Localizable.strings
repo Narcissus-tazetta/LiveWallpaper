@@ -1675,3 +1675,35 @@
 
 "index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Copies the contents of a folder that contains index.html and uses it as a web wallpaper.";
 "フォルダから追加…" = "Add from Folder…";
+
+"3Dモデル(glTF)…" = "3D Model (glTF)…";
+"傾き" = "Tilt";
+"手前へ" = "Toward viewer";
+"影を落とす" = "Cast shadow";
+"アニメーション" = "Animation";
+"止める" = "Stop";
+"再生の速さ" = "Playback speed";
+"1回 %.1f 秒。ループの長さで割り切れないと、ロック画面などの書き出しでつなぎ目がずれます。" = "One cycle is %.1f s. If it does not divide the loop length, the lock screen and other exports show a seam.";
+"画角" = "Field of view";
+"0° では遠近なし(平行投影)で表示します。" = "At 0° the models are shown without perspective (parallel projection).";
+"大きいほど遠近が強くなります。画像レイヤーの見え方は変わりません。" = "Larger values give stronger perspective. Image layers look the same.";
+"視点の左右" = "View left/right";
+"視点の上下" = "View up/down";
+"空からの光" = "Light from the sky";
+"地面からの照り返し" = "Light bounced from the ground";
+"光を追加" = "Add Light";
+"3Dモデルの見え方" = "3D Model View";
+"光の種類" = "Light type";
+"平行光(太陽)" = "Directional (sun)";
+"点光源" = "Point light";
+"光の色" = "Light color";
+"この光を削除" = "Remove This Light";
+"光の向き(左右)" = "Light direction (left/right)";
+"光の向き(高さ)" = "Light direction (height)";
+"位置(左右)" = "Position (left/right)";
+"位置(上下)" = "Position (up/down)";
+"位置(手前)" = "Position (depth)";
+"点光源は影を落としません。" = "Point lights do not cast shadows.";
+"影を受ける床" = "Shadow-catching floor";
+"見えない床で、モデルの影だけを下の絵に落とします。" = "An invisible floor that casts only the models’ shadows onto the picture below.";
+"床の高さ" = "Floor height";

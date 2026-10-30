@@ -30,6 +30,11 @@ extension SettingsView {
             Button(model.localizedString("動画…")) {
                 chooseSceneLayerVideo(path: path)
             }
+            Button(model.localizedString("3Dモデル(glTF)…")) {
+                chooseSceneLayerModel(path: path)
+            }
+            // A scene seen through its own camera stands its layers in space, where the stage does not apply.
+            .disabled(model.sceneDocumentsByPath[path]?.camera?.perspective == true)
             Section(model.localizedString("粒子")) {
                 Button(model.localizedString("動きを細かく決められる粒子")) {
                     if let id = model.addSceneParticleSystemLayer(

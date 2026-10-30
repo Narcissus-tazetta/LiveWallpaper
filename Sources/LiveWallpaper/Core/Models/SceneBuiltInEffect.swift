@@ -201,7 +201,7 @@ enum SceneBuiltInEffect: String, CaseIterable, Identifiable {
             ])
         case .blur:
             func pass(_ from: String, _ to: String, direction: [Float]) -> SceneRenderGraph.Pass {
-                var data = Self.draw(Self.blurSource, bytes: 20, updates: [
+                var data = Self.draw(Self.blurSource, bytes: 24, updates: [
                     .init(offset: 0, value: .texelSize, texture: from), effect("radius", at: 16),
                 ], textures: [from])
                 data.fragment.uniforms.replaceSubrange(8 ..< 16, with: Self.data(direction))
@@ -216,7 +216,7 @@ enum SceneBuiltInEffect: String, CaseIterable, Identifiable {
             var bright = Self.draw(SceneBloom.brightPass, bytes: 4, updates: [effect("threshold", at: 0)], textures: ["input"])
             bright.vertex.source = SceneBloom.vertex
             func blur(_ from: String, direction: [Float]) -> SceneRenderGraph.Draw {
-                var blur = Self.draw(SceneBloom.blurPass, bytes: 20, updates: [
+                var blur = Self.draw(SceneBloom.blurPass, bytes: 24, updates: [
                     .init(offset: 0, value: .texelSize, texture: from), effect("radius", at: 16),
                 ], textures: [from])
                 blur.fragment.uniforms.replaceSubrange(8 ..< 16, with: Self.data(direction))
