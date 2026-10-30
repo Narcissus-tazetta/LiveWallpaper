@@ -340,12 +340,17 @@ extension SettingsView {
                         .foregroundColor(.secondary)
                 }
             }
-            VStack(spacing: 2) {
-                // Top layer first, as in image editors.
-                ForEach(document.layers.reversed()) { layer in
-                    sceneLayerRow(path: path, document: document, layer: layer, isSelected: layer.id == selectedID)
+            // Bounded so that dozens of layers scroll instead of pushing the buttons and everything below the list down.
+            ScrollView {
+                VStack(spacing: 2) {
+                    // Top layer first, as in image editors.
+                    ForEach(document.layers.reversed()) { layer in
+                        sceneLayerRow(path: path, document: document, layer: layer, isSelected: layer.id == selectedID)
+                    }
                 }
             }
+            .frame(maxHeight: 320)
+            .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 4) {
                 sceneAddLayerMenu(path: path)
 
