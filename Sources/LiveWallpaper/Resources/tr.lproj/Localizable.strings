@@ -1620,3 +1620,33 @@
 "間隔の最長(秒)" = "En uzun ara (sn)";
 
 "音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Masaüstünde çalmak için ses dosyaları ekleyin. Yalnızca uygulama ayarlarında duvar kâğıdı sesi açıksa çalar.";
+
+"シーン全体" = "Tüm sahne";
+
+"背景色" = "Arka plan rengi";
+
+"明るさの幅を広げる(HDR)" = "Daha geniş parlaklık aralığı (HDR)";
+
+"白より明るい色を最後まで保ちます。使う作品は、描画の負荷が少し上がります。" = "Beyazdan parlak renkleri sona kadar korur. Çizim yükünü biraz artırır.";
+
+"グロー(光のにじみ)" = "Parıltı (ışık yayılması)";
+
+"この作品は、取り込み時の仕上げ処理を使っています。" = "Bu çalışma içe aktarmadaki son işlemeyi kullanıyor.";
+
+"しきい値" = "Eşik";
+
+"広がり" = "Yayılma";
+
+"カメラの揺れ" = "Kamera sarsıntısı";
+
+"揺れの速さ" = "Sarsıntı hızı";
+
+"揺れの大きさ" = "Sarsıntı miktarı";
+
+"揺れの荒さ" = "Sarsıntı pürüzlülüğü";
+
+"視差の動きを細かく決める" = "Paralaksı ayrıntılı ayarla";
+
+"視差の移動量" = "Paralaks mesafesi";
+
+"視差の追従の速さ" = "Paralaks takip hızı";

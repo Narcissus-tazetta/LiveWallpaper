@@ -1620,3 +1620,33 @@
 "間隔の最長(秒)" = "Longest pause (s)";
 
 "音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Add audio files to play them on the desktop. They play only when wallpaper sound is turned on in the app’s settings.";
+
+"シーン全体" = "Whole scene";
+
+"背景色" = "Background color";
+
+"明るさの幅を広げる(HDR)" = "Wider brightness range (HDR)";
+
+"白より明るい色を最後まで保ちます。使う作品は、描画の負荷が少し上がります。" = "Keeps colors brighter than white until the end. It adds a little to the drawing load.";
+
+"グロー(光のにじみ)" = "Glow (light bleed)";
+
+"この作品は、取り込み時の仕上げ処理を使っています。" = "This wallpaper uses finishing passes from its import.";
+
+"しきい値" = "Threshold";
+
+"広がり" = "Spread";
+
+"カメラの揺れ" = "Camera shake";
+
+"揺れの速さ" = "Shake speed";
+
+"揺れの大きさ" = "Shake amount";
+
+"揺れの荒さ" = "Shake roughness";
+
+"視差の動きを細かく決める" = "Set parallax in detail";
+
+"視差の移動量" = "Parallax travel";
+
+"視差の追従の速さ" = "Parallax follow speed";

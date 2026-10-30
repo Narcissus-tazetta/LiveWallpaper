@@ -11,6 +11,7 @@ struct SceneScriptPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             scriptsSection
+            SceneWorldPanel(model: model, path: path)
             SceneUserPropertiesPanel(model: model, path: path)
             SceneSoundsPanel(model: model, path: path)
         }

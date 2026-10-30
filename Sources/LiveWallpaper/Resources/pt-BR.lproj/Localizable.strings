@@ -1620,3 +1620,33 @@
 "間隔の最長(秒)" = "Pausa máxima (s)";
 
 "音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Adicione arquivos de áudio para tocá-los na mesa. Eles só tocam quando o som do plano de fundo está ativado nos ajustes do app.";
+
+"シーン全体" = "Cena inteira";
+
+"背景色" = "Cor de fundo";
+
+"明るさの幅を広げる(HDR)" = "Faixa de brilho maior (HDR)";
+
+"白より明るい色を最後まで保ちます。使う作品は、描画の負荷が少し上がります。" = "Mantém até o fim as cores mais claras que o branco. Aumenta um pouco a carga de desenho.";
+
+"グロー(光のにじみ)" = "Brilho (difusão de luz)";
+
+"この作品は、取り込み時の仕上げ処理を使っています。" = "Esta obra usa o acabamento da importação.";
+
+"しきい値" = "Limite";
+
+"広がり" = "Dispersão";
+
+"カメラの揺れ" = "Tremor da câmera";
+
+"揺れの速さ" = "Velocidade do tremor";
+
+"揺れの大きさ" = "Intensidade do tremor";
+
+"揺れの荒さ" = "Aspereza do tremor";
+
+"視差の動きを細かく決める" = "Definir a paralaxe em detalhe";
+
+"視差の移動量" = "Deslocamento da paralaxe";
+
+"視差の追従の速さ" = "Velocidade de acompanhamento da paralaxe";

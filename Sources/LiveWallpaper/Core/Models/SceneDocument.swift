@@ -1271,6 +1271,8 @@ struct SceneDocument: Codable, Equatable {
     var highDynamicRange = false
     /// Runs over the finished canvas (`input`) before it is shown, such as a glow.
     var finishing: SceneRenderGraph?
+    /// The glow the editor made, which `finishing` is built from; nil leaves `finishing` as it is.
+    var bloom: SceneBloom?
     /// How far a layer of depth 1 moves, as a fraction of the canvas, with the cursor at
     /// an edge; the renderer's own amount when absent.
     var parallaxTravel: Double?
@@ -1320,6 +1322,7 @@ struct SceneDocument: Codable, Equatable {
         }
         highDynamicRange = try container.decodeIfPresent(Bool.self, forKey: .highDynamicRange) ?? false
         finishing = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .finishing)
+        bloom = try container.decodeIfPresent(SceneBloom.self, forKey: .bloom)
         parallaxTravel = try container.decodeIfPresent(Double.self, forKey: .parallaxTravel)
         parallaxResponse = try container.decodeIfPresent(Double.self, forKey: .parallaxResponse)
         cameraShake = try container.decodeIfPresent(SceneCameraShake.self, forKey: .cameraShake)

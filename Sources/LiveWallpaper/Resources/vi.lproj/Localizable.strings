@@ -1620,3 +1620,33 @@
 "間隔の最長(秒)" = "Khoảng nghỉ dài nhất (giây)";
 
 "音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Thêm tệp âm thanh để phát trên màn hình nền. Chỉ phát khi bật âm thanh hình nền trong cài đặt ứng dụng.";
+
+"シーン全体" = "Toàn cảnh";
+
+"背景色" = "Màu nền";
+
+"明るさの幅を広げる(HDR)" = "Mở rộng dải độ sáng (HDR)";
+
+"白より明るい色を最後まで保ちます。使う作品は、描画の負荷が少し上がります。" = "Giữ các màu sáng hơn trắng đến cuối cùng. Làm tăng nhẹ tải vẽ.";
+
+"グロー(光のにじみ)" = "Phát sáng (loang sáng)";
+
+"この作品は、取り込み時の仕上げ処理を使っています。" = "Tác phẩm này dùng bước hoàn thiện từ lúc nhập.";
+
+"しきい値" = "Ngưỡng";
+
+"広がり" = "Độ lan";
+
+"カメラの揺れ" = "Rung máy ảnh";
+
+"揺れの速さ" = "Tốc độ rung";
+
+"揺れの大きさ" = "Biên độ rung";
+
+"揺れの荒さ" = "Độ gồ ghề của rung";
+
+"視差の動きを細かく決める" = "Tùy chỉnh chi tiết thị sai";
+
+"視差の移動量" = "Quãng di chuyển thị sai";
+
+"視差の追従の速さ" = "Tốc độ bám thị sai";
