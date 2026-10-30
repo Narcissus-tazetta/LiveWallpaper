@@ -208,7 +208,6 @@ final class SceneMetalLayer: CAMetalLayer {
             }
         } else {
             let renderer = try SceneRenderer(document: document, videoPath: videoPath)
-            renderer.effectResolutionScale = 0.5
             renderer.decodesVideoAhead = true
             renderer.timeOfDay = timeOfDay
             self.renderer = renderer

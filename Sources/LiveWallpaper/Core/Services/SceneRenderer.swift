@@ -1490,14 +1490,6 @@ final class SceneRenderer {
         } else {
             return blackTexture
         }
-        if let graph = graphRenderers[layer.id] {
-            source = try graph.encode(input: source, images: graphResources[layer.id]!, time: input.time,
-                                      cursor: input.cursor, audio: input.audio, meshes: lastFrame?.meshes ?? [],
-                                      layerFromCanvas: graph.usesLayerPlacement ? layerFromCanvas(layer) : matrix_identity_float3x3,
-                                      pointerPresses: input.pointerPresses, parallax: input.parallax,
-                                      background: canvasSource ?? blackTexture,
-                                      commandBuffer: commandBuffer)
-        }
         var effects = layer.activeEffects
         // While a particle area is painted, an effect pass that changes nothing
         // tints the painted part like an effect mask.
@@ -1507,14 +1499,44 @@ final class SceneRenderer {
             marker.strength = 0
             effects.append(marker)
         }
+        if let graph = graphRenderers[layer.id] {
+            var images = graphResources[layer.id]!
+            // A puppet's effects (and their masks and flow maps) are authored on its texture sheet,
+            // so they run there and the mesh then draws the result; run after the mesh they would
+            // sit on the wrong parts.
+            if drawsSkeleton(layer), !effects.isEmpty, let file = layer.renderGraph?.images["atlas"], let atlas = images[file] {
+                let width = max(Int((Float(atlas.width) * effectResolutionScale).rounded()), 16)
+                let height = max(Int((Float(atlas.height) * effectResolutionScale).rounded()), 16)
+                images[file] = try encodeEffects(effects, on: atlas, layer: layer, width: width, height: height,
+                                                 commandBuffer: commandBuffer, input: input, canvasSource: canvasSource)
+                effects = []
+            }
+            source = try graph.encode(input: source, images: images, time: input.time,
+                                      cursor: input.cursor, audio: input.audio, meshes: lastFrame?.meshes ?? [],
+                                      layerFromCanvas: graph.usesLayerPlacement ? layerFromCanvas(layer) : matrix_identity_float3x3,
+                                      pointerPresses: input.pointerPresses, parallax: input.parallax,
+                                      background: canvasSource ?? blackTexture,
+                                      commandBuffer: commandBuffer)
+        }
         guard !effects.isEmpty else {
             return source
         }
-        // Half the layer's size on the target (never above its own resolution): the
-        // distortions are smooth, and this pass is most of the GPU time.
+        // The size the layer shows on the target, never above its own resolution.
         let width = layer.capturesCanvas ? source.width : max(min(Int(shown.x.rounded()), source.width), 16)
         let height = layer.capturesCanvas ? source.height : max(min(Int(shown.y.rounded()), source.height), 16)
+        return try encodeEffects(effects, on: source, layer: layer, width: width, height: height,
+                                 commandBuffer: commandBuffer, input: input, canvasSource: canvasSource)
+    }
 
+    private func drawsSkeleton(_ layer: SceneLayer) -> Bool {
+        layer.renderGraph?.passes.contains { $0.draw?.skeleton != nil || $0.draw?.skeletonID != nil } == true
+    }
+
+    /// Runs `effects` over `source` into targets of the given size.
+    private func encodeEffects(
+        _ effects: [SceneEffect], on source: MTLTexture, layer: SceneLayer, width: Int, height: Int,
+        commandBuffer: MTLCommandBuffer, input: SceneFrameInput, canvasSource: MTLTexture?
+    ) throws -> MTLTexture {
         let standardEffectCount = effects.filter { graphRenderers[$0.id] == nil }.count
         let layerTarget = standardEffectCount > 0 ? try effectLayerTexture(for: layer.id, width: width, height: height) : nil
         let scratchTarget = standardEffectCount > 1 ? try effectScratchTexture(width: width, height: height) : nil

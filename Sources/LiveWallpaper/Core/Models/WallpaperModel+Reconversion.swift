@@ -17,7 +17,16 @@ extension WallpaperModel {
                 if metadata.isScene == true {
                     flushSceneSave(path: path)
                     cancelSceneBake(path: path)
-                    let previous = sceneDocumentsByPath[path]
+                    // The document is only in memory once the wallpaper has been shown this session;
+                    // without it the allowed scripts could not be recognised after the rewrite.
+                    var previous = sceneDocumentsByPath[path]
+                    if previous == nil {
+                        do {
+                            previous = try SceneStore.load(videoPath: path).map { SceneScriptPermissions.restored($0, path: path) }
+                        } catch {
+                            AppLog.externalWallpapers.error("previous scene of \(id, privacy: .public) not read: \(error.localizedDescription, privacy: .public)")
+                        }
+                    }
                     let scene = try await Task.detached(priority: .utility) {
                         try await ReconvertedSceneFiles.replace(source: source.appendingPathComponent("wallpaper.scene"),
                                                                 videoPath: path, backup: backupRoot.appendingPathComponent(id))
