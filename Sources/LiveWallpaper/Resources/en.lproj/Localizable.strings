@@ -1707,3 +1707,13 @@
 "影を受ける床" = "Shadow-catching floor";
 "見えない床で、モデルの影だけを下の絵に落とします。" = "An invisible floor that casts only the models’ shadows onto the picture below.";
 "床の高さ" = "Floor height";
+"このシーンは削除されました" = "This scene was deleted.";
+"シーンエディタを開く" = "Open Scene Editor";
+"シーンエディタ" = "Scene Editor";
+"レイヤー・エフェクト・動きを、大きなプレビューを見ながら編集します。" = "Edit layers, effects, and motion while watching a large preview.";
+"インスペクタ" = "Inspector";
+"連動" = "Links";
+"シーン" = "Scene";
+"レイヤーを選ぶと、ここで設定できます" = "Select a layer to edit it here.";
+"説明を表示" = "Show Descriptions";
+"説明を隠す" = "Hide Descriptions";

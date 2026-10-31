@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension SettingsView {
+extension SceneEditorView {
     private static let sceneBlendModeGroups: [(title: String, modes: [SceneBlendMode])] = [
         ("", [.normal]),
         ("暗くする系", [.darken, .multiply, .colorBurn, .subtract, .minimum]),

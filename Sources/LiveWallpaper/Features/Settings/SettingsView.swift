@@ -29,23 +29,6 @@ struct SettingsView: View {
     @StateObject var storeMySubmissions: StoreMySubmissionsController
     @StateObject var remoteThumbnailCache: RemoteThumbnailCache
     @State var editorSubMode: EditorSubMode = .fit
-    @State var selectedSceneLayerID: UUID?
-    @State var selectedSceneEffectID: UUID?
-    @State var sceneEditorTool: SceneEditorTool?
-    @State var selectedScenePinID: UUID?
-    @State var selectedSceneKeyframeID: UUID?
-    @StateObject var sceneMaskPainter = SceneMaskPainter()
-    @StateObject var scenePreviewController = ScenePreviewController()
-    @StateObject var sceneScriptEditor = SceneScriptEditorController()
-    @State var renamingSceneLayerID: UUID?
-    @State var sceneLayerNameDraft = ""
-    @State var draggedSceneLayerID: UUID?
-    @State var isSavingScenePreset = false
-    @State var scenePresetNameDraft = ""
-    @State var scenePresetIncludesPaint = false
-    @State var scenePresetIncludesParticles = true
-    @State var scenePresetPendingDeletion: ScenePreset?
-    @State var selectedSceneLinkID: UUID?
     /// 「他の壁紙へコピー」ピッカーの状態。
     @State var isTrimCopyPickerPresented: Bool = false
     @State var trimCopySelection: Set<String> = []
@@ -543,7 +526,7 @@ struct SettingsView: View {
                 case .trim:
                     wallpaperTrimEditorPanel
                 case .scene:
-                    wallpaperSceneEditorPanel
+                    sceneEditorLauncherPanel
                 case .effects:
                     wallpaperEffectsEditorPanel
                 }

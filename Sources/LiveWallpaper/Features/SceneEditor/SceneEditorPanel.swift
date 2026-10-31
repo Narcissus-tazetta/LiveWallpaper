@@ -2,32 +2,28 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-extension SettingsView {
+extension SceneEditorView {
     private var sceneRowLabelWidth: CGFloat {
-        132
+        SceneInspectorMetrics.labelWidth
     }
 
-    /// Layers of a still-image wallpaper. Shown instead of trim editing for scenes.
     var wallpaperSceneEditorPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let path = fitEditor.resolvedVideoPath(), let document = model.sceneDocumentsByPath[path] {
+        Group {
+            if let document = model.sceneDocumentsByPath[path] {
                 sceneEditorContent(path: path, document: document)
             } else {
-                Text(model.localizedString("下の壁紙一覧から画像の壁紙を選択すると、レイヤーを編集できます"))
-                    .font(.caption)
+                Text(model.localizedString("このシーンは削除されました"))
                     .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .settingsCardBackground()
         .onDisappear {
             endSceneEditorTool()
             model.endScenePresetTrial()
             model.bakeAllScenesNowIfPending()
         }
         .sheet(isPresented: $isSavingScenePreset) {
-            scenePresetSaveSheet(path: fitEditor.resolvedVideoPath() ?? "", layerID: selectedSceneLayerID)
+            scenePresetSaveSheet(path: path, layerID: selectedSceneLayerID)
         }
         .confirmationDialog(
             model.localizedString("プリセットを削除しますか?"),
@@ -53,23 +49,100 @@ extension SettingsView {
         let selectedID = document.layers.contains(where: { $0.id == selectedSceneLayerID })
             ? selectedSceneLayerID
             : document.layers.last?.id
+        let selectedLayer = selectedID.flatMap { id in document.layers.first { $0.id == id } }
 
-        HStack(spacing: 10) {
-            Text(model.registeredVideoDisplayName(for: path))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            scenePresetMenu(path: path, layer: selectedID.flatMap { id in document.layers.first { $0.id == id } })
-                .controlSize(.small)
+        VStack(spacing: 0) {
+            if #unavailable(macOS 14.0) {
+                sceneEditorToolbarRow(path: path, selectedLayer: selectedLayer)
+                Divider()
+            }
+            HSplitView {
+                sceneLayerList(path: path, document: document, selectedID: selectedID)
+                    .frame(minWidth: 200, idealWidth: 240, maxWidth: 360, maxHeight: .infinity)
+                sceneCanvasColumn(path: path, document: document, selectedID: selectedID)
+                    .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+                sceneInspectorColumn(path: path, document: document, selectedLayer: selectedLayer)
+                    .frame(minWidth: 340, idealWidth: 380, maxWidth: 540, maxHeight: .infinity)
+            }
+            Divider()
+            sceneStatusBar(path: path)
+        }
+        .background {
+            // The shortcuts live in the content: on macOS 14 the buttons are moved into the
+            // window's AppKit toolbar, where SwiftUI shortcuts are not guaranteed to fire.
+            Group {
+                Button("") {
+                    model.undoScene(path: path)
+                    syncScenePainterWithDocument(path: path)
+                }
+                .keyboardShortcut("z", modifiers: .command)
+                .disabled(!model.canUndoScene(path: path))
+                Button("") {
+                    model.redoScene(path: path)
+                    syncScenePainterWithDocument(path: path)
+                }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .disabled(!model.canRedoScene(path: path))
+            }
+            .opacity(0)
+            .accessibilityHidden(true)
+        }
+        .navigationTitle(model.registeredVideoDisplayName(for: path))
+        .navigationSubtitle(model.localizedString("シーンエディタ"))
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                sceneZoomControls()
+            }
+            // Separate items, so each group gets its own capsule with room around its text.
+            ToolbarItem(placement: .primaryAction) {
+                sceneHintsToggle()
+            }
+            ToolbarItem(placement: .primaryAction) {
+                sceneComparisonControls(path: path)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                scenePresetMenu(path: path, layer: selectedLayer)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                sceneUndoRedoButtons(path: path)
+            }
+        }
+    }
+
+    // MARK: - Toolbar
+
+    /// macOS 13 has no way to put the toolbar into the window, so it is a row of the content.
+    private func sceneEditorToolbarRow(path: String, selectedLayer: SceneLayer?) -> some View {
+        HStack(spacing: 12) {
+            sceneZoomControls()
+            Spacer(minLength: 8)
+            sceneHintsToggle()
+            sceneComparisonControls(path: path)
+            scenePresetMenu(path: path, layer: selectedLayer)
+                .fixedSize()
+            sceneUndoRedoButtons(path: path)
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 14)
+        .frame(height: 40)
+    }
+
+    private func sceneHintsToggle() -> some View {
+        Toggle(isOn: $showsSceneHints) {
+            Image(systemName: "info.circle")
+        }
+        .toggleStyle(.button)
+        .iconHelp(model.localizedString(showsSceneHints ? "説明を隠す" : "説明を表示"))
+    }
+
+    private func sceneUndoRedoButtons(path: String) -> some View {
+        ControlGroup {
             Button {
                 model.undoScene(path: path)
                 syncScenePainterWithDocument(path: path)
             } label: {
                 Image(systemName: "arrow.uturn.backward")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .keyboardShortcut("z", modifiers: .command)
             .disabled(!model.canUndoScene(path: path))
             .iconHelp(model.localizedString("取り消す(⌘Z)"))
 
@@ -79,17 +152,16 @@ extension SettingsView {
             } label: {
                 Image(systemName: "arrow.uturn.forward")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .keyboardShortcut("z", modifiers: [.command, .shift])
             .disabled(!model.canRedoScene(path: path))
             .iconHelp(model.localizedString("やり直す(⇧⌘Z)"))
         }
+        .fixedSize()
+    }
 
-        sceneStatusRow(path: path)
+    // MARK: - Canvas
 
-        scenePreviewToolbar(path: path, document: document)
-
+    @ViewBuilder
+    private func sceneCanvasColumn(path: String, document: SceneDocument, selectedID: UUID?) -> some View {
         let comparison = scenePreviewController.isComparing ? model.sceneComparisonSnapshots[path] : nil
         let trial = model.scenePresetTrial.flatMap { $0.path == path ? $0 : nil }
         let isEditable = comparison == nil && trial == nil
@@ -98,77 +170,102 @@ extension SettingsView {
             .flatMap { selectedSceneKeyframe(in: $0) }
             .map { $0.time * Double(document.loopSeconds) }
         let visibleRegions = model.desktopVisibleRegions(path: path, videoAspectRatio: document.aspectRatio)
-        ScenePreviewView(
-            document: comparison ?? trial?.document ?? document,
-            videoPath: path,
-            controller: scenePreviewController,
-            interaction: isEditable ? scenePreviewInteraction(layerID: selectedID) : .hover,
-            painter: sceneMaskPainter,
-            onPickPoint: { point in
-                if let selectedID {
-                    handleScenePreviewPick(point, path: path, layerID: selectedID)
+
+        VStack(spacing: 0) {
+            ScenePreviewView(
+                document: comparison ?? trial?.document ?? document,
+                videoPath: path,
+                controller: scenePreviewController,
+                interaction: isEditable ? scenePreviewInteraction(layerID: selectedID) : .hover,
+                painter: sceneMaskPainter,
+                onPickPoint: { point in
+                    if let selectedID {
+                        handleScenePreviewPick(point, path: path, layerID: selectedID)
+                    }
+                },
+                onSelectLayer: { id in
+                    selectSceneLayer(id)
+                },
+                editableTransform: { layer in
+                    sceneEditableTransform(of: layer)
+                },
+                onTransformLayer: { id, transform in
+                    applySceneTransform(transform, path: path, layerID: id)
+                },
+                markers: isEditable ? scenePreviewMarkers(document: document, layerID: selectedID) : [],
+                fixedTime: fixedTime,
+                visibleRegions: visibleRegions,
+                onScriptIssues: { issues in
+                    if model.sceneScriptIssues[path] != issues { model.sceneScriptIssues[path] = issues }
+                },
+                onScriptLogs: { model.receiveSceneScriptLogs($0, path: path) }
+            )
+            .aspectRatio(CGFloat(document.aspectRatio), contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12))
+            )
+            .overlay(alignment: .topLeading) {
+                if comparison != nil || trial != nil {
+                    Text(model.localizedString(comparison != nil ? "記録した状態を表示中" : "プリセットを試し中"))
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(8)
                 }
-            },
-            onSelectLayer: { id in
-                selectSceneLayer(id)
-            },
-            editableTransform: { layer in
-                sceneEditableTransform(of: layer)
-            },
-            onTransformLayer: { id, transform in
-                applySceneTransform(transform, path: path, layerID: id)
-            },
-            markers: isEditable ? scenePreviewMarkers(document: document, layerID: selectedID) : [],
-            fixedTime: fixedTime,
-            visibleRegions: visibleRegions,
-            onScriptIssues: { issues in
-                if model.sceneScriptIssues[path] != issues { model.sceneScriptIssues[path] = issues }
-            },
-            onScriptLogs: { model.receiveSceneScriptLogs($0, path: path) }
-        )
-        .aspectRatio(CGFloat(document.aspectRatio), contentMode: .fit)
-        .frame(maxWidth: .infinity, maxHeight: 300)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(alignment: .topLeading) {
-            if comparison != nil || trial != nil {
-                Text(model.localizedString(comparison != nil ? "記録した状態を表示中" : "プリセットを試し中"))
-                    .font(.caption)
+            }
+            .overlay(alignment: .topTrailing) {
+                if scenePreviewController.simulatedTimeOfDay != nil || scenePreviewController.simulatedCursor != nil {
+                    HStack(spacing: 6) {
+                        Text(scenePreviewConditionText())
+                            .font(.caption)
+                        Button(model.localizedString("戻す")) {
+                            scenePreviewController.simulatedTimeOfDay = nil
+                            scenePreviewController.simulatedCursor = nil
+                        }
+                        .controlSize(.small)
+                        .help(model.localizedString("いまの時間帯と、ポインタの位置に戻します"))
+                    }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(.regularMaterial, in: Capsule())
                     .padding(8)
-            }
-        }
-        .overlay(alignment: .topTrailing) {
-            if scenePreviewController.simulatedTimeOfDay != nil || scenePreviewController.simulatedCursor != nil {
-                HStack(spacing: 6) {
-                    Text(scenePreviewConditionText())
-                        .font(.caption)
-                    Button(model.localizedString("戻す")) {
-                        scenePreviewController.simulatedTimeOfDay = nil
-                        scenePreviewController.simulatedCursor = nil
-                    }
-                    .controlSize(.small)
-                    .help(model.localizedString("いまの時間帯と、ポインタの位置に戻します"))
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(.regularMaterial, in: Capsule())
-                .padding(8)
             }
-        }
-        .accessibilityLabel(model.localizedString("プレビュー"))
-        .task(id: path) {
-            if let trial = model.scenePresetTrial, trial.path != path {
-                model.endScenePresetTrial()
+            .accessibilityLabel(model.localizedString("プレビュー"))
+            .padding(24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .underPageBackgroundColor))
+            .task(id: path) {
+                if let trial = model.scenePresetTrial, trial.path != path {
+                    model.endScenePresetTrial()
+                }
+                if model.sceneComparisonSnapshots[path] == nil {
+                    model.recordSceneComparison(path: path)
+                }
             }
-            if model.sceneComparisonSnapshots[path] == nil {
-                model.recordSceneComparison(path: path)
-            }
-        }
 
-        scenePlaybackBar(path: path, document: document, selectedID: selectedID, fixedTime: fixedTime)
+            Divider()
 
+            VStack(alignment: .leading, spacing: 8) {
+                scenePlaybackBar(path: path, document: document, selectedID: selectedID, fixedTime: fixedTime)
+                sceneCanvasHint(path: path, comparison: comparison, trial: trial, visibleRegions: visibleRegions)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
+    }
+
+    /// What the pointer does on the canvas right now, or the bar of the tool in use.
+    @ViewBuilder
+    private func sceneCanvasHint(
+        path _: String,
+        comparison: SceneDocument?,
+        trial: ScenePresetTrial?,
+        visibleRegions: [CGRect]
+    ) -> some View {
         if comparison != nil {
             settingsFootnote(model.localizedString("記録した状態を、いまと同じ時刻・カーソル位置で表示しています。編集内容は変わりません。"))
         } else if let trial {
@@ -184,15 +281,102 @@ extension SettingsView {
                 model.localizedString("レイヤーをクリックして選び、ドラッグで移動します。四隅で拡大・縮小、上の丸で回転します(⇧で15°ずつ、⌘でスナップなし)。ポインタを動かすと、カーソルへの反応も確かめられます。")
             )
         }
-
         if visibleRegions.contains(where: { $0.width < 0.999 || $0.height < 0.999 }) {
             settingsFootnote(model.localizedString("暗い部分は、デスクトップでは画面の外になり表示されません。"))
         }
+    }
 
-        scenePresetGuideCard(path: path, document: document)
-        SceneScriptPanel(model: model, editor: sceneScriptEditor, preview: scenePreviewController,
-                         path: path, selectedLayerID: selectedID)
+    // MARK: - Inspector
 
+    private func sceneInspectorColumn(path: String, document: SceneDocument, selectedLayer: SceneLayer?) -> some View {
+        VStack(spacing: 0) {
+            Picker(model.localizedString("インスペクタ"), selection: $inspectorTab) {
+                Text(model.localizedString("レイヤー")).tag(SceneInspectorTab.layer)
+                Text(model.localizedString("動き")).tag(SceneInspectorTab.motion)
+                Text(model.localizedString("連動")).tag(SceneInspectorTab.links)
+                Text(model.localizedString("シーン")).tag(SceneInspectorTab.scene)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    sceneInspectorContent(path: path, document: document, selectedLayer: selectedLayer)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    @ViewBuilder
+    private func sceneInspectorContent(path: String, document: SceneDocument, selectedLayer: SceneLayer?) -> some View {
+        switch inspectorTab {
+        case .layer:
+            scenePresetGuideCard(path: path, document: document)
+            if let layer = selectedLayer {
+                sceneInspectorLayerHeader(path: path, layer: layer)
+                sceneLayerInspector(path: path, layer: layer)
+                if layer.particleSystem != nil {
+                    Divider()
+                    sceneParticleSystemSection(path: path, layer: layer)
+                }
+            } else {
+                sceneInspectorEmpty()
+            }
+        case .motion:
+            if let layer = selectedLayer {
+                sceneInspectorLayerHeader(path: path, layer: layer)
+                sceneEffectsSection(path: path, layer: layer)
+                    .disabled(layer.isLocked)
+            } else {
+                sceneInspectorEmpty()
+            }
+        case .links:
+            sceneLinksSection(path: path, document: document, selectedLayerID: selectedLayer?.id)
+        case .scene:
+            sceneDocumentSettings(path: path, document: document)
+            SceneScriptPanel(model: model, editor: sceneScriptEditor, preview: scenePreviewController,
+                             path: path, selectedLayerID: selectedLayer?.id)
+        }
+    }
+
+    /// Which layer the tab edits, since the list may be scrolled away from it.
+    private func sceneInspectorLayerHeader(path: String, layer: SceneLayer) -> some View {
+        HStack(spacing: 10) {
+            SceneLayerThumbnail(
+                url: sceneLayerThumbnailURL(layer, path: path),
+                symbol: sceneLayerSymbol(layer),
+                isVideo: layer.videoFile != nil
+            )
+            Text(layer.name)
+                .font(.headline)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(layer.name)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if layer.isLocked {
+                Image(systemName: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .help(model.localizedString("ロックを解除"))
+            }
+        }
+        .padding(.bottom, 2)
+    }
+
+    private func sceneInspectorEmpty() -> some View {
+        Text(model.localizedString("レイヤーを選ぶと、ここで設定できます"))
+            .font(.callout)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 24)
+    }
+
+    @ViewBuilder
+    private func sceneDocumentSettings(path: String, document: SceneDocument) -> some View {
         HStack(spacing: 12) {
             Text(model.localizedString("ループの長さ"))
                 .frame(width: sceneRowLabelWidth, alignment: .leading)
@@ -214,49 +398,32 @@ extension SettingsView {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
         }
         settingsFootnote(
             model.localizedString("動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。")
         )
-
         if document.usesAudio {
             SceneSoundReactionToggle(model: model, path: path)
         }
-
-        HStack(alignment: .top, spacing: 16) {
-            sceneLayerList(path: path, document: document, selectedID: selectedID)
-                .frame(width: 240)
-            if let selectedID, let layer = document.layers.first(where: { $0.id == selectedID }) {
-                sceneLayerInspector(path: path, layer: layer)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-
-        if let selectedID, let layer = document.layers.first(where: { $0.id == selectedID }) {
-            if layer.particleSystem != nil {
-                Divider()
-                sceneParticleSystemSection(path: path, layer: layer)
-            }
-            Divider()
-            sceneEffectsSection(path: path, layer: layer)
-                .disabled(layer.isLocked)
-        }
-
         Divider()
-        sceneLinksSection(path: path, document: document, selectedLayerID: selectedID)
+    }
 
-        if let message = model.sceneErrorMessage {
-            Text(message)
-                .font(.caption)
-                .foregroundColor(.orange)
+    // MARK: - Status bar
+
+    private func sceneStatusBar(path: String) -> some View {
+        HStack(spacing: 12) {
+            sceneStatusRow(path: path)
+            if let message = model.sceneErrorMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .lineLimit(1)
+            }
         }
-
-        settingsFootnote(
-            model.localizedString(
-                "変更はすぐに壁紙へ反映されます。ロック画面とスクリーンセーバーでは、カーソルに反応していない状態で表示されます。"
-            )
-        )
+        .padding(.horizontal, 14)
+        .frame(height: 26)
+        .help(model.localizedString("変更はすぐに壁紙へ反映されます。ロック画面とスクリーンセーバーでは、カーソルに反応していない状態で表示されます。"))
     }
 
     // MARK: - Status
@@ -328,32 +495,36 @@ extension SettingsView {
 
     private func sceneLayerList(path: String, document: SceneDocument, selectedID: UUID?) -> some View {
         let selectedLayer = selectedID.flatMap { id in document.layers.first { $0.id == id } }
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(spacing: 0) {
             HStack(spacing: 6) {
                 Text(model.localizedString("レイヤー"))
                     .font(.headline)
+                    .help(model.localizedString("ドラッグで重ね順を変えられます。名前はダブルクリックで変更できます。"))
                 if model.sceneLayerImportCounts[path] != nil {
                     ProgressView()
                         .controlSize(.small)
-                    Text(model.localizedString("画像を読み込み中…"))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .help(model.localizedString("画像を読み込み中…"))
                 }
+                Spacer(minLength: 0)
+                sceneAddLayerMenu(path: path)
+                    .fixedSize()
+                    .sceneFocusRingHidden()
             }
-            // Bounded so that dozens of layers scroll instead of pushing the buttons and everything below the list down.
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            Divider()
             ScrollView {
-                VStack(spacing: 2) {
+                // Lazy: imported scenes reach hundreds of layers, each row with a thumbnail to load.
+                LazyVStack(spacing: 1) {
                     // Top layer first, as in image editors.
                     ForEach(document.layers.reversed()) { layer in
                         sceneLayerRow(path: path, document: document, layer: layer, isSelected: layer.id == selectedID)
                     }
                 }
+                .padding(6)
             }
-            .frame(maxHeight: 320)
-            .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 4) {
-                sceneAddLayerMenu(path: path)
-
+            Divider()
+            HStack(spacing: 2) {
                 Button {
                     if let selectedID {
                         duplicateSceneLayer(path: path, id: selectedID)
@@ -370,7 +541,7 @@ extension SettingsView {
                         model.removeSceneLayer(id: selectedID, path: path)
                     }
                 } label: {
-                    Image(systemName: "minus")
+                    Image(systemName: "trash")
                 }
                 .disabled(document.layers.count <= 1 || selectedLayer?.isLocked == true)
                 .help(model.localizedString("選択したレイヤーを削除"))
@@ -397,22 +568,49 @@ extension SettingsView {
                 .accessibilityLabel(model.localizedString("背面へ移動"))
             }
             .buttonStyle(.borderless)
-            settingsFootnote(model.localizedString("ドラッグで重ね順を変えられます。名前はダブルクリックで変更できます。"))
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    func sceneLayerSymbol(_ layer: SceneLayer) -> String {
+        switch layer.kind {
+        case .particles: "sparkles"
+        case .text: "textformat"
+        case .model: "cube"
+        case .image: layer.videoFile != nil ? "film" : "photo"
         }
     }
 
+    func sceneLayerThumbnailURL(_ layer: SceneLayer, path: String) -> URL? {
+        guard layer.kind == .image, !layer.imageFile.isEmpty else {
+            return nil
+        }
+        return SceneStore.folderURL(forVideoPath: path).appendingPathComponent(layer.imageFile)
+    }
+
     private func sceneLayerRow(path: String, document: SceneDocument, layer: SceneLayer, isSelected: Bool) -> some View {
-        HStack(spacing: 6) {
+        let showsLock = layer.isLocked || hoveredSceneLayerID == layer.id || isSelected
+        return HStack(spacing: 8) {
             Button {
                 updateSceneLayer(path: path, id: layer.id, allowLocked: true) { $0.isVisible.toggle() }
             } label: {
                 Image(systemName: layer.isVisible ? "eye" : "eye.slash")
+                    .foregroundColor(layer.isVisible ? .secondary : .secondary.opacity(0.5))
                     .frame(width: 18)
             }
             .buttonStyle(.borderless)
             .help(model.localizedString(layer.isVisible ? "レイヤーを隠す" : "レイヤーを表示"))
             .accessibilityLabel(model.localizedString(layer.isVisible ? "レイヤーを隠す" : "レイヤーを表示"))
             .accessibilityValue(layer.name)
+
+            SceneLayerThumbnail(
+                url: sceneLayerThumbnailURL(layer, path: path),
+                symbol: sceneLayerSymbol(layer),
+                isVideo: layer.videoFile != nil
+            )
+            .opacity(layer.isVisible ? 1 : 0.4)
 
             if renamingSceneLayerID == layer.id {
                 TextField(model.localizedString("レイヤー名"), text: $sceneLayerNameDraft)
@@ -426,25 +624,22 @@ extension SettingsView {
                     }
             } else {
                 HStack(spacing: 6) {
-                    if layer.kind == .particles {
-                        Image(systemName: "sparkles")
-                            .foregroundColor(.secondary)
-                    } else if layer.kind == .text {
-                        Image(systemName: "textformat")
-                            .foregroundColor(.secondary)
-                    } else if layer.kind == .model {
-                        Image(systemName: "cube")
-                            .foregroundColor(.secondary)
-                    }
                     Text(layer.name)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .foregroundColor(layer.isVisible ? .primary : .secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .help(layer.name)
                     if layer.cursorMask != nil {
                         Image(systemName: "circle.dashed")
                             .foregroundColor(.secondary)
                             .help(model.localizedString("カーソルで透かす"))
+                    }
+                    if !layer.effects.isEmpty {
+                        Image(systemName: "wind")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .help(model.localizedString("動き"))
                     }
                 }
                 .contentShape(Rectangle())
@@ -470,19 +665,28 @@ extension SettingsView {
                 toggleSceneLayerLock(path: path, layer: layer)
             } label: {
                 Image(systemName: layer.isLocked ? "lock.fill" : "lock.open")
-                    .foregroundColor(layer.isLocked ? .primary : .secondary.opacity(0.6))
+                    .foregroundColor(layer.isLocked ? .primary : .secondary)
                     .frame(width: 16)
             }
             .buttonStyle(.borderless)
+            // Kept in the layout while hidden, so names do not shift under the pointer.
+            .opacity(showsLock ? 1 : 0)
             .help(model.localizedString(layer.isLocked ? "ロックを解除" : "ロックして、誤って動かしたり変えたりしないようにする"))
             .accessibilityLabel(model.localizedString(layer.isLocked ? "ロックを解除" : "ロック"))
             .accessibilityValue(layer.name)
         }
+        .onHover { inside in
+            if inside {
+                hoveredSceneLayerID = layer.id
+            } else if hoveredSceneLayerID == layer.id {
+                hoveredSceneLayerID = nil
+            }
+        }
         .padding(.horizontal, 6)
-        .padding(.vertical, 4)
+        .frame(height: 32)
         .background(
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(isSelected ? Color.primary.opacity(0.1) : Color.clear)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(isSelected ? Color.primary.opacity(0.12) : hoveredSceneLayerID == layer.id ? Color.primary.opacity(0.05) : Color.clear)
         )
         .contextMenu {
             Button(model.localizedString("名前を変更")) {
@@ -597,7 +801,7 @@ extension SettingsView {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
         }
 
         if layer.kind == .image {
@@ -644,7 +848,7 @@ extension SettingsView {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
         }
 
         if let mask = layer.cursorMask {
@@ -820,7 +1024,7 @@ extension SettingsView {
         }
         Task {
             guard let id = await model.addSceneVideoLayer(from: url, path: path),
-                  fitEditor.resolvedVideoPath() == path
+                  isStillEditing
             else {
                 return
             }
@@ -840,7 +1044,7 @@ extension SettingsView {
         let urls = panel.urls
         Task {
             guard let id = await model.addSceneLayers(from: urls, path: path),
-                  fitEditor.resolvedVideoPath() == path
+                  isStillEditing
             else {
                 return
             }

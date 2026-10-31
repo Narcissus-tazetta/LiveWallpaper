@@ -1707,3 +1707,13 @@
 "影を受ける床" = "Gölge alan zemin";
 "見えない床で、モデルの影だけを下の絵に落とします。" = "Yalnızca modellerin gölgesini alttaki resme düşüren görünmez bir zemin.";
 "床の高さ" = "Zemin yüksekliği";
+"このシーンは削除されました" = "Bu sahne silindi.";
+"シーンエディタを開く" = "Sahne Düzenleyiciyi Aç";
+"シーンエディタ" = "Sahne Düzenleyici";
+"レイヤー・エフェクト・動きを、大きなプレビューを見ながら編集します。" = "Büyük bir önizlemeye bakarak katmanları, efektleri ve hareketi düzenleyin.";
+"インスペクタ" = "Denetçi";
+"連動" = "Bağlantılar";
+"シーン" = "Sahne";
+"レイヤーを選ぶと、ここで設定できます" = "Burada düzenlemek için bir katman seçin.";
+"説明を表示" = "Açıklamaları Göster";
+"説明を隠す" = "Açıklamaları Gizle";

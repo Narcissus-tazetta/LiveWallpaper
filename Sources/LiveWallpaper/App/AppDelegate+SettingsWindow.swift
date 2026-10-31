@@ -72,7 +72,7 @@ extension AppDelegate {
                     return nil
                 }
                 if characters == "w" {
-                    if let win = self?.settingsWindowController?.window, win.isKeyWindow {
+                    if let win = self?.closableKeyWindow {
                         win.close()
                         return nil
                     }
@@ -80,7 +80,7 @@ extension AppDelegate {
                 if characters == "q" {
                     // 設定ウィンドウ操作中の Cmd+Q は誤ってアプリごと終了しないよう、
                     // 無反応にするのではなくウィンドウを閉じる操作として扱う。
-                    if let win = self?.settingsWindowController?.window, win.isKeyWindow {
+                    if let win = self?.closableKeyWindow {
                         win.close()
                         return nil
                     } else {
@@ -133,6 +133,13 @@ extension AppDelegate {
                     .environment(\.locale, wallpaperModel.appLocale)
             }
             .store(in: &cancellables)
+    }
+
+    /// The settings or scene editor window, when it is key: the windows that ⌘W and ⌘Q close.
+    private var closableKeyWindow: NSWindow? {
+        [settingsWindowController?.window, sceneEditorWindowController?.window]
+            .compactMap { $0 }
+            .first { $0.isKeyWindow }
     }
 
     /// An accessory app has no main menu, so the Edit menu's key equivalents that

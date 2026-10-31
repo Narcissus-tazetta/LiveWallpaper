@@ -1125,10 +1125,7 @@ private struct ParticleSystemForm: View {
     // MARK: Building blocks
 
     private func settingsNote(_ text: String) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+        SceneHintText(text: text)
     }
 
     private func vectorRow(_ title: String, _ values: Binding<[Double]>, help: String? = nil) -> some View {
@@ -1286,7 +1283,7 @@ private func component(_ values: Binding<[Double]>, _ index: Int) -> Binding<Dou
 
 private struct ParticleRow<Content: View>: View {
     static var labelWidth: CGFloat {
-        170
+        SceneInspectorMetrics.labelWidth
     }
 
     let title: String

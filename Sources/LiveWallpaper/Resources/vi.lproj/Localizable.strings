@@ -1707,3 +1707,13 @@
 "影を受ける床" = "Mặt sàn nhận bóng";
 "見えない床で、モデルの影だけを下の絵に落とします。" = "Một mặt sàn vô hình chỉ đổ bóng của mô hình lên hình bên dưới.";
 "床の高さ" = "Độ cao mặt sàn";
+"このシーンは削除されました" = "Cảnh này đã bị xóa.";
+"シーンエディタを開く" = "Mở trình sửa cảnh";
+"シーンエディタ" = "Trình sửa cảnh";
+"レイヤー・エフェクト・動きを、大きなプレビューを見ながら編集します。" = "Sửa lớp, hiệu ứng và chuyển động trong khi xem bản xem trước lớn.";
+"インスペクタ" = "Bộ kiểm tra";
+"連動" = "Liên kết";
+"シーン" = "Cảnh";
+"レイヤーを選ぶと、ここで設定できます" = "Chọn một lớp để chỉnh ở đây.";
+"説明を表示" = "Hiện mô tả";
+"説明を隠す" = "Ẩn mô tả";

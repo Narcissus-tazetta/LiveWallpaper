@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension SettingsView {
+extension SceneEditorView {
     /// The keyframe being edited, when the layer moves over time.
     func selectedSceneKeyframe(in layer: SceneLayer) -> SceneKeyframe? {
         guard layer.isKeyframed else {
@@ -51,7 +51,7 @@ extension SettingsView {
     /// Placement, and its keyframes when the layer moves over time.
     @ViewBuilder
     func sceneLayoutControls(path: String, layer: SceneLayer) -> some View {
-        let labelWidth: CGFloat = 132
+        let labelWidth = SceneInspectorMetrics.labelWidth
         let keyframe = selectedSceneKeyframe(in: layer)
         let loopSeconds = Double(model.sceneDocumentsByPath[path]?.loopSeconds ?? 20)
 

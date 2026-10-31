@@ -1707,3 +1707,13 @@
 "影を受ける床" = "Schattenfänger-Boden";
 "見えない床で、モデルの影だけを下の絵に落とします。" = "Ein unsichtbarer Boden, der nur die Schatten der Modelle auf das Bild darunter wirft.";
 "床の高さ" = "Bodenhöhe";
+"このシーンは削除されました" = "Diese Szene wurde gelöscht.";
+"シーンエディタを開く" = "Szenen-Editor öffnen";
+"シーンエディタ" = "Szenen-Editor";
+"レイヤー・エフェクト・動きを、大きなプレビューを見ながら編集します。" = "Bearbeite Ebenen, Effekte und Bewegung mit einer großen Vorschau.";
+"インスペクタ" = "Inspektor";
+"連動" = "Verknüpfungen";
+"シーン" = "Szene";
+"レイヤーを選ぶと、ここで設定できます" = "Wähle eine Ebene aus, um sie hier zu bearbeiten.";
+"説明を表示" = "Beschreibungen einblenden";
+"説明を隠す" = "Beschreibungen ausblenden";

@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension SettingsView {
+extension SceneEditorView {
     private static let sceneTextFontFamilies = NSFontManager.shared.availableFontFamilies
 
     @ViewBuilder
@@ -33,7 +33,7 @@ extension SettingsView {
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
-                .fixedSize()
+                .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
             }
             sceneTextSlider(
                 model.localizedString("大きさ"), value: text.pointSize, range: SceneText.pointSizeRange, format: "%.0f"
@@ -57,7 +57,7 @@ extension SettingsView {
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
-                .fixedSize()
+                .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
             }
             sceneTextSlider(
                 model.localizedString("字間"), value: text.letterSpacing, range: -20 ... 100, format: "%.0f"
@@ -171,7 +171,7 @@ extension SettingsView {
         HStack(spacing: 12) {
             Text(title)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(width: 132, alignment: .leading)
+                .frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
             Spacer(minLength: 0)
             content()
         }
@@ -185,7 +185,7 @@ extension SettingsView {
         return HStack(spacing: 12) {
             Text(title)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(width: 132, alignment: .leading)
+                .frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
             Slider(value: Binding(get: { min(max(value, range.lowerBound), range.upperBound) }, set: set), in: range)
                 .accessibilityLabel(title)
                 .accessibilityValue(valueText)
@@ -230,7 +230,7 @@ extension SettingsView {
     }
 }
 
-extension SettingsView {
+extension SceneEditorView {
     /// Switches an image layer's picture to the playing track's cover or to the canvas below it.
     @ViewBuilder
     func sceneLayerSourceToggles(path: String, layer: SceneLayer) -> some View {
@@ -253,7 +253,7 @@ extension SettingsView {
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Toggle(title, isOn: Binding(get: { isOn }, set: set))
-                .toggleStyle(.switch)
+                .toggleStyle(SceneInspectorSwitchStyle())
             settingsFootnote(note)
         }
     }

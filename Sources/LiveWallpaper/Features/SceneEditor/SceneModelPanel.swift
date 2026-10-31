@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-extension SettingsView {
+extension SceneEditorView {
     func chooseSceneLayerModel(path: String) {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
@@ -14,7 +14,7 @@ extension SettingsView {
         }
         Task {
             guard let id = await model.addSceneModelLayer(from: url, path: path),
-                  fitEditor.resolvedVideoPath() == path
+                  isStillEditing
             else {
                 return
             }
@@ -38,7 +38,7 @@ extension SettingsView {
             }
             HStack(spacing: 12) {
                 Text(model.localizedString("影を落とす"))
-                    .frame(width: 132, alignment: .leading)
+                    .frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
                 Spacer(minLength: 0)
                 Toggle(model.localizedString("影を落とす"), isOn: Binding(
                     get: { layer.castsShadow ?? true },
@@ -50,7 +50,7 @@ extension SettingsView {
             if let rig, let rigID = layer.model?.skeleton, !rig.clips.isEmpty {
                 HStack(spacing: 12) {
                     Text(model.localizedString("アニメーション"))
-                        .frame(width: 132, alignment: .leading)
+                        .frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
                     Spacer(minLength: 0)
                     Picker(model.localizedString("アニメーション"), selection: Binding<Int?>(
                         get: { rig.playback.first?.clip },
@@ -68,7 +68,7 @@ extension SettingsView {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .fixedSize()
+                    .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
                 }
                 if let playback = rig.playback.first {
                     sceneModelSlider(model.localizedString("再生の速さ"), value: playback.rate, range: 0.1 ... 3, unit: "×", digits: 2) { value in
@@ -91,7 +91,7 @@ extension SettingsView {
     ) -> some View {
         HStack(spacing: 12) {
             Text(title)
-                .frame(width: 132, alignment: .leading)
+                .frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
             Slider(value: Binding(get: { min(max(value, range.lowerBound), range.upperBound) }, set: set), in: range)
                 .accessibilityLabel(title)
             SceneNumberField(title: title, value: value, factor: 1, unit: unit, range: range, fractionDigits: digits, onCommit: set)
@@ -170,7 +170,7 @@ struct SceneModelStagePanel: View {
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
-                .fixedSize()
+                .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
                 ColorPicker(model.localizedString("光の色"), selection: colorBinding(light.color) { color in
                     setLight(index) { $0.color = color }
                 }, supportsOpacity: false)
@@ -238,7 +238,7 @@ struct SceneModelStagePanel: View {
 
     private func colorRow(_ key: String, _ color: [Double], set: @escaping ([Double]) -> Void) -> some View {
         HStack(spacing: 12) {
-            Text(model.localizedString(key)).frame(width: 132, alignment: .leading)
+            Text(model.localizedString(key)).frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
             Spacer(minLength: 0)
             ColorPicker(model.localizedString(key), selection: colorBinding(color, set: set), supportsOpacity: false)
                 .labelsHidden()
@@ -268,7 +268,7 @@ struct SceneModelStagePanel: View {
     }
 
     private func note(_ key: String) -> some View {
-        Text(model.localizedString(key)).font(.caption).foregroundColor(.secondary)
+        SceneHintText(text: model.localizedString(key))
     }
 
     private func slider(
@@ -276,7 +276,7 @@ struct SceneModelStagePanel: View {
         set: @escaping (Double) -> Void
     ) -> some View {
         HStack(spacing: 12) {
-            Text(model.localizedString(key)).frame(width: 132, alignment: .leading)
+            Text(model.localizedString(key)).frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
             Slider(value: Binding(get: { min(max(value, range.lowerBound), range.upperBound) }, set: set), in: range)
                 .accessibilityLabel(model.localizedString(key))
             SceneNumberField(

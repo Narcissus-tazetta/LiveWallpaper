@@ -8,9 +8,9 @@ enum SceneEditorTool: Equatable {
     case addPins(effectID: UUID)
 }
 
-extension SettingsView {
+extension SceneEditorView {
     var sceneEffectLabelWidth: CGFloat {
-        132
+        SceneInspectorMetrics.labelWidth
     }
 
     func sceneEffectDisplayName(_ effect: SceneEffect) -> String {
@@ -108,7 +108,7 @@ extension SettingsView {
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
-                .fixedSize()
+                .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
 
                 Text(model.localizedString("筆の大きさ"))
                 Slider(value: $sceneMaskPainter.brushSize, in: 0.01 ... 0.3)
@@ -205,7 +205,7 @@ extension SettingsView {
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
-                HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(layer.effects) { effect in
                             sceneEffectRow(path: path, layerID: layer.id, effect: effect, isSelected: effect.id == selectedID)
@@ -241,7 +241,7 @@ extension SettingsView {
                         }
                         .buttonStyle(.borderless)
                     }
-                    .frame(width: 240)
+                    Divider()
 
                     if let selectedID, let effect = layer.effects.first(where: { $0.id == selectedID }) {
                         sceneEffectInspector(path: path, layerID: layer.id, effect: effect)
@@ -285,6 +285,9 @@ extension SettingsView {
                 HStack(spacing: 6) {
                     Text(sceneEffectDisplayName(effect))
                         .foregroundColor(effect.isEnabled ? .primary : .secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(sceneEffectDisplayName(effect))
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if effect.maskFile != nil {
                         Image(systemName: "paintbrush.pointed")
@@ -440,7 +443,7 @@ extension SettingsView {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .fixedSize()
+                    .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
                     Spacer(minLength: 0)
                 }
                 if effect.fixedEdge != .none {
@@ -492,7 +495,7 @@ extension SettingsView {
         endSceneEditorTool()
         Task {
             guard let id = await model.moveScenePaintedAreaToOwnLayer(effectID: effectID, layerID: layerID, path: path),
-                  fitEditor.resolvedVideoPath() == path
+                  isStillEditing
             else {
                 return
             }
@@ -544,7 +547,7 @@ extension SettingsView {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .fixedSize()
+                    .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
                     Button {
                         updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) { effect in
                             effect.pins.removeAll { $0.id == pin.id }

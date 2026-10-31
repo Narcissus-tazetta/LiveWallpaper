@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension SettingsView {
+extension SceneEditorView {
     func sceneParticleName(_ preset: SceneParticlePreset) -> String {
         switch preset {
         case .snow: model.localizedString("雪")
@@ -64,7 +64,7 @@ extension SettingsView {
 
     @ViewBuilder
     func sceneParticleControls(path: String, layer: SceneLayer, particles: SceneParticles) -> some View {
-        let labelWidth: CGFloat = 132
+        let labelWidth = SceneInspectorMetrics.labelWidth
         let loopSeconds = model.sceneDocumentsByPath[path]?.loopSeconds ?? 20
 
         HStack(spacing: 12) {
@@ -98,7 +98,7 @@ extension SettingsView {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
         }
 
         sceneParticleSlider(
@@ -188,7 +188,7 @@ extension SettingsView {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
         }
 
         HStack(spacing: 12) {

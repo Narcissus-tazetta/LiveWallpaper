@@ -175,7 +175,7 @@ struct SceneRealTimeField: Identifiable {
     ]
 }
 
-extension SettingsView {
+extension SceneEditorView {
     @ViewBuilder
     func sceneRealTimeEffectInspector(path: String, layerID: UUID, effect: SceneEffect) -> some View {
         let fields = SceneRealTimeField.fields(for: effect.kind)
@@ -247,7 +247,7 @@ extension SettingsView {
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
-                .fixedSize()
+                .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
                 Spacer(minLength: 0)
             case let .colour(greenKey, blueKey):
                 let green = sceneEffectValueBinding(path: path, layerID: layerID, effect: effect, key: greenKey)

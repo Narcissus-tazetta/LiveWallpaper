@@ -92,12 +92,12 @@ struct SceneWorldPanel: View {
     }
 
     private func note(_ key: String) -> some View {
-        Text(model.localizedString(key)).font(.caption).foregroundColor(.secondary)
+        SceneHintText(text: model.localizedString(key))
     }
 
     private func slider(_ key: String, _ value: Double, _ range: ClosedRange<Double>, set: @escaping (Double) -> Void) -> some View {
         HStack(spacing: 12) {
-            Text(model.localizedString(key)).frame(width: 132, alignment: .leading)
+            Text(model.localizedString(key)).frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
             Slider(value: Binding(get: { min(max(value, range.lowerBound), range.upperBound) }, set: set), in: range)
                 .accessibilityLabel(model.localizedString(key))
             Text(String(format: "%.2f", locale: model.appLocale, value))

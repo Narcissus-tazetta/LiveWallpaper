@@ -1707,3 +1707,13 @@
 "影を受ける床" = "Sol qui reçoit les ombres";
 "見えない床で、モデルの影だけを下の絵に落とします。" = "Un sol invisible qui ne projette que les ombres des modèles sur l’image en dessous.";
 "床の高さ" = "Hauteur du sol";
+"このシーンは削除されました" = "Cette scène a été supprimée.";
+"シーンエディタを開く" = "Ouvrir l’éditeur de scène";
+"シーンエディタ" = "Éditeur de scène";
+"レイヤー・エフェクト・動きを、大きなプレビューを見ながら編集します。" = "Modifiez les calques, les effets et le mouvement avec un grand aperçu.";
+"インスペクタ" = "Inspecteur";
+"連動" = "Liens";
+"シーン" = "Scène";
+"レイヤーを選ぶと、ここで設定できます" = "Sélectionnez un calque pour le modifier ici.";
+"説明を表示" = "Afficher les descriptions";
+"説明を隠す" = "Masquer les descriptions";

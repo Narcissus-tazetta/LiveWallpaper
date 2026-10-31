@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension SettingsView {
+extension SceneEditorView {
     // MARK: - Menu
 
     /// Built-in and saved presets. Choosing one shows it on the preview first.

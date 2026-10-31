@@ -12,11 +12,10 @@ extension SettingsView {
             model.bakeSceneNowIfPending(path: previous)
         }
         fitEditor.selectVideo(path: path)
-        endSceneEditorTool()
-        scenePreviewController.reset()
-        renamingSceneLayerID = nil
-        selectedSceneLayerID = nil
-        selectedSceneEffectID = nil
+        // An open scene editor follows the library, as the other editors do.
+        if model.isScene(path: path), SceneEditorSession.shared.path != nil {
+            SceneEditorSession.shared.open(path: path, bringToFront: false)
+        }
         syncEditorSubMode()
     }
 

@@ -54,7 +54,7 @@ struct SceneSoundsPanel: View {
                     .accessibilityLabel(model.localizedString("効果音を削除"))
             }
             HStack(spacing: 12) {
-                Text(model.localizedString("音量")).frame(width: 132, alignment: .leading)
+                Text(model.localizedString("音量")).frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
                 Slider(value: Binding(get: { sound.volume }, set: { value in update(id) { $0.volume = value } }), in: 0 ... 1)
                 Text("\(Int((sound.volume * 100).rounded()))%")
                     .font(.caption.monospacedDigit()).foregroundColor(.secondary)
