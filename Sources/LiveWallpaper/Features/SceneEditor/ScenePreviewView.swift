@@ -694,8 +694,15 @@ final class ScenePreviewNSView: NSView {
     private func hitLayer(at canvas: SIMD2<Float>, renderer: SceneRenderer) -> SceneLayer? {
         for saved in renderer.document.layers.reversed() {
             let layer = renderer.currentLayer(layerID: saved.id)!
-            guard layer.isVisible, !layer.isLocked, layer.kind == .image,
+            guard layer.isVisible, !layer.isLocked, layer.kind == .image || layer.modelPlacement != nil,
                   renderer.currentOpacity(layerID: layer.id)! > 0.02 else { continue }
+            if layer.modelPlacement != nil {
+                // A model is picked anywhere in its footprint.
+                if let uv = renderer.layerUV(canvasUV: canvas, layerID: layer.id), (0 ... 1).contains(uv.x), (0 ... 1).contains(uv.y) {
+                    return layer
+                }
+                continue
+            }
             guard let uv = renderer.layerUV(canvasUV: canvas, layerID: layer.id), let videoPath = sceneLayer?.videoPath
             else {
                 continue

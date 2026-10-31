@@ -1,8 +1,8 @@
 import SwiftUI
 
-extension SettingsView {
+extension SceneEditorView {
     private var sceneLinkLabelWidth: CGFloat {
-        132
+        SceneInspectorMetrics.labelWidth
     }
 
     func sceneTimeOfDayName(_ timeOfDay: SceneTimeOfDay) -> String {
@@ -83,7 +83,7 @@ extension SettingsView {
             if document.links.isEmpty {
                 settingsFootnote(model.localizedString("時間帯で明るさや色を変えたり、カーソルの位置に合わせてレイヤーを動かしたりできます。「連動を追加」で、選んでいるレイヤーに設定します。"))
             } else {
-                HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(document.links) { link in
                             sceneLinkRow(path: path, document: document, link: link, isSelected: link.id == selected?.id)
@@ -103,7 +103,7 @@ extension SettingsView {
                         }
                         .buttonStyle(.borderless)
                     }
-                    .frame(width: 240)
+                    Divider()
 
                     if let selected {
                         sceneLinkInspector(path: path, document: document, link: selected)
@@ -115,40 +115,53 @@ extension SettingsView {
         }
     }
 
-    /// What the preview takes the time of day and the cursor to be.
+    /// What the preview takes the time of day and the cursor to be. One row per menu:
+    /// side by side they do not fit the inspector.
     private func scenePreviewConditionRow(document: SceneDocument) -> some View {
         let now = document.timeOfDay(at: Date())
-        return HStack(spacing: 12) {
+        return VStack(alignment: .leading, spacing: 8) {
             Text(model.localizedString("プレビューの条件"))
-                .frame(width: sceneLinkLabelWidth, alignment: .leading)
-            Picker(model.localizedString("時間帯"), selection: $scenePreviewController.simulatedTimeOfDay) {
-                Text(String(format: model.localizedString("いまの時間帯(%@)"), sceneTimeOfDayName(now)))
-                    .tag(SceneTimeOfDay?.none)
-                ForEach(SceneTimeOfDay.allCases, id: \.self) { timeOfDay in
-                    Text(sceneTimeOfDayName(timeOfDay)).tag(SceneTimeOfDay?.some(timeOfDay))
-                }
-            }
-            .pickerStyle(.menu)
-            .fixedSize()
-            Picker(
-                model.localizedString("カーソル"),
-                selection: Binding(
-                    get: { scenePreviewController.simulatedCursor.map { [$0.x, $0.y] } },
-                    set: { value in
-                        scenePreviewController.simulatedCursor = value.map { SIMD2($0[0], $0[1]) }
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.secondary)
+            HStack(spacing: 12) {
+                Text(model.localizedString("時間帯"))
+                    .frame(width: sceneLinkLabelWidth, alignment: .leading)
+                Spacer(minLength: 0)
+                Picker(model.localizedString("時間帯"), selection: $scenePreviewController.simulatedTimeOfDay) {
+                    Text(String(format: model.localizedString("いまの時間帯(%@)"), sceneTimeOfDayName(now)))
+                        .tag(SceneTimeOfDay?.none)
+                    ForEach(SceneTimeOfDay.allCases, id: \.self) { timeOfDay in
+                        Text(sceneTimeOfDayName(timeOfDay)).tag(SceneTimeOfDay?.some(timeOfDay))
                     }
-                )
-            ) {
-                Text(model.localizedString("ポインタに合わせる")).tag([Float]?.none)
-                Text(model.localizedString("中央")).tag([Float]?.some([0, 0]))
-                Text(model.localizedString("左端")).tag([Float]?.some([-1, 0]))
-                Text(model.localizedString("右端")).tag([Float]?.some([1, 0]))
-                Text(model.localizedString("上端")).tag([Float]?.some([0, -1]))
-                Text(model.localizedString("下端")).tag([Float]?.some([0, 1]))
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
             }
-            .pickerStyle(.menu)
-            .fixedSize()
-            Spacer(minLength: 0)
+            HStack(spacing: 12) {
+                Text(model.localizedString("カーソル"))
+                    .frame(width: sceneLinkLabelWidth, alignment: .leading)
+                Spacer(minLength: 0)
+                Picker(
+                    model.localizedString("カーソル"),
+                    selection: Binding(
+                        get: { scenePreviewController.simulatedCursor.map { [$0.x, $0.y] } },
+                        set: { value in
+                            scenePreviewController.simulatedCursor = value.map { SIMD2($0[0], $0[1]) }
+                        }
+                    )
+                ) {
+                    Text(model.localizedString("ポインタに合わせる")).tag([Float]?.none)
+                    Text(model.localizedString("中央")).tag([Float]?.some([0, 0]))
+                    Text(model.localizedString("左端")).tag([Float]?.some([-1, 0]))
+                    Text(model.localizedString("右端")).tag([Float]?.some([1, 0]))
+                    Text(model.localizedString("上端")).tag([Float]?.some([0, -1]))
+                    Text(model.localizedString("下端")).tag([Float]?.some([0, 1]))
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
+            }
         }
     }
 
@@ -198,10 +211,12 @@ extension SettingsView {
     private func sceneLinkInspector(path: String, document: SceneDocument, link: SceneLink) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(model.localizedString("対象のレイヤー"))
-            VStack(alignment: .leading, spacing: 2) {
-                // Top layer first, as in the layer list.
-                ForEach(document.layers.reversed()) { layer in
-                    Toggle(layer.name, isOn: Binding(
+            // Bounded: imported scenes have hundreds of layers.
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    // Top layer first, as in the layer list.
+                    ForEach(document.layers.reversed()) { layer in
+                        Toggle(isOn: Binding(
                         get: { link.layerIDs.contains(layer.id) },
                         set: { isOn in
                             updateSceneLink(link.id, path: path, coalescing: false) { link in
@@ -212,11 +227,24 @@ extension SettingsView {
                                 }
                             }
                         }
-                    ))
-                    .toggleStyle(.checkbox)
+                        )) {
+                            Text(layer.name)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .help(layer.name)
+                        }
+                        .toggleStyle(.checkbox)
+                    }
                 }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.leading, 4)
+            .frame(maxHeight: 220)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.12))
+            )
             settingsFootnote(model.localizedString("チェックしたレイヤーが、同じ値で一緒に変わります。"))
 
             Divider()
@@ -250,7 +278,7 @@ extension SettingsView {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
             Spacer(minLength: 0)
         }
         sceneLinkValueEditor(
@@ -319,7 +347,7 @@ extension SettingsView {
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
-                .fixedSize()
+                .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
                 Spacer(minLength: 0)
             }
         }

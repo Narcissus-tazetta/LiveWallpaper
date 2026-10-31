@@ -1,9 +1,9 @@
 import SwiftUI
 
-extension SettingsView {
+extension SceneEditorView {
     @ViewBuilder
     func sceneAIControls(path: String, layer: SceneLayer) -> some View {
-        let labelWidth: CGFloat = 132
+        let labelWidth = SceneInspectorMetrics.labelWidth
         let work = model.sceneAIWork[layer.id]
 
         Divider()

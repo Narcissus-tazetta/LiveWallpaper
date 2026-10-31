@@ -239,6 +239,8 @@ struct SceneEffect: Codable, Equatable, Identifiable {
     var id = UUID()
     var kind: SceneEffectKind
     var renderGraph: SceneRenderGraph?
+    /// The `SceneBuiltInEffect` this shader effect was made from; nil for one an import brought.
+    var builtIn: String?
     var isEnabled = true
     var cycles = 1
     /// 0...1
@@ -289,6 +291,7 @@ struct SceneEffect: Codable, Equatable, Identifiable {
         id = try container.decode(UUID.self, forKey: .id)
         kind = try container.decode(SceneEffectKind.self, forKey: .kind)
         renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
+        builtIn = try? container.decodeIfPresent(String.self, forKey: .builtIn)
         let defaults = SceneEffect(kind: kind)
         isEnabled = (try? container.decode(Bool.self, forKey: .isEnabled)) ?? defaults.isEnabled
         cycles = (try? container.decode(Int.self, forKey: .cycles)) ?? defaults.cycles
@@ -691,6 +694,8 @@ struct SceneStaticModel: Codable, Equatable {
     var indices: Data
     /// The rig whose pose skins the vertices; their components then include joints and weights.
     var skeleton: UUID?
+    /// Shaded by the app's own material instead of the scene's mesh material at `material`.
+    var surface: SceneModelSurface?
 
     private var floatsPerVertex: Int {
         SceneRenderGraph.Attribute.Semantic.allCases.enumerated()
@@ -699,7 +704,7 @@ struct SceneStaticModel: Codable, Equatable {
 
     var isValid: Bool {
         let stride = floatsPerVertex
-        guard stride > 0, vertices.count % (stride * 4) == 0, indices.count % 12 == 0 else { return false }
+        guard stride > 0, vertices.count % (stride * 4) == 0, indices.count % 12 == 0, surface?.isValid ?? true else { return false }
         let count = UInt32(vertices.count / (stride * 4))
         return indices.withUnsafeBytes { bytes in
             (0 ..< indices.count / 4).allSatisfy { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian < count }
@@ -875,6 +880,10 @@ struct SceneLayer: Codable, Equatable, Identifiable {
     var space: SceneSpace?
     /// What a layer of kind `model` draws.
     var model: SceneStaticModel?
+    /// More shapes drawn with `model` as one model, each with its own material, sharing its rig.
+    var modelParts: [SceneStaticModel]?
+    /// Set on a model the editor imported: the layer's transform places it on the canvas.
+    var modelPlacement: SceneModelPlacement?
     var castsShadow: Bool?
     var modelValues: [String: Double]?
     var text: SceneText?
@@ -943,6 +952,14 @@ struct SceneLayer: Codable, Equatable, Identifiable {
         modelValues = try container.decodeIfPresent([String: Double].self, forKey: .modelValues)
         guard model.map({ $0.isValid }) ?? true else {
             throw DecodingError.dataCorruptedError(forKey: .model, in: container, debugDescription: "Invalid model")
+        }
+        modelParts = try container.decodeIfPresent([SceneStaticModel].self, forKey: .modelParts)
+        guard (modelParts ?? []).allSatisfy({ $0.isValid && $0.skeleton == model?.skeleton }) else {
+            throw DecodingError.dataCorruptedError(forKey: .modelParts, in: container, debugDescription: "Invalid model part")
+        }
+        modelPlacement = try container.decodeIfPresent(SceneModelPlacement.self, forKey: .modelPlacement)
+        guard modelPlacement.map({ $0.isValid && model != nil }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .modelPlacement, in: container, debugDescription: "Invalid model placement")
         }
         text = try container.decodeIfPresent(SceneText.self, forKey: .text)
         renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
@@ -1271,6 +1288,8 @@ struct SceneDocument: Codable, Equatable {
     var highDynamicRange = false
     /// Runs over the finished canvas (`input`) before it is shown, such as a glow.
     var finishing: SceneRenderGraph?
+    /// The glow the editor made, which `finishing` is built from; nil leaves `finishing` as it is.
+    var bloom: SceneBloom?
     /// How far a layer of depth 1 moves, as a fraction of the canvas, with the cursor at
     /// an edge; the renderer's own amount when absent.
     var parallaxTravel: Double?
@@ -1283,6 +1302,8 @@ struct SceneDocument: Codable, Equatable {
     var meshMaterials: [SceneMeshMaterial?]?
     /// Where model layers scripts make are seen from; scripts can move it.
     var camera: SceneCamera?
+    /// How models the editor imported are seen and lit; in place of `camera` for all model layers when set.
+    var modelStage: SceneModelStage?
     var properties: [LocalWebProperty]?
     var authorSourceDirectory: String?
     /// Hash of the author's scene file and script modules this scene was converted from.
@@ -1320,6 +1341,7 @@ struct SceneDocument: Codable, Equatable {
         }
         highDynamicRange = try container.decodeIfPresent(Bool.self, forKey: .highDynamicRange) ?? false
         finishing = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .finishing)
+        bloom = try container.decodeIfPresent(SceneBloom.self, forKey: .bloom)
         parallaxTravel = try container.decodeIfPresent(Double.self, forKey: .parallaxTravel)
         parallaxResponse = try container.decodeIfPresent(Double.self, forKey: .parallaxResponse)
         cameraShake = try container.decodeIfPresent(SceneCameraShake.self, forKey: .cameraShake)
@@ -1327,6 +1349,10 @@ struct SceneDocument: Codable, Equatable {
         camera = try container.decodeIfPresent(SceneCamera.self, forKey: .camera)
         guard camera.map({ $0.isValid }) ?? true else {
             throw DecodingError.dataCorruptedError(forKey: .camera, in: container, debugDescription: "Invalid camera")
+        }
+        modelStage = try container.decodeIfPresent(SceneModelStage.self, forKey: .modelStage)
+        guard modelStage.map({ $0.isValid }) ?? true else {
+            throw DecodingError.dataCorruptedError(forKey: .modelStage, in: container, debugDescription: "Invalid model stage")
         }
         guard [parallaxTravel, parallaxResponse].allSatisfy({ $0?.isFinite ?? true }) else {
             throw DecodingError.dataCorruptedError(forKey: .parallaxTravel, in: container, debugDescription: "Parallax values must be finite")
@@ -1347,6 +1373,10 @@ struct SceneDocument: Codable, Equatable {
 
     var isAnimated: Bool {
         layers.contains(where: \.isAnimated) || scripts.contains { $0.canRun && $0.usesTime } || cameraShake != nil
+            || layers.contains { layer in
+                layer.isVisible && layer.modelPlacement != nil
+                    && layer.model?.skeleton.flatMap { rigs[$0] }.map { !$0.playback.isEmpty } == true
+            }
     }
 
     var aspectRatio: Double {

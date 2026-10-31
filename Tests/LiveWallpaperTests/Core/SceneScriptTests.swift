@@ -146,13 +146,14 @@ final class SceneScriptTests: XCTestCase {
         for sample in SceneScriptSample.allCases {
             var document = scene(sample.source)
             document.layers[0].effects = [SceneEffect(kind: .waves)]
-            if [.master, .particles, .palette, .dayParticles, .particleWind, .particleCursor].contains(sample) {
+            if [.master, .particles, .palette, .dayParticles, .particleWind, .particleCursor, .audioColor].contains(sample) {
                 document.layers[0].kind = .particles
                 document.layers[0].particles = SceneParticles(preset: .fireflies)
             }
             document.scripts[0].usesTime = sample.usesTime
             document.scripts[0].usesCursor = sample.usesCursor
             document.scripts[0].usesTimeOfDay = sample.usesTimeOfDay
+            document.scripts[0].readsAudio = sample.readsAudio
             // Sample correctness must not depend on the CI runner meeting a live frame deadline.
             let evaluator = SceneFrameEvaluator(budget: .offline)
             for time in [0.0, 5, 10, 19.99] {

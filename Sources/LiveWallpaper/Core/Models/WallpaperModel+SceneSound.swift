@@ -93,3 +93,31 @@ extension WallpaperModel {
         sceneSoundPlayer.isActive = sceneSoundIsAllowed
     }
 }
+
+extension WallpaperModel {
+    func updateSceneSounds(path: String, _ change: (inout [SceneSound]) -> Void) {
+        guard var document = sceneDocumentsByPath[path] else { return }
+        change(&document.sounds)
+        updateScene(document, path: path)
+    }
+
+    /// Copies each audio file into the scene folder and adds a looping sound for it.
+    func addSceneSounds(from urls: [URL], path: String) {
+        guard var document = sceneDocumentsByPath[path] else { return }
+        let folder = SceneStore.folderURL(forVideoPath: path)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for url in urls where document.sounds.count < SceneSound.maximumCount {
+                let source = url.resolvingSymlinksInPath()
+                let ext = source.pathExtension.isEmpty ? "m4a" : source.pathExtension.lowercased()
+                let fileName = "sound-\(UUID().uuidString).\(ext)"
+                try FileManager.default.copyItem(at: source, to: folder.appendingPathComponent(fileName))
+                document.sounds.append(SceneSound(name: source.deletingPathExtension().lastPathComponent, files: [fileName]))
+            }
+        } catch {
+            AppLog.windowRefresh.error("adding scene sound failed: \(error.localizedDescription, privacy: .public)")
+            sceneErrorMessage = error.localizedDescription
+        }
+        updateScene(document, path: path, coalescing: false)
+    }
+}

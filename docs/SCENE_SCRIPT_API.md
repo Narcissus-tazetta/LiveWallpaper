@@ -48,6 +48,8 @@ function update(ctx) {
 | `ctx.pointer` | キャンバス座標の`{x,y}`。左上が0、右下が1。反応できない場合はnull。平滑化しない。「カーソル」が必要 |
 | `ctx.pointerPresses` | 前回のスクリプト評価以降の主ボタンの押下・解放。古い順の`{isDown,x,y}`配列。座標は`pointer`と同じ。「カーソル」が必要 |
 | `ctx.media` | Music / Spotify の曲情報。「曲情報」が必要。詳細は後述 |
+| `ctx.userProperties` | 「ユーザー設定項目」のID→値の辞書。利用者が「作品の設定」で変えるまでは初期値。色は`"r g b"`（各0〜1）の文字列 |
+| `ctx.audio` | `{left,right}`。各64帯域の強さの配列で、低音が先頭。「システム音」が必要。音がない場合と、作品の「システム音に反応」が許可されていない場合はnull |
 
 未選択の入力にアクセスするとエラーになる。動画書き出しではカーソルは中立の`{x:0,y:0}`、`cursorActive`はfalse、`pointer`はnull、`pointerPresses`は空配列、`media`は`{isAvailable:false}`になる。時間帯は書き出し開始時に固定され、アプリが動いている間は時間帯境界で動画を更新する。`wallClock`はリアルタイム描画では現在時刻、書き出しでは最初のフレームを基準に入力時刻の差分だけ進む。画面上のポインタ操作は、評価までに蓄積した直近32件を保持する。
 
@@ -165,6 +167,17 @@ function update(ctx) {
 | `clearCursorMask` | trueでカーソルマスクを除く。同時に`cursorMask`は指定できない |
 
 入力の`layer.appearance`には現在の設定と`hasDepthMap`が入る。ファイルのパスは入らず、深度画像の新規作成や読み込みはGUIで行う。視差・カーソルマスク・粒子のカーソル反応を使う場合は「カーソル」、自動運動を使う場合は「ループ時刻」を宣言する。
+
+## システム音
+
+「システム音」を有効にすると`ctx.audio`を読める。値は各チャンネル64帯域で、先頭ほど低音。作品ごとに「システム音に反応」を許可するまでは、音が鳴っていてもnullが渡る。音を使うスクリプトは書き出し動画ではなくリアルタイムで描画する。
+
+```js
+function update(ctx) {
+  const low = ctx.audio ? ctx.audio.left.slice(0, 8).reduce((sum, v) => sum + v, 0) / 8 : 0;
+  return ctx.targets.map(layer => ({ id: layer.id, values: { scale: 1 + low * 0.2 } }));
+}
+```
 
 ## 曲情報
 

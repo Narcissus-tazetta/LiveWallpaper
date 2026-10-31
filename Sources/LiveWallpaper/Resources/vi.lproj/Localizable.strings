@@ -1570,3 +1570,150 @@
 "下のレイヤーを入力にする" = "Dùng các lớp bên dưới làm đầu vào";
 
 "画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Dùng hình ảnh bên dưới lớp này làm đầu vào thay cho ảnh. Kết hợp với chuyển động, bạn có thể làm rung hoặc méo hình bên dưới.";
+
+"音に合わせて拡大" = "Phóng to theo âm thanh";
+
+"音に合わせて粒子の色を変更" = "Đổi màu hạt theo âm thanh";
+
+"システム音" = "Âm thanh hệ thống";
+
+"システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Đọc cường độ các dải tần của âm thanh hệ thống qua ctx.audio. Chỉ có giá trị khi cho phép “Phản ứng với âm thanh hệ thống” cho hình nền này.";
+
+"ユーザー設定項目" = "Cài đặt người dùng";
+
+"設定項目を追加" = "Thêm cài đặt";
+
+"スライダー" = "Thanh trượt";
+
+"オン／オフ" = "Bật/Tắt";
+
+"選択肢" = "Lựa chọn";
+
+"文字入力" = "Nhập văn bản";
+
+"表示名" = "Tên hiển thị";
+
+"ID" = "ID";
+
+"設定項目を削除" = "Xóa cài đặt";
+
+"初期値" = "Giá trị ban đầu";
+
+"選択肢（カンマ区切り）" = "Lựa chọn (cách nhau bằng dấu phẩy)";
+
+"項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Sau khi thêm, người xem có thể đổi giá trị trong “Cài đặt tác phẩm”. Script đọc qua ctx.userProperties.<ID>.";
+
+"効果音" = "Hiệu ứng âm thanh";
+
+"効果音を追加…" = "Thêm âm thanh…";
+
+"鳴らし方" = "Cách phát";
+
+"繰り返す" = "Lặp lại";
+
+"ときどき鳴らす" = "Thỉnh thoảng";
+
+"効果音を削除" = "Xóa âm thanh";
+
+"間隔の最短(秒)" = "Khoảng nghỉ ngắn nhất (giây)";
+
+"間隔の最長(秒)" = "Khoảng nghỉ dài nhất (giây)";
+
+"音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Thêm tệp âm thanh để phát trên màn hình nền. Chỉ phát khi bật âm thanh hình nền trong cài đặt ứng dụng.";
+
+"シーン全体" = "Toàn cảnh";
+
+"背景色" = "Màu nền";
+
+"明るさの幅を広げる(HDR)" = "Mở rộng dải độ sáng (HDR)";
+
+"白より明るい色を最後まで保ちます。使う作品は、描画の負荷が少し上がります。" = "Giữ các màu sáng hơn trắng đến cuối cùng. Làm tăng nhẹ tải vẽ.";
+
+"グロー(光のにじみ)" = "Phát sáng (loang sáng)";
+
+"この作品は、取り込み時の仕上げ処理を使っています。" = "Tác phẩm này dùng bước hoàn thiện từ lúc nhập.";
+
+"しきい値" = "Ngưỡng";
+
+"広がり" = "Độ lan";
+
+"カメラの揺れ" = "Rung máy ảnh";
+
+"揺れの速さ" = "Tốc độ rung";
+
+"揺れの大きさ" = "Biên độ rung";
+
+"揺れの荒さ" = "Độ gồ ghề của rung";
+
+"視差の動きを細かく決める" = "Tùy chỉnh chi tiết thị sai";
+
+"視差の移動量" = "Quãng di chuyển thị sai";
+
+"視差の追従の速さ" = "Tốc độ bám thị sai";
+
+"画像エフェクト" = "Hiệu ứng hình ảnh";
+
+"色調補正" = "Chỉnh màu";
+
+"ぼかし(画像)" = "Làm mờ";
+
+"色ずれ" = "Quang sai màu";
+
+"モザイク" = "Khảm điểm ảnh";
+
+"グリッチ" = "Glitch";
+
+"コントラスト" = "Độ tương phản";
+
+"ぼかしの半径" = "Bán kính làm mờ";
+
+"ずれの大きさ" = "Độ lệch";
+
+"ずれの向き(度)" = "Hướng lệch (°)";
+
+"ブロックの大きさ" = "Kích thước khối";
+
+"index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Sao chép nội dung thư mục có index.html và dùng làm hình nền web.";
+"フォルダから追加…" = "Thêm từ thư mục…";
+
+"3Dモデル(glTF)…" = "Mô hình 3D (glTF)…";
+"傾き" = "Độ nghiêng";
+"手前へ" = "Về phía người xem";
+"影を落とす" = "Đổ bóng";
+"アニメーション" = "Hoạt ảnh";
+"止める" = "Dừng";
+"再生の速さ" = "Tốc độ phát";
+"1回 %.1f 秒。ループの長さで割り切れないと、ロック画面などの書き出しでつなぎ目がずれます。" = "Một vòng dài %.1f giây. Nếu không chia hết độ dài vòng lặp, màn hình khóa và các bản xuất khác sẽ có chỗ nối.";
+"画角" = "Góc nhìn";
+"0° では遠近なし(平行投影)で表示します。" = "Ở 0°, mô hình hiển thị không có phối cảnh (chiếu song song).";
+"大きいほど遠近が強くなります。画像レイヤーの見え方は変わりません。" = "Giá trị càng lớn, phối cảnh càng mạnh. Lớp hình ảnh không thay đổi.";
+"視点の左右" = "Góc nhìn trái/phải";
+"視点の上下" = "Góc nhìn lên/xuống";
+"空からの光" = "Ánh sáng từ bầu trời";
+"地面からの照り返し" = "Ánh sáng phản chiếu từ mặt đất";
+"光を追加" = "Thêm ánh sáng";
+"3Dモデルの見え方" = "Hiển thị mô hình 3D";
+"光の種類" = "Loại ánh sáng";
+"平行光(太陽)" = "Ánh sáng song song (mặt trời)";
+"点光源" = "Đèn điểm";
+"光の色" = "Màu ánh sáng";
+"この光を削除" = "Xóa ánh sáng này";
+"光の向き(左右)" = "Hướng ánh sáng (trái/phải)";
+"光の向き(高さ)" = "Hướng ánh sáng (độ cao)";
+"位置(左右)" = "Vị trí (trái/phải)";
+"位置(上下)" = "Vị trí (lên/xuống)";
+"位置(手前)" = "Vị trí (độ sâu)";
+"点光源は影を落としません。" = "Đèn điểm không đổ bóng.";
+"影を受ける床" = "Mặt sàn nhận bóng";
+"見えない床で、モデルの影だけを下の絵に落とします。" = "Một mặt sàn vô hình chỉ đổ bóng của mô hình lên hình bên dưới.";
+"床の高さ" = "Độ cao mặt sàn";
+"このシーンは削除されました" = "Cảnh này đã bị xóa.";
+"シーンエディタを開く" = "Mở trình sửa cảnh";
+"シーンエディタ" = "Trình sửa cảnh";
+"レイヤー・エフェクト・動きを、大きなプレビューを見ながら編集します。" = "Sửa lớp, hiệu ứng và chuyển động trong khi xem bản xem trước lớn.";
+"インスペクタ" = "Bộ kiểm tra";
+"連動" = "Liên kết";
+"シーン" = "Cảnh";
+"レイヤーを選ぶと、ここで設定できます" = "Chọn một lớp để chỉnh ở đây.";
+"説明を表示" = "Hiện mô tả";
+"説明を隠す" = "Ẩn mô tả";

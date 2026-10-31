@@ -1570,3 +1570,150 @@
 "下のレイヤーを入力にする" = "Usar as camadas abaixo como entrada";
 
 "画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Usa a imagem abaixo desta camada como entrada, no lugar de uma imagem. Combinado com um movimento, pode balançar ou distorcer o que está abaixo.";
+
+"音に合わせて拡大" = "Ampliar com o som";
+
+"音に合わせて粒子の色を変更" = "Mudar a cor das partículas com o som";
+
+"システム音" = "Áudio do sistema";
+
+"システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Lê a intensidade das faixas de frequência do áudio do sistema em ctx.audio. Os valores só chegam quando “Reagir ao áudio do sistema” é permitido para o plano de fundo.";
+
+"ユーザー設定項目" = "Configurações do usuário";
+
+"設定項目を追加" = "Adicionar configuração";
+
+"スライダー" = "Controle deslizante";
+
+"オン／オフ" = "Ligado/Desligado";
+
+"選択肢" = "Opções";
+
+"文字入力" = "Entrada de texto";
+
+"表示名" = "Nome de exibição";
+
+"ID" = "ID";
+
+"設定項目を削除" = "Excluir configuração";
+
+"初期値" = "Valor inicial";
+
+"選択肢（カンマ区切り）" = "Opções (separadas por vírgulas)";
+
+"項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Ao adicionar uma configuração, os usuários podem alterar o valor em “Configurações da obra”. Os scripts leem como ctx.userProperties.<ID>.";
+
+"効果音" = "Efeitos sonoros";
+
+"効果音を追加…" = "Adicionar som…";
+
+"鳴らし方" = "Reprodução";
+
+"繰り返す" = "Repetir";
+
+"ときどき鳴らす" = "De vez em quando";
+
+"効果音を削除" = "Excluir som";
+
+"間隔の最短(秒)" = "Pausa mínima (s)";
+
+"間隔の最長(秒)" = "Pausa máxima (s)";
+
+"音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Adicione arquivos de áudio para tocá-los na mesa. Eles só tocam quando o som do plano de fundo está ativado nos ajustes do app.";
+
+"シーン全体" = "Cena inteira";
+
+"背景色" = "Cor de fundo";
+
+"明るさの幅を広げる(HDR)" = "Faixa de brilho maior (HDR)";
+
+"白より明るい色を最後まで保ちます。使う作品は、描画の負荷が少し上がります。" = "Mantém até o fim as cores mais claras que o branco. Aumenta um pouco a carga de desenho.";
+
+"グロー(光のにじみ)" = "Brilho (difusão de luz)";
+
+"この作品は、取り込み時の仕上げ処理を使っています。" = "Esta obra usa o acabamento da importação.";
+
+"しきい値" = "Limite";
+
+"広がり" = "Dispersão";
+
+"カメラの揺れ" = "Tremor da câmera";
+
+"揺れの速さ" = "Velocidade do tremor";
+
+"揺れの大きさ" = "Intensidade do tremor";
+
+"揺れの荒さ" = "Aspereza do tremor";
+
+"視差の動きを細かく決める" = "Definir a paralaxe em detalhe";
+
+"視差の移動量" = "Deslocamento da paralaxe";
+
+"視差の追従の速さ" = "Velocidade de acompanhamento da paralaxe";
+
+"画像エフェクト" = "Efeitos de imagem";
+
+"色調補正" = "Ajuste de cor";
+
+"ぼかし(画像)" = "Desfoque";
+
+"色ずれ" = "Aberração cromática";
+
+"モザイク" = "Pixelizar";
+
+"グリッチ" = "Glitch";
+
+"コントラスト" = "Contraste";
+
+"ぼかしの半径" = "Raio do desfoque";
+
+"ずれの大きさ" = "Quantidade de deslocamento";
+
+"ずれの向き(度)" = "Direção do deslocamento (°)";
+
+"ブロックの大きさ" = "Tamanho do bloco";
+
+"index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Copia o conteúdo de uma pasta com index.html e o usa como plano de fundo da web.";
+"フォルダから追加…" = "Adicionar de uma pasta…";
+
+"3Dモデル(glTF)…" = "Modelo 3D (glTF)…";
+"傾き" = "Inclinação";
+"手前へ" = "Para a frente";
+"影を落とす" = "Projetar sombra";
+"アニメーション" = "Animação";
+"止める" = "Parar";
+"再生の速さ" = "Velocidade de reprodução";
+"1回 %.1f 秒。ループの長さで割り切れないと、ロック画面などの書き出しでつなぎ目がずれます。" = "Um ciclo dura %.1f s. Se não dividir a duração do loop, a tela de bloqueio e outras exportações mostram uma emenda.";
+"画角" = "Campo de visão";
+"0° では遠近なし(平行投影)で表示します。" = "Em 0° os modelos aparecem sem perspectiva (projeção paralela).";
+"大きいほど遠近が強くなります。画像レイヤーの見え方は変わりません。" = "Valores maiores dão mais perspectiva. As camadas de imagem não mudam.";
+"視点の左右" = "Visão esquerda/direita";
+"視点の上下" = "Visão cima/baixo";
+"空からの光" = "Luz do céu";
+"地面からの照り返し" = "Luz refletida pelo chão";
+"光を追加" = "Adicionar luz";
+"3Dモデルの見え方" = "Visualização dos modelos 3D";
+"光の種類" = "Tipo de luz";
+"平行光(太陽)" = "Direcional (sol)";
+"点光源" = "Luz pontual";
+"光の色" = "Cor da luz";
+"この光を削除" = "Remover esta luz";
+"光の向き(左右)" = "Direção da luz (esquerda/direita)";
+"光の向き(高さ)" = "Direção da luz (altura)";
+"位置(左右)" = "Posição (esquerda/direita)";
+"位置(上下)" = "Posição (cima/baixo)";
+"位置(手前)" = "Posição (profundidade)";
+"点光源は影を落としません。" = "Luzes pontuais não projetam sombras.";
+"影を受ける床" = "Chão que recebe sombras";
+"見えない床で、モデルの影だけを下の絵に落とします。" = "Um chão invisível que projeta apenas as sombras dos modelos na imagem abaixo.";
+"床の高さ" = "Altura do chão";
+"このシーンは削除されました" = "Esta cena foi apagada.";
+"シーンエディタを開く" = "Abrir Editor de Cena";
+"シーンエディタ" = "Editor de Cena";
+"レイヤー・エフェクト・動きを、大きなプレビューを見ながら編集します。" = "Edite camadas, efeitos e movimento enquanto vê uma prévia grande.";
+"インスペクタ" = "Inspetor";
+"連動" = "Vínculos";
+"シーン" = "Cena";
+"レイヤーを選ぶと、ここで設定できます" = "Selecione uma camada para editá-la aqui.";
+"説明を表示" = "Mostrar Descrições";
+"説明を隠す" = "Ocultar Descrições";

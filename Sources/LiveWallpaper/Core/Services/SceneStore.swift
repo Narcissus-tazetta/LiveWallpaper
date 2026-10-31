@@ -280,6 +280,9 @@ enum SceneStore {
                 files.insert(layer.imageFile)
             }
             files.formUnion([layer.particles?.maskFile, layer.depthFile, layer.text?.fontFile, layer.videoFile].compactMap { $0 })
+            for part in [layer.model].compactMap({ $0 }) + (layer.modelParts ?? []) {
+                files.formUnion(part.surface?.images ?? [])
+            }
             if let graph = layer.renderGraph { files.formUnion(graph.images.values) }
             files.formUnion(layer.particleSystem?.textureFiles ?? [])
             for effect in layer.effects {

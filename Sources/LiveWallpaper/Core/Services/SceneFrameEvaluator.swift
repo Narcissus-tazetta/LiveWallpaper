@@ -281,7 +281,7 @@ final class SceneFrameEvaluator {
                         context.end(position, count: 2)
                     } else { context.null() }
                 } else { missing.append("audio") }
-                if let userProps = input.userProperties {
+                if let userProps = Self.userProperties(document, input: input) {
                     member("userProperties")
                     let position = context.beginObject()
                     for (k, v) in userProps.sorted(by: { $0.key < $1.key }) {
@@ -363,6 +363,19 @@ final class SceneFrameEvaluator {
             }
         }
         return SceneEvaluatedFrame(instances: instances, input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, sounds: sounds, camera: camera, particleControls: particleControls, lights: lights)
+    }
+
+    /// A hand-made scene reads its properties' defaults until the viewer changes one; an
+    /// imported scene gets only what was set, as its scripts expect.
+    private static func userProperties(_ document: SceneDocument, input: SceneFrameInput) -> [String: WebPropertyValue]? {
+        guard document.authorSourceDirectory == nil, document.scriptOrigin == nil,
+              let properties = document.properties, !properties.isEmpty
+        else {
+            return input.userProperties
+        }
+        var merged = Dictionary(properties.map { ($0.id, $0.value) }, uniquingKeysWith: { _, last in last })
+        merged.merge(input.userProperties ?? [:]) { _, set in set }
+        return merged
     }
 
     /// A live frame shows the real time. A frame drawn ahead of time (a bake) gets

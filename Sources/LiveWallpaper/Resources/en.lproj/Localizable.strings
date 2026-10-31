@@ -1570,3 +1570,150 @@
 "下のレイヤーを入力にする" = "Use the layers below as input";
 
 "画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。" = "Uses the picture below this layer as the input instead of an image. Combined with a motion, it can shake or distort what is below.";
+
+"音に合わせて拡大" = "Scale with the sound";
+
+"音に合わせて粒子の色を変更" = "Change particle color with the sound";
+
+"システム音" = "System audio";
+
+"システム音の周波数帯の強さを ctx.audio で読めます。作品ごとの「システム音に反応」を許可したときだけ値が入ります。" = "Read the strength of the system audio’s frequency bands as ctx.audio. Values arrive only when “React to system audio” is allowed for the wallpaper.";
+
+"ユーザー設定項目" = "User settings";
+
+"設定項目を追加" = "Add setting";
+
+"スライダー" = "Slider";
+
+"オン／オフ" = "On/Off";
+
+"選択肢" = "Choices";
+
+"文字入力" = "Text input";
+
+"表示名" = "Display name";
+
+"ID" = "ID";
+
+"設定項目を削除" = "Delete setting";
+
+"初期値" = "Default value";
+
+"選択肢（カンマ区切り）" = "Choices (comma-separated)";
+
+"項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。" = "Add a setting and viewers can change its value in “Wallpaper Settings”. Scripts read it as ctx.userProperties.<ID>.";
+
+"効果音" = "Sound effects";
+
+"効果音を追加…" = "Add sound…";
+
+"鳴らし方" = "Playback";
+
+"繰り返す" = "Loop";
+
+"ときどき鳴らす" = "Now and then";
+
+"効果音を削除" = "Delete sound";
+
+"間隔の最短(秒)" = "Shortest pause (s)";
+
+"間隔の最長(秒)" = "Longest pause (s)";
+
+"音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。" = "Add audio files to play them on the desktop. They play only when wallpaper sound is turned on in the app’s settings.";
+
+"シーン全体" = "Whole scene";
+
+"背景色" = "Background color";
+
+"明るさの幅を広げる(HDR)" = "Wider brightness range (HDR)";
+
+"白より明るい色を最後まで保ちます。使う作品は、描画の負荷が少し上がります。" = "Keeps colors brighter than white until the end. It adds a little to the drawing load.";
+
+"グロー(光のにじみ)" = "Glow (light bleed)";
+
+"この作品は、取り込み時の仕上げ処理を使っています。" = "This wallpaper uses finishing passes from its import.";
+
+"しきい値" = "Threshold";
+
+"広がり" = "Spread";
+
+"カメラの揺れ" = "Camera shake";
+
+"揺れの速さ" = "Shake speed";
+
+"揺れの大きさ" = "Shake amount";
+
+"揺れの荒さ" = "Shake roughness";
+
+"視差の動きを細かく決める" = "Set parallax in detail";
+
+"視差の移動量" = "Parallax travel";
+
+"視差の追従の速さ" = "Parallax follow speed";
+
+"画像エフェクト" = "Image effects";
+
+"色調補正" = "Color adjustment";
+
+"ぼかし(画像)" = "Blur";
+
+"色ずれ" = "Chromatic aberration";
+
+"モザイク" = "Pixelate";
+
+"グリッチ" = "Glitch";
+
+"コントラスト" = "Contrast";
+
+"ぼかしの半径" = "Blur radius";
+
+"ずれの大きさ" = "Offset amount";
+
+"ずれの向き(度)" = "Offset direction (°)";
+
+"ブロックの大きさ" = "Block size";
+
+"index.html を含むフォルダの中身をコピーして、Web壁紙として使います" = "Copies the contents of a folder that contains index.html and uses it as a web wallpaper.";
+"フォルダから追加…" = "Add from Folder…";
+
+"3Dモデル(glTF)…" = "3D Model (glTF)…";
+"傾き" = "Tilt";
+"手前へ" = "Toward viewer";
+"影を落とす" = "Cast shadow";
+"アニメーション" = "Animation";
+"止める" = "Stop";
+"再生の速さ" = "Playback speed";
+"1回 %.1f 秒。ループの長さで割り切れないと、ロック画面などの書き出しでつなぎ目がずれます。" = "One cycle is %.1f s. If it does not divide the loop length, the lock screen and other exports show a seam.";
+"画角" = "Field of view";
+"0° では遠近なし(平行投影)で表示します。" = "At 0° the models are shown without perspective (parallel projection).";
+"大きいほど遠近が強くなります。画像レイヤーの見え方は変わりません。" = "Larger values give stronger perspective. Image layers look the same.";
+"視点の左右" = "View left/right";
+"視点の上下" = "View up/down";
+"空からの光" = "Light from the sky";
+"地面からの照り返し" = "Light bounced from the ground";
+"光を追加" = "Add Light";
+"3Dモデルの見え方" = "3D Model View";
+"光の種類" = "Light type";
+"平行光(太陽)" = "Directional (sun)";
+"点光源" = "Point light";
+"光の色" = "Light color";
+"この光を削除" = "Remove This Light";
+"光の向き(左右)" = "Light direction (left/right)";
+"光の向き(高さ)" = "Light direction (height)";
+"位置(左右)" = "Position (left/right)";
+"位置(上下)" = "Position (up/down)";
+"位置(手前)" = "Position (depth)";
+"点光源は影を落としません。" = "Point lights do not cast shadows.";
+"影を受ける床" = "Shadow-catching floor";
+"見えない床で、モデルの影だけを下の絵に落とします。" = "An invisible floor that casts only the models’ shadows onto the picture below.";
+"床の高さ" = "Floor height";
+"このシーンは削除されました" = "This scene was deleted.";
+"シーンエディタを開く" = "Open Scene Editor";
+"シーンエディタ" = "Scene Editor";
+"レイヤー・エフェクト・動きを、大きなプレビューを見ながら編集します。" = "Edit layers, effects, and motion while watching a large preview.";
+"インスペクタ" = "Inspector";
+"連動" = "Links";
+"シーン" = "Scene";
+"レイヤーを選ぶと、ここで設定できます" = "Select a layer to edit it here.";
+"説明を表示" = "Show Descriptions";
+"説明を隠す" = "Hide Descriptions";

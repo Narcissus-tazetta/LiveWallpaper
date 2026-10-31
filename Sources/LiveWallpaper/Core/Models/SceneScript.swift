@@ -16,6 +16,8 @@ struct SceneScript: Codable, Equatable, Identifiable {
     var usesCursor = false
     /// The track playing in Music or Spotify, which needs their automation permission.
     var usesMedia = false
+    /// Reads the system audio as `ctx.audio`; a script that only mentions registerAudioBuffers reads it too.
+    var readsAudio = false
     var layerIDs: [UUID]
     var targetsAllLayers = false
     var params: [String: Double] = ["amount": 0.05, "cycles": 1]
@@ -24,7 +26,7 @@ struct SceneScript: Codable, Equatable, Identifiable {
     var executionRevision = 0
 
     enum CodingKeys: String, CodingKey {
-        case id, name, source, modules, version, isEnabled, usesTime, usesTimeOfDay, usesCursor, usesMedia, layerIDs, targetsAllLayers, params
+        case id, name, source, modules, version, isEnabled, usesTime, usesTimeOfDay, usesCursor, usesMedia, readsAudio, layerIDs, targetsAllLayers, params
     }
 
     init(source: String, layerIDs: [UUID]) {
@@ -44,6 +46,7 @@ struct SceneScript: Codable, Equatable, Identifiable {
         usesTimeOfDay = try c.decode(Bool.self, forKey: .usesTimeOfDay)
         usesCursor = try c.decode(Bool.self, forKey: .usesCursor)
         usesMedia = try c.decodeIfPresent(Bool.self, forKey: .usesMedia) ?? false
+        readsAudio = try c.decodeIfPresent(Bool.self, forKey: .readsAudio) ?? false
         layerIDs = try c.decode([UUID].self, forKey: .layerIDs)
         targetsAllLayers = try c.decodeIfPresent(Bool.self, forKey: .targetsAllLayers) ?? false
         params = try c.decode([String: Double].self, forKey: .params)
@@ -69,8 +72,8 @@ struct SceneScript: Codable, Equatable, Identifiable {
         return needsCursor || needsMedia || needsClock
     }
 
-    /// Registers audio buffers, so it reads the system audio every frame.
-    var usesAudio: Bool { canRun && userCode.contains("registerAudioBuffers") }
+    /// Reads the system audio every frame.
+    var usesAudio: Bool { canRun && (readsAudio || userCode.contains("registerAudioBuffers")) }
 
     /// The script and its modules without the imported runtime bridge, which declares
     /// cursor, media and audio stubs even when the scene's own code uses none of them.

@@ -1,12 +1,11 @@
 import SwiftUI
 
-extension SettingsView {
+extension SceneEditorView {
     // MARK: - Toolbar above the preview
 
-    /// Viewing controls: zoom, the painted-area display and the comparison. None of
-    /// them changes the wallpaper.
-    func scenePreviewToolbar(path: String, document _: SceneDocument) -> some View {
-        HStack(spacing: 6) {
+    /// Viewing controls; none of them changes the wallpaper.
+    func sceneZoomControls() -> some View {
+        HStack(spacing: 10) {
             Button {
                 scenePreviewController.zoom(to: scenePreviewController.zoom / 1.5)
             } label: {
@@ -29,6 +28,8 @@ extension SettingsView {
             } label: {
                 Text("\(Int((scenePreviewController.zoom * 100).rounded()))%")
                     .font(.caption.monospacedDigit())
+                    // Wide enough for "800%", so the controls do not shift as the zoom changes.
+                    .frame(minWidth: 40)
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
@@ -46,12 +47,15 @@ extension SettingsView {
             if case .paint = sceneEditorTool {
                 Toggle(model.localizedString("塗った範囲を表示"), isOn: $sceneMaskPainter.showsOverlay)
                     .toggleStyle(.checkbox)
-                    .controlSize(.small)
                     .padding(.leading, 8)
             }
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 8)
+    }
 
-            Spacer(minLength: 0)
-
+    func sceneComparisonControls(path: String) -> some View {
+        HStack(spacing: 12) {
             Button(model.localizedString("比較用に記録")) {
                 model.recordSceneComparison(path: path)
             }
@@ -74,7 +78,7 @@ extension SettingsView {
             .help(model.localizedString("オンの間、記録した状態をプレビューに表示します。"))
         }
         .buttonStyle(.borderless)
-        .controlSize(.small)
+        .padding(.horizontal, 8)
     }
 
     // MARK: - Playback bar under the preview

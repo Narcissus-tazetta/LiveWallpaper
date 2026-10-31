@@ -40,6 +40,38 @@ final class SceneScriptInputTests: XCTestCase {
         XCTAssertEqual(baked.layers[id]!.transform.offsetY, 0)
     }
 
+    func testAudioReachesScriptsThatAskForItWithoutMentioningTheImportedRegistration() throws {
+        var document = scene("""
+        export function update(c){return [{id:c.targets[0].id,values:{offsetX:c.audio?c.audio.left[0]:-1}}];}
+        """)
+        let id = document.layers[0].id
+        var input = SceneFrameInput()
+        input.audio = SceneAudioSpectrum(left: [0.25] + Array(repeating: 0, count: 63), right: Array(repeating: 0, count: 64))
+        XCTAssertFalse(document.scripts[0].usesAudio)
+        document.scripts[0].readsAudio = true
+        XCTAssertTrue(document.scripts[0].usesAudio)
+        XCTAssertTrue(document.usesAudio)
+        let frame = try SceneFrameEvaluator().evaluate(document, input: input, timeOfDay: .day)
+        XCTAssertEqual(frame.layers[id]!.transform.offsetX, 0.25, accuracy: 1e-6)
+        input.audio = nil
+        let silent = try SceneFrameEvaluator().evaluate(document, input: input, timeOfDay: .day)
+        XCTAssertEqual(silent.layers[id]!.transform.offsetX, -1, accuracy: 1e-6)
+    }
+
+    func testHandMadeScenesReadPropertyDefaultsUntilTheViewerChangesThem() throws {
+        var document = scene("""
+        export function update(c){return [{id:c.targets[0].id,values:{offsetX:c.userProperties.speed}}];}
+        """)
+        document.properties = [LocalWebProperty(id: "speed", kind: "slider", label: ["default": "Speed"], value: .number(0.25))]
+        let id = document.layers[0].id
+        var input = SceneFrameInput()
+        let byDefault = try SceneFrameEvaluator().evaluate(document, input: input, timeOfDay: .day)
+        XCTAssertEqual(byDefault.layers[id]!.transform.offsetX, 0.25, accuracy: 1e-6)
+        input.userProperties = ["speed": .number(0.75)]
+        let changed = try SceneFrameEvaluator().evaluate(document, input: input, timeOfDay: .day)
+        XCTAssertEqual(changed.layers[id]!.transform.offsetX, 0.75, accuracy: 1e-6)
+    }
+
     func testOldDocumentsDecodeWithoutTheMediaInput() throws {
         let script = SceneScript(source: "function update(c){return []}", layerIDs: [])
         var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(script)) as? [String: Any])

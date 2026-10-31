@@ -58,11 +58,20 @@ extension WallpaperModel {
         script.usesTime = sample.usesTime
         script.usesCursor = sample.usesCursor
         script.usesTimeOfDay = sample.usesTimeOfDay
+        script.readsAudio = sample.readsAudio
         if sample == .blank { script.params = [:] }
         script.targetsAllLayers = sample == .blank || sample == .master
         document.scripts.append(script)
         updateScene(document, path: path, coalescing: false)
         return script.id
+    }
+
+    func updateSceneProperties(path: String, _ change: (inout [LocalWebProperty]) -> Void) {
+        guard var document = sceneDocumentsByPath[path] else { return }
+        var properties = document.properties ?? []
+        change(&properties)
+        document.properties = properties.isEmpty ? nil : properties
+        updateScene(document, path: path)
     }
 
     func removeSceneScript(_ id: UUID, path: String) {

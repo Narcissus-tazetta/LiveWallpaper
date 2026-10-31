@@ -15,4 +15,5 @@ extension Notification.Name {
     static let checkUpdatesNow = Notification.Name("CheckUpdatesNow")
     static let refreshPlayback = Notification.Name("RefreshPlayback")
     static let openReleasePage = Notification.Name("OpenReleasePage")
+    static let openSceneEditor = Notification.Name("OpenSceneEditor")
 }

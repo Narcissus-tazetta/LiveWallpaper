@@ -476,6 +476,18 @@ extension SettingsView {
                 .disabled(webURLInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
 
+            Divider()
+
+            Text(model.localizedString("index.html を含むフォルダの中身をコピーして、Web壁紙として使います"))
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button(model.localizedString("フォルダから追加…")) {
+                chooseWebWallpaperFolder()
+            }
+            .buttonStyle(.bordered)
+
             if let errorMessage = model.webWallpaperErrorMessage {
                 Text(errorMessage)
                     .font(.caption)

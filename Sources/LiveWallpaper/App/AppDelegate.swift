@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var settingsWindowController: NSWindowController?
+    var sceneEditorWindowController: NSWindowController?
     let wallpaperModel = WallpaperModel()
     var launchAtLoginEnabled: Bool = false
     var autoUpdateEnabled: Bool = true
@@ -73,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         setupStatusBar()
         setupSettingsWindow()
+        setupSceneEditorWindow()
         setupSceneScriptApprovalPrompts()
         setupGlobalHotKeys()
         setupScreenUnlockObserver()

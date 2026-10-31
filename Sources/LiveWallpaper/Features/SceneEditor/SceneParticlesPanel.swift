@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension SettingsView {
+extension SceneEditorView {
     func sceneParticleName(_ preset: SceneParticlePreset) -> String {
         switch preset {
         case .snow: model.localizedString("雪")
@@ -30,6 +30,11 @@ extension SettingsView {
             Button(model.localizedString("動画…")) {
                 chooseSceneLayerVideo(path: path)
             }
+            Button(model.localizedString("3Dモデル(glTF)…")) {
+                chooseSceneLayerModel(path: path)
+            }
+            // A scene seen through its own camera stands its layers in space, where the stage does not apply.
+            .disabled(model.sceneDocumentsByPath[path]?.camera?.perspective == true)
             Section(model.localizedString("粒子")) {
                 Button(model.localizedString("動きを細かく決められる粒子")) {
                     if let id = model.addSceneParticleSystemLayer(
@@ -59,7 +64,7 @@ extension SettingsView {
 
     @ViewBuilder
     func sceneParticleControls(path: String, layer: SceneLayer, particles: SceneParticles) -> some View {
-        let labelWidth: CGFloat = 132
+        let labelWidth = SceneInspectorMetrics.labelWidth
         let loopSeconds = model.sceneDocumentsByPath[path]?.loopSeconds ?? 20
 
         HStack(spacing: 12) {
@@ -93,7 +98,7 @@ extension SettingsView {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
         }
 
         sceneParticleSlider(
@@ -183,7 +188,7 @@ extension SettingsView {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
         }
 
         HStack(spacing: 12) {

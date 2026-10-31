@@ -539,6 +539,49 @@ extension WallpaperModel {
         return layer.id
     }
 
+    /// Imports a glTF or GLB file as a model layer above the existing layers; the scene
+    /// gets a stage with one light the first time.
+    func addSceneModelLayer(from modelURL: URL, path: String) async -> UUID? {
+        guard let current = sceneDocumentsByPath[path] else {
+            return nil
+        }
+        let stagingVideoPath = Self.sceneStagingVideoPath()
+        let stagingFolder = SceneStore.folderURL(forVideoPath: stagingVideoPath)
+        defer {
+            removeLeftovers(of: [stagingFolder])
+        }
+        do {
+            let (width, height) = (current.canvasWidth, current.canvasHeight)
+            let result = try await Task.detached(priority: .userInitiated) {
+                try FileManager.default.createDirectory(at: stagingFolder, withIntermediateDirectories: true)
+                let result = try SceneModelImporter.importModel(at: modelURL, canvasWidth: width, canvasHeight: height)
+                for file in result.files {
+                    try file.data.write(to: stagingFolder.appendingPathComponent(file.name))
+                }
+                return result
+            }.value
+            guard var document = sceneDocumentsByPath[path] else {
+                return nil
+            }
+            for file in result.files {
+                try adoptStagedSceneFile(file.name, from: stagingFolder, path: path)
+            }
+            if let rig = result.rig {
+                document.rigs[rig.id] = rig.skeleton
+            }
+            if document.modelStage == nil {
+                document.modelStage = SceneModelStage()
+            }
+            document.layers.append(result.layer)
+            updateScene(document, path: path, coalescing: false)
+            return result.layer.id
+        } catch {
+            AppLog.windowRefresh.error("adding scene model layer failed: \(error.localizedDescription, privacy: .public)")
+            sceneErrorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
     func addSceneTextLayer(string: String, name: String, path: String) -> UUID? {
         guard var document = sceneDocumentsByPath[path] else {
             return nil
@@ -823,7 +866,16 @@ extension WallpaperModel {
         else {
             return
         }
-        document.layers.remove(at: index)
+        let removed = document.layers.remove(at: index)
+        if removed.modelPlacement != nil {
+            if let rig = removed.model?.skeleton, !document.layers.contains(where: { $0.model?.skeleton == rig }) {
+                document.rigs[rig] = nil
+            }
+            // Without imported models the scene's own camera lights its models again.
+            if !document.layers.contains(where: { $0.modelPlacement != nil }) {
+                document.modelStage = nil
+            }
+        }
         updateScene(document, path: path, coalescing: false)
     }
 

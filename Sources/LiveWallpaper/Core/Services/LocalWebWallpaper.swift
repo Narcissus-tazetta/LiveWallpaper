@@ -16,11 +16,14 @@ struct LocalWebWallpaperPackage: Codable, Equatable {
 
     static let fileName = "web-wallpaper.json"
 
+    static let defaultEntryPoint = "index.html"
+
     static func load(folder: URL) throws -> Self {
-        let package = try JSONDecoder().decode(
-            Self.self,
-            from: Data(contentsOf: folder.appendingPathComponent(fileName))
-        )
+        let manifest = folder.appendingPathComponent(fileName)
+        guard FileManager.default.fileExists(atPath: manifest.path) else {
+            return try bare(folder: folder)
+        }
+        let package = try JSONDecoder().decode(Self.self, from: Data(contentsOf: manifest))
         if let properties = package.properties {
             guard Set(properties.map(\.id)).count == properties.count,
                   properties.allSatisfy({ !$0.id.isEmpty && [
@@ -39,6 +42,21 @@ struct LocalWebWallpaperPackage: Codable, Equatable {
         _ = try file(package.entryPoint, inside: folder)
         if let preview = package.preview { _ = try file(preview, inside: folder) }
         return package
+    }
+
+    /// A hand-written folder with no manifest: `index.html` is the page, and the audio and
+    /// now-playing switches appear only when the page subscribes to them.
+    private static func bare(folder: URL) throws -> Self {
+        let entry = try file(defaultEntryPoint, inside: folder)
+        let html = try String(contentsOf: entry, encoding: .utf8)
+        func subscribes(_ feature: String) -> Bool {
+            html.contains(try! Regex("(?i)subscribe\\(\\s*['\"]\(feature)['\"]"))
+        }
+        return Self(
+            entryPoint: defaultEntryPoint,
+            supportsSpectrum: subscribes("spectrum"),
+            supportsMedia: subscribes("media")
+        )
     }
 
     static func file(_ name: String, inside folder: URL) throws -> URL {
