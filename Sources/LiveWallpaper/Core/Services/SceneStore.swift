@@ -37,7 +37,30 @@ enum SceneStore {
         guard FileManager.default.fileExists(atPath: url.path) else {
             return nil
         }
-        return try JSONDecoder().decode(SceneDocument.self, from: Data(contentsOf: url))
+        return try decode(folder: url.deletingLastPathComponent())
+    }
+
+    private static func decode(folder: URL) throws -> SceneDocument {
+        let decoder = JSONDecoder()
+        decoder.userInfo[.sceneFolder] = folder
+        return try decoder.decode(SceneDocument.self, from: Data(contentsOf: folder.appendingPathComponent(documentFileName)))
+    }
+
+    /// Moves model geometry that scene.json still holds inline into its own files and
+    /// reads the scene back mapped. scene.json keeps its date, so the video is out of
+    /// date exactly when it was before.
+    static func movingGeometryToFiles(_ document: SceneDocument, videoPath: String) throws -> SceneDocument {
+        guard document.hasInlineModelGeometry else {
+            return document
+        }
+        let folder = folderURL(forVideoPath: videoPath)
+        let documentURL = folder.appendingPathComponent(documentFileName)
+        let date = try FileManager.default.attributesOfItem(atPath: documentURL.path)[.modificationDate]
+        try write(encode(document, folder: folder), videoPath: videoPath)
+        if let date {
+            try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: documentURL.path)
+        }
+        return try decode(folder: folder)
     }
 
     /// The scene was saved after its video was last written.
@@ -69,12 +92,18 @@ enum SceneStore {
     }
 
     static func save(_ document: SceneDocument, videoPath: String) throws {
-        try write(encode(document), videoPath: videoPath)
+        try write(encode(document, folder: folderURL(forVideoPath: videoPath)), videoPath: videoPath)
     }
 
-    static func encode(_ document: SceneDocument) throws -> Data {
+    /// With a folder, writes the files of large models there first and names them in
+    /// the result; without one, the result holds everything (for a package).
+    static func encode(_ document: SceneDocument, folder: URL?) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let folder {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            encoder.userInfo[.sceneFolder] = folder
+        }
         return try encoder.encode(document)
     }
 
@@ -270,6 +299,10 @@ enum SceneStore {
 
     /// Every file a scene reads, besides scene.json.
     static func referencedFiles(of document: SceneDocument) -> Set<String> {
+        assetFiles(of: document).union(document.storedGeometryFiles)
+    }
+
+    private static func assetFiles(of document: SceneDocument) -> Set<String> {
         var files = Set<String>()
         for sound in document.sounds { files.formUnion(sound.files) }
         for material in (document.meshMaterials ?? []).compactMap({ $0 }) {
@@ -294,14 +327,16 @@ enum SceneStore {
     }
 
     /// Copies the scene of `videoPath` into `destination` (scene.json and the files it
-    /// uses only).
+    /// uses only), with model geometry inline in scene.json so that the copy reads in
+    /// app versions from before geometry files.
     static func copyScene(videoPath: String, to destination: URL) throws {
         guard let document = try load(videoPath: videoPath) else {
             return
         }
         let folder = folderURL(forVideoPath: videoPath)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        for name in referencedFiles(of: document).union([documentFileName]) {
+        try encode(document, folder: nil).write(to: destination.appendingPathComponent(documentFileName))
+        for name in assetFiles(of: document) {
             try FileManager.default.copyItem(
                 at: folder.appendingPathComponent(name), to: destination.appendingPathComponent(name)
             )
@@ -327,8 +362,7 @@ enum SceneStore {
     /// package comes from anyone: only plain files that scene.json names, with plain
     /// names, are copied.
     static func importScene(from source: URL, videoPath: String, videoIsOutOfDate: Bool = false) throws -> SceneDocument {
-        let documentURL = source.appendingPathComponent(documentFileName)
-        let document = try JSONDecoder().decode(SceneDocument.self, from: Data(contentsOf: documentURL))
+        var document = try decode(folder: source)
         let root = source.resolvingSymlinksInPath().standardizedFileURL.path
         var names = referencedFiles(of: document).union([documentFileName])
         if FileManager.default.fileExists(atPath: source.appendingPathComponent("properties.json").path) {
@@ -359,6 +393,11 @@ enum SceneStore {
                 try FileManager.default.copyItem(
                     at: source.appendingPathComponent(name), to: staging.appendingPathComponent(name)
                 )
+            }
+            if document.hasInlineModelGeometry {
+                try encode(document, folder: staging).write(to: staging.appendingPathComponent(documentFileName))
+                // Mapped from the staging folder; the mapping outlives moving the folder below.
+                document = try decode(folder: staging)
             }
             // The video imported beside it already shows this scene. Dated like it,
             // scene.json only becomes newer than the video (isNewerThanVideo) once edited.

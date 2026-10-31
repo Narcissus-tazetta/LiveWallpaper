@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import simd
 
@@ -684,18 +685,186 @@ enum SceneLayerKind: String, Codable {
 }
 
 /// A solid model: one shape, drawn with the scene's mesh material at `material`.
+///
+/// In a scene folder, the vertices and indices of a large model live in their own files
+/// (`SceneModelGeometryFiles`), which are memory-mapped: inline in scene.json they took
+/// hundreds of megabytes of heap for every scene in the library, shown or not.
+struct SceneModelGeometryFiles: Codable, Equatable {
+    var vertices: String
+    var indices: String
+
+    /// Below this (vertices plus indices) a model stays inline in scene.json.
+    static let minimumBytes = 64 * 1024
+
+    static func isFileName(_ name: String) -> Bool {
+        name.hasPrefix("mesh-") && name.hasSuffix(".bin") && !name.contains("/")
+    }
+
+    /// Named after the contents, so a file never changes once written: a mapped file
+    /// that a later save replaced or a prune deleted stays readable.
+    static func fileName(for data: Data) -> String {
+        "mesh-" + SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() + ".bin"
+    }
+}
+
+extension CodingUserInfoKey {
+    /// The folder of the scene.json being read or written; model geometry files go beside it.
+    static let sceneFolder = CodingUserInfoKey(rawValue: "sceneFolder")!
+}
+
+extension SceneDocument {
+    private var models: [SceneStaticModel] {
+        layers.flatMap { [$0.model].compactMap { $0 } + ($0.modelParts ?? []) }
+    }
+
+    var hasInlineModelGeometry: Bool {
+        models.contains(where: \.hasInlineGeometry)
+    }
+
+    /// The geometry files that exist in the scene folder for this document: read from
+    /// there, or written by a save.
+    var storedGeometryFiles: Set<String> {
+        Set(models.filter { !$0.hasInlineGeometry }.compactMap(\.geometryFiles).flatMap { [$0.vertices, $0.indices] })
+    }
+}
+
 struct SceneStaticModel: Codable, Equatable {
     var material: Int
     /// Bit i set when the vertices hold `Semantic.allCases[i]`.
     var components: UInt32
     /// Little-endian 32-bit floats.
-    var vertices: Data
+    let vertices: Data
     /// Little-endian 32-bit vertex indices, three to a triangle.
-    var indices: Data
+    let indices: Data
     /// The rig whose pose skins the vertices; their components then include joints and weights.
     var skeleton: UUID?
     /// Shaded by the app's own material instead of the scene's mesh material at `material`.
     var surface: SceneModelSurface?
+    /// Shared by every copy, so hashing the geometry happens once however often the scene is saved.
+    private let files: FileNames
+
+    /// Where `vertices` and `indices` are, or will be once saved, in the scene folder;
+    /// nil while they belong inline.
+    var geometryFiles: SceneModelGeometryFiles? {
+        vertices.count + indices.count >= SceneModelGeometryFiles.minimumBytes ? files.names(vertices, indices) : nil
+    }
+
+    /// The geometry was read from scene.json itself, so a save moves it into files.
+    var hasInlineGeometry: Bool {
+        vertices.count + indices.count >= SceneModelGeometryFiles.minimumBytes && !files.isStored
+    }
+
+    init(material: Int, components: UInt32, vertices: Data, indices: Data, skeleton: UUID? = nil, surface: SceneModelSurface? = nil) {
+        self.material = material
+        self.components = components
+        self.vertices = vertices
+        self.indices = indices
+        self.skeleton = skeleton
+        self.surface = surface
+        files = FileNames(stored: nil)
+    }
+
+    private final class FileNames: @unchecked Sendable {
+        private let lock = NSLock()
+        private var cached: SceneModelGeometryFiles?
+        private var stored: Bool
+
+        init(stored: SceneModelGeometryFiles?) {
+            cached = stored
+            self.stored = stored != nil
+        }
+
+        var isStored: Bool {
+            lock.withLock { stored }
+        }
+
+        func names(_ vertices: Data, _ indices: Data) -> SceneModelGeometryFiles {
+            lock.withLock {
+                if let cached { return cached }
+                let names = SceneModelGeometryFiles(
+                    vertices: SceneModelGeometryFiles.fileName(for: vertices),
+                    indices: SceneModelGeometryFiles.fileName(for: indices)
+                )
+                cached = names
+                return names
+            }
+        }
+
+        func markStored() {
+            lock.withLock { stored = true }
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case material, components, vertices, indices, geometryFiles, skeleton, surface
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        material = try container.decode(Int.self, forKey: .material)
+        components = try container.decode(UInt32.self, forKey: .components)
+        skeleton = try container.decodeIfPresent(UUID.self, forKey: .skeleton)
+        surface = try container.decodeIfPresent(SceneModelSurface.self, forKey: .surface)
+        guard let names = try container.decodeIfPresent(SceneModelGeometryFiles.self, forKey: .geometryFiles) else {
+            vertices = try container.decode(Data.self, forKey: .vertices)
+            indices = try container.decode(Data.self, forKey: .indices)
+            files = FileNames(stored: nil)
+            return
+        }
+        guard let folder = decoder.userInfo[.sceneFolder] as? URL else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .geometryFiles, in: container,
+                debugDescription: "model geometry lives in files beside scene.json; decode the scene with SceneStore"
+            )
+        }
+        for name in [names.vertices, names.indices] where !SceneModelGeometryFiles.isFileName(name) {
+            throw DecodingError.dataCorruptedError(forKey: .geometryFiles, in: container, debugDescription: "bad geometry file name \(name)")
+        }
+        vertices = try Data(contentsOf: folder.appendingPathComponent(names.vertices), options: .alwaysMapped)
+        indices = try Data(contentsOf: folder.appendingPathComponent(names.indices), options: .alwaysMapped)
+        files = FileNames(stored: names)
+    }
+
+    /// With a scene folder in `userInfo[.sceneFolder]`, writes the geometry files there.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(material, forKey: .material)
+        try container.encode(components, forKey: .components)
+        try container.encodeIfPresent(skeleton, forKey: .skeleton)
+        try container.encodeIfPresent(surface, forKey: .surface)
+        if let folder = encoder.userInfo[.sceneFolder] as? URL, let names = geometryFiles {
+            try Self.writeIfMissing(vertices, named: names.vertices, in: folder)
+            try Self.writeIfMissing(indices, named: names.indices, in: folder)
+            files.markStored()
+            try container.encode(names, forKey: .geometryFiles)
+        } else {
+            try container.encode(vertices, forKey: .vertices)
+            try container.encode(indices, forKey: .indices)
+        }
+    }
+
+    private static func writeIfMissing(_ data: Data, named name: String, in folder: URL) throws {
+        let url = folder.appendingPathComponent(name)
+        guard !FileManager.default.fileExists(atPath: url.path) else { return }
+        // A dot name, like SceneStore.write: pruning skips it while it is half written.
+        let partial = folder.appendingPathComponent(".\(name).\(UUID().uuidString)")
+        try data.write(to: partial)
+        // Replacing a file of the same contents that another save wrote meanwhile is harmless.
+        if rename(partial.path, url.path) != 0 {
+            let error = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            do {
+                try FileManager.default.removeItem(at: partial)
+            } catch let cleanupError {
+                AppLog.persistence.error("mesh write cleanup failed: \(cleanupError.localizedDescription, privacy: .public)")
+            }
+            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path, NSUnderlyingErrorKey: error])
+        }
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.material == rhs.material && lhs.components == rhs.components && lhs.skeleton == rhs.skeleton
+            && lhs.surface == rhs.surface && lhs.vertices == rhs.vertices && lhs.indices == rhs.indices
+    }
 
     private var floatsPerVertex: Int {
         SceneRenderGraph.Attribute.Semantic.allCases.enumerated()

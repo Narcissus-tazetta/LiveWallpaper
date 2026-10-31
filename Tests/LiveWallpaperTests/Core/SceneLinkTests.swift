@@ -116,7 +116,7 @@ final class SceneLinkTests: XCTestCase {
         link.timeValues[.evening] = { var values = SceneLinkValues(); values.warmth = 0.5; return values }()
         scene.links = [link]
 
-        let data = try SceneStore.encode(scene)
+        let data = try SceneStore.encode(scene, folder: nil)
         XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("\"evening\""), "keyed by name")
         let decoded = try JSONDecoder().decode(SceneDocument.self, from: data)
         XCTAssertEqual(decoded.timeBands, SceneTimeBand.defaults)

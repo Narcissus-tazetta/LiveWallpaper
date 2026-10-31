@@ -172,7 +172,7 @@ final class ExternalWallpaperTests: XCTestCase {
         CGImageDestinationAddImage(destination, image, nil)
         XCTAssertTrue(CGImageDestinationFinalize(destination))
         let document = SceneDocument(canvasWidth: 16, canvasHeight: 9, layers: [SceneLayer(name: "Sky", imageFile: "layer.png")])
-        try SceneStore.encode(document).write(to: folder.appendingPathComponent("scene.json"))
+        try SceneStore.encode(document, folder: nil).write(to: folder.appendingPathComponent("scene.json"))
         return folder
     }
 

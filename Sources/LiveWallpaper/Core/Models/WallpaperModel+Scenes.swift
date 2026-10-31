@@ -85,7 +85,15 @@ extension WallpaperModel {
         }
         for path in candidatePaths where path.hasPrefix(cacheDirectory) || path.hasPrefix(externalDirectory) {
             do {
-                if let loaded = try SceneStore.load(videoPath: path) {
+                if var loaded = try SceneStore.load(videoPath: path) {
+                    do {
+                        loaded = try SceneStore.movingGeometryToFiles(loaded, videoPath: path)
+                    } catch {
+                        // The scene still plays from the inline copy; only the memory saving is lost.
+                        AppLog.windowRefresh.error(
+                            "scene geometry not moved to files path=\(path, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                        )
+                    }
                     let document = SceneScriptPermissions.restored(loaded, path: path)
                     restored[path] = document
                     if SceneStore.isNewerThanVideo(videoPath: path) {
@@ -319,7 +327,7 @@ extension WallpaperModel {
 
             let data: Data
             do {
-                data = try SceneStore.encode(document)
+                data = try SceneStore.encode(document, folder: folder)
             } catch {
                 SceneSaveCoordinator.shared.recordResult(generation, result: .failure(error))
                 DispatchQueue.main.async {

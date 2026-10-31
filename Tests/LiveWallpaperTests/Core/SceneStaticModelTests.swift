@@ -97,9 +97,8 @@ final class SceneStaticModelTests: XCTestCase {
         let initialVertexBuffer = try XCTUnwrap(cachedInitial.shape.vertexBuffer)
 
         // Update model vertices
-        var m2 = m1
         let updatedVertices: [Float] = [2, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1]
-        m2.vertices = data(updatedVertices)
+        let m2 = SceneStaticModel(material: m1.material, components: m1.components, vertices: data(updatedVertices), indices: m1.indices)
         var lUpdated = l
         lUpdated.model = m2
         let docUpdated = SceneDocument(canvasWidth: 100, canvasHeight: 100, layers: [lUpdated])

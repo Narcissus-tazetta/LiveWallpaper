@@ -374,7 +374,7 @@ final class SceneRenderGraphTests: XCTestCase {
         let document = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [layer])
         let restored = try JSONDecoder().decode(
             SceneDocument.self,
-            from: SceneStore.encode(document)
+            from: SceneStore.encode(document, folder: nil)
         )
         XCTAssertEqual(restored.layers[0].renderGraph, graph)
         XCTAssertEqual(SceneStore.referencedFiles(of: restored), ["image.png", "mask.png"])

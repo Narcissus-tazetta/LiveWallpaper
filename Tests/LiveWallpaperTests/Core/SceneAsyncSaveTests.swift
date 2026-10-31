@@ -162,7 +162,7 @@ final class SceneAsyncSaveTests: XCTestCase {
 
         // Measure old synchronous cost: encode time
         let encodeStart = CFAbsoluteTimeGetCurrent()
-        let encodedData = try SceneStore.encode(document)
+        let encodedData = try SceneStore.encode(document, folder: nil)
         let encodeDurationMs = (CFAbsoluteTimeGetCurrent() - encodeStart) * 1000
 
         // Measure old synchronous cost: prune analysis time on real directory
