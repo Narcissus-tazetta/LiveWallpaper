@@ -10,8 +10,10 @@ typedef int (*lwjs_storage_handler)(void *opaque, int operation, int global, con
                                     const char *value, size_t value_length, char **result, size_t *result_length);
 LWJSProgram *lwjs_compile(const char *source, char **error);
 LWJSProgram *lwjs_compile_modules(const char *source, const char *modules, char **error);
-/* `input` is the tagged value tree SceneScriptInput writes. */
-char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_seconds, char **error);
+/* `input` is the tagged value tree SceneScriptInput writes. The result is
+   `output_length` bytes: JSON text, or when its first byte is 0xFF the tagged
+   value tree SceneScriptOutputReader reads. */
+char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_seconds, size_t *output_length, char **error);
 const char *lwjs_logs(LWJSProgram *program);
 /* The meshes emitted by the last evaluation, valid until the next one. */
 const uint8_t *lwjs_meshes(LWJSProgram *program, size_t *length);

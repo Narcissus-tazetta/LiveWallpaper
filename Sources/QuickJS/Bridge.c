@@ -1,6 +1,7 @@
 #include "WallpaperJS.h"
 #include "quickjs.h"
 #include "DrawHelpers.h"
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -481,8 +482,265 @@ static JSValue decode_input(JSContext *context, const uint8_t **cursor, int dept
     return value;
 }
 
-char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_seconds, char **error) {
+#define LWJS_MAX_OUTPUT_JSON 262144
+#define LWJS_OUTPUT_MAGIC 0xFF
+
+/* The update(context) result as a tagged value tree (see SceneScriptOutputReader),
+ * carrying exactly what JSON.stringify followed by JSONSerialization would. Only
+ * plain objects and arrays of data properties take this path: anything stringify
+ * would treat specially (toJSON, accessors, proxies, holes, wrapper objects, BigInt,
+ * lone surrogates, cycles) makes the walk give up, and since it never runs script
+ * code the JSON path then sees the same values. */
+typedef struct {
+    uint8_t *bytes;
+    size_t length;
+    size_t capacity;
+    /* An upper bound on the JSON text's length, so the 256 KiB limit is only
+       decided here when it cannot matter. */
+    size_t json_bound;
+    JSClassID object_class;
+    JSClassID array_class;
+    JSAtom to_json;
+    /* Prototypes already checked for toJSON; nothing can change them during the walk. */
+    JSValue clean_protos[8];
+    int clean_count;
+} OutputWriter;
+
+enum { OUTPUT_FALLBACK = 0, OUTPUT_WRITTEN = 1, OUTPUT_OMITTED = 2, OUTPUT_EXCEPTION = -1 };
+
+static int output_put(OutputWriter *w, const void *data, size_t length) {
+    if (w->length + length > w->capacity) {
+        size_t capacity = w->capacity ? w->capacity * 2 : 4096;
+        while (capacity < w->length + length) capacity *= 2;
+        uint8_t *bytes = realloc(w->bytes, capacity);
+        if (!bytes) return 0;
+        w->bytes = bytes;
+        w->capacity = capacity;
+    }
+    memcpy(w->bytes + w->length, data, length);
+    w->length += length;
+    return 1;
+}
+
+static int output_tag_count(OutputWriter *w, uint8_t tag, uint32_t count) {
+    return output_put(w, &tag, 1) && output_put(w, &count, 4);
+}
+
+/* Returns OUTPUT_FALLBACK for UTF-8 that came from a lone surrogate, which
+   stringify escapes and JSONSerialization does not read back as the same text. */
+/* A string value is tagged; an object key is only its u32 length and bytes. */
+static int output_text(OutputWriter *w, int is_key, const char *text, size_t length) {
+    size_t bound = 2;
+    for (size_t i = 0; i < length; i++) {
+        uint8_t c = (uint8_t)text[i];
+        if (c == 0xED && i + 1 < length && (uint8_t)text[i + 1] >= 0xA0) return OUTPUT_FALLBACK;
+        bound += c == '"' || c == '\\' ? 2 : c < 0x20 ? 6 : 1;
+    }
+    w->json_bound += bound;
+    uint32_t count = (uint32_t)length;
+    int ok = is_key ? output_put(w, &count, 4) : output_tag_count(w, 5, count);
+    return ok && output_put(w, text, length) ? OUTPUT_WRITTEN : OUTPUT_FALLBACK;
+}
+
+static int output_number(OutputWriter *w, double number, int is_int) {
+    if (!isfinite(number)) {
+        uint8_t tag = 0;
+        w->json_bound += 4;
+        return output_put(w, &tag, 1) ? OUTPUT_WRITTEN : OUTPUT_FALLBACK;
+    }
+    // JSONSerialization reads integral text as Int64 (or a decimal past it) and the
+    // rest as Double. Below 2^53 stringify prints integral values exactly; from 2^53
+    // up to 1e21 it prints digits that need not equal the double, so JSON decides.
+    int integral = number == trunc(number);
+    if (!is_int && integral && fabs(number) >= 9007199254740992.0 && fabs(number) < 1e21) return OUTPUT_FALLBACK;
+    if (is_int || (integral && fabs(number) < 9007199254740992.0)) {
+        int64_t value = (int64_t)number;
+        uint8_t tag = 3;
+        size_t digits = value <= 0 ? 1 : 0;
+        for (int64_t rest = value; rest != 0; rest /= 10) digits++;
+        w->json_bound += digits;
+        return output_put(w, &tag, 1) && output_put(w, &value, 8) ? OUTPUT_WRITTEN : OUTPUT_FALLBACK;
+    }
+    uint8_t tag = 4;
+    w->json_bound += 25;
+    return output_put(w, &tag, 1) && output_put(w, &number, 8) ? OUTPUT_WRITTEN : OUTPUT_FALLBACK;
+}
+
+/* No own or inherited toJSON, found without running getters or proxy traps. */
+static int output_has_no_to_json(JSContext *context, OutputWriter *w, JSValueConst object) {
+    JSPropertyDescriptor desc;
+    int found = JS_GetOwnProperty(context, &desc, object, w->to_json);
+    if (found < 0) return OUTPUT_EXCEPTION;
+    if (found) {
+        JS_FreeValue(context, desc.value);
+        JS_FreeValue(context, desc.getter);
+        JS_FreeValue(context, desc.setter);
+        return OUTPUT_FALLBACK;
+    }
+    JSValue proto = JS_GetPrototype(context, object);
+    int result = OUTPUT_WRITTEN;
+    while (result == OUTPUT_WRITTEN && JS_IsObject(proto)) {
+        int known = 0;
+        for (int i = 0; i < w->clean_count; i++) known |= JS_VALUE_GET_PTR(w->clean_protos[i]) == JS_VALUE_GET_PTR(proto);
+        if (known) break;
+        if (JS_IsProxy(proto)) { result = OUTPUT_FALLBACK; break; }
+        found = JS_GetOwnProperty(context, &desc, proto, w->to_json);
+        if (found < 0) { result = OUTPUT_EXCEPTION; break; }
+        if (found) {
+            JS_FreeValue(context, desc.value);
+            JS_FreeValue(context, desc.getter);
+            JS_FreeValue(context, desc.setter);
+            result = OUTPUT_FALLBACK;
+            break;
+        }
+        // Remembered before the rest of its chain is checked: a toJSON further up
+        // abandons the whole walk anyway.
+        if (w->clean_count < 8) w->clean_protos[w->clean_count++] = JS_DupValue(context, proto);
+        JSValue next = JS_GetPrototype(context, proto);
+        JS_FreeValue(context, proto);
+        proto = next;
+        if (JS_IsException(proto)) result = OUTPUT_EXCEPTION;
+    }
+    JS_FreeValue(context, proto);
+    return result;
+}
+
+static int output_value(JSContext *context, OutputWriter *w, JSValueConst value, int depth);
+
+static int output_own_data(JSContext *context, OutputWriter *w, JSValueConst object, JSAtom atom, int depth) {
+    JSPropertyDescriptor desc;
+    int found = JS_GetOwnProperty(context, &desc, object, atom);
+    if (found < 0) return OUTPUT_EXCEPTION;
+    if (!found) return OUTPUT_FALLBACK;
+    int result = desc.flags & JS_PROP_GETSET ? OUTPUT_FALLBACK : output_value(context, w, desc.value, depth + 1);
+    JS_FreeValue(context, desc.value);
+    JS_FreeValue(context, desc.getter);
+    JS_FreeValue(context, desc.setter);
+    return result;
+}
+
+static int output_value(JSContext *context, OutputWriter *w, JSValueConst value, int depth) {
+    // Past the limit JSON decides, before this buffer (outside the script's memory
+    // limit) grows with an output the script was never allowed to return.
+    if (depth > 256 || w->json_bound > LWJS_MAX_OUTPUT_JSON) return OUTPUT_FALLBACK;
+    uint8_t tag;
+    switch (JS_VALUE_GET_NORM_TAG(value)) {
+    case JS_TAG_NULL:
+        tag = 0;
+        w->json_bound += 4;
+        return output_put(w, &tag, 1) ? OUTPUT_WRITTEN : OUTPUT_FALLBACK;
+    case JS_TAG_BOOL:
+        tag = JS_VALUE_GET_BOOL(value) ? 2 : 1;
+        w->json_bound += 5;
+        return output_put(w, &tag, 1) ? OUTPUT_WRITTEN : OUTPUT_FALLBACK;
+    case JS_TAG_INT:
+        return output_number(w, JS_VALUE_GET_INT(value), 1);
+    case JS_TAG_FLOAT64:
+        return output_number(w, JS_VALUE_GET_FLOAT64(value), 0);
+    case JS_TAG_STRING:
+    case JS_TAG_STRING_ROPE: {
+        size_t length;
+        const char *text = JS_ToCStringLen(context, &length, value);
+        if (!text) return OUTPUT_EXCEPTION;
+        int result = output_text(w, 0, text, length);
+        JS_FreeCString(context, text);
+        return result;
+    }
+    case JS_TAG_UNDEFINED:
+    case JS_TAG_SYMBOL:
+        return OUTPUT_OMITTED;
+    case JS_TAG_OBJECT:
+        break;
+    default:
+        return OUTPUT_FALLBACK;
+    }
+    int checked = output_has_no_to_json(context, w, value);
+    if (checked != OUTPUT_WRITTEN) return checked;
+    if (JS_IsFunction(context, value)) return OUTPUT_OMITTED;
+    JSClassID class_id = JS_GetClassID(value);
+    if (class_id == w->array_class) {
+        int64_t length;
+        if (JS_GetLength(context, value, &length) < 0) return OUTPUT_EXCEPTION;
+        if (length > UINT32_MAX) return OUTPUT_FALLBACK;
+        if (!output_tag_count(w, 6, (uint32_t)length)) return OUTPUT_FALLBACK;
+        w->json_bound += 2 + (length > 0 ? (size_t)length - 1 : 0);
+        for (uint32_t i = 0; i < length; i++) {
+            JSAtom atom = JS_NewAtomUInt32(context, i);
+            if (atom == JS_ATOM_NULL) return OUTPUT_EXCEPTION;
+            int result = output_own_data(context, w, value, atom, depth);
+            JS_FreeAtom(context, atom);
+            if (result == OUTPUT_OMITTED) {
+                tag = 0;
+                w->json_bound += 4;
+                if (!output_put(w, &tag, 1)) return OUTPUT_FALLBACK;
+            } else if (result != OUTPUT_WRITTEN) {
+                return result;
+            }
+        }
+        return OUTPUT_WRITTEN;
+    }
+    if (class_id != w->object_class) return OUTPUT_FALLBACK;
+    JSPropertyEnum *properties;
+    uint32_t count;
+    if (JS_GetOwnPropertyNames(context, &properties, &count, value, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) < 0) return OUTPUT_EXCEPTION;
+    size_t count_position = w->length + 1;
+    int result = output_tag_count(w, 7, 0) ? OUTPUT_WRITTEN : OUTPUT_FALLBACK;
+    w->json_bound += 2;
+    uint32_t written = 0;
+    for (uint32_t i = 0; i < count && result == OUTPUT_WRITTEN; i++) {
+        size_t start = w->length;
+        size_t bound = w->json_bound;
+        size_t length;
+        const char *key = JS_AtomToCStringLen(context, &length, properties[i].atom);
+        if (!key) { result = OUTPUT_EXCEPTION; break; }
+        result = output_text(w, 1, key, length);
+        JS_FreeCString(context, key);
+        if (result != OUTPUT_WRITTEN) break;
+        result = output_own_data(context, w, value, properties[i].atom, depth);
+        if (result == OUTPUT_OMITTED) {
+            w->length = start;
+            w->json_bound = bound;
+            result = OUTPUT_WRITTEN;
+        } else if (result == OUTPUT_WRITTEN) {
+            w->json_bound += written ? 2 : 1;
+            written++;
+        }
+    }
+    JS_FreePropertyEnum(context, properties, count);
+    if (result == OUTPUT_WRITTEN) memcpy(w->bytes + count_position, &written, 4);
+    return result;
+}
+
+/* OUTPUT_WRITTEN with *output set, OUTPUT_FALLBACK for the JSON path, or
+   OUTPUT_EXCEPTION with the exception pending in `context`. */
+static int write_output(JSContext *context, JSValueConst result, char **output, size_t *output_length) {
+    if (!JS_IsObject(result)) return OUTPUT_FALLBACK;
+    OutputWriter w = {0};
+    JSValue sample_object = JS_NewObject(context);
+    JSValue sample_array = JS_NewArray(context);
+    w.object_class = JS_GetClassID(sample_object);
+    w.array_class = JS_GetClassID(sample_array);
+    JS_FreeValue(context, sample_object);
+    JS_FreeValue(context, sample_array);
+    w.to_json = JS_NewAtom(context, "toJSON");
+    uint8_t magic = LWJS_OUTPUT_MAGIC;
+    int status = w.to_json == JS_ATOM_NULL ? OUTPUT_EXCEPTION
+        : output_put(&w, &magic, 1) ? output_value(context, &w, result, 0) : OUTPUT_FALLBACK;
+    if (status == OUTPUT_OMITTED || (status == OUTPUT_WRITTEN && w.json_bound > LWJS_MAX_OUTPUT_JSON)) status = OUTPUT_FALLBACK;
+    for (int i = 0; i < w.clean_count; i++) JS_FreeValue(context, w.clean_protos[i]);
+    if (w.to_json != JS_ATOM_NULL) JS_FreeAtom(context, w.to_json);
+    if (status == OUTPUT_WRITTEN) {
+        *output = (char *)w.bytes;
+        *output_length = w.length;
+    } else {
+        free(w.bytes);
+    }
+    return status;
+}
+
+char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_seconds, size_t *output_length, char **error) {
     *error = NULL;
+    *output_length = 0;
     program->deadline = now() + budget_seconds;
     program->timed_out = 0;
     program->logs[0] = 0;
@@ -574,7 +832,13 @@ char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_se
         JS_FreeValue(context, result);
         result = JS_ThrowTypeError(context, "Only synchronous update(context) is supported");
     }
-    if (!JS_IsException(result)) {
+    int fast = JS_IsException(result) ? OUTPUT_FALLBACK : write_output(context, result, &output, output_length);
+    if (fast == OUTPUT_WRITTEN && program->timed_out) {
+        free(output);
+        output = NULL;
+        JS_ThrowRangeError(context, "Output exceeds 256 KiB or evaluation limit");
+    }
+    if (!JS_IsException(result) && fast == OUTPUT_FALLBACK) {
         JSValue json = JS_JSONStringify(context, result, JS_UNDEFINED, JS_UNDEFINED);
         if (!JS_IsException(json) && JS_IsJobPending(program->runtime)) {
             JS_FreeValue(context, json);
@@ -583,7 +847,7 @@ char *lwjs_evaluate(LWJSProgram *program, const uint8_t *input, double budget_se
         if (!JS_IsException(json) && !JS_IsUndefined(json)) {
             size_t length;
             const char *text = JS_ToCStringLen(context, &length, json);
-            if (text && length <= 262144 && !program->timed_out) output = strdup(text);
+            if (text && length <= LWJS_MAX_OUTPUT_JSON && !program->timed_out) { output = strdup(text); *output_length = length; }
             else JS_ThrowRangeError(context, "Output exceeds 256 KiB or evaluation limit");
             if (text) JS_FreeCString(context, text);
         } else if (JS_IsUndefined(json)) {

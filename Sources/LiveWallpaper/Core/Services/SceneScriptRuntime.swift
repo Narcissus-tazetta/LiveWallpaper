@@ -126,8 +126,9 @@ final class SceneScriptRuntime {
             lwjs_set_memory_limit(programs[script.id]!.pointer, min(64 * 1024 * 1024, Self.maximumMemoryBytes - otherMemory))
             let pointer = programs[script.id]!.pointer
             lwjs_set_storage(pointer, Self.storageHandler, Unmanaged.passUnretained(storage).toOpaque())
+            var outputLength = 0
             let result = withExtendedLifetime(storage) {
-                input.bytes.withUnsafeBufferPointer { lwjs_evaluate(pointer, $0.baseAddress!, budget, &error) }
+                input.bytes.withUnsafeBufferPointer { lwjs_evaluate(pointer, $0.baseAddress!, budget, &outputLength, &error) }
             }
             lwjs_set_storage(pointer, nil, nil)
             programs[script.id]?.hasStarted = true
@@ -153,9 +154,10 @@ final class SceneScriptRuntime {
             defer { lwjs_free_string(result) }
             logs[script.id] = String(cString: lwjs_logs(programs[script.id]!.pointer))
             programs[script.id]!.memoryIsStale = true
-            let outputLength = strlen(result!)
-            let outputData = Data(bytesNoCopy: result!, count: outputLength, deallocator: .none)
-            var output = try JSONSerialization.jsonObject(with: outputData)
+            let outputBytes = UnsafeRawBufferPointer(start: result!, count: outputLength)
+            var output = outputBytes.first == SceneScriptOutputReader.magic
+                ? SceneScriptOutputReader.read(outputBytes)
+                : try JSONSerialization.jsonObject(with: Data(bytesNoCopy: result!, count: outputLength, deallocator: .none))
             var warnings: [String] = []
             var meshes: [SceneMeshFrame] = []
             var models: [SceneModelLayerFrame] = []
@@ -253,7 +255,7 @@ final class SceneScriptRuntime {
         }
     }
 
-    /// Fields stored as Int: a fraction would only fail later, in JSONDecoder, with a
+    /// Fields stored as Int: a fraction would only fail later, in the decoder, with a
     /// message that does not name the field.
     private static func integers(_ object: [String: Any], names: [String], path: String) throws {
         for name in names where object[name] != nil {
@@ -280,6 +282,11 @@ final class SceneScriptRuntime {
     }
 
     private static func decode<T: Decodable>(_ type: T.Type, _ value: [String: Any]) throws -> T {
+        try SceneScriptValueDecoder.decode(type, from: value)
+    }
+
+    /// For types with a Float, which JSONDecoder rounds from the decimal text.
+    private static func decodeThroughJSON<T: Decodable>(_ type: T.Type, _ value: [String: Any]) throws -> T {
         try JSONDecoder().decode(type, from: JSONSerialization.data(withJSONObject: value))
     }
 
@@ -344,8 +351,8 @@ final class SceneScriptRuntime {
         }
     }
 
-    /// Appearance fields that need no nested decoding, read without the JSON round
-    /// trip; tint and cursorMask keep JSONDecoder's handling of missing members.
+    /// Appearance fields that need no nested decoding, read directly; tint and
+    /// cursorMask keep the decoder's handling of missing members.
     private static func appearanceValues(_ appearance: [String: Any]) throws -> SceneScriptAppearanceValues {
         guard appearance["tint"] == nil, appearance["cursorMask"] == nil else {
             return try decode(SceneScriptAppearanceValues.self, appearance)
@@ -663,7 +670,7 @@ final class SceneScriptRuntime {
                               change["frame"] == nil || change["rate"] == nil else {
                             throw failure("rigs.playback: expected a unique playback index and either frame or rate")
                         }
-                        changes[index] = try decode(SceneScriptPlaybackValues.self, change)
+                        changes[index] = try decodeThroughJSON(SceneScriptPlaybackValues.self, change)
                     }
                     adjustment.rigPlayback[id] = changes
                 }
