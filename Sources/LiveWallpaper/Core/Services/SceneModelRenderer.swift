@@ -371,7 +371,7 @@ final class SceneModelRenderer {
     private static let planeSource = """
     #include <metal_stdlib>
     using namespace metal;
-    struct PlaneUniforms { float4x4 transform; float4 color; };
+    struct PlaneUniforms { float4x4 transform; float4 color; uint discardTransparent; };
     struct PlaneOut { float4 position [[position]]; float2 uv; };
     vertex PlaneOut planeVertex(uint id [[vertex_id]], constant PlaneUniforms& u [[buffer(0)]]) {
         float2 corner = float2(id == 1 || id == 2 || id == 4 ? 0.5 : -0.5, id == 2 || id == 4 || id == 5 ? 0.5 : -0.5);
@@ -384,7 +384,10 @@ final class SceneModelRenderer {
                                   sampler linear [[sampler(0)]], constant PlaneUniforms& u [[buffer(0)]]) {
         // The picture is premultiplied; the tint scales its colour, the alpha its coverage.
         float4 c = picture.sample(linear, in.uv);
-        return float4(c.rgb * u.color.rgb, c.a) * u.color.a;
+        float4 result = float4(c.rgb * u.color.rgb, c.a) * u.color.a;
+        // A transparent margin must not hide geometry drawn later through the depth buffer.
+        if (u.discardTransparent != 0 && all(result == float4(0.0))) discard_fragment();
+        return result;
     }
     """
     private var planeFunctions: (MTLFunction, MTLFunction)?
@@ -427,9 +430,9 @@ final class SceneModelRenderer {
         encoder.setDepthStencilState(depthState(test: space.depthTest, write: space.depthWrite))
         encoder.setFrontFacing(.counterClockwise)
         encoder.setCullMode(space.cull == .back ? .back : space.cull == .front ? .front : .none)
-        var uniforms = (transform, color)
-        encoder.setVertexBytes(&uniforms, length: MemoryLayout<(simd_float4x4, SIMD4<Float>)>.stride, index: 0)
-        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<(simd_float4x4, SIMD4<Float>)>.stride, index: 0)
+        var uniforms = (transform, color, UInt32(space.blending != .normal ? 1 : 0))
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<(simd_float4x4, SIMD4<Float>, UInt32)>.stride, index: 0)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<(simd_float4x4, SIMD4<Float>, UInt32)>.stride, index: 0)
         encoder.setFragmentTexture(picture, index: 0)
         encoder.setFragmentSamplerState(planeSampler, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
