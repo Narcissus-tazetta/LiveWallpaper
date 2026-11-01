@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="%lang%">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="%sveltekit.assets%/icon.png" />
+        <meta name="color-scheme" content="dark" />
+        <script>
+            // Runs before first paint so Japanese visitors land on /ja/ without a flash of English.
+            // An explicit choice from the language switch wins over the browser language.
+            if ("%lang%" === "en") {
+                const saved = localStorage.getItem("lang");
+                const preferred = navigator.languages.find((tag) => /^(ja|en)\b/i.test(tag));
+                if (saved ? saved === "ja" : preferred && /^ja\b/i.test(preferred)) {
+                    location.replace("ja/" + location.hash);
+                }
+            }
+        </script>
+        %sveltekit.head%
+    </head>
+    <body data-sveltekit-preload-data="hover">
+        <div style="display: contents">%sveltekit.body%</div>
+    </body>
+</html>
