@@ -517,6 +517,7 @@ extension SettingsView {
         // so the grid sits inset and the scroll view reaches out into the card padding by
         // the same amount to keep the cards aligned with the header.
         let inset: CGFloat = 10
+        let entries = mergedListEntries
         return GeometryReader { proxy in
             let layout = wallpaperGridLayout(for: proxy.size.width - inset * 2)
             ScrollView {
@@ -525,7 +526,7 @@ extension SettingsView {
                     alignment: .leading,
                     spacing: wallpaperGridRowSpacing
                 ) {
-                    ForEach(mergedListEntries) { entry in
+                    ForEach(entries) { entry in
                         switch entry {
                         case .video(let path):
                             if let screenID = activeDisplayOverrideScreenID {
@@ -570,7 +571,7 @@ extension SettingsView {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(inset)
                 .motionAnimation(Motion.standard, value: activeGridSelectionKey)
-                .motionAnimation(value: mergedListEntries.map(\.id))
+                .motionAnimation(value: entries.map(\.id))
             }
         }
         .frame(minHeight: wallpaperLibraryGridMinHeight, maxHeight: 340)
@@ -610,12 +611,45 @@ extension SettingsView {
         let count = paths.count
         let currentIndex = model.videoOverride(forScreenID: screenID)
             .flatMap { paths.firstIndex(of: $0) }
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 14) {
                 Text(model.localizedString("この画面専用のプレイリストです"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
+            }
+
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Button {
+                        withMotion {
+                            model.playPreviousVideo(forScreenID: screenID)
+                        }
+                    } label: {
+                        Image(systemName: "backward.fill")
+                            .frame(width: 34)
+                    }
+                    .disabled(count < 2)
+                    .help(model.localizedString("前へ"))
+                    .accessibilityLabel(model.localizedString("前へ"))
+
+                    Button {
+                        withMotion {
+                            model.playNextVideo(forScreenID: screenID)
+                        }
+                    } label: {
+                        Image(systemName: "forward.fill")
+                            .frame(width: 34)
+                    }
+                    .disabled(count < 2)
+                    .help(model.localizedString("次へ"))
+                    .accessibilityLabel(model.localizedString("次へ"))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .fixedSize()
+
                 Spacer(minLength: 12)
+
                 if let currentIndex, count > 0 {
                     Text("\(currentIndex + 1) / \(count)")
                         .font(.caption)
@@ -624,30 +658,6 @@ extension SettingsView {
                         .contentTransition(.numericText())
                         .motionAnimation(Motion.quick, value: currentIndex)
                 }
-            }
-
-            HStack(spacing: 8) {
-                Button {
-                    withMotion {
-                        model.playPreviousVideo(forScreenID: screenID)
-                    }
-                } label: {
-                    Label(model.localizedString("前へ"), systemImage: "backward.fill")
-                }
-                .buttonStyle(.bordered)
-                .disabled(count < 2)
-
-                Button {
-                    withMotion {
-                        model.playNextVideo(forScreenID: screenID)
-                    }
-                } label: {
-                    Label(model.localizedString("次へ"), systemImage: "forward.fill")
-                }
-                .buttonStyle(.bordered)
-                .disabled(count < 2)
-
-                Spacer(minLength: 0)
             }
         }
     }
@@ -677,118 +687,164 @@ extension SettingsView {
         }
     }
 
+    private func playlistTransportButtons(registeredCount: Int) -> some View {
+        HStack(spacing: 6) {
+            Button {
+                withMotion {
+                    model.playPreviousVideo()
+                }
+            } label: {
+                Image(systemName: "backward.fill")
+                    .frame(width: 34)
+            }
+            .disabled(registeredCount < 2)
+            .help(model.localizedString("前へ"))
+            .accessibilityLabel(model.localizedString("前へ"))
+
+            Button { model.toggleManualPause() } label: {
+                Image(systemName: model.manualPauseActive ? "play.fill" : "pause.fill")
+                    .frame(width: 34)
+            }
+            .help(model.localizedString(model.manualPauseActive ? "再開" : "一時停止"))
+            .accessibilityLabel(model.localizedString(model.manualPauseActive ? "再開" : "一時停止"))
+
+            Button {
+                withMotion {
+                    model.playNextVideo()
+                }
+            } label: {
+                Image(systemName: "forward.fill")
+                    .frame(width: 34)
+            }
+            .disabled(registeredCount < 2)
+            .help(model.localizedString("次へ"))
+            .accessibilityLabel(model.localizedString("次へ"))
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .fixedSize()
+    }
+
+    private func autoSwitchControl(registeredCount: Int) -> some View {
+        HStack(spacing: 8) {
+            Text(model.localizedString("自動で次の壁紙へ"))
+                .fixedSize()
+                .accessibilityHidden(true)
+            Picker(model.localizedString("自動で次の壁紙へ"), selection: autoSwitchIntervalBinding) {
+                Text(model.localizedString("オフ")).tag(0)
+                Text(model.localizedString("5分")).tag(5)
+                Text(model.localizedString("15分")).tag(15)
+                Text(model.localizedString("30分")).tag(30)
+                Text(model.localizedString("1時間")).tag(60)
+                Text(model.localizedString("3時間")).tag(180)
+            }
+            .labelsHidden()
+            .fixedSize()
+            .disabled(registeredCount < 2 || model.pinCurrentVideo)
+        }
+    }
+
+    @ViewBuilder
+    private func playlistToggleLeading(registeredCount: Int) -> some View {
+        HStack(spacing: 4) {
+            Toggle(
+                model.localizedString("ループ再生"),
+                isOn: Binding<Bool>(
+                    get: { model.videoLoopEnabled },
+                    set: { model.setVideoLoopEnabled($0) }
+                )
+            )
+            .disabled(!model.isVideoLoopSettingEnabled)
+
+            helpIconButton(for: .videoLoop)
+        }
+
+        Toggle(
+            model.localizedString("プレイリスト連続再生"),
+            isOn: Binding<Bool>(
+                get: { model.playlistPlaybackEnabled },
+                set: { model.setPlaylistPlaybackEnabled($0) }
+            )
+        )
+    }
+
+    @ViewBuilder
+    private func playlistToggleTrailing(registeredCount: Int, showsPin: Bool) -> some View {
+        Toggle(
+            model.localizedString("シャッフル"),
+            isOn: Binding<Bool>(
+                get: { model.shufflePlaybackEnabled },
+                set: { model.setShufflePlaybackEnabled($0) }
+            )
+        )
+        .disabled(
+            !model.playlistPlaybackEnabled
+                || registeredCount < 2
+                || model.pinCurrentVideo
+        )
+
+        if showsPin {
+            Toggle(
+                model.localizedString("この壁紙で固定"),
+                isOn: Binding<Bool>(
+                    get: { model.pinCurrentVideo },
+                    set: { model.setPinCurrentVideo($0) }
+                )
+            )
+            .transition(Motion.pop)
+        }
+    }
+
+    @ViewBuilder
+    private func playlistPositionLabel(registeredCount: Int) -> some View {
+        if let index = model.currentPlaybackIndex {
+            Text("\(index + 1) / \(registeredCount)")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundColor(.secondary)
+                .contentTransition(.numericText())
+                .motionAnimation(Motion.quick, value: index)
+        }
+    }
+
     private var playlistPlaybackControls: some View {
         let registeredCount = model.registeredPlaybackEntries.count
         let showsPin = model.canPinCurrentVideo || model.pinCurrentVideo
         return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                HStack(spacing: 6) {
-                    Button {
-                        withMotion {
-                            model.playPreviousVideo()
-                        }
-                    } label: {
-                        Image(systemName: "backward.fill")
-                            .frame(width: 34)
-                    }
-                    .disabled(registeredCount < 2)
-                    .help(model.localizedString("前へ"))
-                    .accessibilityLabel(model.localizedString("前へ"))
-
-                    Button { model.toggleManualPause() } label: {
-                        Image(systemName: model.manualPauseActive ? "play.fill" : "pause.fill")
-                            .frame(width: 34)
-                    }
-                    .help(model.localizedString(model.manualPauseActive ? "再開" : "一時停止"))
-                    .accessibilityLabel(model.localizedString(model.manualPauseActive ? "再開" : "一時停止"))
-
-                    Button {
-                        withMotion {
-                            model.playNextVideo()
-                        }
-                    } label: {
-                        Image(systemName: "forward.fill")
-                            .frame(width: 34)
-                    }
-                    .disabled(registeredCount < 2)
-                    .help(model.localizedString("次へ"))
-                    .accessibilityLabel(model.localizedString("次へ"))
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    playlistTransportButtons(registeredCount: registeredCount)
+                    Spacer(minLength: 12)
+                    autoSwitchControl(registeredCount: registeredCount)
                 }
-                .buttonStyle(.bordered)
-                .fixedSize()
-
-                Spacer(minLength: 12)
-
-                Text(model.localizedString("自動で次の壁紙へ"))
-                    .accessibilityHidden(true)
-                Picker(model.localizedString("自動で次の壁紙へ"), selection: autoSwitchIntervalBinding) {
-                    Text(model.localizedString("オフ")).tag(0)
-                    Text(model.localizedString("5分")).tag(5)
-                    Text(model.localizedString("15分")).tag(15)
-                    Text(model.localizedString("30分")).tag(30)
-                    Text(model.localizedString("1時間")).tag(60)
-                    Text(model.localizedString("3時間")).tag(180)
+                VStack(alignment: .leading, spacing: 8) {
+                    playlistTransportButtons(registeredCount: registeredCount)
+                    autoSwitchControl(registeredCount: registeredCount)
                 }
-                .labelsHidden()
-                .fixedSize()
-                .disabled(registeredCount < 2 || model.pinCurrentVideo)
             }
 
-            HStack(spacing: 16) {
-                HStack(spacing: 4) {
-                    Toggle(
-                        model.localizedString("ループ再生"),
-                        isOn: Binding<Bool>(
-                            get: { model.videoLoopEnabled },
-                            set: { model.setVideoLoopEnabled($0) }
-                        )
-                    )
-                    .disabled(!model.isVideoLoopSettingEnabled)
-
-                    helpIconButton(for: .videoLoop)
+            // ラベルが長い言語では1行に収まらないため、収まらないときは縦に積む。
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 16) {
+                    playlistToggleLeading(registeredCount: registeredCount)
+                    playlistToggleTrailing(registeredCount: registeredCount, showsPin: showsPin)
+                    Spacer(minLength: 12)
+                    playlistPositionLabel(registeredCount: registeredCount)
                 }
-
-                Toggle(
-                    model.localizedString("プレイリスト連続再生"),
-                    isOn: Binding<Bool>(
-                        get: { model.playlistPlaybackEnabled },
-                        set: { model.setPlaylistPlaybackEnabled($0) }
-                    )
-                )
-
-                Toggle(
-                    model.localizedString("シャッフル"),
-                    isOn: Binding<Bool>(
-                        get: { model.shufflePlaybackEnabled },
-                        set: { model.setShufflePlaybackEnabled($0) }
-                    )
-                )
-                .disabled(
-                    !model.playlistPlaybackEnabled
-                        || registeredCount < 2
-                        || model.pinCurrentVideo
-                )
-
-                if showsPin {
-                    Toggle(
-                        model.localizedString("この壁紙で固定"),
-                        isOn: Binding<Bool>(
-                            get: { model.pinCurrentVideo },
-                            set: { model.setPinCurrentVideo($0) }
-                        )
-                    )
-                    .transition(Motion.pop)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 16) {
+                        playlistToggleLeading(registeredCount: registeredCount)
+                        Spacer(minLength: 12)
+                        playlistPositionLabel(registeredCount: registeredCount)
+                    }
+                    HStack(spacing: 16) {
+                        playlistToggleTrailing(registeredCount: registeredCount, showsPin: showsPin)
+                    }
                 }
-
-                Spacer(minLength: 12)
-
-                if let index = model.currentPlaybackIndex {
-                    Text("\(index + 1) / \(registeredCount)")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundColor(.secondary)
-                        .contentTransition(.numericText())
-                        .motionAnimation(Motion.quick, value: index)
+                VStack(alignment: .leading, spacing: 6) {
+                    playlistToggleLeading(registeredCount: registeredCount)
+                    playlistToggleTrailing(registeredCount: registeredCount, showsPin: showsPin)
+                    playlistPositionLabel(registeredCount: registeredCount)
                 }
             }
             .toggleStyle(.checkbox)

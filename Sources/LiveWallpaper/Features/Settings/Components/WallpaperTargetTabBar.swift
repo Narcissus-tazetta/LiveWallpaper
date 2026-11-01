@@ -204,6 +204,9 @@ extension SettingsView {
                             Label(targetTitle(for: target), systemImage: targetIconName(for: target))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(isSelected ? tint : .primary)
+                                // Wrapping splits single long words (e.g. "Schreibtisch") mid-word.
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                             if target == .desktop, model.manualPauseActive {
                                 Label(model.localizedString("一時停止中"), systemImage: "pause.fill")
                                     .font(.system(size: 9, weight: .semibold))
@@ -220,7 +223,7 @@ extension SettingsView {
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
-                            .contentTransition(.numericText())
+                            .contentTransition(.opacity)
                             .motionAnimation(Motion.quick, value: summary)
                     }
                     .frame(minWidth: 90, maxWidth: 200, alignment: .leading)

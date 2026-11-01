@@ -39,20 +39,6 @@ extension SettingsView {
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
-    func compactToggle(_ title: String, isOn: Binding<Bool>) -> some View {
-        HStack(spacing: 6) {
-            Text(title)
-                .accessibilityHidden(true)
-            // Outside a Form the switch defaults to the large size; match the Form rows.
-            Toggle(title, isOn: isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .fixedSize()
-        }
-        .fixedSize(horizontal: true, vertical: false)
-    }
-
     /// プレイリスト編集中に名前行へ出すチェックボックスの汎用実装。ON=そのプレイリストに含まれる。
     /// 動画カード・Web壁紙カードの両方から、対象に応じたクロージャを渡して使う。
     func membershipCheckbox(
