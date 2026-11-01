@@ -1320,7 +1320,7 @@ struct SceneCamera: Codable, Equatable {
 
 /// Fog by distance from the eye and by height. Each zone blends toward its colour by a
 /// density that is `startDensity` up to `start` and rises along the square of the
-/// position between `start` and `end` to `endDensity` (Wallpaper Engine's common_fog.h).
+/// position between `start` and `end` to `endDensity`.
 struct SceneFog: Codable, Equatable {
     struct Zone: Codable, Equatable {
         var start: Double
@@ -1343,7 +1343,7 @@ struct SceneFog: Codable, Equatable {
 }
 
 /// Key points the camera passes through: a curve between each pair, held at the last
-/// one, and back to the first after `period` (measured on Wallpaper Engine's own scenes).
+/// one, and back to the first after `period` (measured on reference scenes).
 struct SceneCameraPath: Codable, Equatable {
     struct Transform: Codable, Equatable {
         var timestamp: Double
@@ -1376,7 +1376,7 @@ struct SceneCameraPath: Codable, Equatable {
     }
 
     /// Each segment is its own cubic: P + ΔP·(½u + 3⁄2u² − u³), a Hermite curve whose slope
-    /// at both ends is half the segment's own change. Wallpaper Engine's three-point paths
+    /// at both ends is half the segment's own change. Reference three-point paths
     /// fit this within about 1 px; a slope taken from the neighbouring key points does not.
     func transform(at time: Double) -> (eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>, zoom: Float) {
         let t = time.truncatingRemainder(dividingBy: period)

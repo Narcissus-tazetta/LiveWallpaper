@@ -12,7 +12,7 @@ enum SceneTextVerticalAlignment: String, Codable, CaseIterable {
     case bottom
 }
 
-/// The outline, blur and drop shadow of Wallpaper Engine's text shader. Sizes are in text pixels.
+/// The outline, blur and drop shadow of a scene's text shader. Sizes are in text pixels.
 struct SceneTextStyle: Codable, Equatable {
     struct Outline: Codable, Equatable {
         var color: RGBAColor

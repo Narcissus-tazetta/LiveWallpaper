@@ -1102,9 +1102,9 @@
 "外部アプリの壁紙を適用中:" = "Diğer uygulamadan duvar kâğıdı uygulanıyor:";
 "%d件" = "%d öge";
 "Storeで確認" = "Store'da Gör";
-"Workshopで探す" = "Workshop'a Göz At";
-"Workshopで壁紙を探す" = "Workshop'ta Duvar Kâğıdı Bul";
-"we-import を開いて Steam Workshop から壁紙を探します" = "Steam Workshop'tan duvar kâğıtları bulmak için we-import'u açın";
+"他のアプリで探す" = "Başka Uygulamada Göz At";
+"他のアプリで壁紙を探す" = "Başka Uygulamada Duvar Kâğıdı Bul";
+"他のアプリを開いて壁紙を探します" = "Duvar kâğıdı bulmak için başka bir uygulamayı açın";
 "外部アプリの壁紙がありません" = "Diğer uygulamalardan duvar kâğıdı yok";
 "元の壁紙に戻す" = "Kendi Duvar Kâğıdımı Geri Yükle";
 "Web壁紙の表示中は使えません" = "Web duvar kâğıdı gösterilirken kullanılamaz";

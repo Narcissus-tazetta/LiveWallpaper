@@ -1102,9 +1102,9 @@
 "外部アプリの壁紙を適用中:" = "Fondo de otra app aplicado:";
 "%d件" = "%d elementos";
 "Storeで確認" = "Ver en Store";
-"Workshopで探す" = "Explorar Workshop";
-"Workshopで壁紙を探す" = "Buscar fondos en Workshop";
-"we-import を開いて Steam Workshop から壁紙を探します" = "Abre we-import para buscar fondos en Steam Workshop";
+"他のアプリで探す" = "Explorar en otra app";
+"他のアプリで壁紙を探す" = "Buscar fondos en otra app";
+"他のアプリを開いて壁紙を探します" = "Abre otra app para buscar fondos";
 "外部アプリの壁紙がありません" = "No hay fondos de otras apps";
 "元の壁紙に戻す" = "Restaurar mi fondo";
 "Web壁紙の表示中は使えません" = "No disponible mientras se muestra un fondo web";

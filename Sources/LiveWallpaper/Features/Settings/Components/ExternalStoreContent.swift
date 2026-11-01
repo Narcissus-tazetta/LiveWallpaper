@@ -24,11 +24,11 @@ extension SettingsView {
                 Button {
                     model.openExternalWallpaperProvider()
                 } label: {
-                    Label(model.localizedString("Workshopで探す"), systemImage: "arrow.up.forward.app")
+                    Label(model.localizedString("他のアプリで探す"), systemImage: "arrow.up.forward.app")
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
-                .help(model.localizedString("we-import を開いて Steam Workshop から壁紙を探します"))
+                .help(model.localizedString("他のアプリを開いて壁紙を探します"))
             }
 
             if wallpapers.isEmpty {
@@ -44,7 +44,7 @@ extension SettingsView {
                         Button {
                             model.openExternalWallpaperProvider()
                         } label: {
-                            Label(model.localizedString("Workshopで壁紙を探す"), systemImage: "arrow.up.forward.app")
+                            Label(model.localizedString("他のアプリで壁紙を探す"), systemImage: "arrow.up.forward.app")
                         }
                         .buttonStyle(.bordered)
                     }

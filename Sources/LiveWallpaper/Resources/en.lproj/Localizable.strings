@@ -1102,9 +1102,9 @@
 "外部アプリの壁紙を適用中:" = "Playing wallpaper from other app:";
 "%d件" = "%d items";
 "Storeで確認" = "View in Store";
-"Workshopで探す" = "Browse Workshop";
-"Workshopで壁紙を探す" = "Find Wallpapers on Workshop";
-"we-import を開いて Steam Workshop から壁紙を探します" = "Open we-import to find wallpapers from Steam Workshop";
+"他のアプリで探す" = "Browse in Another App";
+"他のアプリで壁紙を探す" = "Find Wallpapers in Another App";
+"他のアプリを開いて壁紙を探します" = "Open another app to find wallpapers";
 "外部アプリの壁紙がありません" = "No wallpapers from other apps";
 "元の壁紙に戻す" = "Restore My Wallpaper";
 "Web壁紙の表示中は使えません" = "Unavailable while a web wallpaper is showing";

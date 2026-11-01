@@ -1,7 +1,7 @@
 import AVFoundation
 import Foundation
 
-/// What the scene's scripts say about a sound this frame (Wallpaper Engine's layer
+/// What the scene's scripts say about a sound this frame (the layer
 /// `play`, `pause`, `stop` and `volume`). `plays` and `stops` count the calls, so a
 /// second `play()` on a sound that is already playing starts it again.
 struct SceneScriptedSound: Equatable {

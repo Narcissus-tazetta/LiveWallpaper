@@ -1,6 +1,6 @@
 import Foundation
 
-/// Wallpaper Engine's text shader draws outline, blur and drop shadow from a signed distance
+/// The scene text shader draws outline, blur and drop shadow from a signed distance
 /// field of the glyphs. This builds that field from a coverage picture and evaluates the same
 /// formulas, in output pixels.
 enum SceneTextEffects {

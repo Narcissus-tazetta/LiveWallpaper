@@ -1102,9 +1102,9 @@
 "外部アプリの壁紙を適用中:" = "Đang áp dụng hình nền từ ứng dụng khác:";
 "%d件" = "%d mục";
 "Storeで確認" = "Xem trong Store";
-"Workshopで探す" = "Duyệt Workshop";
-"Workshopで壁紙を探す" = "Tìm hình nền trên Workshop";
-"we-import を開いて Steam Workshop から壁紙を探します" = "Mở we-import để tìm hình nền từ Steam Workshop";
+"他のアプリで探す" = "Duyệt trong ứng dụng khác";
+"他のアプリで壁紙を探す" = "Tìm hình nền trong ứng dụng khác";
+"他のアプリを開いて壁紙を探します" = "Mở ứng dụng khác để tìm hình nền";
 "外部アプリの壁紙がありません" = "Không có hình nền từ ứng dụng khác";
 "元の壁紙に戻す" = "Khôi phục hình nền của tôi";
 "Web壁紙の表示中は使えません" = "Không khả dụng khi đang hiển thị hình nền web";
