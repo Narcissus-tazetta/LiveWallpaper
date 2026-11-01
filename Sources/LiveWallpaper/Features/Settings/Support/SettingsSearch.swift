@@ -106,6 +106,10 @@ extension SettingsView {
                 }
             }
             .listStyle(.sidebar)
+            // The sidebar material blends with whatever is behind the window (the desktop
+            // wallpaper). Dropping it lets the window's own background show, which matches the
+            // tab strip and the detail pane; an explicit windowBackgroundColor does not.
+            .scrollContentBackground(.hidden)
         }
     }
 
