@@ -312,4 +312,4 @@ export type { Dict };
 export const repo = "https://github.com/Narcissus-tazetta/LiveWallpaper";
 export const repoApi = "https://api.github.com/repos/Narcissus-tazetta/LiveWallpaper";
 export const brewCommand = "brew install --cask narcissus-tazetta/tap/livewallpaper";
-export const siteUrl = "https://narcissus-tazetta.github.io/LiveWallpaper";
+export const siteUrl = "https://livewallpaper.prason.dev";
