@@ -1,5 +1,7 @@
 <script lang="ts">
     import Landing from "#lib/Landing.svelte";
+
+    let { data } = $props();
 </script>
 
-<Landing />
+<Landing lang="en" release={data.release} />

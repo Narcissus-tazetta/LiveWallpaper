@@ -1,23 +1,44 @@
 <script lang="ts">
-    import { asset } from "$app/paths";
+    import { asset, resolve } from "$app/paths";
     import CopyButton from "./CopyButton.svelte";
+    import Faq from "./Faq.svelte";
     import Features from "./Features.svelte";
     import HeroVideo from "./HeroVideo.svelte";
     import Screenshots from "./Screenshots.svelte";
-    import { brewCommand, dictionaries, repo, siteUrl } from "./i18n";
-    import { current, initLang, setLang } from "./lang.svelte";
+    import { brewCommand, dictionaries, repo, repoApi, siteUrl, type Lang } from "./i18n";
 
-    const lang = $derived(current.value);
+    let { lang, release }: { lang: Lang; release: { version: string; date: string } } = $props();
+
     const t = $derived(dictionaries[lang]);
     const other = $derived(lang === "ja" ? "en" : "ja");
+    const pageUrl = { en: `${siteUrl}/`, ja: `${siteUrl}/ja/` } as const;
 
     const videoSource = "https://www.pexels.com/video/29717425/";
+    const photoSource = "https://pixabay.com/photos/pond-lake-of-fire-azores-mountain-6390510/";
+    const cloudsSource = "https://pixabay.com/videos/clouds-blue-sky-hdr-summer-nature-180151/";
 
     let scrolled = $state(false);
+    let downloads = $state<number>();
 
-    $effect(() => initLang());
+    // Counts every release asset, so Homebrew installs and in-app updates (both zip) are included alongside DMGs.
+    async function countDownloads() {
+        let total = 0;
+        for (let page = 1; ; page++) {
+            const response = await fetch(`${repoApi}/releases?per_page=100&page=${page}`);
+            if (!response.ok) throw new Error(`GitHub API responded ${response.status}`);
+            const releases = (await response.json()) as { assets: { download_count: number }[] }[];
+            for (const release of releases) {
+                for (const item of release.assets) total += item.download_count;
+            }
+            if (releases.length < 100) return total;
+        }
+    }
+
     $effect(() => {
-        document.documentElement.lang = lang;
+        countDownloads()
+            .then((total) => (downloads = total))
+            // The count is decoration; the page is complete without it.
+            .catch((error: unknown) => console.warn("Could not load the download count:", error));
     });
 </script>
 
@@ -26,13 +47,21 @@
 <svelte:head>
     <title>{t.title}</title>
     <meta name="description" content={t.description} />
-    <link rel="canonical" href="{siteUrl}/" />
+    <link rel="canonical" href={pageUrl[lang]} />
+    <link rel="alternate" hreflang="en" href={pageUrl.en} />
+    <link rel="alternate" hreflang="ja" href={pageUrl.ja} />
+    <link rel="alternate" hreflang="x-default" href={pageUrl.en} />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="LiveWallpaper" />
+    <meta property="og:locale" content={t.locale} />
     <meta property="og:title" content={t.title} />
     <meta property="og:description" content={t.description} />
-    <meta property="og:url" content="{siteUrl}/" />
-    <meta property="og:image" content="{siteUrl}/icon.png" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:url" content={pageUrl[lang]} />
+    <meta property="og:image" content="{siteUrl}/og-{lang}.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={t.title} />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#090a0d" />
 </svelte:head>
 
@@ -43,10 +72,18 @@
             LiveWallpaper
         </a>
         <nav aria-label="Primary">
-            <a href="#features">{t.nav.features}</a>
+            <a class="section-link" href="#features">{t.nav.features}</a>
+            <a class="section-link" href="#faq">{t.nav.faq}</a>
             <a href="#download">{t.nav.download}</a>
             <a href={repo}>{t.nav.github}</a>
-            <button type="button" class="lang" lang={other} onclick={() => setLang(other)}>{t.switchLabel}</button>
+            <!-- A full reload so the prerendered <html lang> of the other page applies; resolve() drops the trailing slash the static host expects. -->
+            <a
+                href={other === "ja" ? `${resolve("/ja")}/` : resolve("/")}
+                hreflang={other}
+                lang={other}
+                data-sveltekit-reload
+                onclick={() => localStorage.setItem("lang", other)}>{t.switchLabel}</a
+            >
         </nav>
     </div>
 </header>
@@ -58,9 +95,20 @@
             <p class="lead">{t.hero.lead}</p>
             <div class="actions">
                 <a class="btn primary" href="#download">{t.hero.primary}</a>
-                <a class="btn ghost" href={repo}>{t.hero.secondary}</a>
+                <a class="btn ghost" href={repo}>
+                    {t.hero.secondary}
+                    {#if downloads !== undefined}
+                        <span class="count" title={t.hero.downloads(downloads.toLocaleString(lang))}>
+                            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10" /></svg>
+                            <span class="visually-hidden">{t.hero.downloads(downloads.toLocaleString(lang))}</span>
+                            <span aria-hidden="true">{downloads.toLocaleString(lang)}</span>
+                        </span>
+                    {/if}
+                </a>
             </div>
-            <p class="meta">{t.hero.meta}</p>
+            <p class="meta">
+                <a href="{repo}/releases/latest">v{release.version}</a> · {t.hero.meta}
+            </p>
         </div>
 
         <div class="demo">
@@ -72,10 +120,15 @@
 
     <Screenshots {t} />
 
+    <Faq {t} />
+
     <section id="download" class="download">
         <div class="download-inner">
             <h2>{t.download.title}</h2>
             <p class="lead">{t.download.lead}</p>
+            <p class="latest">
+                <a href="{repo}/releases/latest">{t.download.latest(release.version, release.date)}</a>
+            </p>
 
             <div class="brew">
                 <span class="brew-label">{t.download.brewLabel}</span>
@@ -112,6 +165,8 @@
         <p>
             {t.footer.unofficial}
             <a href={videoSource}>{t.footer.videoCredit}</a>
+            <a href={photoSource}>{t.footer.photoCredit}</a>
+            <a href={cloudsSource}>{t.footer.cloudsCredit}</a>
         </p>
     </div>
 </footer>
@@ -165,24 +220,14 @@
     }
 
     nav a {
+        white-space: nowrap;
         color: var(--muted);
         text-decoration: none;
         transition: color 0.15s;
     }
 
-    nav a:hover,
-    .lang:hover {
+    nav a:hover {
         color: var(--fg);
-    }
-
-    .lang {
-        padding: 0;
-        border: 0;
-        background: none;
-        color: var(--muted);
-        font: inherit;
-        cursor: pointer;
-        transition: color 0.15s;
     }
 
     .hero {
@@ -221,6 +266,38 @@
         margin-top: 14px;
         font-size: 12.5px;
         color: var(--muted);
+    }
+
+    .meta a {
+        color: var(--fg);
+        text-decoration: none;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .meta a:hover {
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    .count {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: 8px;
+        padding-left: 9px;
+        border-left: 1px solid var(--line-strong);
+        color: var(--muted);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
     }
 
     .btn {
@@ -275,6 +352,21 @@
 
     .download .lead {
         margin: 10px 0 0;
+    }
+
+    .latest {
+        margin-top: 6px;
+        font-size: 13px;
+    }
+
+    .latest a {
+        color: var(--accent);
+        text-decoration: none;
+    }
+
+    .latest a:hover {
+        text-decoration: underline;
+        text-underline-offset: 2px;
     }
 
     .download .actions {
@@ -368,7 +460,7 @@
             gap: 14px;
         }
 
-        .nav nav a:first-child {
+        .section-link {
             display: none;
         }
 

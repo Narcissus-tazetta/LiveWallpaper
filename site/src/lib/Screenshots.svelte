@@ -1,21 +1,15 @@
 <script lang="ts">
     import { asset } from "$app/paths";
-    import type { Dict, Lang } from "./i18n";
+    import type { Dict } from "./i18n";
 
     let { t }: { t: Dict } = $props();
 
-    const sources = {
-        ja: {
-            display: asset("screens/ja-display.png"),
-            integrations: asset("screens/ja-integrations.png"),
-            general: asset("screens/ja-general.png"),
-        },
-        en: {
-            display: asset("screens/en-display.png"),
-            integrations: asset("screens/en-integrations.png"),
-            general: asset("screens/en-general.png"),
-        },
-    } as const;
+    // The scene editor is its own, larger window, so it gets more room than the settings window.
+    const sizes: Record<string, { width: number; height: number }> = {
+        library: { width: 1560, height: 1144 },
+        edit: { width: 1560, height: 1144 },
+        scene: { width: 2000, height: 1331 },
+    };
 
     let selected = $state(0);
     const item = $derived(t.screens.items[selected]);
@@ -42,10 +36,11 @@
 
         <div class="panel" role="tabpanel" id="panel-screens" aria-labelledby="tab-{item.id}">
             <img
-                src={sources[t.lang as Lang][item.id as keyof typeof sources.ja]}
+                src={asset(`screens/${t.lang}-${item.id}.webp` as Parameters<typeof asset>[0])}
                 alt="{t.screens.title}: {item.label}"
-                width="1560"
-                height="1144"
+                class:wide={item.id === "scene"}
+                width={sizes[item.id].width}
+                height={sizes[item.id].height}
                 loading="lazy"
             />
             <p>{item.caption}</p>
@@ -114,6 +109,10 @@
         height: auto;
         margin: 0 auto;
         filter: drop-shadow(0 30px 50px rgb(0 0 0 / 0.55));
+    }
+
+    img.wide {
+        width: min(100%, 1000px);
     }
 
     p {
