@@ -628,79 +628,38 @@ extension SettingsView {
 
     private var playlistPlaybackControls: some View {
         let registeredCount = model.registeredPlaybackEntries.count
-        return VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 4) {
+        let showsPin = model.canPinCurrentVideo || model.pinCurrentVideo
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
                 HStack(spacing: 6) {
-                    compactToggle(
-                        model.localizedString("ループ再生"),
-                        isOn: Binding<Bool>(
-                            get: { model.videoLoopEnabled },
-                            set: { model.setVideoLoopEnabled($0) }
-                        )
-                    )
-                    // 無効時はアクセントカラーのまま暗くすると他のOFFトグルと違う色に沈んで見えるため、
-                    // 無効時だけsecondaryに切り替えてOFFトグルと同系統のグレーに揃える。
-                    .tint(model.isVideoLoopSettingEnabled ? Color.accentColor : Color.secondary)
-                    .disabled(!model.isVideoLoopSettingEnabled)
+                    Button { model.playPreviousVideo() } label: {
+                        Image(systemName: "backward.fill")
+                            .frame(width: 34)
+                    }
+                    .disabled(registeredCount < 2)
+                    .help(model.localizedString("前へ"))
+                    .accessibilityLabel(model.localizedString("前へ"))
 
-                    helpIconButton(for: .videoLoop)
-                        .disabled(false)
+                    Button { model.toggleManualPause() } label: {
+                        Image(systemName: model.manualPauseActive ? "play.fill" : "pause.fill")
+                            .frame(width: 34)
+                    }
+                    .help(model.localizedString(model.manualPauseActive ? "再開" : "一時停止"))
+                    .accessibilityLabel(model.localizedString(model.manualPauseActive ? "再開" : "一時停止"))
+
+                    Button { model.playNextVideo() } label: {
+                        Image(systemName: "forward.fill")
+                            .frame(width: 34)
+                    }
+                    .disabled(registeredCount < 2)
+                    .help(model.localizedString("次へ"))
+                    .accessibilityLabel(model.localizedString("次へ"))
                 }
-
-                if expandedHelpTopics.contains(.videoLoop) {
-                    Text(
-                        model.localizedString(
-                            "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。"
-                        )
-                    )
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            HStack(spacing: 14) {
-                compactToggle(
-                    model.localizedString("プレイリスト連続再生"),
-                    isOn: Binding<Bool>(
-                        get: { model.playlistPlaybackEnabled },
-                        set: { model.setPlaylistPlaybackEnabled($0) }
-                    )
-                )
-
-                compactToggle(
-                    model.localizedString("シャッフル"),
-                    isOn: Binding<Bool>(
-                        get: { model.shufflePlaybackEnabled },
-                        set: { model.setShufflePlaybackEnabled($0) }
-                    )
-                )
-                .disabled(
-                    !model.playlistPlaybackEnabled
-                        || registeredCount < 2
-                        || model.pinCurrentVideo
-                )
-
-                if model.canPinCurrentVideo || model.pinCurrentVideo {
-                    compactToggle(
-                        model.localizedString("この壁紙で固定"),
-                        isOn: Binding<Bool>(
-                            get: { model.pinCurrentVideo },
-                            set: { model.setPinCurrentVideo($0) }
-                        )
-                    )
-                }
+                .buttonStyle(.bordered)
+                .fixedSize()
 
                 Spacer(minLength: 12)
 
-                if let index = model.currentPlaybackIndex {
-                    Text("\(index + 1) / \(registeredCount)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            HStack(spacing: 8) {
                 Text(model.localizedString("自動で次の壁紙へ"))
                     .accessibilityHidden(true)
                 Picker(model.localizedString("自動で次の壁紙へ"), selection: autoSwitchIntervalBinding) {
@@ -714,41 +673,76 @@ extension SettingsView {
                 .labelsHidden()
                 .fixedSize()
                 .disabled(registeredCount < 2 || model.pinCurrentVideo)
-
-                Spacer(minLength: 0)
             }
 
-            HStack(spacing: 8) {
-                Button {
-                    model.playPreviousVideo()
-                } label: {
-                    Label(model.localizedString("前へ"), systemImage: "backward.fill")
-                }
-                .buttonStyle(.bordered)
-                .disabled(registeredCount < 2)
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Toggle(
+                        model.localizedString("ループ再生"),
+                        isOn: Binding<Bool>(
+                            get: { model.videoLoopEnabled },
+                            set: { model.setVideoLoopEnabled($0) }
+                        )
+                    )
+                    .disabled(!model.isVideoLoopSettingEnabled)
 
-                Button {
-                    model.toggleManualPause()
-                } label: {
-                    Label(
-                        model.localizedString(model.manualPauseActive ? "再開" : "一時停止"),
-                        systemImage: model.manualPauseActive ? "play.fill" : "pause.fill"
+                    helpIconButton(for: .videoLoop)
+                }
+
+                Toggle(
+                    model.localizedString("プレイリスト連続再生"),
+                    isOn: Binding<Bool>(
+                        get: { model.playlistPlaybackEnabled },
+                        set: { model.setPlaylistPlaybackEnabled($0) }
+                    )
+                )
+
+                Toggle(
+                    model.localizedString("シャッフル"),
+                    isOn: Binding<Bool>(
+                        get: { model.shufflePlaybackEnabled },
+                        set: { model.setShufflePlaybackEnabled($0) }
+                    )
+                )
+                .disabled(
+                    !model.playlistPlaybackEnabled
+                        || registeredCount < 2
+                        || model.pinCurrentVideo
+                )
+
+                if showsPin {
+                    Toggle(
+                        model.localizedString("この壁紙で固定"),
+                        isOn: Binding<Bool>(
+                            get: { model.pinCurrentVideo },
+                            set: { model.setPinCurrentVideo($0) }
+                        )
                     )
                 }
-                .buttonStyle(.bordered)
 
-                Button {
-                    model.playNextVideo()
-                } label: {
-                    Label(model.localizedString("次へ"), systemImage: "forward.fill")
+                Spacer(minLength: 12)
+
+                if let index = model.currentPlaybackIndex {
+                    Text("\(index + 1) / \(registeredCount)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
                 }
-                .buttonStyle(.bordered)
-                .disabled(registeredCount < 2)
+            }
+            .toggleStyle(.checkbox)
 
-                Spacer(minLength: 0)
+            if expandedHelpTopics.contains(.videoLoop) {
+                Text(
+                    model.localizedString(
+                        "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。"
+                    )
+                )
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
-            if model.canPinCurrentVideo || model.pinCurrentVideo {
+            if showsPin {
                 Text(model.localizedString("固定中は自動で壁紙が切り替わりません。再起動後も固定を維持します。"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
