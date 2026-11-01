@@ -91,6 +91,8 @@ struct SettingsView: View {
     /// pass of the pointer across the grid doesn't spin up a player for every card.
     @State var hoverPreviewPath: String?
     @State var settingsCategory: SettingsCategory = .general
+    @State var hoveredSettingsCategory: SettingsCategory?
+    @FocusState var focusedSettingsCategory: SettingsCategory?
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     @Environment(\.colorSchemeContrast) var colorSchemeContrast
@@ -135,7 +137,14 @@ struct SettingsView: View {
         let content = VStack(spacing: 0) {
             tabBar
             Divider()
-            tabContent
+            // Only the incoming tab fades; the outgoing one is removed at once so the two
+            // never share the stack's layout.
+            ZStack {
+                tabContent
+                    .id(selectedTab)
+                    .transition(Motion.crossfade)
+            }
+            .motionAnimation(.easeOut(duration: 0.15), value: selectedTab)
         }
         .background(ambientBackground)
 
@@ -157,7 +166,7 @@ struct SettingsView: View {
                         .transition(.opacity)
                 }
             }
-            .animation(.easeOut(duration: 0.15), value: isDropTargeted)
+            .motionAnimation(Motion.quick, value: isDropTargeted)
             .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
                 handleDroppedVideoProviders(providers)
             }
@@ -471,11 +480,13 @@ struct SettingsView: View {
                 libraryToolbarItems
                     .padding(.trailing, 14)
                     .padding(.bottom, 6)
+                    .transition(Motion.pop)
             }
         }
         // Animate only the highlight; wrapping the tab switch in withAnimation would
         // also animate the whole incoming tab (video previews, the wallpaper grid).
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: selectedTab)
+        .motionAnimation(Motion.standard, value: selectedTab)
+        .motionAnimation(Motion.quick, value: hoveredTab)
     }
 
     @ViewBuilder
@@ -489,10 +500,14 @@ struct SettingsView: View {
                 // 集中モード連携・スケジュールのターゲットはデスクトップ壁紙のみの
                 // ため、ロック画面タブでは出さない。
                 if selectedAssignmentTarget == .desktop {
-                    wallpaperFocusFilterCard
-                    wallpaperScheduleCard
+                    Group {
+                        wallpaperFocusFilterCard
+                        wallpaperScheduleCard
+                    }
+                    .transition(Motion.reveal)
                 }
             }
+            .motionAnimation(Motion.standard, value: selectedAssignmentTarget)
             .background(
                 Button("") { isLibrarySearchFocused = true }
                     .keyboardShortcut("f", modifiers: .command)
@@ -520,16 +535,13 @@ struct SettingsView: View {
                 .frame(maxWidth: 420)
                 .frame(maxWidth: .infinity)
 
-                switch effectiveEditorSubMode {
-                case .fit:
-                    wallpaperFitEditorPanel
-                case .trim:
-                    wallpaperTrimEditorPanel
-                case .scene:
-                    sceneEditorLauncherPanel
-                case .effects:
-                    wallpaperEffectsEditorPanel
+                ZStack {
+                    editorSubModePanel
+                        .id(effectiveEditorSubMode)
+                        .transition(Motion.crossfade)
                 }
+                .motionAnimation(Motion.quick, value: effectiveEditorSubMode)
+
                 wallpaperFitLibraryPanel
             }
         case .store:
@@ -541,8 +553,28 @@ struct SettingsView: View {
                 settingsSidebar
                     .frame(width: 210)
                 Divider()
-                settingsForm
+                ZStack {
+                    settingsForm
+                        .id(isSettingsSearchActive ? nil : Optional(settingsCategory))
+                        .transition(Motion.crossfade)
+                }
+                .motionAnimation(Motion.quick, value: settingsCategory)
+                .motionAnimation(Motion.quick, value: isSettingsSearchActive)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var editorSubModePanel: some View {
+        switch effectiveEditorSubMode {
+        case .fit:
+            wallpaperFitEditorPanel
+        case .trim:
+            wallpaperTrimEditorPanel
+        case .scene:
+            sceneEditorLauncherPanel
+        case .effects:
+            wallpaperEffectsEditorPanel
         }
     }
 

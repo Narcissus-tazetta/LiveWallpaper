@@ -24,7 +24,7 @@ extension SettingsView {
                     .background(Color.accentColor.gradient, in: Circle())
                     .contentShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .disabled(model.isImportingMedia)
             .help(model.localizedString("メディアを追加"))
             .accessibilityLabel(model.localizedString("メディアを追加"))
@@ -83,7 +83,7 @@ extension SettingsView {
             )
             .ignoresSafeArea()
             .allowsHitTesting(false)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.6), value: path)
+            .motionAnimation(.easeInOut(duration: 0.6), value: path)
         }
     }
 

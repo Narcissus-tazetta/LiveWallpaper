@@ -31,7 +31,7 @@ extension SettingsView {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .onHover { hovering in
             hoveredTab = hovering ? tab : (hoveredTab == tab ? nil : hoveredTab)
         }
@@ -303,24 +303,29 @@ extension SettingsView {
     }
 
     func toggleHelp(_ topic: HelpTopic) {
-        if expandedHelpTopics.contains(topic) {
-            expandedHelpTopics.remove(topic)
-        } else {
-            expandedHelpTopics.insert(topic)
+        withMotion {
+            if expandedHelpTopics.contains(topic) {
+                expandedHelpTopics.remove(topic)
+            } else {
+                expandedHelpTopics.insert(topic)
+            }
         }
     }
 
     func helpIconButton(for topic: HelpTopic) -> some View {
-        Button(action: { toggleHelp(topic) }) {
+        let isHighlighted = expandedHelpTopics.contains(topic) || hoveredHelpTopic == topic
+        return Button(action: { toggleHelp(topic) }) {
             Image(
-                systemName: expandedHelpTopics.contains(topic) || hoveredHelpTopic == topic
+                systemName: isHighlighted
                     ? "questionmark.circle.fill"
                     : "questionmark.circle"
             )
+            .foregroundColor(isHighlighted ? .accentColor : .secondary)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         // Otherwise the first help icon takes the initial focus ring when a sheet opens.
         .focusable(false)
+        .motionAnimation(Motion.quick, value: isHighlighted)
         .onHover { over in
             hoveredHelpTopic = over ? topic : nil
         }
@@ -331,6 +336,7 @@ extension SettingsView {
     func helpFootnote(for topic: HelpTopic, text: String) -> some View {
         if expandedHelpTopics.contains(topic) {
             settingsFootnote(text)
+                .transition(Motion.reveal)
         }
     }
 

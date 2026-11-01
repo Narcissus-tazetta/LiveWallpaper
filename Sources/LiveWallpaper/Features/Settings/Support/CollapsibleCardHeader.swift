@@ -25,6 +25,8 @@ extension SettingsView {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .contentTransition(.numericText())
+                    .motionAnimation(Motion.quick, value: summary)
                 Spacer()
             }
             .accessibilityElement(children: .ignore)
@@ -43,7 +45,7 @@ extension SettingsView {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withMotion {
                 isExpanded.wrappedValue.toggle()
             }
         }
@@ -72,22 +74,50 @@ extension SettingsView {
         source: WebWallpaperSource,
         isSelected: Bool,
         cardWidth: CGFloat,
+        selectionGroupID: String = "pickerWallpaperGridSelection",
         onSelect: @escaping () -> Void
     ) -> some View {
-        Button(action: onSelect) {
+        let thumbnailWidth = max(cardWidth - 8, 1)
+        let thumbnailHeight = (thumbnailWidth * 9 / 16).rounded()
+        return Button {
+            withMotion {
+                onSelect()
+            }
+        } label: {
             VStack(spacing: 4) {
                 WebWallpaperThumbnailView(
                     source: source,
                     isActive: isSelected,
                     thumbnailStore: webThumbnailStore,
-                    width: cardWidth,
-                    height: (cardWidth * 9 / 16).rounded()
+                    width: thumbnailWidth,
+                    height: thumbnailHeight
                 )
                 Text(source.displayName)
                     .font(.system(size: 10))
                     .lineLimit(1)
             }
+            .padding(4)
+            .frame(width: cardWidth)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+            )
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(Color.accentColor, lineWidth: 2.5)
+                        )
+                        .shadow(color: Color.accentColor.opacity(0.38), radius: 6, y: 0)
+                        .matchedGeometryEffect(id: selectionGroupID, in: tabSelectionNamespace)
+                        .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                        .allowsHitTesting(false)
+                }
+            }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
+        .zIndex(isSelected ? 2 : 0)
     }
 }

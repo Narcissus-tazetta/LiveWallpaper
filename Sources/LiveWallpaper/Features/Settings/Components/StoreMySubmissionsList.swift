@@ -15,9 +15,11 @@ extension SettingsView {
                     VStack(spacing: 8) {
                         ForEach(storeMySubmissions.submissions) { submission in
                             storeMySubmissionRow(submission)
+                                .transition(Motion.reveal)
                         }
                     }
                     .padding(.vertical, 2)
+                    .motionAnimation(value: storeMySubmissions.submissions.map(\.id))
                 }
                 .frame(minHeight: 320, maxHeight: 560)
             }

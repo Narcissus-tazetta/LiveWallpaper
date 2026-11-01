@@ -27,6 +27,7 @@ struct SceneHintText: View {
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(Motion.reveal)
         }
     }
 }

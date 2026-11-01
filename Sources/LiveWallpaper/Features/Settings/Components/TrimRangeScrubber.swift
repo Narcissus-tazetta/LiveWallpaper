@@ -171,7 +171,7 @@ struct TrimRangeScrubber: View {
         .frame(width: width, height: trackHeight, alignment: .leading)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .opacity(images.isEmpty ? 0 : 1)
-        .animation(.easeInOut(duration: 0.25), value: images.isEmpty)
+        .motionAnimation(.easeInOut(duration: 0.25), value: images.isEmpty)
         .allowsHitTesting(false)
     }
 

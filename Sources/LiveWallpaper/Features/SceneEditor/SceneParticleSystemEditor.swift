@@ -16,16 +16,21 @@ struct SceneParticleSystemEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             if !openPath.isEmpty {
                 breadcrumb(openPath)
+                    .transition(Motion.reveal)
             }
-            ParticleSystemForm(
-                model: model,
-                path: path,
-                system: binding(at: openPath),
-                isRoot: openPath.isEmpty,
-                openChild: { childPath = openPath + [$0] }
-            )
-            .id(openPath)
+            ZStack {
+                ParticleSystemForm(
+                    model: model,
+                    path: path,
+                    system: binding(at: openPath),
+                    isRoot: openPath.isEmpty,
+                    openChild: { childPath = openPath + [$0] }
+                )
+                .id(openPath)
+                .transition(Motion.crossfade)
+            }
         }
+        .motionAnimation(Motion.quick, value: openPath)
     }
 
     private func breadcrumb(_ openPath: [Int]) -> some View {

@@ -2,25 +2,29 @@ import SwiftUI
 
 extension SettingsView {
     func storeEntryCard(entry: StoreEntry, cardWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let loadedImage = remoteThumbnailCache.image(for: entry)
+        let isDownloading = storeCatalog.downloadingEntryID == entry.id
+        return VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.secondary.opacity(0.15))
                     .frame(height: cardWidth * 9 / 16)
                     .accessibilityHidden(true)
-                if let image = remoteThumbnailCache.image(for: entry) {
+                if let image = loadedImage {
                     Image(nsImage: image)
                         .resizable()
                         .scaledToFill()
                         .frame(height: cardWidth * 9 / 16)
                         .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .transition(.opacity)
                 } else {
                     Image(systemName: "film.stack")
                         .font(.system(size: 22))
                         .foregroundColor(.secondary)
                 }
             }
+            .motionAnimation(Motion.quick, value: loadedImage != nil)
             .accessibilityHidden(true)
 
             Text(entry.title)
@@ -53,8 +57,10 @@ extension SettingsView {
             .font(.caption2)
             .foregroundColor(.secondary)
 
-            if storeCatalog.downloadingEntryID == entry.id {
-                ProgressView().controlSize(.small)
+            if isDownloading {
+                ProgressView()
+                    .controlSize(.small)
+                    .transition(Motion.pop)
             } else {
                 Button(model.localizedString("追加")) {
                     Task {
@@ -65,8 +71,10 @@ extension SettingsView {
                 .controlSize(.small)
                 // Every card has an "Add" button; naming the wallpaper tells them apart.
                 .accessibilityLabel("\(model.localizedString("追加")) \(entry.title)")
+                .transition(Motion.pop)
             }
         }
+        .motionAnimation(Motion.quick, value: isDownloading)
         .frame(width: cardWidth, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityActions {

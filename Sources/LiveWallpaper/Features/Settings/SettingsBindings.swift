@@ -24,9 +24,7 @@ extension SettingsView {
     }
 
     var audioEnabledBinding: Binding<Bool> {
-        modelBinding(model.audioEnabled) { value in
-            withAnimation { model.setAudioEnabled(value) }
-        }
+        modelBinding(model.audioEnabled) { model.setAudioEnabled($0) }
     }
 
     var audioVolumeBinding: Binding<Double> {
@@ -50,14 +48,18 @@ extension SettingsView {
     }
 
     var suspendWhenFullScreenBinding: Binding<Bool> {
-        modelBinding(model.suspendWhenOtherAppFullScreen) {
-            _ = model.setSuspendWhenOtherAppFullScreen($0)
+        modelBinding(model.suspendWhenOtherAppFullScreen) { value in
+            withMotion {
+                _ = model.setSuspendWhenOtherAppFullScreen(value)
+            }
         }
     }
 
     var suspendHighSensitivityBinding: Binding<Bool> {
-        modelBinding(model.suspendHighSensitivityEnabled) {
-            _ = model.setSuspendHighSensitivityEnabled($0)
+        modelBinding(model.suspendHighSensitivityEnabled) { value in
+            withMotion(Motion.quick) {
+                _ = model.setSuspendHighSensitivityEnabled(value)
+            }
         }
     }
 
@@ -88,13 +90,15 @@ extension SettingsView {
                     : .off
             },
             set: { choice in
-                switch choice {
-                case .off:
-                    model.setWallpaperTransitionDuration(0)
-                case .style(let style):
-                    model.setWallpaperTransitionStyle(style)
-                    if model.wallpaperTransitionDuration <= 0 {
-                        model.setWallpaperTransitionDuration(0.5)
+                withMotion(Motion.quick) {
+                    switch choice {
+                    case .off:
+                        model.setWallpaperTransitionDuration(0)
+                    case .style(let style):
+                        model.setWallpaperTransitionStyle(style)
+                        if model.wallpaperTransitionDuration <= 0 {
+                            model.setWallpaperTransitionDuration(0.5)
+                        }
                     }
                 }
             }
@@ -150,8 +154,10 @@ extension SettingsView {
     }
 
     var spaceWallpaperFeatureBinding: Binding<Bool> {
-        modelBinding(model.spaceWallpaperFeatureEnabled) {
-            model.setSpaceWallpaperFeatureEnabled($0)
+        modelBinding(model.spaceWallpaperFeatureEnabled) { value in
+            withMotion {
+                model.setSpaceWallpaperFeatureEnabled(value)
+            }
         }
     }
 
@@ -184,10 +190,18 @@ extension SettingsView {
     }
 
     var hotKeysEnabledBinding: Binding<Bool> {
-        modelBinding(model.hotKeysEnabled) { model.setHotKeysEnabled($0) }
+        modelBinding(model.hotKeysEnabled) { value in
+            withMotion {
+                model.setHotKeysEnabled(value)
+            }
+        }
     }
 
     var followSystemAppearanceBinding: Binding<Bool> {
-        modelBinding(model.followSystemAppearanceEnabled) { model.setFollowSystemAppearanceEnabled($0) }
+        modelBinding(model.followSystemAppearanceEnabled) { value in
+            withMotion {
+                model.setFollowSystemAppearanceEnabled(value)
+            }
+        }
     }
 }

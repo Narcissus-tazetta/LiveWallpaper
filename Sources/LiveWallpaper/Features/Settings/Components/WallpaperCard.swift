@@ -9,6 +9,7 @@ extension SettingsView {
         assignmentTarget: WallpaperAssignmentTarget = .desktop,
         playlistEditingID: UUID? = nil,
         isSelected: Bool? = nil,
+        selectionGroupID: String = "mainWallpaperGridSelection",
         onSelect: (() -> Void)? = nil
     ) -> some View {
         let thumbnailWidth = max(cardWidth - 8, 1)
@@ -20,31 +21,38 @@ extension SettingsView {
         let isScreenSaverAssigned = model.screenSaverVideoPath == path
         let isDisplayOverrideAssigned = model.hasLiveDisplayOverride(forPath: path)
         let isHovered = hoveredWallpaperPath == path
-        let strokeColor = wallpaperCardStrokeColor(
-            path: path,
+        let isCardSelected = isWallpaperCardSelected(
             assignmentTarget: assignmentTarget,
             isDesktopAssigned: isDesktopAssigned,
             isLockScreenAssigned: isLockScreenAssigned,
             isScreenSaverAssigned: isScreenSaverAssigned,
             isSelected: isSelected
         )
+        let ringColor = wallpaperCardRingColor(
+            assignmentTarget: assignmentTarget,
+            isSelected: isSelected
+        )
 
         let thumbnailButton = Button {
-            model.stopExternalWallpaper()
-            if let onSelect {
-                onSelect()
-            } else {
-                switch assignmentTarget {
-                case .desktop:
-                    model.selectRegisteredVideo(path: path)
-                case .lockScreen:
-                    model.selectLockScreenVideo(path: path)
-                case .screenSaver:
-                    model.selectScreenSaverVideo(path: path)
+            withMotion {
+                model.stopExternalWallpaper()
+                if let onSelect {
+                    onSelect()
+                } else {
+                    switch assignmentTarget {
+                    case .desktop:
+                        model.selectRegisteredVideo(path: path)
+                    case .lockScreen:
+                        model.selectLockScreenVideo(path: path)
+                    case .screenSaver:
+                        model.selectScreenSaverVideo(path: path)
+                    }
                 }
-                if switchToWallpaperTabOnSelect {
-                    selectedTab = .wallpaper
-                }
+            }
+            // Outside withMotion: the tab content has its own crossfade, and an enclosing
+            // animation would also animate the incoming grid.
+            if onSelect == nil, switchToWallpaperTabOnSelect {
+                selectedTab = .wallpaper
             }
         } label: {
             ZStack {
@@ -86,6 +94,7 @@ extension SettingsView {
                             .accessibilityHidden(true)
                             // Steps aside for the hover "⋯" button, which takes the same corner.
                             .padding(.trailing, isHovered ? 28 : 0)
+                            .transition(Motion.pop)
                         }
                     }
                     .padding(.top, 6)
@@ -103,7 +112,7 @@ extension SettingsView {
                 setThumbnailVisibility(path: path, isVisible: false)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .accessibilityLabel(model.registeredVideoDisplayName(for: path))
         .accessibilityValue(
             wallpaperAssignmentDescription(
@@ -114,7 +123,7 @@ extension SettingsView {
                 isPinned: model.pinCurrentVideo && isDesktopAssigned
             )
         )
-        .accessibilityAddTraits(strokeColor == .clear ? [] : .isSelected)
+        .accessibilityAddTraits(isCardSelected ? .isSelected : [])
         // The "⋯" button only exists while the pointer is over the card, so its actions are
         // offered here too for VoiceOver and keyboard users.
         .accessibilityActions {
@@ -150,7 +159,7 @@ extension SettingsView {
                 )
                 .padding(6)
                 .iconHelp(model.localizedString("その他の操作"))
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.85)))
+                .transition(Motion.pop)
             }
         }
 
@@ -199,19 +208,38 @@ extension SettingsView {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.secondary.opacity(isHovered ? 0.16 : 0.08))
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(strokeColor, lineWidth: strokeColor == .clear ? 0 : 2)
-        )
         .shadow(
-            color: strokeColor == .clear ? .black.opacity(isHovered ? 0.3 : 0) : strokeColor.opacity(0.4),
-            radius: isHovered ? 10 : 6,
+            color: .black.opacity(isHovered ? 0.28 : 0),
+            radius: isHovered ? 10 : 4,
             y: isHovered ? 5 : 0
         )
         .scaleEffect(isHovered && !reduceMotion ? 1.03 : 1)
-        .zIndex(isHovered ? 1 : 0)
-        .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.8), value: isHovered)
-        .animation(.easeOut(duration: 0.25), value: hoverPreviewPath == path)
+        .motionAnimation(Motion.hover, value: isHovered)
+        .motionAnimation(Motion.quick, value: model.pinCurrentVideo)
+        .motionAnimation(
+            Motion.quick,
+            value: [isDesktopAssigned, isLockScreenAssigned, isDisplayOverrideAssigned, isScreenSaverAssigned]
+        )
+        .motionAnimation(.easeOut(duration: 0.25), value: hoverPreviewPath == path)
+        // 選択枠のオーバーレイはカード個別の .motionAnimation より外側に置くことで、
+        // 親グリッドのトランザクションを遮らず matchedGeometryEffect でカード間をスライドさせる。
+        .overlay {
+            if isCardSelected {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(ringColor.opacity(0.12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(ringColor, lineWidth: 2.5)
+                    )
+                    .shadow(color: ringColor.opacity(0.42), radius: 8, y: 0)
+                    .scaleEffect(isHovered && !reduceMotion ? 1.03 : 1)
+                    .motionAnimation(Motion.hover, value: isHovered)
+                    .matchedGeometryEffect(id: selectionGroupID, in: tabSelectionNamespace)
+                    .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
+        .zIndex(isHovered ? 3 : (isCardSelected ? 2 : 0))
         .onHover { hovering in
             handleWallpaperCardHover(path: path, hovering: hovering)
         }
@@ -243,15 +271,21 @@ extension SettingsView {
     @ViewBuilder
     func wallpaperCardMenuItems(path: String) -> some View {
         Button(model.localizedString("デスクトップに設定")) {
-            model.stopExternalWallpaper()
-            model.selectRegisteredVideo(path: path)
+            withMotion {
+                model.stopExternalWallpaper()
+                model.selectRegisteredVideo(path: path)
+            }
         }
         Button(model.localizedString("ロック画面に設定")) {
-            model.selectLockScreenVideo(path: path)
+            withMotion {
+                model.selectLockScreenVideo(path: path)
+            }
         }
         .disabled(!model.lockScreenSyncService.isSupported)
         Button(model.localizedString("スクリーンセーバーに設定")) {
-            model.selectScreenSaverVideo(path: path)
+            withMotion {
+                model.selectScreenSaverVideo(path: path)
+            }
         }
         // 新規割り当てには2台以上が必要だが、接続解除後も残った古い割り当て
         // (このパス宛て)を解除する手段は画面数によらず必ず出す。
@@ -387,6 +421,7 @@ extension SettingsView {
                     .frame(width: 18, height: 18)
                     .background(Color.accentColor, in: Circle())
                     .help(model.localizedString("デスクトップに設定中"))
+                    .transition(Motion.pop)
             }
             if isLockScreenAssigned {
                 Image(systemName: "lock.fill")
@@ -395,6 +430,7 @@ extension SettingsView {
                     .frame(width: 18, height: 18)
                     .background(Color.orange, in: Circle())
                     .help(model.localizedString("ロック画面に設定中"))
+                    .transition(Motion.pop)
             }
             if isDisplayOverrideAssigned {
                 Image(systemName: "rectangle.on.rectangle")
@@ -403,6 +439,7 @@ extension SettingsView {
                     .frame(width: 18, height: 18)
                     .background(Color.purple, in: Circle())
                     .help(model.localizedString("画面別に割り当て中"))
+                    .transition(Motion.pop)
             }
             if isScreenSaverAssigned {
                 Image(systemName: "moon.stars.fill")
@@ -411,6 +448,7 @@ extension SettingsView {
                     .frame(width: 18, height: 18)
                     .background(Color.indigo, in: Circle())
                     .help(model.localizedString("スクリーンセーバーに設定中"))
+                    .transition(Motion.pop)
             }
         }
         .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
@@ -466,24 +504,40 @@ extension SettingsView {
         }
     }
 
-    func wallpaperCardStrokeColor(
-        path: String,
+    func isWallpaperCardSelected(
         assignmentTarget: WallpaperAssignmentTarget,
         isDesktopAssigned: Bool,
         isLockScreenAssigned: Bool,
         isScreenSaverAssigned: Bool,
         isSelected: Bool?
-    ) -> Color {
+    ) -> Bool {
         if let isSelected {
-            return isSelected ? Color.accentColor : .clear
+            return isSelected
         }
         switch assignmentTarget {
         case .desktop:
-            return isDesktopAssigned ? Color.accentColor : .clear
+            return isDesktopAssigned
         case .lockScreen:
-            return isLockScreenAssigned ? Color.orange : .clear
+            return isLockScreenAssigned
         case .screenSaver:
-            return isScreenSaverAssigned ? Color.indigo : .clear
+            return isScreenSaverAssigned
+        }
+    }
+
+    func wallpaperCardRingColor(
+        assignmentTarget: WallpaperAssignmentTarget,
+        isSelected: Bool?
+    ) -> Color {
+        if isSelected != nil {
+            return Color.accentColor
+        }
+        switch assignmentTarget {
+        case .desktop:
+            return Color.accentColor
+        case .lockScreen:
+            return Color.orange
+        case .screenSaver:
+            return Color.indigo
         }
     }
 }

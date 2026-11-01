@@ -42,6 +42,7 @@ struct SearchField: View {
                 }
                 .buttonStyle(.plain)
                 .opacity(text.isEmpty ? 0 : 1)
+                .scaleEffect(text.isEmpty ? 0.85 : 1)
                 .disabled(text.isEmpty)
                 .allowsHitTesting(!text.isEmpty)
                 .accessibilityLabel(clearButtonLabel)
@@ -56,8 +57,10 @@ struct SearchField: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(isFocused.wrappedValue ? Color.accentColor : Color.clear, lineWidth: 1.5)
+                .strokeBorder(Color.accentColor.opacity(isFocused.wrappedValue ? 1 : 0), lineWidth: 1.5)
         )
+        .motionAnimation(Motion.quick, value: text.isEmpty)
+        .motionAnimation(Motion.quick, value: isFocused.wrappedValue)
         .contentShape(Rectangle())
         .onTapGesture { isFocused.wrappedValue = true }
     }

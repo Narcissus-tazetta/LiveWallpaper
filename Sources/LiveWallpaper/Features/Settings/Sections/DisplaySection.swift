@@ -110,6 +110,7 @@ extension SettingsView {
           ],
           selection: wallpaperTransitionDurationBinding
         )
+        .transition(Motion.reveal)
       }
 
       desktopReadabilityDimSection
@@ -162,6 +163,7 @@ extension SettingsView {
           isOn: menuBarSpaceNumberBinding
         )
         .padding(.leading, 20)
+        .transition(Motion.reveal)
       }
 
       Toggle(
@@ -210,6 +212,7 @@ extension SettingsView {
 
       if model.suspendWhenOtherAppFullScreen {
         suspendExclusionSection
+          .transition(Motion.reveal)
       }
 
       advancedSettingsSection
@@ -305,6 +308,7 @@ extension SettingsView {
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
           }
+          .transition(Motion.reveal)
         }
 
         // 画面が1つに減っても、除外した画面は自動停止されないままなので、解除できるよう残す。
@@ -399,6 +403,7 @@ extension SettingsView {
           VStack(alignment: .leading, spacing: 4) {
             ForEach(model.suspendExclusionBundleIDs, id: \.self) { bundleID in
               suspendExclusionRow(for: bundleID)
+                .transition(Motion.reveal)
             }
           }
         }
@@ -453,7 +458,9 @@ extension SettingsView {
       .frame(maxWidth: .infinity, alignment: .leading)
 
       Button(model.localizedString("削除"), role: .destructive) {
-        model.removeSuspendExclusionBundleID(bundleID)
+        withMotion(Motion.quick) {
+          model.removeSuspendExclusionBundleID(bundleID)
+        }
       }
       .buttonStyle(.bordered)
       .controlSize(.small)
@@ -514,7 +521,9 @@ extension SettingsView {
             ForEach(candidates, id: \.processIdentifier) { app in
               Button {
                 if let bundleID = app.bundleIdentifier {
-                  model.addSuspendExclusionBundleID(bundleID)
+                  withMotion(Motion.quick) {
+                    model.addSuspendExclusionBundleID(bundleID)
+                  }
                 }
               } label: {
                 HStack(spacing: 8) {

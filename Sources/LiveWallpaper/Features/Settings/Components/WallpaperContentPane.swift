@@ -24,6 +24,7 @@ extension SettingsView {
                     .padding(.vertical, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .settingsCardBackground()
+                    .transition(Motion.reveal)
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -36,6 +37,7 @@ extension SettingsView {
                     Text(importErrorMessage)
                         .font(.callout)
                         .foregroundColor(.orange)
+                        .transition(Motion.reveal)
                 }
 
                 wallpaperListContent
@@ -43,12 +45,20 @@ extension SettingsView {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .settingsCardBackground()
+            .motionAnimation(Motion.quick, value: model.mediaImportErrorMessage)
 
             if hasPlaybackControls {
-                playbackControlsPanel
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .floatingGlass(in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                ZStack {
+                    playbackControlsPanel
+                        .id("\(selectedAssignmentTarget):\(selectedScope)")
+                        .transition(Motion.crossfade)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .floatingGlass(in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .motionAnimation(Motion.quick, value: selectedAssignmentTarget)
+                .motionAnimation(Motion.quick, value: selectedScope)
+                .transition(Motion.reveal)
             }
         }
     }
@@ -134,6 +144,8 @@ extension SettingsView {
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .fixedSize()
+                .contentTransition(.numericText())
+                .motionAnimation(Motion.quick, value: displayedItemCount)
 
             if model.isWebWallpaperActive {
                 HStack(spacing: 4) {
@@ -144,8 +156,10 @@ extension SettingsView {
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
+                .transition(Motion.pop)
             }
         }
+        .motionAnimation(Motion.quick, value: model.isWebWallpaperActive)
     }
 
     /// プレイリストの選択・作成・名前変更・削除を1つに集約したメニュー。
@@ -434,9 +448,11 @@ extension SettingsView {
                     .buttonStyle(.plain)
                     .iconHelp(model.localizedString("変換をキャンセル"))
                 }
+                .transition(Motion.pop)
             }
 
         }
+        .motionAnimation(Motion.quick, value: model.isImportingMedia)
     }
 
     var webWallpaperURLInputSection: some View {
@@ -553,10 +569,38 @@ extension SettingsView {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(inset)
+                .motionAnimation(Motion.standard, value: activeGridSelectionKey)
+                .motionAnimation(value: mergedListEntries.map(\.id))
             }
         }
         .frame(minHeight: wallpaperLibraryGridMinHeight, maxHeight: 340)
         .padding(-inset)
+    }
+
+    private var activeGridSelectionKey: String {
+        if let screenID = activeDisplayOverrideScreenID {
+            if let video = model.videoOverride(forScreenID: screenID) {
+                return "screen-video:\(screenID):\(video)"
+            }
+            if let web = model.webOverrideByScreenID[screenID] {
+                return "screen-web:\(screenID):\(web.uuidString)"
+            }
+            return "screen-none:\(screenID)"
+        }
+        if let spaceUUID = activeSpaceScopeUUID {
+            return "space:\(spaceUUID):\(model.spaceVideo(forSpaceUUID: spaceUUID) ?? "")"
+        }
+        switch selectedAssignmentTarget {
+        case .desktop:
+            if model.isWebWallpaperActive, let webID = model.currentWebWallpaperID {
+                return "desktop-web:\(webID.uuidString)"
+            }
+            return "desktop-video:\(model.currentVideoPath ?? "")"
+        case .lockScreen:
+            return "lock:\(model.lockScreenVideoPath ?? "")"
+        case .screenSaver:
+            return "saver:\(model.screenSaverVideoPath ?? "")"
+        }
     }
 
     /// 画面割り当てモード用の再生コントロール。専用プレイヤーは常にループする
@@ -575,13 +619,18 @@ extension SettingsView {
                 if let currentIndex, count > 0 {
                     Text("\(currentIndex + 1) / \(count)")
                         .font(.caption)
+                        .monospacedDigit()
                         .foregroundColor(.secondary)
+                        .contentTransition(.numericText())
+                        .motionAnimation(Motion.quick, value: currentIndex)
                 }
             }
 
             HStack(spacing: 8) {
                 Button {
-                    model.playPreviousVideo(forScreenID: screenID)
+                    withMotion {
+                        model.playPreviousVideo(forScreenID: screenID)
+                    }
                 } label: {
                     Label(model.localizedString("前へ"), systemImage: "backward.fill")
                 }
@@ -589,7 +638,9 @@ extension SettingsView {
                 .disabled(count < 2)
 
                 Button {
-                    model.playNextVideo(forScreenID: screenID)
+                    withMotion {
+                        model.playNextVideo(forScreenID: screenID)
+                    }
                 } label: {
                     Label(model.localizedString("次へ"), systemImage: "forward.fill")
                 }
@@ -632,7 +683,11 @@ extension SettingsView {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 HStack(spacing: 6) {
-                    Button { model.playPreviousVideo() } label: {
+                    Button {
+                        withMotion {
+                            model.playPreviousVideo()
+                        }
+                    } label: {
                         Image(systemName: "backward.fill")
                             .frame(width: 34)
                     }
@@ -647,7 +702,11 @@ extension SettingsView {
                     .help(model.localizedString(model.manualPauseActive ? "再開" : "一時停止"))
                     .accessibilityLabel(model.localizedString(model.manualPauseActive ? "再開" : "一時停止"))
 
-                    Button { model.playNextVideo() } label: {
+                    Button {
+                        withMotion {
+                            model.playNextVideo()
+                        }
+                    } label: {
                         Image(systemName: "forward.fill")
                             .frame(width: 34)
                     }
@@ -718,6 +777,7 @@ extension SettingsView {
                             set: { model.setPinCurrentVideo($0) }
                         )
                     )
+                    .transition(Motion.pop)
                 }
 
                 Spacer(minLength: 12)
@@ -727,6 +787,8 @@ extension SettingsView {
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundColor(.secondary)
+                        .contentTransition(.numericText())
+                        .motionAnimation(Motion.quick, value: index)
                 }
             }
             .toggleStyle(.checkbox)
@@ -740,13 +802,16 @@ extension SettingsView {
                 .font(.caption2)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .transition(Motion.reveal)
             }
 
             if showsPin {
                 Text(model.localizedString("固定中は自動で壁紙が切り替わりません。再起動後も固定を維持します。"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
+                    .transition(Motion.reveal)
             }
         }
+        .motionAnimation(Motion.quick, value: showsPin)
     }
 }

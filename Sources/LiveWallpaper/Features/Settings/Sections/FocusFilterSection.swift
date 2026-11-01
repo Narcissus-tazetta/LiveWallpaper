@@ -21,15 +21,20 @@ extension SettingsView {
         VStack(alignment: .leading, spacing: 8) {
             focusCardHeader
             if isFocusCardExpanded {
-                if !model.focusFilterIntegrationEnabled {
-                    Text(model.localizedString("オフの間は、集中モードによる壁紙の切り替えを行いません。"))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else if model.focusModes.isEmpty {
-                    focusModeAccessGuidance
-                } else {
-                    focusModeAssignmentList
+                Group {
+                    if !model.focusFilterIntegrationEnabled {
+                        Text(model.localizedString("オフの間は、集中モードによる壁紙の切り替えを行いません。"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .transition(Motion.reveal)
+                    } else if model.focusModes.isEmpty {
+                        focusModeAccessGuidance
+                            .transition(Motion.reveal)
+                    } else {
+                        focusModeAssignmentList
+                            .transition(Motion.reveal)
+                    }
                 }
             }
         }
@@ -52,7 +57,11 @@ extension SettingsView {
                 model.localizedString("集中モードで壁紙を切り替える"),
                 isOn: Binding(
                     get: { model.focusFilterIntegrationEnabled },
-                    set: { model.setFocusFilterIntegrationEnabled($0) }
+                    set: { value in
+                        withMotion {
+                            model.setFocusFilterIntegrationEnabled(value)
+                        }
+                    }
                 )
             )
             .labelsHidden()
@@ -151,10 +160,12 @@ extension SettingsView {
                     .padding(.vertical, 1)
                     .background(Capsule().fill(Color.accentColor.opacity(0.2)))
                     .foregroundColor(.accentColor)
+                    .transition(Motion.pop)
             }
             Spacer(minLength: 8)
             focusModeTargetPickerButton(mode)
         }
+        .motionAnimation(Motion.quick, value: model.activeFocusModeID == mode.id)
     }
 
     // MARK: - 割り当て壁紙ピッカー
@@ -249,6 +260,7 @@ extension SettingsView {
                                 switchToWallpaperTabOnSelect: false,
                                 isSelected: assignment?.kind == .video
                                     && assignment?.videoPath == path,
+                                selectionGroupID: "focusFilterTargetGridSelection",
                                 onSelect: {
                                     model.setFocusModeAssignment(.video(path), forModeID: modeID)
                                     scheduleTargetPickerContext = nil
@@ -261,6 +273,7 @@ extension SettingsView {
                                 isSelected: assignment?.kind == .web
                                     && assignment?.webWallpaperID == source.id,
                                 cardWidth: cardWidth,
+                                selectionGroupID: "focusFilterTargetGridSelection",
                                 onSelect: {
                                     model.setFocusModeAssignment(.web(source.id), forModeID: modeID)
                                     scheduleTargetPickerContext = nil
