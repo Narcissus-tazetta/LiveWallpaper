@@ -22,6 +22,9 @@ extension AppDelegate {
             model: wallpaperModel,
             session: session
         ))
+        // The root view is empty while no scene is open; by default the hosting controller then
+        // shrinks the window to fit that nothing and autosaves the collapsed frame.
+        hosting.sizingOptions = []
         let window = NSWindow(contentViewController: hosting)
         window.styleMask.insert(.resizable)
         if #available(macOS 14.0, *) {
@@ -31,7 +34,13 @@ extension AppDelegate {
         }
         window.minSize = NSSize(width: 1000, height: 640)
         window.setContentSize(NSSize(width: 1280, height: 800))
-        if !window.setFrameUsingName(Self.sceneEditorFrameAutosaveName) {
+        if window.setFrameUsingName(Self.sceneEditorFrameAutosaveName) {
+            // A frame saved by an earlier build can already be collapsed, and restoring it does not apply minSize.
+            if window.frame.width < window.minSize.width || window.frame.height < window.minSize.height {
+                window.setContentSize(NSSize(width: 1280, height: 800))
+                window.center()
+            }
+        } else {
             window.center()
         }
         window.setFrameAutosaveName(Self.sceneEditorFrameAutosaveName)
