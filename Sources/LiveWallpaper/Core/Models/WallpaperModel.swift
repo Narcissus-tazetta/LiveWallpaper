@@ -203,6 +203,9 @@ final class WallpaperModel: ObservableObject {
     /// Scenes edited since their video was baked, whose bake waits until their
     /// scripts are allowed or stopped.
     @Published var sceneVideosAwaitingScriptApproval: Set<String> = []
+    /// Scenes saved by a newer app: not loaded, so they play as the video they were baked
+    /// into, and their files are never rewritten. Cleared once the user has been told.
+    @Published var scenesFromNewerVersion: Set<String> = []
     /// Video path → why its last bake failed; the previous video stays in use.
     @Published var sceneBakeFailures: [String: String] = [:]
     /// Scenes with edits not yet written to scene.json.

@@ -18,31 +18,39 @@ struct ScenePresetStore {
     }
 
     /// Oldest first. A preset that cannot be read is skipped and logged, so one bad
-    /// folder does not hide the rest.
-    func loadAll() throws -> [ScenePreset] {
+    /// folder does not hide the rest. One saved by a newer format is skipped the same
+    /// way but counted, so the user can be told; its folder is left as it is.
+    func loadAll() throws -> (presets: [ScenePreset], newerVersionCount: Int) {
         guard FileManager.default.fileExists(atPath: directory.path) else {
-            return []
+            return ([], 0)
         }
         let folders = try FileManager.default.contentsOfDirectory(
             at: directory, includingPropertiesForKeys: [.creationDateKey], options: [.skipsHiddenFiles]
         )
         var loaded: [(Date, ScenePreset)] = []
+        var newerVersionCount = 0
         for folder in folders {
             let url = folder.appendingPathComponent(Self.documentFileName)
             guard FileManager.default.fileExists(atPath: url.path) else {
                 continue
             }
             do {
-                let preset = try JSONDecoder().decode(ScenePreset.self, from: Data(contentsOf: url))
+                let prepared = try StoredFormat.scenePreset.prepare(Data(contentsOf: url))
+                let preset = try JSONDecoder().decode(ScenePreset.self, from: prepared.data)
                 let created = try folder.resourceValues(forKeys: [.creationDateKey]).creationDate ?? .distantPast
                 loaded.append((created, preset))
+            } catch let error as StoredFormat.NewerVersionError {
+                newerVersionCount += 1
+                AppLog.persistence.error(
+                    "scene preset from a newer format path=\(url.path, privacy: .public) version=\(error.found, privacy: .public)"
+                )
             } catch {
                 AppLog.persistence.error(
                     "scene preset unreadable path=\(url.path, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
                 )
             }
         }
-        return loaded.sorted { $0.0 < $1.0 }.map(\.1)
+        return (loaded.sorted { $0.0 < $1.0 }.map(\.1), newerVersionCount)
     }
 
     /// Writes the preset, copying the painted files it names from `sceneFolder`.
@@ -57,7 +65,7 @@ struct ScenePresetStore {
             }
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            try encoder.encode(preset).write(to: staging.appendingPathComponent(Self.documentFileName))
+            try StoredFormat.scenePreset.encode(preset, using: encoder).write(to: staging.appendingPathComponent(Self.documentFileName))
             let destination = folderURL(of: preset.id)
             if FileManager.default.fileExists(atPath: destination.path) {
                 _ = try FileManager.default.replaceItemAt(destination, withItemAt: staging)

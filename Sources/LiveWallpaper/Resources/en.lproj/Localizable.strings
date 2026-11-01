@@ -1717,3 +1717,7 @@
 "レイヤーを選ぶと、ここで設定できます" = "Select a layer to edit it here.";
 "説明を表示" = "Show Descriptions";
 "説明を隠す" = "Hide Descriptions";
+"新しい版のLiveWallpaperで作られたため、この版では開けません。LiveWallpaperを更新してください。" = "It was made with a newer version of LiveWallpaper and can’t be opened in this one. Update LiveWallpaper.";
+"新しい版のLiveWallpaperで作ったプリセットがあります。この版では使えません。LiveWallpaperを更新してください。" = "There are presets made with a newer version of LiveWallpaper. This version can’t use them. Update LiveWallpaper.";
+"新しい版のLiveWallpaperで作られたシーンがあります" = "Some scenes were made with a newer version of LiveWallpaper";
+"この版では編集できません。動画としては再生できます。LiveWallpaperを更新すると編集できます。" = "They can’t be edited in this version, but they still play as videos. Update LiveWallpaper to edit them.";

@@ -21,7 +21,13 @@ extension WallpaperModel {
             return
         }
         do {
-            userScenePresets = try store.loadAll()
+            let loaded = try store.loadAll()
+            userScenePresets = loaded.presets
+            if loaded.newerVersionCount > 0 {
+                sceneErrorMessage = localizedString(
+                    "新しい版のLiveWallpaperで作ったプリセットがあります。この版では使えません。LiveWallpaperを更新してください。"
+                )
+            }
         } catch {
             userScenePresets = []
             sceneErrorMessage = error.localizedDescription

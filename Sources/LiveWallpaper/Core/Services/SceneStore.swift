@@ -31,19 +31,45 @@ enum SceneStore {
         )
     }
 
-    /// nil when the video has no scene. A scene that exists but cannot be read throws.
-    static func load(videoPath: String) throws -> SceneDocument? {
-        let url = folderURL(forVideoPath: videoPath).appendingPathComponent(documentFileName)
+    /// nil when the video has no scene. A scene that exists but cannot be read throws;
+    /// one saved by a newer format throws `StoredFormat.NewerVersionError` and stays as it is.
+    static func load(videoPath: String, format: StoredFormat = .scene) throws -> SceneDocument? {
+        let folder = folderURL(forVideoPath: videoPath)
+        let url = folder.appendingPathComponent(documentFileName)
         guard FileManager.default.fileExists(atPath: url.path) else {
             return nil
         }
-        return try decode(folder: url.deletingLastPathComponent())
+        let (document, prepared) = try read(folder: folder, format: format)
+        if prepared.reshaped {
+            try keepCopyBeforeUpgrade(of: url, fromVersion: prepared.storedVersion)
+        }
+        return document
+    }
+
+    /// For a scene folder that is not a library scene (an author's source folder).
+    static func load(sceneFolder: URL) throws -> SceneDocument {
+        try decode(folder: sceneFolder)
     }
 
     private static func decode(folder: URL) throws -> SceneDocument {
+        try read(folder: folder).document
+    }
+
+    private static func read(folder: URL, format: StoredFormat = .scene) throws -> (document: SceneDocument, prepared: StoredFormat.Prepared) {
+        let prepared = try format.prepare(Data(contentsOf: folder.appendingPathComponent(documentFileName)))
         let decoder = JSONDecoder()
         decoder.userInfo[.sceneFolder] = folder
-        return try decoder.decode(SceneDocument.self, from: Data(contentsOf: folder.appendingPathComponent(documentFileName)))
+        return (try decoder.decode(SceneDocument.self, from: prepared.data), prepared)
+    }
+
+    /// A dot name, so pruning (which skips those) leaves it alone. Kept once per version:
+    /// the first copy is the file as the older app wrote it.
+    private static func keepCopyBeforeUpgrade(of documentURL: URL, fromVersion version: Int) throws {
+        let copy = documentURL.deletingLastPathComponent().appendingPathComponent(".\(documentFileName).v\(version).bak")
+        guard !FileManager.default.fileExists(atPath: copy.path) else {
+            return
+        }
+        try FileManager.default.copyItem(at: documentURL, to: copy)
     }
 
     /// Moves model geometry that scene.json still holds inline into its own files and
@@ -104,7 +130,7 @@ enum SceneStore {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             encoder.userInfo[.sceneFolder] = folder
         }
-        return try encoder.encode(document)
+        return try StoredFormat.scene.encode(document, using: encoder)
     }
 
     /// Writes data from encode(_:) as the scene's scene.json, atomically. The partial

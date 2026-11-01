@@ -75,6 +75,7 @@ extension WallpaperModel {
         }
         let externalDirectory = ExternalWallpaperProviderMonitor.bakedScenesDirectoryURL.path
         var restored: [String: SceneDocument] = [:]
+        var fromNewerVersion: Set<String> = []
         var unbaked: [String] = []
         var candidatePaths = Set(libraryVideoPaths)
         if let current = currentVideoPath {
@@ -104,6 +105,11 @@ extension WallpaperModel {
                         }
                     }
                 }
+            } catch let error as StoredFormat.NewerVersionError {
+                fromNewerVersion.insert(path)
+                AppLog.windowRefresh.error(
+                    "scene from a newer format path=\(path, privacy: .public) version=\(error.found, privacy: .public)"
+                )
             } catch {
                 AppLog.windowRefresh.error(
                     "scene unreadable path=\(path, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
@@ -111,6 +117,7 @@ extension WallpaperModel {
             }
         }
         sceneDocumentsByPath = restored
+        scenesFromNewerVersion = fromNewerVersion
         // The app quit before an edit was baked.
         for path in unbaked {
             scheduleSceneBake(path: path)

@@ -1701,3 +1701,7 @@
 "レイヤーを選ぶと、ここで設定できます" = "選擇圖層後，可在此處設定。";
 "説明を表示" = "顯示說明";
 "説明を隠す" = "隱藏說明";
+"新しい版のLiveWallpaperで作られたため、この版では開けません。LiveWallpaperを更新してください。" = "它由較新版本的 LiveWallpaper 建立，無法在此版本中開啟。請更新 LiveWallpaper。";
+"新しい版のLiveWallpaperで作ったプリセットがあります。この版では使えません。LiveWallpaperを更新してください。" = "有由較新版本的 LiveWallpaper 建立的預設。此版本無法使用它們。請更新 LiveWallpaper。";
+"新しい版のLiveWallpaperで作られたシーンがあります" = "有由較新版本的 LiveWallpaper 建立的場景";
+"この版では編集できません。動画としては再生できます。LiveWallpaperを更新すると編集できます。" = "此版本無法編輯它們，但仍可作為影片播放。更新 LiveWallpaper 後即可編輯。";

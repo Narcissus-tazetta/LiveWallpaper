@@ -237,8 +237,7 @@ extension WallpaperModel {
                 if let loaded = try? SceneStore.load(videoPath: wallpaper.path) {
                     registerImportedScene(loaded, path: wallpaper.path)
                 } else if let folder = wallpaper.sceneFolderPath,
-                          let data = try? Data(contentsOf: URL(fileURLWithPath: folder).appendingPathComponent("scene.json")),
-                          let doc = try? JSONDecoder().decode(SceneDocument.self, from: data) {
+                          let doc = try? SceneStore.load(sceneFolder: URL(fileURLWithPath: folder)) {
                     registerImportedScene(doc, path: wallpaper.path)
                 }
             }
@@ -342,8 +341,7 @@ extension WallpaperModel {
         } else {
             document = try await Task.detached {
                 if let sourceFolder {
-                    return try JSONDecoder().decode(SceneDocument.self, from: Data(contentsOf:
-                        URL(fileURLWithPath: sourceFolder).appendingPathComponent("scene.json")))
+                    return try SceneStore.load(sceneFolder: URL(fileURLWithPath: sourceFolder))
                 }
                 return try SceneStore.load(videoPath: path)
             }.value

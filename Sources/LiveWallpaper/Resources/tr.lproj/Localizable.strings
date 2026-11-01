@@ -1717,3 +1717,7 @@
 "レイヤーを選ぶと、ここで設定できます" = "Burada düzenlemek için bir katman seçin.";
 "説明を表示" = "Açıklamaları Göster";
 "説明を隠す" = "Açıklamaları Gizle";
+"新しい版のLiveWallpaperで作られたため、この版では開けません。LiveWallpaperを更新してください。" = "Bu, LiveWallpaper’ın daha yeni bir sürümüyle oluşturulduğu için bu sürümde açılamıyor. LiveWallpaper’ı güncelleyin.";
+"新しい版のLiveWallpaperで作ったプリセットがあります。この版では使えません。LiveWallpaperを更新してください。" = "LiveWallpaper’ın daha yeni bir sürümüyle oluşturulmuş ön ayarlar var. Bu sürüm onları kullanamaz. LiveWallpaper’ı güncelleyin.";
+"新しい版のLiveWallpaperで作られたシーンがあります" = "LiveWallpaper’ın daha yeni bir sürümüyle oluşturulmuş sahneler var";
+"この版では編集できません。動画としては再生できます。LiveWallpaperを更新すると編集できます。" = "Bu sürümde düzenlenemezler ancak video olarak oynatılmaya devam ederler. Düzenlemek için LiveWallpaper’ı güncelleyin.";

@@ -76,6 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupSettingsWindow()
         setupSceneEditorWindow()
         setupSceneScriptApprovalPrompts()
+        setupNewerSceneNotice()
         setupGlobalHotKeys()
         setupScreenUnlockObserver()
         setupAppearanceObserver()

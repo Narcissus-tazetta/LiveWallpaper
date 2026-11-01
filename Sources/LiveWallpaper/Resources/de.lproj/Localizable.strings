@@ -1717,3 +1717,7 @@
 "レイヤーを選ぶと、ここで設定できます" = "Wähle eine Ebene aus, um sie hier zu bearbeiten.";
 "説明を表示" = "Beschreibungen einblenden";
 "説明を隠す" = "Beschreibungen ausblenden";
+"新しい版のLiveWallpaperで作られたため、この版では開けません。LiveWallpaperを更新してください。" = "Sie wurde mit einer neueren Version von LiveWallpaper erstellt und lässt sich in dieser nicht öffnen. Aktualisiere LiveWallpaper.";
+"新しい版のLiveWallpaperで作ったプリセットがあります。この版では使えません。LiveWallpaperを更新してください。" = "Es gibt Voreinstellungen, die mit einer neueren Version von LiveWallpaper erstellt wurden. Diese Version kann sie nicht verwenden. Aktualisiere LiveWallpaper.";
+"新しい版のLiveWallpaperで作られたシーンがあります" = "Einige Szenen wurden mit einer neueren Version von LiveWallpaper erstellt";
+"この版では編集できません。動画としては再生できます。LiveWallpaperを更新すると編集できます。" = "Sie lassen sich in dieser Version nicht bearbeiten, werden aber weiterhin als Videos abgespielt. Aktualisiere LiveWallpaper, um sie zu bearbeiten.";

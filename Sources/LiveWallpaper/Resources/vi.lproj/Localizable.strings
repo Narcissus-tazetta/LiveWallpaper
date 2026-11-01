@@ -1717,3 +1717,7 @@
 "レイヤーを選ぶと、ここで設定できます" = "Chọn một lớp để chỉnh ở đây.";
 "説明を表示" = "Hiện mô tả";
 "説明を隠す" = "Ẩn mô tả";
+"新しい版のLiveWallpaperで作られたため、この版では開けません。LiveWallpaperを更新してください。" = "Mục này được tạo bằng phiên bản LiveWallpaper mới hơn nên không thể mở trong phiên bản này. Hãy cập nhật LiveWallpaper.";
+"新しい版のLiveWallpaperで作ったプリセットがあります。この版では使えません。LiveWallpaperを更新してください。" = "Có các cài đặt sẵn được tạo bằng phiên bản LiveWallpaper mới hơn. Phiên bản này không dùng được chúng. Hãy cập nhật LiveWallpaper.";
+"新しい版のLiveWallpaperで作られたシーンがあります" = "Có các cảnh được tạo bằng phiên bản LiveWallpaper mới hơn";
+"この版では編集できません。動画としては再生できます。LiveWallpaperを更新すると編集できます。" = "Phiên bản này không thể chỉnh sửa chúng, nhưng chúng vẫn phát như video. Hãy cập nhật LiveWallpaper để chỉnh sửa.";
