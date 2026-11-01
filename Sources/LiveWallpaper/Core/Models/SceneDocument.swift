@@ -1011,7 +1011,7 @@ struct SceneParticles: Codable, Equatable {
     }
 }
 
-struct SceneLayer: Codable, Equatable, Identifiable {
+struct SceneLayer: Codable, Equatable, Identifiable, Sendable {
     var id = UUID()
     var name: String
     var kind: SceneLayerKind = .image
@@ -1433,7 +1433,7 @@ struct SceneShadowLight: Codable, Equatable {
 /// A still-image wallpaper built from layers. Lives in a folder next to the video it
 /// is baked into (SceneStore); the desktop draws it live, everything else that only
 /// plays videos (lock screen, screen saver, thumbnails) uses the baked video.
-struct SceneDocument: Codable, Equatable {
+struct SceneDocument: Codable, Equatable, Sendable {
     static let loopSecondsChoices = [10, 20, 30, 60]
 
     var canvasWidth: Int

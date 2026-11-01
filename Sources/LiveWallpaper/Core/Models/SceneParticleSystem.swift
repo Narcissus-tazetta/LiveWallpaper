@@ -4,7 +4,7 @@ import Foundation
 /// opposed to SceneParticles, whose positions are a function of the loop phase.
 /// Lengths are canvas pixels in the layer's own space, x right and y up; times are
 /// seconds; a fraction of a particle's life runs 0...1.
-struct SceneParticleSystem: Codable, Equatable {
+struct SceneParticleSystem: Codable, Equatable, Sendable {
     enum Blend: String, Codable, CaseIterable {
         /// Covers what is below, ignoring the particle's alpha.
         case opaque
@@ -414,7 +414,7 @@ struct SceneParticleSystem: Codable, Equatable {
     }
 
     /// Children hold whole systems, which a struct cannot contain directly.
-    final class Box: Codable, Equatable {
+    final class Box: Codable, Equatable, Sendable {
         let value: SceneParticleSystem
 
         init(_ value: SceneParticleSystem) {
