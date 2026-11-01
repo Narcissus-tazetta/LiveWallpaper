@@ -1,0 +1,28 @@
+{
+    "name": "livewallpaper-site",
+    "private": true,
+    "type": "module",
+    "imports": {
+        "#lib/*": "./src/lib/*"
+    },
+    "scripts": {
+        "dev": "vite dev",
+        "build": "vite build",
+        "preview": "vite preview",
+        "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+        "lint": "oxlint",
+        "format": "oxfmt"
+    },
+    "devDependencies": {
+        "@sveltejs/adapter-static": "^4.0.1",
+        "@sveltejs/kit": "^3.1.1",
+        "@sveltejs/vite-plugin-svelte": "^7.3.1",
+        "@types/node": "^26.6.6",
+        "oxfmt": "^0.75.0",
+        "oxlint": "^1.90.0",
+        "svelte": "^5.57.3",
+        "svelte-check": "^4.7.7",
+        "typescript": "^6",
+        "vite": "^8.3.5"
+    }
+}
