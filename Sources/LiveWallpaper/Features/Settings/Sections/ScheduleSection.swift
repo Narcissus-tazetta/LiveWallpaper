@@ -25,9 +25,12 @@ extension SettingsView {
         VStack(alignment: .leading, spacing: 14) {
             scheduleCardHeader
             if isScheduleCardExpanded {
-                scheduleFollowAppearanceContent
-                Divider().opacity(0.35)
-                scheduleAdvancedRulesContent
+                VStack(alignment: .leading, spacing: 14) {
+                    scheduleFollowAppearanceContent
+                    Divider().opacity(0.35)
+                    scheduleAdvancedRulesContent
+                }
+                .transition(Motion.reveal)
             }
         }
         .padding(12)
@@ -96,14 +99,17 @@ extension SettingsView {
                 )
             )
             if model.followSystemAppearanceEnabled {
-                scheduleSimpleTargetRow(
-                    title: model.localizedString("ライトモード用の壁紙"),
-                    ruleID: appearanceRuleID(for: .light)
-                )
-                scheduleSimpleTargetRow(
-                    title: model.localizedString("ダークモード用の壁紙"),
-                    ruleID: appearanceRuleID(for: .dark)
-                )
+                Group {
+                    scheduleSimpleTargetRow(
+                        title: model.localizedString("ライトモード用の壁紙"),
+                        ruleID: appearanceRuleID(for: .light)
+                    )
+                    scheduleSimpleTargetRow(
+                        title: model.localizedString("ダークモード用の壁紙"),
+                        ruleID: appearanceRuleID(for: .dark)
+                    )
+                }
+                .transition(Motion.reveal)
             }
         }
     }
@@ -147,7 +153,7 @@ extension SettingsView {
                 Spacer()
                 Button(model.localizedString("ルールを追加")) {
                     let newID = model.addScheduleRule()
-                    withAnimation(.easeInOut(duration: 0.15)) {
+                    withMotion {
                         expandedScheduleRuleID = newID
                     }
                 }
@@ -163,11 +169,13 @@ extension SettingsView {
 
             if model.scheduleRules.contains(where: { $0.timeRange?.followsSun == true }) {
                 scheduleSunLocationRow
+                    .transition(Motion.reveal)
             }
 
             let advancedRules = model.scheduleRules.filter { $0.origin == .advanced }
             if advancedRules.isEmpty {
                 settingsFootnote(model.localizedString("曜日スケジュールのルールはまだありません"))
+                    .transition(Motion.reveal)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array(advancedRules.enumerated()), id: \.element.id) { index, rule in
@@ -177,8 +185,10 @@ extension SettingsView {
                             canMoveUp: index > 0,
                             canMoveDown: index < advancedRules.count - 1
                         )
+                        .transition(Motion.reveal)
                     }
                 }
+                .motionAnimation(value: advancedRules.map(\.id))
             }
         }
     }
@@ -229,7 +239,7 @@ extension SettingsView {
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.15)) {
+                withMotion {
                     expandedScheduleRuleID = isExpanded ? nil : id
                 }
             }
@@ -240,6 +250,7 @@ extension SettingsView {
                     canMoveUp: canMoveUp,
                     canMoveDown: canMoveDown
                 )
+                .transition(Motion.reveal)
             }
         }
         .padding(10)
@@ -266,6 +277,7 @@ extension SettingsView {
             .padding(.vertical, 1.5)
             .background(Capsule().fill(Color.accentColor.opacity(0.18)))
             .foregroundColor(.accentColor)
+            .transition(Motion.pop)
     }
 
     @ViewBuilder
@@ -291,14 +303,17 @@ extension SettingsView {
                     .toggleStyle(.checkbox)
                     .controlSize(.small)
                 if let range = rule.timeRange {
-                    scheduleTimeEndpoint(ruleBinding, isStart: true)
-                    Text("–")
-                    scheduleTimeEndpoint(ruleBinding, isStart: false)
-                    if scheduleRangeCrossesMidnight(range) {
-                        Text(model.localizedString("(翌日)"))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    Group {
+                        scheduleTimeEndpoint(ruleBinding, isStart: true)
+                        Text("–")
+                        scheduleTimeEndpoint(ruleBinding, isStart: false)
+                        if scheduleRangeCrossesMidnight(range) {
+                            Text(model.localizedString("(翌日)"))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
+                    .transition(Motion.pop)
                 }
             }
 
@@ -324,7 +339,9 @@ extension SettingsView {
 
             HStack(spacing: 8) {
                 Button {
-                    model.moveScheduleRule(id: id, direction: .up)
+                    withMotion {
+                        model.moveScheduleRule(id: id, direction: .up)
+                    }
                 } label: {
                     Image(systemName: "chevron.up")
                 }
@@ -333,7 +350,9 @@ extension SettingsView {
                 .disabled(!canMoveUp)
                 .iconHelp(model.localizedString("上へ移動"))
                 Button {
-                    model.moveScheduleRule(id: id, direction: .down)
+                    withMotion {
+                        model.moveScheduleRule(id: id, direction: .down)
+                    }
                 } label: {
                     Image(systemName: "chevron.down")
                 }
@@ -343,7 +362,7 @@ extension SettingsView {
                 .iconHelp(model.localizedString("下へ移動"))
                 Button {
                     if let newID = model.duplicateScheduleRule(id: id) {
-                        withAnimation(.easeInOut(duration: 0.15)) {
+                        withMotion {
                             expandedScheduleRuleID = newID
                         }
                     }
@@ -368,10 +387,12 @@ extension SettingsView {
                     titleVisibility: .visible
                 ) {
                     Button(model.localizedString("削除"), role: .destructive) {
-                        if expandedScheduleRuleID == id {
-                            expandedScheduleRuleID = nil
+                        withMotion {
+                            if expandedScheduleRuleID == id {
+                                expandedScheduleRuleID = nil
+                            }
+                            model.removeScheduleRule(id: id)
                         }
-                        model.removeScheduleRule(id: id)
                     }
                     Button(model.localizedString("キャンセル"), role: .cancel) {}
                 } message: {
@@ -484,6 +505,7 @@ extension SettingsView {
                     displayedComponents: .hourAndMinute
                 )
                 .labelsHidden()
+                .transition(Motion.pop)
             }
         }
     }
@@ -497,25 +519,27 @@ extension SettingsView {
                 return isStart ? range?.start.solarEvent : range?.end.solarEvent
             },
             set: { event in
-                guard var range = ruleBinding.wrappedValue.timeRange else {
-                    return
+                withMotion(Motion.quick) {
+                    guard var range = ruleBinding.wrappedValue.timeRange else {
+                        return
+                    }
+                    var time = isStart ? range.start : range.end
+                    time.solarEvent = event
+                    // Bake today's time into hour/minute so the fixed time a version without
+                    // sun support falls back to is close, and switching back to a fixed time
+                    // starts from where the sun was.
+                    if let event, let sun = model.todaySunTimes() {
+                        let minutes = min(event == .sunrise ? sun.sunrise : sun.sunset, 1439)
+                        time.hour = minutes / 60
+                        time.minute = minutes % 60
+                    }
+                    if isStart {
+                        range.start = time
+                    } else {
+                        range.end = time
+                    }
+                    ruleBinding.wrappedValue.timeRange = range
                 }
-                var time = isStart ? range.start : range.end
-                time.solarEvent = event
-                // Bake today's time into hour/minute so the fixed time a version without
-                // sun support falls back to is close, and switching back to a fixed time
-                // starts from where the sun was.
-                if let event, let sun = model.todaySunTimes() {
-                    let minutes = min(event == .sunrise ? sun.sunrise : sun.sunset, 1439)
-                    time.hour = minutes / 60
-                    time.minute = minutes % 60
-                }
-                if isStart {
-                    range.start = time
-                } else {
-                    range.end = time
-                }
-                ruleBinding.wrappedValue.timeRange = range
             }
         )
     }
@@ -762,6 +786,7 @@ extension SettingsView {
                                 switchToWallpaperTabOnSelect: false,
                                 isSelected: rule.target.kind == .video && rule.target
                                     .videoPath == path,
+                                selectionGroupID: "scheduleTargetGridSelection",
                                 onSelect: {
                                     model.updateScheduleRule(scheduleRule(
                                         rule,
@@ -778,6 +803,7 @@ extension SettingsView {
                                     isSelected: rule.target.kind == .web
                                         && rule.target.webWallpaperID == source.id,
                                     cardWidth: cardWidth,
+                                    selectionGroupID: "scheduleTargetGridSelection",
                                     onSelect: {
                                         model.updateScheduleRule(
                                             scheduleRule(rule, withTarget: .web(source.id))
@@ -822,13 +848,15 @@ extension SettingsView {
         Binding<Bool>(
             get: { ruleBinding.wrappedValue.timeRange == nil },
             set: { isAllDay in
-                if isAllDay {
-                    ruleBinding.wrappedValue.timeRange = nil
-                } else {
-                    ruleBinding.wrappedValue.timeRange = ScheduleTimeRange(
-                        start: ScheduleTimeOfDay(hour: 9, minute: 0),
-                        end: ScheduleTimeOfDay(hour: 18, minute: 0)
-                    )
+                withMotion(Motion.quick) {
+                    if isAllDay {
+                        ruleBinding.wrappedValue.timeRange = nil
+                    } else {
+                        ruleBinding.wrappedValue.timeRange = ScheduleTimeRange(
+                            start: ScheduleTimeOfDay(hour: 9, minute: 0),
+                            end: ScheduleTimeOfDay(hour: 18, minute: 0)
+                        )
+                    }
                 }
             }
         )

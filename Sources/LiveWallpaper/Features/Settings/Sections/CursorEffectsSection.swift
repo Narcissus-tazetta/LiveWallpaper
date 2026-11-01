@@ -24,6 +24,7 @@ extension SettingsView {
             "ほかのアプリを使っている間は、マウスの監視ごとエフェクトを止めて負荷をなくします。デスクトップ（Finder）かこのアプリが前面にあるときだけ動きます。"
           )
         )
+        .transition(Motion.reveal)
       }
     }
   }
@@ -113,6 +114,7 @@ extension SettingsView {
       content()
     }
     .padding(.leading, 20)
+    .transition(Motion.reveal)
   }
 
   private func cursorLevelRow(
@@ -182,7 +184,11 @@ extension SettingsView {
   ) -> Binding<T> {
     Binding(
       get: { cursorEffectSettings(target)[keyPath: keyPath] },
-      set: { newValue in updateCursorEffects(target, field: "\(keyPath)") { $0[keyPath: keyPath] = newValue } }
+      set: { newValue in
+        withMotion(Motion.quick) {
+          updateCursorEffects(target, field: "\(keyPath)") { $0[keyPath: keyPath] = newValue }
+        }
+      }
     )
   }
 
@@ -210,6 +216,7 @@ extension SettingsView {
         ),
         supportsOpacity: false
       )
+      .transition(Motion.reveal)
     }
   }
 }

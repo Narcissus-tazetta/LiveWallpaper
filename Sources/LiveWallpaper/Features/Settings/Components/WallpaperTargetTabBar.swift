@@ -106,8 +106,10 @@ extension SettingsView {
                 isScopeSelectable(selectedScope) ? selectedScope : .shared
             },
             set: { value in
-                selectedScope = value
-                selectedAssignmentTarget = .desktop
+                withMotion {
+                    selectedScope = value
+                    selectedAssignmentTarget = .desktop
+                }
             }
         )
     }
@@ -189,7 +191,9 @@ extension SettingsView {
         // としてカードの装飾を共有する。
         return HStack(spacing: 8) {
             Button {
-                selectedAssignmentTarget = target
+                withMotion {
+                    selectedAssignmentTarget = target
+                }
             } label: {
                 HStack(spacing: 10) {
                     targetPreview(for: target)
@@ -200,6 +204,9 @@ extension SettingsView {
                             Label(targetTitle(for: target), systemImage: targetIconName(for: target))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(isSelected ? tint : .primary)
+                                // Wrapping splits single long words (e.g. "Schreibtisch") mid-word.
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                             if target == .desktop, model.manualPauseActive {
                                 Label(model.localizedString("一時停止中"), systemImage: "pause.fill")
                                     .font(.system(size: 9, weight: .semibold))
@@ -207,19 +214,23 @@ extension SettingsView {
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(Color.secondary.opacity(0.15), in: Capsule())
+                                    .transition(Motion.pop)
                             }
                         }
-                        Text(targetSummary(for: target))
+                        let summary = targetSummary(for: target)
+                        Text(summary)
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
+                            .contentTransition(.opacity)
+                            .motionAnimation(Motion.quick, value: summary)
                     }
                     .frame(minWidth: 90, maxWidth: 200, alignment: .leading)
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .focusable(false)
 
             if showsDisplayPicker {
@@ -231,14 +242,24 @@ extension SettingsView {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? tint.opacity(0.14) : Color.secondary.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isSelected ? tint : Color.clear, lineWidth: 1.5)
-        )
+        .background {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.secondary.opacity(0.08))
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(tint.opacity(0.14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(tint, lineWidth: 1.5)
+                        )
+                        .matchedGeometryEffect(id: "selectedAssignmentTarget", in: tabSelectionNamespace)
+                }
+            }
+        }
+        .motionAnimation(Motion.standard, value: isSelected)
+        .motionAnimation(Motion.quick, value: model.manualPauseActive)
+        .motionAnimation(Motion.quick, value: selectedScope)
         .accessibilityLabel(targetTitle(for: target))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }

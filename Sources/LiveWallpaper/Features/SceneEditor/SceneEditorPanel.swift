@@ -22,6 +22,7 @@ extension SceneEditorView {
             model.endScenePresetTrial()
             model.bakeAllScenesNowIfPending()
         }
+        .motionAnimation(Motion.quick, value: showsSceneHints)
         .sheet(isPresented: $isSavingScenePreset) {
             scenePresetSaveSheet(path: path, layerID: selectedSceneLayerID)
         }
@@ -214,6 +215,7 @@ extension SceneEditorView {
                         .padding(.vertical, 4)
                         .background(.regularMaterial, in: Capsule())
                         .padding(8)
+                        .transition(Motion.pop)
                 }
             }
             .overlay(alignment: .topTrailing) {
@@ -232,8 +234,14 @@ extension SceneEditorView {
                     .padding(.vertical, 4)
                     .background(.regularMaterial, in: Capsule())
                     .padding(8)
+                    .transition(Motion.pop)
                 }
             }
+            .motionAnimation(Motion.quick, value: comparison != nil || trial != nil)
+            .motionAnimation(
+                Motion.quick,
+                value: scenePreviewController.simulatedTimeOfDay != nil || scenePreviewController.simulatedCursor != nil
+            )
             .accessibilityLabel(model.localizedString("プレビュー"))
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -302,9 +310,14 @@ extension SceneEditorView {
             .padding(.vertical, 8)
             Divider()
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    sceneInspectorContent(path: path, document: document, selectedLayer: selectedLayer)
+                ZStack {
+                    VStack(alignment: .leading, spacing: 12) {
+                        sceneInspectorContent(path: path, document: document, selectedLayer: selectedLayer)
+                    }
+                    .id(inspectorTab)
+                    .transition(Motion.crossfade)
                 }
+                .motionAnimation(Motion.quick, value: inspectorTab)
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

@@ -101,6 +101,7 @@ extension SettingsView {
                     "オンにすると、編集内容が保存操作なしで自動的に壁紙へ反映されます"
                 )
             )
+            .transition(Motion.reveal)
         }
 
         fitEditorSecondaryActions(path: path, screenID: screenID, hasOverride: hasOverride)
@@ -131,6 +132,7 @@ extension SettingsView {
                         "ここで変更すると、この動画・この画面だけの表示方法を上書きします。未設定の場合は設定タブの既定値が使われます"
                     )
                 )
+                .transition(Motion.reveal)
             }
         }
 
@@ -187,6 +189,7 @@ extension SettingsView {
             .disabled(!canPanX)
         }
         .opacity(canPanX ? 1 : 0.5)
+        .motionAnimation(Motion.quick, value: canPanX)
 
         HStack(spacing: 12) {
             Text(model.localizedString("縦位置"))
@@ -204,11 +207,13 @@ extension SettingsView {
             .disabled(!canPanY)
         }
         .opacity(canPanY ? 1 : 0.5)
+        .motionAnimation(Motion.quick, value: canPanY)
 
         if !canPanX, !canPanY {
             Text(model.localizedString("今の表示設定では動かせる余白がありません。ズームを上げるか「拡大」表示にすると位置を調整できます"))
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .transition(Motion.reveal)
         }
 
         Text(model.localizedString("ドラッグまたは矢印キーで位置を調整できます（Shift 併用で速く移動）。ピンチまたは Option+スクロールでカーソル位置を中心にズームします"))
@@ -246,7 +251,7 @@ extension SettingsView {
                 Label(model.localizedString("反映しました"), systemImage: "checkmark.circle.fill")
                     .font(.caption)
                     .foregroundColor(.green)
-                    .transition(.opacity)
+                    .transition(Motion.pop)
             }
 
             Button(model.localizedString("保存して再適用")) {
@@ -262,7 +267,7 @@ extension SettingsView {
             .disabled(!isDirty)
             .help(model.localizedString("未保存の編集を取り消して、保存済みの状態に戻します"))
         }
-        .animation(.easeInOut(duration: 0.15), value: fitEditor.showsSavedFeedback)
+        .motionAnimation(Motion.quick, value: fitEditor.showsSavedFeedback)
     }
 
     private func fitEditorSecondaryActions(

@@ -20,10 +20,12 @@ extension SettingsView {
                     Text(message)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .transition(Motion.pop)
                 } else if let message = storeCatalog.downloadResultMessage {
                     Text(message)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .transition(Motion.pop)
                 }
                 Button {
                     isStoreSharePickerPresented = true
@@ -59,17 +61,17 @@ extension SettingsView {
                 }
             }
 
-            switch storeTabMode {
-            case .browse:
-                storeBrowseContent
-            case .mine:
-                storeMySubmissionsList
-            case .external:
-                externalStoreContent
+            ZStack {
+                storeSubModeContent
+                    .id(storeTabMode)
+                    .transition(Motion.crossfade)
             }
+            .motionAnimation(Motion.quick, value: storeTabMode)
         }
         .padding(12)
         .settingsCardBackground()
+        .motionAnimation(Motion.quick, value: storeCatalog.reportResultMessage)
+        .motionAnimation(Motion.quick, value: storeCatalog.downloadResultMessage)
         .task {
             await storeCatalog.loadIfNeeded()
         }
@@ -85,6 +87,18 @@ extension SettingsView {
             Task {
                 await storeMySubmissions.refreshAll()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var storeSubModeContent: some View {
+        switch storeTabMode {
+        case .browse:
+            storeBrowseContent
+        case .mine:
+            storeMySubmissionsList
+        case .external:
+            externalStoreContent
         }
     }
 
@@ -138,6 +152,7 @@ extension SettingsView {
                     ProgressView()
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 40)
+                        .transition(.opacity)
                 } else {
                     SearchEmptyState(
                         isSearchActive: !storeCatalog.searchQuery
@@ -168,7 +183,9 @@ extension SettingsView {
                     }
                 }
                 .frame(minHeight: 320, maxHeight: 560)
+                .transition(.opacity)
             }
         }
+        .motionAnimation(Motion.quick, value: storeCatalog.entries.isEmpty)
     }
 }

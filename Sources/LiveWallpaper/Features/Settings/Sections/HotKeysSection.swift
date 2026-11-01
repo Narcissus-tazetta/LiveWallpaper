@@ -42,8 +42,10 @@ extension SettingsView {
                         }
                     }
                 }
+                .transition(Motion.reveal)
             }
         }
+        .motionAnimation(value: model.hotKeysEnabled)
     }
 
     @ViewBuilder

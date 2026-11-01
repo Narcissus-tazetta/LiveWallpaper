@@ -95,34 +95,88 @@ extension SettingsView {
                 .padding(.horizontal, 10)
                 .padding(.top, 10)
 
-            List(selection: settingsSidebarSelection) {
-                ForEach(SettingsCategory.allCases, id: \.self) { category in
-                    Label {
-                        Text(model.localizedString(category.titleKey))
-                    } icon: {
-                        SettingsIconTile(systemImage: category.systemImage, tint: category.tint)
+            ScrollView {
+                VStack(spacing: 2) {
+                    ForEach(SettingsCategory.allCases, id: \.self) { category in
+                        settingsSidebarButton(for: category)
                     }
-                    .tag(category)
                 }
+                .padding(.horizontal, 10)
+                .padding(.top, 4)
+                .motionAnimation(Motion.standard, value: settingsCategory)
+                .motionAnimation(Motion.quick, value: isSettingsSearchActive)
+                .motionAnimation(Motion.quick, value: hoveredSettingsCategory)
             }
-            .listStyle(.sidebar)
         }
     }
 
     /// No row is highlighted while searching, since the results span every category.
     /// Picking a row ends the search.
-    private var settingsSidebarSelection: Binding<SettingsCategory?> {
-        Binding(
-            get: { isSettingsSearchActive ? nil : settingsCategory },
-            set: { category in
-                guard let category else {
-                    return
-                }
-                settingsCategory = category
-                settingsSearchText = ""
-                isSettingsSearchFocused = false
+    private func selectSettingsCategory(_ category: SettingsCategory) {
+        settingsCategory = category
+        settingsSearchText = ""
+        isSettingsSearchFocused = false
+    }
+
+    private func settingsSidebarButton(for category: SettingsCategory) -> some View {
+        let isSelected = !isSettingsSearchActive && settingsCategory == category
+        let isHovered = hoveredSettingsCategory == category
+        return Button {
+            selectSettingsCategory(category)
+        } label: {
+            HStack(spacing: 8) {
+                SettingsIconTile(systemImage: category.systemImage, tint: category.tint)
+                Text(model.localizedString(category.titleKey))
+                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
             }
-        )
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .strokeBorder(Color.accentColor.opacity(0.28), lineWidth: 1)
+                        )
+                        .matchedGeometryEffect(id: "selectedSettingsCategory", in: tabSelectionNamespace)
+                } else if isHovered {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(0.05))
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableButtonStyle())
+        .focused($focusedSettingsCategory, equals: category)
+        // The plain List this replaced moved between rows with the arrow keys.
+        .onMoveCommand { direction in
+            let all = SettingsCategory.allCases
+            guard let index = all.firstIndex(of: category) else {
+                return
+            }
+            let next: Int
+            switch direction {
+            case .up: next = index - 1
+            case .down: next = index + 1
+            default: return
+            }
+            guard all.indices.contains(next) else {
+                return
+            }
+            selectSettingsCategory(all[next])
+            focusedSettingsCategory = all[next]
+        }
+        .onHover { hovering in
+            hoveredSettingsCategory = hovering
+                ? category
+                : (hoveredSettingsCategory == category ? nil : hoveredSettingsCategory)
+        }
+        .accessibilityLabel(model.localizedString(category.titleKey))
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     var settingsPaneHeader: some View {

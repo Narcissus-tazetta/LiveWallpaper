@@ -2,10 +2,9 @@ import SwiftUI
 
 extension SettingsView {
     var wallpaperTrimEditorPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let path = wallpaperEditor.resolvedVideoPath(),
-               wallpaperEditor.isDraftDirty(path: path)
-            {
+        let isDirty = wallpaperEditor.resolvedVideoPath().map { wallpaperEditor.isDraftDirty(path: $0) } ?? false
+        return VStack(alignment: .leading, spacing: 10) {
+            if isDirty {
                 HStack {
                     Text(model.localizedString("未保存"))
                         .font(.system(size: 10, weight: .semibold))
@@ -17,6 +16,7 @@ extension SettingsView {
                         .foregroundColor(.orange)
                     Spacer(minLength: 0)
                 }
+                .transition(Motion.pop)
             }
 
             if let path = wallpaperEditor.resolvedVideoPath(), !path.isEmpty {
@@ -29,6 +29,7 @@ extension SettingsView {
         }
         .padding(12)
         .settingsCardBackground()
+        .motionAnimation(Motion.quick, value: isDirty)
         .sheet(isPresented: $isTrimCopyPickerPresented) {
             trimCopyPickerSheet
         }
@@ -90,6 +91,7 @@ extension SettingsView {
                     accessibilityLabel: model.localizedString("動画全体の中で表示している範囲"),
                     onCenter: { wallpaperEditor.centerTimeline(on: $0) }
                 )
+                .transition(Motion.reveal)
             }
 
             TrimRangeScrubber(
@@ -127,6 +129,7 @@ extension SettingsView {
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .transition(Motion.reveal)
             }
 
             trimEditorTransferRow(path: path)
@@ -201,7 +204,9 @@ extension SettingsView {
     private func trimEditorToolbarRow() -> some View {
         HStack(spacing: 6) {
             Button {
-                wallpaperEditor.zoomTimeline(by: 1 / wallpaperEditor.zoomStepFactor)
+                withMotion(Motion.quick) {
+                    wallpaperEditor.zoomTimeline(by: 1 / wallpaperEditor.zoomStepFactor)
+                }
             } label: {
                 Image(systemName: "minus.magnifyingglass")
             }
@@ -211,7 +216,9 @@ extension SettingsView {
             .iconHelp(model.localizedString("タイムラインを縮小"))
 
             Button {
-                wallpaperEditor.zoomTimeline(by: wallpaperEditor.zoomStepFactor)
+                withMotion(Motion.quick) {
+                    wallpaperEditor.zoomTimeline(by: wallpaperEditor.zoomStepFactor)
+                }
             } label: {
                 Image(systemName: "plus.magnifyingglass")
             }
@@ -221,14 +228,18 @@ extension SettingsView {
             .iconHelp(model.localizedString("タイムラインを拡大(トラックパッドのピンチでも操作できます)"))
 
             Button(model.localizedString("範囲へ")) {
-                wallpaperEditor.zoomTimelineToSelection()
+                withMotion(Motion.quick) {
+                    wallpaperEditor.zoomTimelineToSelection()
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
             .help(model.localizedString("カット範囲が画面いっぱいになるまで拡大します"))
 
             Button(model.localizedString("全体")) {
-                wallpaperEditor.zoomTimelineToFull()
+                withMotion(Motion.quick) {
+                    wallpaperEditor.zoomTimelineToFull()
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -260,13 +271,18 @@ extension SettingsView {
     }
 
     private func trimEditorOptionsRow(draft: WallpaperEditDraft) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let isShortLoop = loopDuration(draft: draft) < shortLoopWarningThreshold
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 12) {
                 Toggle(
                     model.localizedString("途中からループする"),
                     isOn: Binding(
                         get: { draft.hasCustomLoopStart },
-                        set: { wallpaperEditor.toggleCustomLoopStart($0) }
+                        set: { value in
+                            withMotion {
+                                wallpaperEditor.toggleCustomLoopStart(value)
+                            }
+                        }
                     )
                 )
                 .toggleStyle(.checkbox)
@@ -338,11 +354,12 @@ extension SettingsView {
 
                 // 警告は文言ごと並べると行が溢れるので、アイコンだけ出して
                 // 理由はツールチップに逃がす。
-                if loopDuration(draft: draft) < shortLoopWarningThreshold {
+                if isShortLoop {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundColor(.orange)
                         .help(model.localizedString("ループが短すぎると再生負荷が上がります"))
+                        .transition(Motion.pop)
                 }
 
                 Button {
@@ -362,6 +379,7 @@ extension SettingsView {
                     )
                 )
             }
+            .motionAnimation(Motion.quick, value: isShortLoop)
         }
     }
 
@@ -388,6 +406,7 @@ extension SettingsView {
                 )
                 .font(.caption)
                 .foregroundColor(wallpaperEditor.transferMessageIsError ? .orange : .green)
+                .transition(Motion.pop)
             }
 
             Spacer(minLength: 0)
@@ -417,6 +436,7 @@ extension SettingsView {
             .disabled(wallpaperEditor.isExporting || path.isEmpty)
             .help(model.localizedString("カット範囲だけを含む動画ファイルを作ります"))
         }
+        .motionAnimation(Motion.quick, value: wallpaperEditor.transferMessage)
     }
 
     private func trimEditorTimeLabel(_ seconds: Double) -> String {
@@ -450,7 +470,7 @@ extension SettingsView {
                 Label(model.localizedString("反映しました"), systemImage: "checkmark.circle.fill")
                     .font(.caption)
                     .foregroundColor(.green)
-                    .transition(.opacity)
+                    .transition(Motion.pop)
             }
 
             Spacer(minLength: 0)
@@ -480,7 +500,7 @@ extension SettingsView {
             .buttonStyle(.borderedProminent)
             .disabled(!isDirty)
         }
-        .animation(.easeInOut(duration: 0.15), value: wallpaperEditor.showsSavedFeedback)
+        .motionAnimation(Motion.quick, value: wallpaperEditor.showsSavedFeedback)
     }
 }
 

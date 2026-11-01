@@ -69,6 +69,7 @@ extension SettingsView {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 2)
+                        .motionAnimation(value: wallpapers.map(\.id))
                     }
                 }
                 .frame(minHeight: 320, maxHeight: 560)
@@ -175,6 +176,7 @@ struct ExternalWallpaperThumbnail: View {
                 Image(decorative: image, scale: 1)
                     .resizable()
                     .scaledToFill()
+                    .transition(.opacity)
             } else {
                 Image(systemName: wallpaper.webSource == nil ? "film.stack" : "globe")
                     .font(.system(size: 22))
@@ -183,6 +185,7 @@ struct ExternalWallpaperThumbnail: View {
         }
         .clipped()
         .contentShape(Rectangle())
+        .motionAnimation(Motion.quick, value: image != nil)
         .onAppear {
             if image == nil, let cached = Self.cache.object(forKey: Self.cacheKey(for: wallpaper)) {
                 image = cached

@@ -25,9 +25,14 @@ struct WebWallpaperThumbnailView: View {
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(isActive ? Color.accentColor.opacity(0.45) : Color.secondary.opacity(0.18), lineWidth: 1)
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.secondary.opacity(0.18), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.accentColor.opacity(isActive ? 0.45 : 0), lineWidth: 1)
+            }
         )
+        .motionAnimation(Motion.quick, value: isActive)
         .onAppear {
             thumbnailStore.loadIfNeeded(for: source)
         }

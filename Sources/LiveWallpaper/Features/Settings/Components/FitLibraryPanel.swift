@@ -55,6 +55,7 @@ extension SettingsView {
                                     cardWidth: layout.1,
                                     switchToWallpaperTabOnSelect: false,
                                     isSelected: selectedPath == path,
+                                    selectionGroupID: "editorWallpaperGridSelection",
                                     onSelect: {
                                         selectEditorVideo(path: path)
                                     }
@@ -63,6 +64,7 @@ extension SettingsView {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 2)
+                        .motionAnimation(Motion.standard, value: selectedPath)
                     }
                 }
                 .frame(minHeight: wallpaperLibraryGridMinHeight, maxHeight: 360)

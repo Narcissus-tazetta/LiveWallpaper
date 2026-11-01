@@ -24,6 +24,7 @@ extension SettingsView {
                     .padding(.vertical, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .settingsCardBackground()
+                    .transition(Motion.reveal)
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -36,6 +37,7 @@ extension SettingsView {
                     Text(importErrorMessage)
                         .font(.callout)
                         .foregroundColor(.orange)
+                        .transition(Motion.reveal)
                 }
 
                 wallpaperListContent
@@ -43,12 +45,20 @@ extension SettingsView {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .settingsCardBackground()
+            .motionAnimation(Motion.quick, value: model.mediaImportErrorMessage)
 
             if hasPlaybackControls {
-                playbackControlsPanel
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .floatingGlass(in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                ZStack {
+                    playbackControlsPanel
+                        .id("\(selectedAssignmentTarget):\(selectedScope)")
+                        .transition(Motion.crossfade)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .floatingGlass(in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .motionAnimation(Motion.quick, value: selectedAssignmentTarget)
+                .motionAnimation(Motion.quick, value: selectedScope)
+                .transition(Motion.reveal)
             }
         }
     }
@@ -134,6 +144,8 @@ extension SettingsView {
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .fixedSize()
+                .contentTransition(.numericText())
+                .motionAnimation(Motion.quick, value: displayedItemCount)
 
             if model.isWebWallpaperActive {
                 HStack(spacing: 4) {
@@ -144,8 +156,10 @@ extension SettingsView {
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
+                .transition(Motion.pop)
             }
         }
+        .motionAnimation(Motion.quick, value: model.isWebWallpaperActive)
     }
 
     /// プレイリストの選択・作成・名前変更・削除を1つに集約したメニュー。
@@ -434,9 +448,11 @@ extension SettingsView {
                     .buttonStyle(.plain)
                     .iconHelp(model.localizedString("変換をキャンセル"))
                 }
+                .transition(Motion.pop)
             }
 
         }
+        .motionAnimation(Motion.quick, value: model.isImportingMedia)
     }
 
     var webWallpaperURLInputSection: some View {
@@ -501,6 +517,7 @@ extension SettingsView {
         // so the grid sits inset and the scroll view reaches out into the card padding by
         // the same amount to keep the cards aligned with the header.
         let inset: CGFloat = 10
+        let entries = mergedListEntries
         return GeometryReader { proxy in
             let layout = wallpaperGridLayout(for: proxy.size.width - inset * 2)
             ScrollView {
@@ -509,7 +526,7 @@ extension SettingsView {
                     alignment: .leading,
                     spacing: wallpaperGridRowSpacing
                 ) {
-                    ForEach(mergedListEntries) { entry in
+                    ForEach(entries) { entry in
                         switch entry {
                         case .video(let path):
                             if let screenID = activeDisplayOverrideScreenID {
@@ -553,10 +570,38 @@ extension SettingsView {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(inset)
+                .motionAnimation(Motion.standard, value: activeGridSelectionKey)
+                .motionAnimation(value: entries.map(\.id))
             }
         }
         .frame(minHeight: wallpaperLibraryGridMinHeight, maxHeight: 340)
         .padding(-inset)
+    }
+
+    private var activeGridSelectionKey: String {
+        if let screenID = activeDisplayOverrideScreenID {
+            if let video = model.videoOverride(forScreenID: screenID) {
+                return "screen-video:\(screenID):\(video)"
+            }
+            if let web = model.webOverrideByScreenID[screenID] {
+                return "screen-web:\(screenID):\(web.uuidString)"
+            }
+            return "screen-none:\(screenID)"
+        }
+        if let spaceUUID = activeSpaceScopeUUID {
+            return "space:\(spaceUUID):\(model.spaceVideo(forSpaceUUID: spaceUUID) ?? "")"
+        }
+        switch selectedAssignmentTarget {
+        case .desktop:
+            if model.isWebWallpaperActive, let webID = model.currentWebWallpaperID {
+                return "desktop-web:\(webID.uuidString)"
+            }
+            return "desktop-video:\(model.currentVideoPath ?? "")"
+        case .lockScreen:
+            return "lock:\(model.lockScreenVideoPath ?? "")"
+        case .screenSaver:
+            return "saver:\(model.screenSaverVideoPath ?? "")"
+        }
     }
 
     /// 画面割り当てモード用の再生コントロール。専用プレイヤーは常にループする
@@ -566,37 +611,53 @@ extension SettingsView {
         let count = paths.count
         let currentIndex = model.videoOverride(forScreenID: screenID)
             .flatMap { paths.firstIndex(of: $0) }
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 14) {
                 Text(model.localizedString("この画面専用のプレイリストです"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
+            }
+
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Button {
+                        withMotion {
+                            model.playPreviousVideo(forScreenID: screenID)
+                        }
+                    } label: {
+                        Image(systemName: "backward.fill")
+                            .frame(width: 34)
+                    }
+                    .disabled(count < 2)
+                    .help(model.localizedString("前へ"))
+                    .accessibilityLabel(model.localizedString("前へ"))
+
+                    Button {
+                        withMotion {
+                            model.playNextVideo(forScreenID: screenID)
+                        }
+                    } label: {
+                        Image(systemName: "forward.fill")
+                            .frame(width: 34)
+                    }
+                    .disabled(count < 2)
+                    .help(model.localizedString("次へ"))
+                    .accessibilityLabel(model.localizedString("次へ"))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .fixedSize()
+
                 Spacer(minLength: 12)
+
                 if let currentIndex, count > 0 {
                     Text("\(currentIndex + 1) / \(count)")
                         .font(.caption)
+                        .monospacedDigit()
                         .foregroundColor(.secondary)
+                        .contentTransition(.numericText())
+                        .motionAnimation(Motion.quick, value: currentIndex)
                 }
-            }
-
-            HStack(spacing: 8) {
-                Button {
-                    model.playPreviousVideo(forScreenID: screenID)
-                } label: {
-                    Label(model.localizedString("前へ"), systemImage: "backward.fill")
-                }
-                .buttonStyle(.bordered)
-                .disabled(count < 2)
-
-                Button {
-                    model.playNextVideo(forScreenID: screenID)
-                } label: {
-                    Label(model.localizedString("次へ"), systemImage: "forward.fill")
-                }
-                .buttonStyle(.bordered)
-                .disabled(count < 2)
-
-                Spacer(minLength: 0)
             }
         }
     }
@@ -626,133 +687,187 @@ extension SettingsView {
         }
     }
 
+    private func playlistTransportButtons(registeredCount: Int) -> some View {
+        HStack(spacing: 6) {
+            Button {
+                withMotion {
+                    model.playPreviousVideo()
+                }
+            } label: {
+                Image(systemName: "backward.fill")
+                    .frame(width: 34)
+            }
+            .disabled(registeredCount < 2)
+            .help(model.localizedString("前へ"))
+            .accessibilityLabel(model.localizedString("前へ"))
+
+            Button { model.toggleManualPause() } label: {
+                Image(systemName: model.manualPauseActive ? "play.fill" : "pause.fill")
+                    .frame(width: 34)
+            }
+            .help(model.localizedString(model.manualPauseActive ? "再開" : "一時停止"))
+            .accessibilityLabel(model.localizedString(model.manualPauseActive ? "再開" : "一時停止"))
+
+            Button {
+                withMotion {
+                    model.playNextVideo()
+                }
+            } label: {
+                Image(systemName: "forward.fill")
+                    .frame(width: 34)
+            }
+            .disabled(registeredCount < 2)
+            .help(model.localizedString("次へ"))
+            .accessibilityLabel(model.localizedString("次へ"))
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .fixedSize()
+    }
+
+    private func autoSwitchControl(registeredCount: Int) -> some View {
+        HStack(spacing: 8) {
+            Text(model.localizedString("自動で次の壁紙へ"))
+                .fixedSize()
+                .accessibilityHidden(true)
+            Picker(model.localizedString("自動で次の壁紙へ"), selection: autoSwitchIntervalBinding) {
+                Text(model.localizedString("オフ")).tag(0)
+                Text(model.localizedString("5分")).tag(5)
+                Text(model.localizedString("15分")).tag(15)
+                Text(model.localizedString("30分")).tag(30)
+                Text(model.localizedString("1時間")).tag(60)
+                Text(model.localizedString("3時間")).tag(180)
+            }
+            .labelsHidden()
+            .fixedSize()
+            .disabled(registeredCount < 2 || model.pinCurrentVideo)
+        }
+    }
+
+    @ViewBuilder
+    private func playlistToggleLeading(registeredCount: Int) -> some View {
+        HStack(spacing: 4) {
+            Toggle(
+                model.localizedString("ループ再生"),
+                isOn: Binding<Bool>(
+                    get: { model.videoLoopEnabled },
+                    set: { model.setVideoLoopEnabled($0) }
+                )
+            )
+            .disabled(!model.isVideoLoopSettingEnabled)
+
+            helpIconButton(for: .videoLoop)
+        }
+
+        Toggle(
+            model.localizedString("プレイリスト連続再生"),
+            isOn: Binding<Bool>(
+                get: { model.playlistPlaybackEnabled },
+                set: { model.setPlaylistPlaybackEnabled($0) }
+            )
+        )
+    }
+
+    @ViewBuilder
+    private func playlistToggleTrailing(registeredCount: Int, showsPin: Bool) -> some View {
+        Toggle(
+            model.localizedString("シャッフル"),
+            isOn: Binding<Bool>(
+                get: { model.shufflePlaybackEnabled },
+                set: { model.setShufflePlaybackEnabled($0) }
+            )
+        )
+        .disabled(
+            !model.playlistPlaybackEnabled
+                || registeredCount < 2
+                || model.pinCurrentVideo
+        )
+
+        if showsPin {
+            Toggle(
+                model.localizedString("この壁紙で固定"),
+                isOn: Binding<Bool>(
+                    get: { model.pinCurrentVideo },
+                    set: { model.setPinCurrentVideo($0) }
+                )
+            )
+            .transition(Motion.pop)
+        }
+    }
+
+    @ViewBuilder
+    private func playlistPositionLabel(registeredCount: Int) -> some View {
+        if let index = model.currentPlaybackIndex {
+            Text("\(index + 1) / \(registeredCount)")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundColor(.secondary)
+                .contentTransition(.numericText())
+                .motionAnimation(Motion.quick, value: index)
+        }
+    }
+
     private var playlistPlaybackControls: some View {
         let registeredCount = model.registeredPlaybackEntries.count
-        return VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    compactToggle(
-                        model.localizedString("ループ再生"),
-                        isOn: Binding<Bool>(
-                            get: { model.videoLoopEnabled },
-                            set: { model.setVideoLoopEnabled($0) }
-                        )
-                    )
-                    // 無効時はアクセントカラーのまま暗くすると他のOFFトグルと違う色に沈んで見えるため、
-                    // 無効時だけsecondaryに切り替えてOFFトグルと同系統のグレーに揃える。
-                    .tint(model.isVideoLoopSettingEnabled ? Color.accentColor : Color.secondary)
-                    .disabled(!model.isVideoLoopSettingEnabled)
-
-                    helpIconButton(for: .videoLoop)
-                        .disabled(false)
+        let showsPin = model.canPinCurrentVideo || model.pinCurrentVideo
+        return VStack(alignment: .leading, spacing: 10) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    playlistTransportButtons(registeredCount: registeredCount)
+                    Spacer(minLength: 12)
+                    autoSwitchControl(registeredCount: registeredCount)
                 }
-
-                if expandedHelpTopics.contains(.videoLoop) {
-                    Text(
-                        model.localizedString(
-                            "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。"
-                        )
-                    )
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 8) {
+                    playlistTransportButtons(registeredCount: registeredCount)
+                    autoSwitchControl(registeredCount: registeredCount)
                 }
             }
 
-            HStack(spacing: 14) {
-                compactToggle(
-                    model.localizedString("プレイリスト連続再生"),
-                    isOn: Binding<Bool>(
-                        get: { model.playlistPlaybackEnabled },
-                        set: { model.setPlaylistPlaybackEnabled($0) }
+            // ラベルが長い言語では1行に収まらないため、収まらないときは縦に積む。
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 16) {
+                    playlistToggleLeading(registeredCount: registeredCount)
+                    playlistToggleTrailing(registeredCount: registeredCount, showsPin: showsPin)
+                    Spacer(minLength: 12)
+                    playlistPositionLabel(registeredCount: registeredCount)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 16) {
+                        playlistToggleLeading(registeredCount: registeredCount)
+                        Spacer(minLength: 12)
+                        playlistPositionLabel(registeredCount: registeredCount)
+                    }
+                    HStack(spacing: 16) {
+                        playlistToggleTrailing(registeredCount: registeredCount, showsPin: showsPin)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    playlistToggleLeading(registeredCount: registeredCount)
+                    playlistToggleTrailing(registeredCount: registeredCount, showsPin: showsPin)
+                    playlistPositionLabel(registeredCount: registeredCount)
+                }
+            }
+            .toggleStyle(.checkbox)
+
+            if expandedHelpTopics.contains(.videoLoop) {
+                Text(
+                    model.localizedString(
+                        "動画が1本のときは常にループします。複数あるときは、連続再生中は次の動画へ進みます。"
                     )
                 )
-
-                compactToggle(
-                    model.localizedString("シャッフル"),
-                    isOn: Binding<Bool>(
-                        get: { model.shufflePlaybackEnabled },
-                        set: { model.setShufflePlaybackEnabled($0) }
-                    )
-                )
-                .disabled(
-                    !model.playlistPlaybackEnabled
-                        || registeredCount < 2
-                        || model.pinCurrentVideo
-                )
-
-                if model.canPinCurrentVideo || model.pinCurrentVideo {
-                    compactToggle(
-                        model.localizedString("この壁紙で固定"),
-                        isOn: Binding<Bool>(
-                            get: { model.pinCurrentVideo },
-                            set: { model.setPinCurrentVideo($0) }
-                        )
-                    )
-                }
-
-                Spacer(minLength: 12)
-
-                if let index = model.currentPlaybackIndex {
-                    Text("\(index + 1) / \(registeredCount)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .transition(Motion.reveal)
             }
 
-            HStack(spacing: 8) {
-                Text(model.localizedString("自動で次の壁紙へ"))
-                    .accessibilityHidden(true)
-                Picker(model.localizedString("自動で次の壁紙へ"), selection: autoSwitchIntervalBinding) {
-                    Text(model.localizedString("オフ")).tag(0)
-                    Text(model.localizedString("5分")).tag(5)
-                    Text(model.localizedString("15分")).tag(15)
-                    Text(model.localizedString("30分")).tag(30)
-                    Text(model.localizedString("1時間")).tag(60)
-                    Text(model.localizedString("3時間")).tag(180)
-                }
-                .labelsHidden()
-                .fixedSize()
-                .disabled(registeredCount < 2 || model.pinCurrentVideo)
-
-                Spacer(minLength: 0)
-            }
-
-            HStack(spacing: 8) {
-                Button {
-                    model.playPreviousVideo()
-                } label: {
-                    Label(model.localizedString("前へ"), systemImage: "backward.fill")
-                }
-                .buttonStyle(.bordered)
-                .disabled(registeredCount < 2)
-
-                Button {
-                    model.toggleManualPause()
-                } label: {
-                    Label(
-                        model.localizedString(model.manualPauseActive ? "再開" : "一時停止"),
-                        systemImage: model.manualPauseActive ? "play.fill" : "pause.fill"
-                    )
-                }
-                .buttonStyle(.bordered)
-
-                Button {
-                    model.playNextVideo()
-                } label: {
-                    Label(model.localizedString("次へ"), systemImage: "forward.fill")
-                }
-                .buttonStyle(.bordered)
-                .disabled(registeredCount < 2)
-
-                Spacer(minLength: 0)
-            }
-
-            if model.canPinCurrentVideo || model.pinCurrentVideo {
+            if showsPin {
                 Text(model.localizedString("固定中は自動で壁紙が切り替わりません。再起動後も固定を維持します。"))
                     .font(.caption2)
                     .foregroundColor(.secondary)
+                    .transition(Motion.reveal)
             }
         }
+        .motionAnimation(Motion.quick, value: showsPin)
     }
 }

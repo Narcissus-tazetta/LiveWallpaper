@@ -31,26 +31,12 @@ extension SettingsView {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .onHover { hovering in
             hoveredTab = hovering ? tab : (hoveredTab == tab ? nil : hoveredTab)
         }
         .accessibilityLabel(title)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    }
-
-    func compactToggle(_ title: String, isOn: Binding<Bool>) -> some View {
-        HStack(spacing: 6) {
-            Text(title)
-                .accessibilityHidden(true)
-            // Outside a Form the switch defaults to the large size; match the Form rows.
-            Toggle(title, isOn: isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .fixedSize()
-        }
-        .fixedSize(horizontal: true, vertical: false)
     }
 
     /// プレイリスト編集中に名前行へ出すチェックボックスの汎用実装。ON=そのプレイリストに含まれる。
@@ -303,24 +289,29 @@ extension SettingsView {
     }
 
     func toggleHelp(_ topic: HelpTopic) {
-        if expandedHelpTopics.contains(topic) {
-            expandedHelpTopics.remove(topic)
-        } else {
-            expandedHelpTopics.insert(topic)
+        withMotion {
+            if expandedHelpTopics.contains(topic) {
+                expandedHelpTopics.remove(topic)
+            } else {
+                expandedHelpTopics.insert(topic)
+            }
         }
     }
 
     func helpIconButton(for topic: HelpTopic) -> some View {
-        Button(action: { toggleHelp(topic) }) {
+        let isHighlighted = expandedHelpTopics.contains(topic) || hoveredHelpTopic == topic
+        return Button(action: { toggleHelp(topic) }) {
             Image(
-                systemName: expandedHelpTopics.contains(topic) || hoveredHelpTopic == topic
+                systemName: isHighlighted
                     ? "questionmark.circle.fill"
                     : "questionmark.circle"
             )
+            .foregroundColor(isHighlighted ? .accentColor : .secondary)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         // Otherwise the first help icon takes the initial focus ring when a sheet opens.
         .focusable(false)
+        .motionAnimation(Motion.quick, value: isHighlighted)
         .onHover { over in
             hoveredHelpTopic = over ? topic : nil
         }
@@ -331,6 +322,7 @@ extension SettingsView {
     func helpFootnote(for topic: HelpTopic, text: String) -> some View {
         if expandedHelpTopics.contains(topic) {
             settingsFootnote(text)
+                .transition(Motion.reveal)
         }
     }
 

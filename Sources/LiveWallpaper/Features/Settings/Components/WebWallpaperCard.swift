@@ -6,7 +6,8 @@ extension SettingsView {
         cardWidth: CGFloat,
         playlistEditingID: UUID? = nil,
         assignmentTarget: WallpaperAssignmentTarget = .desktop,
-        displayScreenID: String? = nil
+        displayScreenID: String? = nil,
+        selectionGroupID: String = "mainWallpaperGridSelection"
     ) -> some View {
         let thumbnailWidth = max(cardWidth - 8, 1)
         let thumbnailHeight = (thumbnailWidth * 9 / 16).rounded()
@@ -17,17 +18,22 @@ extension SettingsView {
         }
         let isDisplayOverrideAssigned = model.hasLiveWebOverride(forSourceID: source.id)
         let isHovered = hoveredWebWallpaperID == source.id
-        let strokeColor: Color = isActive ? Color.accentColor : .clear
         // Web壁紙はロック画面壁紙の概念を持たないため、ロック画面タブでは
         // 選択(適用)操作のみ無効化する。削除・プレイリスト編集はどちらのタブでも可能。
         let isSelectable = assignmentTarget == .desktop
+        // Space scope selects a per-Space video; the globally active web wallpaper must not
+        // draw a second ring in the same matched-geometry group.
+        let isCardSelected = isSelectable && isActive && activeSpaceScopeUUID == nil
+        let ringColor = Color.accentColor
 
         let thumbnailButton = Button {
-            if let displayScreenID {
-                model.setWebOverride(id: source.id, forScreenID: displayScreenID)
-            } else {
-                model.stopExternalWallpaper()
-                model.selectWebWallpaper(id: source.id)
+            withMotion {
+                if let displayScreenID {
+                    model.setWebOverride(id: source.id, forScreenID: displayScreenID)
+                } else {
+                    model.stopExternalWallpaper()
+                    model.selectWebWallpaper(id: source.id)
+                }
             }
         } label: {
             ZStack {
@@ -49,6 +55,7 @@ extension SettingsView {
                                 .frame(width: 18, height: 18)
                                 .background(Color.purple, in: Circle())
                                 .help(model.localizedString("画面別に割り当て中"))
+                                .transition(Motion.pop)
                         }
                         Spacer(minLength: 0)
                         if isActive, displayScreenID == nil, model.pinCurrentVideo {
@@ -59,6 +66,7 @@ extension SettingsView {
                                 .background(.ultraThinMaterial, in: Capsule())
                                 // Steps aside for the hover "⋯" button, which takes the same corner.
                                 .padding(.trailing, isHovered ? 28 : 0)
+                                .transition(Motion.pop)
                         }
                     }
                     .padding(.top, 4)
@@ -67,9 +75,8 @@ extension SettingsView {
                 }
             }
             .frame(width: thumbnailWidth, height: thumbnailHeight)
-            .opacity(isSelectable ? 1 : 0.5)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .disabled(!isSelectable)
         .accessibilityLabel(source.displayName)
         .accessibilityAddTraits(isActive ? .isSelected : [])
@@ -124,14 +131,15 @@ extension SettingsView {
         .padding(4)
         .frame(width: cardWidth, alignment: .leading)
         .clipped()
-        .contentShape(RoundedRectangle(cornerRadius: 10))
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.secondary.opacity(0.08))
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.secondary.opacity(isHovered ? 0.16 : 0.08))
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(strokeColor, lineWidth: strokeColor == .clear ? 0 : 1.5)
+        .shadow(
+            color: .black.opacity(isHovered ? 0.28 : 0),
+            radius: isHovered ? 10 : 4,
+            y: isHovered ? 5 : 0
         )
         .overlay(alignment: .topTrailing) {
             if isHovered {
@@ -161,10 +169,30 @@ extension SettingsView {
                 )
                 .padding(6)
                 .iconHelp(model.localizedString("その他の操作"))
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.85)))
+                .transition(Motion.pop)
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isHovered)
+        .scaleEffect(isHovered && !reduceMotion ? 1.03 : 1)
+        .motionAnimation(Motion.hover, value: isHovered)
+        .motionAnimation(Motion.quick, value: model.pinCurrentVideo)
+        .motionAnimation(Motion.quick, value: [isActive, isDisplayOverrideAssigned])
+        .overlay {
+            if isCardSelected {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(ringColor.opacity(0.12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(ringColor, lineWidth: 2.5)
+                    )
+                    .shadow(color: ringColor.opacity(0.42), radius: 8, y: 0)
+                    .scaleEffect(isHovered && !reduceMotion ? 1.03 : 1)
+                    .motionAnimation(Motion.hover, value: isHovered)
+                    .matchedGeometryEffect(id: selectionGroupID, in: tabSelectionNamespace)
+                    .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
+        .zIndex(isHovered ? 3 : (isCardSelected ? 2 : 0))
         .onHover { hovering in
             if hovering {
                 hoveredWebWallpaperID = source.id
@@ -180,8 +208,10 @@ extension SettingsView {
     @ViewBuilder
     private func webWallpaperMenuItems(source: WebWallpaperSource, isSelectable: Bool) -> some View {
         Button(model.localizedString("適用")) {
-            model.stopExternalWallpaper()
-            model.selectWebWallpaper(id: source.id)
+            withMotion {
+                model.stopExternalWallpaper()
+                model.selectWebWallpaper(id: source.id)
+            }
         }
         .disabled(!isSelectable)
         if model.availableDisplayScreens().count > 1 || model.webOverrideByScreenID.values.contains(source.id) {
@@ -249,6 +279,7 @@ extension SettingsView {
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)
                 .background(color.opacity(0.85), in: Capsule())
+                .transition(Motion.pop)
         }
     }
 
