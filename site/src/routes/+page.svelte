@@ -2,4 +2,4 @@
     import Landing from "#lib/Landing.svelte";
 </script>
 
-<Landing lang="ja" />
+<Landing />

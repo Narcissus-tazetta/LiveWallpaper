@@ -13,10 +13,10 @@
         <path d="M7 4v16M17 4v16M3 8h4M3 16h4M17 8h4M17 16h4" /><path d="M7 12h10" />
     {:else if name === "cursor"}
         <path d="m5 4 6.5 15 2.2-6.3L20 10.5z" />
-    {:else if name === "playlist"}
-        <path d="M4 7h11M4 12h11M4 17h6" /><path d="m18 14 3 2-3 2z" />
-    {:else if name === "saver"}
-        <rect x="3" y="4" width="18" height="12" rx="2" /><path d="M9 20h6M12 16v4" />
+    {:else if name === "power"}
+        <rect x="2" y="7" width="17" height="10" rx="2" /><path d="M22 10v4" /><path d="m11 10-2 2h3l-2 2" />
+    {:else if name === "control"}
+        <path d="m7 9-3 3 3 3M17 9l3 3-3 3M14 7l-4 10" />
     {:else}
         <path d="M4 9.5 5.5 5h13L20 9.5" /><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0V19H4z" />
     {/if}

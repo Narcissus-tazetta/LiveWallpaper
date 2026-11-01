@@ -37,7 +37,7 @@
     }
 
     .copy.copied {
-        border-color: var(--accent-2);
-        color: var(--accent-2);
+        border-color: var(--fg);
+        color: var(--fg);
     }
 </style>
