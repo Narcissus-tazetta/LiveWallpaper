@@ -77,6 +77,9 @@ extension WallpaperModel {
                 return
             }
         }
+        AppLog.events.notice(
+            "screen \(screenID, privacy: .public) fixed web -> \(id?.uuidString ?? "none", privacy: .public)"
+        )
         persistWebOverrides()
         applyWebOverrideChange()
     }

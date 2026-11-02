@@ -50,6 +50,7 @@ extension WallpaperModel {
         if clearsPin, currentPlaybackEntry != .web(id) {
             clearPinCurrentVideo()
         }
+        AppLog.events.notice("shared wallpaper -> web \(id.uuidString, privacy: .public)")
         performSharedWallpaperTransition(to: .web(id)) {
             applyWebWallpaperSelection(id: id)
         }

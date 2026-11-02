@@ -592,7 +592,7 @@
 "診断情報を書き出す…" = "Export Diagnostics…";
 "不具合を報告…" = "Report a Problem…";
 "ログ" = "Logs";
-"アプリ・macOS・ディスプレイの情報、設定、直近のログを1つのzipにまとめます。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Bundles app, macOS and display info, your settings and recent logs into one zip. Attach it when you report a problem. Video files and web wallpaper URLs are not included.";
+"アプリ・macOS・ディスプレイの情報、設定、直近のログ、このアプリのクラッシュレポートを1つのzipにまとめます。アプリが突然終了したときは、起動し直してから書き出しても終了前の記録が入ります。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Bundles app, macOS and display info, your settings, recent logs and this app's crash reports into one zip. If the app quit unexpectedly, export after relaunching and the records from before it quit are included. Attach it when you report a problem. Video files and web wallpaper URLs are not included.";
 "診断情報の書き出しに失敗しました" = "Couldn’t export diagnostics";
 "上へ移動" = "Move Up";
 "下へ移動" = "Move Down";

@@ -30,7 +30,7 @@ extension SettingsView {
         Spacer()
       }
 
-      Text(model.localizedString("アプリ・macOS・ディスプレイの情報、設定、直近のログを1つのzipにまとめます。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません"))
+      Text(model.localizedString("アプリ・macOS・ディスプレイの情報、設定、直近のログ、このアプリのクラッシュレポートを1つのzipにまとめます。アプリが突然終了したときは、起動し直してから書き出しても終了前の記録が入ります。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません"))
         .font(.caption)
         .foregroundColor(.secondary)
     }

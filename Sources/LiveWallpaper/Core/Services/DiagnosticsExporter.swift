@@ -4,9 +4,10 @@ import Foundation
 import OSLog
 
 /// Bundles what a bug report needs into one zip: app/macOS/hardware info, the displays,
-/// the runtime state, the settings snapshot and this process's log. Video files and web
-/// wallpaper URLs are left out, and the home folder is written as `~` so the user name
-/// does not travel with the report.
+/// the runtime state, the settings snapshot, this process's log, the session log of earlier
+/// runs and this app's recent crash reports. Video files and web wallpaper URLs are left out,
+/// the home folder is written as `~` so the user name does not travel with the report, and
+/// crash reports lose their device and boot identifiers.
 @MainActor
 enum DiagnosticsExporter {
     static func export(from model: WallpaperModel, to outputURL: URL) async throws {
@@ -22,6 +23,9 @@ enum DiagnosticsExporter {
         let logText = try await Task.detached(priority: .userInitiated) {
             try recentLogText()
         }.value
+        let crashReports = try await Task.detached(priority: .userInitiated) {
+            try recentCrashReports(in: crashReportDirectories)
+        }.value
 
         try write(systemReport(), to: contentDir.appendingPathComponent("system.txt"))
         try write(
@@ -30,6 +34,14 @@ enum DiagnosticsExporter {
         )
         try write(settingsJSON(model: model), to: contentDir.appendingPathComponent("settings.json"))
         try write(logText, to: contentDir.appendingPathComponent("log.txt"))
+        try write(sessionLogText(), to: contentDir.appendingPathComponent("session-log.txt"))
+        if !crashReports.isEmpty {
+            let crashDir = contentDir.appendingPathComponent("crash-reports")
+            try FileManager.default.createDirectory(at: crashDir, withIntermediateDirectories: true)
+            for (name, text) in crashReports {
+                try write(text, to: crashDir.appendingPathComponent(name))
+            }
+        }
 
         try PackageArchiveWriter().createPackage(from: contentDir, outputURL: outputURL)
     }
@@ -177,6 +189,95 @@ enum DiagnosticsExporter {
             lines = ["… \(lines.count - maxLines) older lines omitted …"] + lines.suffix(maxLines)
         }
         return lines.isEmpty ? "(no log entries)\n" : lines.joined(separator: "\n") + "\n"
+    }
+
+    private static func sessionLogText() -> String {
+        // A missing or unreadable session log is itself a finding, not a reason to abort.
+        do {
+            return try SessionLog.recentText()
+        } catch {
+            return "session log unreadable: \(error.localizedDescription)\n"
+        }
+    }
+
+    // MARK: - Crash reports
+
+    nonisolated static let crashReportDirectories: [URL] = {
+        let reports = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true)
+        return [reports, reports.appendingPathComponent("Retired", isDirectory: true)]
+    }()
+
+    /// Fields that identify the Mac, the boot or the report itself rather than the crash.
+    nonisolated static let crashReportIdentifyingKeys: Set<String> = [
+        "crashReporterKey", "bootSessionUUID", "sleepWakeUUID", "incident", "incident_id",
+        "deviceIdentifierForVendor", "trialInfo", "logWritingSignature"
+    ]
+
+    /// The newest reports of this app from the last 30 days, redacted, keyed by file name.
+    /// Files named after other processes are never opened.
+    nonisolated static func recentCrashReports(
+        in directories: [URL], now: Date = Date(), limit: Int = 5
+    ) throws -> [(String, String)] {
+        let cutoff = now.addingTimeInterval(-30 * 24 * 60 * 60)
+        var candidates: [(url: URL, date: Date)] = []
+        for directory in directories where FileManager.default.fileExists(atPath: directory.path) {
+            let urls = try FileManager.default.contentsOfDirectory(
+                at: directory, includingPropertiesForKeys: [.contentModificationDateKey]
+            )
+            for url in urls where isOwnCrashReport(fileName: url.lastPathComponent) {
+                let date = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+                if let date, date >= cutoff {
+                    candidates.append((url, date))
+                }
+            }
+        }
+        return try candidates.sorted { $0.date > $1.date }.prefix(limit).map { candidate in
+            let name = candidate.url.lastPathComponent
+            let text = try String(contentsOf: candidate.url, encoding: .utf8)
+            // A report that does not parse cannot be redacted, so only the failure goes in.
+            do {
+                return (name, try redactedCrashReport(text))
+            } catch {
+                return (name + ".txt", "could not redact \(name): \(error.localizedDescription)\n")
+            }
+        }
+    }
+
+    /// `LiveWallpaper-<date>.ips`, plus the `<Kind>_LiveWallpaper-<date>.ips` form macOS uses
+    /// for resource and user-fault reports.
+    nonisolated static func isOwnCrashReport(fileName: String) -> Bool {
+        guard fileName.hasSuffix(".ips") else { return false }
+        let processPart = fileName.split(separator: "_", maxSplits: 1).last.map(String.init) ?? fileName
+        return processPart.hasPrefix("LiveWallpaper-")
+    }
+
+    /// An `.ips` file is a one-line JSON header followed by a JSON body. Both are rewritten
+    /// without the identifying fields; stacks, images and the exception stay as they are.
+    nonisolated static func redactedCrashReport(_ text: String) throws -> String {
+        let parts = text.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+        let jsonParts = try parts.map { part -> Any in
+            try JSONSerialization.jsonObject(with: Data(part.utf8), options: [.fragmentsAllowed])
+        }
+        let rewritten = try jsonParts.enumerated().map { index, object -> String in
+            let options: JSONSerialization.WritingOptions = index == 0
+                ? [.withoutEscapingSlashes, .sortedKeys]
+                : [.withoutEscapingSlashes, .sortedKeys, .prettyPrinted]
+            let data = try JSONSerialization.data(withJSONObject: removingIdentifyingKeys(object), options: options)
+            return String(decoding: data, as: UTF8.self)
+        }
+        return rewritten.joined(separator: "\n") + "\n"
+    }
+
+    nonisolated private static func removingIdentifyingKeys(_ object: Any) -> Any {
+        if let dictionary = object as? [String: Any] {
+            return dictionary.filter { !crashReportIdentifyingKeys.contains($0.key) }
+                .mapValues(removingIdentifyingKeys)
+        }
+        if let array = object as? [Any] {
+            return array.map(removingIdentifyingKeys)
+        }
+        return object
     }
 
     // MARK: - Helpers

@@ -592,7 +592,7 @@
 "診断情報を書き出す…" = "Exportar Diagnóstico…";
 "不具合を報告…" = "Relatar um Problema…";
 "ログ" = "Registros";
-"アプリ・macOS・ディスプレイの情報、設定、直近のログを1つのzipにまとめます。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Reúne em um único arquivo zip as informações do app, do macOS e das telas, seus ajustes e os registros recentes. Anexe-o ao relatar um problema. Arquivos de vídeo e URLs de imagens de fundo web não são incluídos.";
+"アプリ・macOS・ディスプレイの情報、設定、直近のログ、このアプリのクラッシュレポートを1つのzipにまとめます。アプリが突然終了したときは、起動し直してから書き出しても終了前の記録が入ります。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Reúne em um único arquivo zip as informações do app, do macOS e das telas, seus ajustes, os registros recentes e os relatórios de falha deste app. Se o app fechou inesperadamente, exporte depois de abri-lo novamente e os registros de antes do fechamento serão incluídos. Anexe-o ao relatar um problema. Arquivos de vídeo e URLs de imagens de fundo web não são incluídos.";
 "診断情報の書き出しに失敗しました" = "Não foi possível exportar o diagnóstico";
 "上へ移動" = "Mover para Cima";
 "下へ移動" = "Mover para Baixo";

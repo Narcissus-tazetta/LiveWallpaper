@@ -592,7 +592,7 @@
 "診断情報を書き出す…" = "Xuất thông tin chẩn đoán…";
 "不具合を報告…" = "Báo cáo sự cố…";
 "ログ" = "Bản ghi";
-"アプリ・macOS・ディスプレイの情報、設定、直近のログを1つのzipにまとめます。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Gộp thông tin về ứng dụng, macOS và màn hình, cài đặt của bạn và các bản ghi gần đây vào một tệp zip. Hãy đính kèm tệp này khi báo cáo sự cố. Không bao gồm tệp video và URL của hình nền web.";
+"アプリ・macOS・ディスプレイの情報、設定、直近のログ、このアプリのクラッシュレポートを1つのzipにまとめます。アプリが突然終了したときは、起動し直してから書き出しても終了前の記録が入ります。不具合を報告するときに添付してください。動画ファイルや Web 壁紙の URL は含まれません" = "Gộp thông tin về ứng dụng, macOS và màn hình, cài đặt của bạn, các bản ghi gần đây và báo cáo sự cố của ứng dụng này vào một tệp zip. Nếu ứng dụng bị thoát đột ngột, hãy xuất sau khi mở lại, các bản ghi trước khi thoát vẫn được đưa vào. Hãy đính kèm tệp này khi báo cáo sự cố. Không bao gồm tệp video và URL của hình nền web.";
 "診断情報の書き出しに失敗しました" = "Không thể xuất thông tin chẩn đoán";
 "上へ移動" = "Di chuyển lên";
 "下へ移動" = "Di chuyển xuống";

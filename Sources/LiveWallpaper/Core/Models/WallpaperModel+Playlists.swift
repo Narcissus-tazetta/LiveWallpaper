@@ -360,6 +360,9 @@ extension WallpaperModel {
         guard !entries.isEmpty else {
             return
         }
+        if advancingPlaylist {
+            AppLog.events.notice("playlist advancing (\(entries.count) entries)")
+        }
         guard entries.count > 1 else {
             if let entry = entries.first {
                 selectPlaybackEntry(entry, clearsPin: !advancingPlaylist)
@@ -488,6 +491,7 @@ extension WallpaperModel {
             removeRegisteredVideo(path: trimmed)
             return
         }
+        AppLog.events.notice("shared wallpaper -> \(URL(fileURLWithPath: trimmed).lastPathComponent, privacy: .public)")
         performSharedWallpaperTransition(to: .video(trimmed)) {
             applyRegisteredVideoSelection(path: trimmed, clearsPin: clearsPin)
         }

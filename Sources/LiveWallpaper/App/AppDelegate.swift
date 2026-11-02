@@ -59,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_: Notification) {
+        SessionLog.start()
         NSApp.setActivationPolicy(.accessory)
         wallpaperModel.startFocusModeMonitoring()
         wallpaperModel.startExternalWallpaperMonitoring()
@@ -95,6 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SceneScriptStorage.shared.flush()
         wallpaperModel.removeScreenSaverBeforeExit()
         wallpaperModel.restoreLockScreenSyncBeforeExit()
+        SessionLog.finish()
     }
 
     private func setupScreenUnlockObserver() {
