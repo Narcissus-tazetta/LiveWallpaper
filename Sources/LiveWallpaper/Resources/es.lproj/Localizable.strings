@@ -1721,3 +1721,4 @@
 "新しい版のLiveWallpaperで作ったプリセットがあります。この版では使えません。LiveWallpaperを更新してください。" = "Hay ajustes preestablecidos creados con una versión más reciente de LiveWallpaper. Esta versión no puede usarlos. Actualiza LiveWallpaper.";
 "新しい版のLiveWallpaperで作られたシーンがあります" = "Hay escenas creadas con una versión más reciente de LiveWallpaper";
 "この版では編集できません。動画としては再生できます。LiveWallpaperを更新すると編集できます。" = "No se pueden editar en esta versión, pero se siguen reproduciendo como vídeos. Actualiza LiveWallpaper para editarlas.";
+"シーンは効果を半分の解像度で計算し、30fps までで描きます。" = "Las escenas calculan sus efectos a la mitad de resolución y se dibujan a 30 fps como máximo.";

@@ -12,6 +12,7 @@ extension WallpaperModel {
         UserDefaults.standard.set(enabled, forKey: PrefsKey.lightweightMode)
         applyLightweightSettings()
         requestPlaybackReconfiguration()
+        refreshSceneHosts()
     }
 
     func setAudioEnabled(_ enabled: Bool) {

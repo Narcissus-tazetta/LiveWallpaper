@@ -299,4 +299,15 @@ final class SceneScriptTests: XCTestCase {
         document.scripts = [script]
         XCTAssertTrue(document.hasLiveInteraction)
     }
+
+    func testAudioAloneNeedsLiveDrawingOnlyWhileTheSceneListens() {
+        var script = SceneScript(source: "export function update(){}", layerIDs: [])
+        script.isAuthorized = true
+        script.readsAudio = true
+        var document = SceneDocument(canvasWidth: 100, canvasHeight: 100, layers: [SceneLayer(name: "BG", imageFile: "bg.png")])
+        document.scripts = [script]
+        XCTAssertTrue(document.usesAudio)
+        XCTAssertTrue(document.hasLiveInteraction(listensToAudio: true))
+        XCTAssertFalse(document.hasLiveInteraction(listensToAudio: false))
+    }
 }

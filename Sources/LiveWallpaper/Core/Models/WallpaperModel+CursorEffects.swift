@@ -194,7 +194,9 @@ extension WallpaperModel {
             $currentVideoPath.map { _ in () }.eraseToAnyPublisher(),
             $videoOverrideByScreenID.map { _ in () }.eraseToAnyPublisher(),
             $videoBySpaceUUID.map { _ in () }.eraseToAnyPublisher(),
-            $currentSpaceUUIDByDisplayID.map { _ in () }.eraseToAnyPublisher()
+            $currentSpaceUUIDByDisplayID.map { _ in () }.eraseToAnyPublisher(),
+            // Turning sound reaction on or off decides whether the scene is drawn live.
+            NotificationCenter.default.publisher(for: SceneSoundReaction.didChange).map { _ in () }.eraseToAnyPublisher()
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] in

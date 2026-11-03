@@ -147,6 +147,13 @@ final class SceneMetalLayer: CAMetalLayer {
     var didDraw: (() -> Void)?
     /// Called on the main thread once the GPU has finished a frame.
     var frameDidComplete: (() -> Void)?
+    var effectResolutionScale: Float = 1 {
+        didSet {
+            guard effectResolutionScale != oldValue else { return }
+            renderer?.effectResolutionScale = effectResolutionScale
+            setNeedsDisplay()
+        }
+    }
     var maximumFramesPerSecond: Float? {
         didSet {
             if maximumFramesPerSecond != oldValue {
@@ -209,6 +216,7 @@ final class SceneMetalLayer: CAMetalLayer {
         } else {
             let renderer = try SceneRenderer(document: document, videoPath: videoPath)
             renderer.decodesVideoAhead = true
+            renderer.effectResolutionScale = effectResolutionScale
             renderer.timeOfDay = timeOfDay
             self.renderer = renderer
             self.videoPath = videoPath

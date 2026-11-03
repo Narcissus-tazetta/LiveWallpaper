@@ -1721,3 +1721,4 @@
 "新しい版のLiveWallpaperで作ったプリセットがあります。この版では使えません。LiveWallpaperを更新してください。" = "LiveWallpaper’ın daha yeni bir sürümüyle oluşturulmuş ön ayarlar var. Bu sürüm onları kullanamaz. LiveWallpaper’ı güncelleyin.";
 "新しい版のLiveWallpaperで作られたシーンがあります" = "LiveWallpaper’ın daha yeni bir sürümüyle oluşturulmuş sahneler var";
 "この版では編集できません。動画としては再生できます。LiveWallpaperを更新すると編集できます。" = "Bu sürümde düzenlenemezler ancak video olarak oynatılmaya devam ederler. Düzenlemek için LiveWallpaper’ı güncelleyin.";
+"シーンは効果を半分の解像度で計算し、30fps までで描きます。" = "Sahneler efektlerini yarı çözünürlükte hesaplar ve en fazla 30 fps ile çizilir.";

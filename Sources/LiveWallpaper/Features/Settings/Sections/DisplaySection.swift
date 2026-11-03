@@ -181,6 +181,7 @@ extension SettingsView {
       header: SettingsSectionHeader(title: model.localizedString("パフォーマンス・省電力"))
     ) {
       Toggle(model.localizedString("再生の軽量モード（省電力）"), isOn: lightweightModeBinding)
+      settingsFootnote(model.localizedString("シーンは効果を半分の解像度で計算し、30fps までで描きます。"))
       batteryPlaybackPolicyRow
       if #available(macOS 26, *) {
         hdrDisplayRow

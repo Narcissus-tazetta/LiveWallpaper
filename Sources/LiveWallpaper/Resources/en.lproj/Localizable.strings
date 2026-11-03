@@ -1721,3 +1721,4 @@
 "新しい版のLiveWallpaperで作ったプリセットがあります。この版では使えません。LiveWallpaperを更新してください。" = "There are presets made with a newer version of LiveWallpaper. This version can’t use them. Update LiveWallpaper.";
 "新しい版のLiveWallpaperで作られたシーンがあります" = "Some scenes were made with a newer version of LiveWallpaper";
 "この版では編集できません。動画としては再生できます。LiveWallpaperを更新すると編集できます。" = "They can’t be edited in this version, but they still play as videos. Update LiveWallpaper to edit them.";
+"シーンは効果を半分の解像度で計算し、30fps までで描きます。" = "Scenes compute their effects at half resolution and draw at up to 30 fps.";

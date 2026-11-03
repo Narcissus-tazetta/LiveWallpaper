@@ -193,6 +193,7 @@ final class PlayerView: NSView {
         freeClock: Bool,
         timeOfDay: SceneTimeOfDay,
         maximumFramesPerSecond: Float?,
+        effectResolutionScale: Float = 1,
         storageScreen: String,
         userProperties: [String: WebPropertyValue]? = nil
     ) throws {
@@ -219,6 +220,7 @@ final class PlayerView: NSView {
         sceneUsesFreeClock = freeClock
         sceneRunsInRealTime = freeClock && document.requiresRealTimePlayback
         layer.maximumFramesPerSecond = maximumFramesPerSecond
+        layer.effectResolutionScale = effectResolutionScale
         layer.timeOfDay = timeOfDay
         layer.storageScreen = storageScreen
         CATransaction.begin()

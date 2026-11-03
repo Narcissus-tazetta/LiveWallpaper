@@ -106,21 +106,65 @@ extension SceneModelRenderer {
         return (joints, weights)
     }
 
-    /// The caster's vertex positions in its own units, posed by its rig when it has one.
-    private static func positions(_ shape: SceneModelLayerFrame.Shape, pose: [simd_float4x4]?) -> [SIMD4<Float>] {
+    /// The box around every caster's vertices in scene pixels, posed by their rigs.
+    /// Converted models run to millions of vertices, so each caster's box is kept while
+    /// it does not move. Splitting the rest over cores kept the frame rate but cost about
+    /// half again as much CPU in all (measured), so it runs on this thread.
+    private func casterBounds(
+        _ casters: [SceneModelLayerFrame], poses: [Int: [simd_float4x4]]
+    ) -> (low: SIMD3<Float>, high: SIMD3<Float>) {
+        let previous = shadowState.bounds
+        var kept: [ShadowBounds] = []
+        var low = SIMD3<Float>(repeating: .infinity), high = SIMD3<Float>(repeating: -.infinity)
+        for index in casters.indices {
+            let key = ShadowBoundsKey(
+                world: casters[index].world, pose: poses[index],
+                shapes: casters[index].shapes.filter { !$0.vertices.isEmpty && $0.components & 1 != 0 }
+            )
+            var box = previous.first { $0.key.isSame(as: key) }
+            if box == nil {
+                var casterLow = SIMD3<Float>(repeating: .infinity), casterHigh = SIMD3<Float>(repeating: -.infinity)
+                for shape in key.shapes {
+                    let (shapeLow, shapeHigh) = Self.bounds(of: shape, pose: key.pose, world: key.world)
+                    casterLow = simd_min(casterLow, shapeLow)
+                    casterHigh = simd_max(casterHigh, shapeHigh)
+                }
+                box = ShadowBounds(key: key, low: casterLow, high: casterHigh)
+            }
+            kept.append(box!)
+            low = simd_min(low, box!.low)
+            high = simd_max(high, box!.high)
+        }
+        shadowState.bounds = kept
+        return (low, high)
+    }
+
+    private static func bounds(
+        of shape: SceneModelLayerFrame.Shape, pose: [simd_float4x4]?, world: simd_float4x4
+    ) -> (SIMD3<Float>, SIMD3<Float>) {
         let stride = shape.stride
         let skin = pose == nil ? nil : skinOffsets(shape)
-        return Swift.stride(from: 0, to: shape.vertices.count - stride + 1, by: stride).map { start in
-            let p = SIMD4(shape.vertices[start], shape.vertices[start + 1], shape.vertices[start + 2], 1)
-            guard let pose, let skin else { return p }
-            var posed = SIMD4<Float>(repeating: 0)
-            for slot in 0 ..< 4 {
-                let weight = shape.vertices[start + skin.weights / 4 + slot]
-                let joint = Int(shape.vertices[start + skin.joints / 4 + slot].bitPattern)
-                if weight > 0, pose.indices.contains(joint) { posed += pose[joint] * p * weight }
+        let count = shape.vertices.count >= stride ? (shape.vertices.count - stride) / stride + 1 : 0
+        var low = SIMD3<Float>(repeating: .infinity), high = SIMD3<Float>(repeating: -.infinity)
+        shape.vertices.withUnsafeBufferPointer { vertices in
+            for vertex in 0 ..< count {
+                let start = vertex * stride
+                let p = SIMD4(vertices[start], vertices[start + 1], vertices[start + 2], 1)
+                var position = p
+                if let pose, let skin {
+                    position = SIMD4<Float>(repeating: 0)
+                    for slot in 0 ..< 4 {
+                        let weight = vertices[start + skin.weights / 4 + slot]
+                        let joint = Int(vertices[start + skin.joints / 4 + slot].bitPattern)
+                        if weight > 0, pose.indices.contains(joint) { position += pose[joint] * p * weight }
+                    }
+                }
+                let placed = world * position
+                low = simd_min(low, SIMD3(placed.x, placed.y, placed.z))
+                high = simd_max(high, SIMD3(placed.x, placed.y, placed.z))
             }
-            return posed
         }
+        return (low, high)
     }
 
     private func shadowTarget(width: Int, height: Int, slot: Int) throws -> (color: MTLTexture, depth: MTLTexture) {
@@ -203,16 +247,7 @@ extension SceneModelRenderer {
         let size = Self.shadowSize
         var bounds: (center: SIMD3<Float>, radius: Float)?
         if lights.contains(where: { $0.kind == .directional }) {
-            var low = SIMD3<Float>(repeating: .infinity), high = SIMD3<Float>(repeating: -.infinity)
-            for (index, layer) in casters.enumerated() {
-                for shape in layer.shapes where !shape.vertices.isEmpty && shape.components & 1 != 0 {
-                    for position in Self.positions(shape, pose: poses[index]) {
-                        let world = layer.world * position
-                        low = simd_min(low, SIMD3(world.x, world.y, world.z))
-                        high = simd_max(high, SIMD3(world.x, world.y, world.z))
-                    }
-                }
-            }
+            let (low, high) = casterBounds(casters, poses: poses)
             if low.x <= high.x {
                 bounds = ((low + high) / 2, max(simd_length(high - low) / 2 * 1.02, 1))
             }
@@ -357,10 +392,33 @@ extension SceneModelRenderer {
         var weights: Int?
     }
 
+    /// What a caster's box depends on. The shapes are held, so their vertex storage stays
+    /// the same only while nothing has written to it.
+    struct ShadowBoundsKey {
+        var world: simd_float4x4
+        var pose: [simd_float4x4]?
+        var shapes: [SceneModelLayerFrame.Shape]
+
+        func isSame(as other: ShadowBoundsKey) -> Bool {
+            world == other.world && pose == other.pose && shapes.count == other.shapes.count
+                && zip(shapes, other.shapes).allSatisfy { a, b in
+                    a.components == b.components && a.vertices.count == b.vertices.count
+                        && a.vertices.withUnsafeBufferPointer { x in b.vertices.withUnsafeBufferPointer { y in x.baseAddress == y.baseAddress } }
+                }
+        }
+    }
+
+    struct ShadowBounds {
+        var key: ShadowBoundsKey
+        var low: SIMD3<Float>
+        var high: SIMD3<Float>
+    }
+
     final class ShadowState {
         var functions: (MTLFunction, MTLFunction, MTLFunction)?
         var pipelines: [ShadowPipelineKey: MTLRenderPipelineState] = [:]
         var targets: [Int: (color: MTLTexture, depth: MTLTexture)] = [:]
         var open: MTLTexture?
+        var bounds: [ShadowBounds] = []
     }
 }

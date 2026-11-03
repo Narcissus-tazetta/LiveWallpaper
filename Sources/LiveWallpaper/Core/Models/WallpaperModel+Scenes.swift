@@ -118,6 +118,7 @@ extension WallpaperModel {
         }
         sceneDocumentsByPath = restored
         scenesFromNewerVersion = fromNewerVersion
+        Self.removeAbandonedBakeFiles(in: URL(fileURLWithPath: cacheDirectory))
         // The app quit before an edit was baked.
         for path in unbaked {
             scheduleSceneBake(path: path)
@@ -1221,6 +1222,31 @@ extension WallpaperModel {
         Self.removeLeftovers(of: urls)
     }
 
+    /// A bake's staged files are removed when it ends, but not when the app was killed
+    /// mid-bake; each such 60-second 4K file is tens of MB. Another running copy of the
+    /// app (a development build beside the installed one) shares the folder, and a bake
+    /// in progress keeps touching its file, so only files idle for an hour go.
+    nonisolated static func removeAbandonedBakeFiles(in directory: URL, now: Date = Date()) {
+        let names: [String]
+        do {
+            names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        } catch {
+            AppLog.windowRefresh.error(
+                "scene cleanup listing failed path=\(directory.path, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+            return
+        }
+        let abandoned = names.filter { $0.hasPrefix(".scene-") || $0.hasPrefix("..scene-") }
+            .map { directory.appendingPathComponent($0) }
+            .filter { url in
+                guard let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
+                    return false
+                }
+                return now.timeIntervalSince(modified) > 3600
+            }
+        removeLeftovers(of: abandoned)
+    }
+
     // MARK: - Desktop
 
     /// Shows or hides the live scene on each screen to match what it plays. Called
@@ -1239,10 +1265,17 @@ extension WallpaperModel {
     /// at the cost of any other video, so the scene is drawn live only when it reacts
     /// to the cursor or its video is out of date.
     func refreshSceneHosts() {
-        let maximumFramesPerSecond: Float? = switch frameRateLimit {
+        let lightweight = effectiveLightweightMode
+        var maximumFramesPerSecond: Float? = switch frameRateLimit {
         case .off: nil
         case .fps30: 30
         case .fps60: 60
+        }
+        // Lightweight mode trades sharpness and the smoothness of cursor reactions for
+        // GPU time: effects at half the displayed size (a quarter of the pixels), and no
+        // more than the 30 fps a scene already runs at while the cursor rests.
+        if lightweight {
+            maximumFramesPerSecond = min(maximumFramesPerSecond ?? 30, 30)
         }
         for view in playerViews {
             guard let window = view.window, let displayID = displayIDByWindow[ObjectIdentifier(window)],
@@ -1261,7 +1294,8 @@ extension WallpaperModel {
             }
             // Scripts decide when some sounds start and how loud they are, and only a live scene runs them.
             let scriptsDriveSound = audioEnabled && document.soundsNeedScripts
-            guard document.hasLiveInteraction || isStale || scriptsDriveSound else {
+            let listens = SceneSoundReaction.isEnabled(videoPath: path)
+            guard document.hasLiveInteraction(listensToAudio: listens) || isStale || scriptsDriveSound else {
                 if view.isShowingScene {
                     AppLog.windowRefresh.info(
                         "scene video display=\(displayID, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
@@ -1281,6 +1315,7 @@ extension WallpaperModel {
                     document, videoPath: path, freeClock: isStale || document.requiresRealTimePlayback,
                     timeOfDay: document.timeOfDay(at: Date()),
                     maximumFramesPerSecond: maximumFramesPerSecond,
+                    effectResolutionScale: lightweight ? 0.5 : 1,
                     storageScreen: Self.storageScreen(forDisplayID: displayID),
                     userProperties: userProps
                 )

@@ -1561,9 +1561,15 @@ struct SceneDocument: Codable, Equatable, Sendable {
     /// or dynamic media artwork) that require drawing live on the desktop rather than
     /// playing the baked 60fps video.
     var hasLiveInteraction: Bool {
+        hasLiveInteraction(listensToAudio: true)
+    }
+
+    /// A scene not allowed to listen gets no audio, as in its baked video, so its audio
+    /// effects alone do not call for drawing it live.
+    func hasLiveInteraction(listensToAudio: Bool) -> Bool {
         layers.contains(where: \.usesCursor)
             || links.contains { $0.input.usesCursor && $0.hasEffect }
-            || usesAudio
+            || (listensToAudio && usesAudio)
             || layers.contains { $0.isVisible && $0.usesMediaArtwork }
             || scripts.contains { $0.requiresLiveInteraction }
     }
