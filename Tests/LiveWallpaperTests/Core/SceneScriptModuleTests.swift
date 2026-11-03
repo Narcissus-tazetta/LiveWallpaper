@@ -76,7 +76,7 @@ final class SceneScriptModuleTests: XCTestCase {
           return [{id:c.targets[0].id, values:{offsetX:0.1}}];
         }
         """, modules: [:])
-        let evaluator = SceneFrameEvaluator(budget: .init(perScript: 0.001, perFrame: 0.016))
+        let evaluator = SceneFrameEvaluator(budget: .init(perScript: 0.001, perFrame: 0.016, moduleStart: 0.1, moduleStartLimit: 1))
         _ = try evaluator.evaluate(document, input: .init(time: 1), timeOfDay: .day, failOnError: false)
         var stopped = false
         for i in 0 ..< 40 {
@@ -176,7 +176,7 @@ final class SceneScriptModuleTests: XCTestCase {
             let document = scene(source: source, modules: [:])
             let start = ProcessInfo.processInfo.systemUptime
             XCTAssertThrowsError(try SceneFrameEvaluator().evaluate(document, input: .rest, timeOfDay: .day), source)
-            XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - start, 0.5)
+            XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - start, SceneFrameEvaluator.Budget.live.moduleStart + 0.5)
         }
     }
 

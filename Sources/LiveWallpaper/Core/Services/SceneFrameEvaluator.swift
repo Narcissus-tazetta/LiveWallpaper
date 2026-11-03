@@ -30,16 +30,26 @@ struct SceneEvaluatedFrame {
 }
 
 final class SceneFrameEvaluator {
-    /// Wall time for one script and for all scripts of one frame.
+    /// Wall time for one script and for all scripts of one frame, and for the first
+    /// run of a module bundle, which also loads its modules and runs every init: it
+    /// starts at `moduleStart` and doubles after each start that ran out of time, up to
+    /// `moduleStartLimit`.
     struct Budget {
         var perScript: TimeInterval
         var perFrame: TimeInterval
+        var moduleStart: TimeInterval
+        var moduleStartLimit: TimeInterval
 
-        /// Drawing on screen has to keep its frame rate.
-        static let live = Budget(perScript: 0.008, perFrame: 0.016)
+        /// Drawing on screen has to keep its frame rate. The scripts run off the main
+        /// thread, so a long first run only delays when they start, while each start
+        /// that runs out of time throws the half-loaded bundle away and compiles it again
+        /// (the largest converted bundles took 0.39 s on an M5). The limit keeps a start
+        /// that never ends from holding a core for longer at each retry.
+        static let live = Budget(perScript: 0.008, perFrame: 0.016, moduleStart: 1, moduleStartLimit: 2)
         /// A bake has no deadline, and a frame that ran out of time fails the whole
-        /// video, so this only has to stop code that never ends.
-        static let offline = Budget(perScript: 0.25, perFrame: 1)
+        /// video, so this only has to stop code that never ends. A converted bundle that
+        /// takes about 31 ms a frame still failed a 60 s bake at 0.25 s a script, minutes in.
+        static let offline = Budget(perScript: 5, perFrame: 10, moduleStart: 10, moduleStartLimit: 10)
     }
 
     private let budget: Budget
@@ -306,7 +316,8 @@ final class SceneFrameEvaluator {
                 do {
                     output = try runtime.evaluate(
                         script, input: context, elapsedTime: input.time, layers: document.layers, rigs: document.rigs, storage: storage,
-                        perScript: budget.perScript * scale, deadline: deadline
+                        perScript: budget.perScript * scale, deadline: deadline,
+                        moduleStart: budget.moduleStart, moduleStartLimit: budget.moduleStartLimit
                     )
                     if scale > 1, ProcessInfo.processInfo.systemUptime - started < budget.perScript * scale / 4 {
                         timeScales[script.id] = max(scale / 2, 1)

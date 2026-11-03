@@ -16,9 +16,6 @@ final class SceneScriptRuntime {
         var memoryIsStale = false
     }
     static let maximumMemoryBytes = 128 * 1024 * 1024
-    /// The first run of a module bundle also loads its modules and runs every init,
-    /// once: it gets the time compiling gets instead of one frame's share.
-    static let moduleStartSeconds: TimeInterval = 0.1
     /// A start that ran out of time is tried again with this many times more, up to the cap,
     /// since a large bundle needs the time to finish loading however often it is retried.
     private static let maximumStartScale = 10.0
@@ -105,7 +102,8 @@ final class SceneScriptRuntime {
     /// Stops the script after `perScript` seconds, or at `deadline` when that comes first.
     func evaluate(
         _ script: SceneScript, input: SceneScriptInput, elapsedTime: Double, layers: [SceneLayer], rigs: [UUID: SceneSkeleton] = [:],
-        storage: SceneScriptStorage.Session, perScript: TimeInterval, deadline: TimeInterval
+        storage: SceneScriptStorage.Session, perScript: TimeInterval, deadline: TimeInterval,
+        moduleStart: TimeInterval, moduleStartLimit: TimeInterval
     ) throws -> SceneScriptOutput {
         do {
             if script.modules != nil {
@@ -120,7 +118,7 @@ final class SceneScriptRuntime {
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
             guard remaining > 0 || starting else { throw failure("Frame execution time limit exceeded") }
             let startScale = startScales[script.id] ?? 1
-            let budget = starting ? max(min(remaining, perScript), Self.moduleStartSeconds * startScale) : min(remaining, perScript)
+            let budget = starting ? max(min(remaining, perScript), min(moduleStart * startScale, moduleStartLimit)) : min(remaining, perScript)
             var error: UnsafeMutablePointer<CChar>?
             let otherMemory = programs.keys.filter { $0 != script.id }.reduce(0) { $0 + memoryBytes(of: $1) }
             lwjs_set_memory_limit(programs[script.id]!.pointer, min(64 * 1024 * 1024, Self.maximumMemoryBytes - otherMemory))
