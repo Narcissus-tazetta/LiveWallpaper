@@ -3,6 +3,7 @@ import CoreVideo
 import Foundation
 import ImageIO
 import Metal
+import VideoToolbox
 
 /// Renders one loop of an animated scene into a video. Every effect repeats a whole
 /// number of times per loop, so frame N (= frame 0) is left out and the video loops
@@ -257,7 +258,9 @@ enum SceneVideoBaker {
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
             AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: max(4_000_000, Int(Double(width * height * fps) * 0.03)),
+                // Rate control changes texture detail across the loop boundary even when
+                // the rendered frames meet; fixed quality keeps that change out of the seam.
+                kVTCompressionPropertyKey_Quality as String: 1.0,
                 AVVideoExpectedSourceFrameRateKey: fps
             ],
             AVVideoColorPropertiesKey: [

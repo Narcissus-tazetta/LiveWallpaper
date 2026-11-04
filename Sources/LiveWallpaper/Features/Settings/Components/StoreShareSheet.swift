@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension SettingsView {
-    var storeShareSheet: some View {
+    func storeShareSheet(path: String) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -17,7 +17,7 @@ extension SettingsView {
                 }
                 Spacer(minLength: 0)
                 Button(model.localizedString("閉じる")) {
-                    isStoreShareSheetPresented = false
+                    storeShareTarget = nil
                 }
                 .buttonStyle(.bordered)
                 .disabled(storeShareStatus == .submitting)
@@ -30,6 +30,12 @@ extension SettingsView {
                     model.localizedString("ライセンス(任意、例: CC-BY-4.0)"),
                     text: $storeShareLicense
                 )
+            }
+
+            if model.sceneDocumentsByPath[path] != nil {
+                Text(model.localizedString("シーンの動画は、必要に応じて投稿用に圧縮します。手元の画質は変わりません。"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             switch storeShareStatus {
@@ -61,7 +67,7 @@ extension SettingsView {
             HStack {
                 Spacer(minLength: 0)
                 Button(model.localizedString("送信する")) {
-                    submitCurrentVideoToStore()
+                    submitCurrentVideoToStore(path: path)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(
@@ -75,10 +81,7 @@ extension SettingsView {
         .frame(minWidth: 420, minHeight: 320)
     }
 
-    func submitCurrentVideoToStore() {
-        guard let path = storeShareTargetPath else {
-            return
-        }
+    func submitCurrentVideoToStore(path: String) {
         let title = storeShareTitle.trimmingCharacters(in: .whitespaces)
         let author = storeShareAuthor.trimmingCharacters(in: .whitespaces)
         let license = storeShareLicense.trimmingCharacters(in: .whitespaces)

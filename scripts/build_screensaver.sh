@@ -21,6 +21,7 @@ SOURCES=(
   "$ROOT_DIR/Sources/LiveWallpaper/Core/Models/WallpaperGeometry.swift"
   "$ROOT_DIR/Sources/LiveWallpaper/Core/Services/WallpaperLoopBuilder.swift"
   "$ROOT_DIR/Sources/LiveWallpaper/App/AppLog.swift"
+  "$ROOT_DIR/Sources/LiveWallpaper/App/SessionLog.swift"
 )
 
 OPT_FLAGS=(-O)

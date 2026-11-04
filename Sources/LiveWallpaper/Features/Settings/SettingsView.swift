@@ -37,14 +37,13 @@ struct SettingsView: View {
     @State var librarySearchText: String = ""
     @State var isWallpaperShareSheetPresented: Bool = false
     @State var isStoreSharePickerPresented: Bool = false
-    @State var isStoreShareSheetPresented: Bool = false
     @State var storeTabMode: StoreTabMode = .browse
     @State var externalStoreSearchText = ""
     /// Storeへの共有シートが対象にしている動画。共有シートはトリム編集タブの選択状態
     /// (wallpaperEditor.selectedVideoPath)には依存しない — 右クリックメニューや
     /// Storeタブのピッカーなど、編集タブを開かずに共有を始めた場合でも、選んだ動画を
     /// 誤りなく送るため専用の状態として保持する。
-    @State var storeShareTargetPath: String?
+    @State var storeShareTarget: StoreShareTarget?
     @State var storeShareTitle: String = ""
     @State var storeShareAuthor: String = ""
     @State var storeShareLicense: String = ""
@@ -337,8 +336,8 @@ struct SettingsView: View {
             .sheet(isPresented: $isStoreSharePickerPresented) {
                 storeSharePickerSheet
             }
-            .sheet(isPresented: $isStoreShareSheetPresented) {
-                storeShareSheet
+            .sheet(item: $storeShareTarget) { target in
+                storeShareSheet(path: target.path)
             }
             .confirmationDialog(
                 model.localizedString("設定を初期化"),

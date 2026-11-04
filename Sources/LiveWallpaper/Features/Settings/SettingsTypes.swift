@@ -1,5 +1,10 @@
 import SwiftUI
 
+struct StoreShareTarget: Identifiable {
+    let path: String
+    var id: String { path }
+}
+
 enum FitPreviewMode: String, CaseIterable {
     case video
     case still

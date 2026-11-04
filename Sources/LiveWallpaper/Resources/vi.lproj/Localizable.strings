@@ -1722,3 +1722,5 @@
 "新しい版のLiveWallpaperで作られたシーンがあります" = "Có các cảnh được tạo bằng phiên bản LiveWallpaper mới hơn";
 "この版では編集できません。動画としては再生できます。LiveWallpaperを更新すると編集できます。" = "Phiên bản này không thể chỉnh sửa chúng, nhưng chúng vẫn phát như video. Hãy cập nhật LiveWallpaper để chỉnh sửa.";
 "シーンは効果を半分の解像度で計算し、30fps までで描きます。" = "Cảnh tính hiệu ứng ở một nửa độ phân giải và vẽ tối đa 30 khung hình/giây.";
+
+"シーンの動画は、必要に応じて投稿用に圧縮します。手元の画質は変わりません。" = "Video cảnh được nén để đăng khi cần. Chất lượng video trên máy không thay đổi.";

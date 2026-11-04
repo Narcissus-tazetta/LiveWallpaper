@@ -1722,3 +1722,5 @@
 "新しい版のLiveWallpaperで作られたシーンがあります" = "LiveWallpaper’ın daha yeni bir sürümüyle oluşturulmuş sahneler var";
 "この版では編集できません。動画としては再生できます。LiveWallpaperを更新すると編集できます。" = "Bu sürümde düzenlenemezler ancak video olarak oynatılmaya devam ederler. Düzenlemek için LiveWallpaper’ı güncelleyin.";
 "シーンは効果を半分の解像度で計算し、30fps までで描きます。" = "Sahneler efektlerini yarı çözünürlükte hesaplar ve en fazla 30 fps ile çizilir.";
+
+"シーンの動画は、必要に応じて投稿用に圧縮します。手元の画質は変わりません。" = "Sahne videoları gerektiğinde paylaşım için sıkıştırılır. Yerel videonuzun kalitesi değişmez.";

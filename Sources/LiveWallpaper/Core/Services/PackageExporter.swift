@@ -138,7 +138,8 @@ final class PackageExporter {
         videoPath: String,
         outputFolderURL: URL,
         baseFileName: String,
-        license: String? = nil
+        license: String? = nil,
+        maximumStorePackageBytes: Int? = nil
     ) async throws -> URL {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -161,6 +162,13 @@ final class PackageExporter {
         var videoThumbnails: [String: String] = [:]
 
         let packagedVideoURL = try await snapshotVideo(model: model, videoPath: videoPath, videoId: videoId, contentDir: contentDir)
+        if let maximumStorePackageBytes,
+           fileManager.fileExists(atPath: contentDir.appendingPathComponent("scenes/\(videoId)/scene.json").path)
+        {
+            try await StoreSceneVideoCompressor.compressIfNeeded(
+                videoURL: packagedVideoURL, contentDirectory: contentDir, maximumPackageBytes: maximumStorePackageBytes
+            )
+        }
         let attrs = try fileManager.attributesOfItem(atPath: packagedVideoURL.path)
         let fileSize = attrs[.size] as? UInt64 ?? 0
 
@@ -195,6 +203,12 @@ final class PackageExporter {
         let packageFileName = "\(baseFileName).lwpkg"
         let packageURL = outputFolderURL.appendingPathComponent(packageFileName)
         try archiveWriter.createPackage(from: contentDir, outputURL: packageURL)
+        if let maximumStorePackageBytes {
+            let bytes = try fileManager.attributesOfItem(atPath: packageURL.path)[.size] as! Int
+            guard bytes <= maximumStorePackageBytes else {
+                throw StoreClientError.fileTooLarge(sizeBytes: bytes, maxBytes: maximumStorePackageBytes)
+            }
+        }
         return packageURL
     }
 

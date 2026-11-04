@@ -84,4 +84,21 @@ final class PackageExporterLicenseTests: XCTestCase {
         let manifest = try readManifest(fromPackageAt: packageURL)
         XCTAssertNil(manifest.manifest.license)
     }
+
+    func testStoreLimitIncludesTheWholePackage() async throws {
+        let workDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: workDir, withIntermediateDirectories: true)
+        defer { try! fileManager.removeItem(at: workDir) }
+        let video = try makeStandInVideoFile(in: workDir)
+        do {
+            _ = try await PackageExporter().exportSingleWallpaperPackage(
+                model: WallpaperModel(), videoPath: video.path, outputFolderURL: workDir,
+                baseFileName: "limited", maximumStorePackageBytes: 128
+            )
+            XCTFail("The manifest and archive also count toward the upload limit")
+        } catch let StoreClientError.fileTooLarge(sizeBytes, maxBytes) {
+            XCTAssertGreaterThan(sizeBytes, maxBytes)
+            XCTAssertEqual(maxBytes, 128)
+        }
+    }
 }

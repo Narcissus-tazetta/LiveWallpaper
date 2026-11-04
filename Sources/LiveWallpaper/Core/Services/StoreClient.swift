@@ -125,7 +125,8 @@ final class StoreClient {
             videoPath: videoPath,
             outputFolderURL: tempDir,
             baseFileName: baseFileName,
-            license: license
+            license: license,
+            maximumStorePackageBytes: Self.maxUploadBytes
         )
 
         let packageData = try Data(contentsOf: packageURL)

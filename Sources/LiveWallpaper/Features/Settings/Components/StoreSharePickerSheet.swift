@@ -8,12 +8,11 @@ extension SettingsView {
             return
         }
         isStoreSharePickerPresented = false
-        storeShareTargetPath = path
         storeShareStatus = .idle
         storeShareTitle = model.registeredVideoDisplayName(for: path)
         storeShareAuthor = ""
         storeShareLicense = ""
-        isStoreShareSheetPresented = true
+        storeShareTarget = StoreShareTarget(path: path)
     }
 
     var storeSharePickerSheet: some View {
