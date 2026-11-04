@@ -68,6 +68,8 @@ final class SceneSkeletonEvaluator {
     private var order: [Int] = []
     private var inverseBind: [simd_float4x4] = []
     private var playbackOverride: [SceneSkeleton.Playback]?
+    /// The baked loop the clips must close in, nil on real time.
+    private var loop: Double?
     private var cachedPose: (time: Double, pose: Pose)?
 
     init(_ skeleton: SceneSkeleton) throws {
@@ -92,20 +94,32 @@ final class SceneSkeletonEvaluator {
         }
     }
 
+    func setLoop(_ seconds: Double?) {
+        if loop != seconds {
+            loop = seconds
+            cachedPose = nil
+        }
+    }
+
     func evaluate(time: Double) -> Pose {
         if let cachedPose, cachedPose.time == time { return cachedPose.pose }
         var transforms = skeleton.bones.map(\.rest)
         var opacity = Array(repeating: Float(1), count: transforms.count)
         for playback in playbackOverride ?? skeleton.playback where playback.weight > 0 {
             let clip = skeleton.clips[playback.clip]
-            var frame = playback.startFrame + time * playback.rate * clip.framesPerSecond
+            let perSecond = playback.rate * clip.framesPerSecond
+            var frame: Double
             if playback.loops, clip.frameCount > 0 {
                 let period = Double(clip.frameCount) * (playback.mirrors == true ? 2 : 1)
-                frame = frame.truncatingRemainder(dividingBy: period)
+                // A clip runs one way, so a baked loop speeds it on rather than winding it back.
+                let played = SceneLoopTiming.phase(rate: perSecond, cycle: period, keepsDirection: true, time: time, loop: loop)
+                frame = (playback.startFrame + played).truncatingRemainder(dividingBy: period)
                 if frame < 0 { frame += period }
                 if frame > Double(clip.frameCount) { frame = period - frame }
             } else {
-                frame = min(Double(clip.frameCount), max(0, frame))
+                // A clip played once ends where it ends; a baked loop starts it again.
+                let elapsed = loop.map { SceneLoopTiming.timeInLoop(time, loop: $0) } ?? time
+                frame = min(Double(clip.frameCount), max(0, playback.startFrame + elapsed * perSecond))
             }
             let first = Int(frame), next = min(first + 1, clip.frameCount)
             let fraction = Float(frame - Double(first))
@@ -305,6 +319,11 @@ final class SceneSkeletonRegistry {
 
     func setPlaybackOverrides(_ overrides: [UUID: [SceneSkeleton.Playback]]) {
         for (id, evaluator) in evaluators { evaluator.setPlaybackOverride(overrides[id]) }
+    }
+
+    /// The baked loop every clip must close in, nil on real time.
+    func setLoop(_ seconds: Double?) {
+        for evaluator in evaluators.values { evaluator.setLoop(seconds) }
     }
 
     func evaluator(_ id: UUID) throws -> SceneSkeletonEvaluator {

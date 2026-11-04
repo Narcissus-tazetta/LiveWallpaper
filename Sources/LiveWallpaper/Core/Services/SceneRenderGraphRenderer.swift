@@ -1101,6 +1101,15 @@ extension SceneRenderGraph {
     /// clears) and which the frame does not hand on. A target read first, or drawn onto
     /// without clearing, carries the previous frame's content and is not among them.
     func transientTargetNames() -> Set<String> {
+        Set(firstUseOverwrites().filter(\.value).keys).subtracting([output])
+    }
+
+    /// Whether a frame starts from what earlier frames left in a target, so its picture is
+    /// not a function of the time alone.
+    var carriesFrames: Bool { firstUseOverwrites().values.contains(false) }
+
+    /// For each target the frame uses, whether its first use overwrites it completely.
+    private func firstUseOverwrites() -> [String: Bool] {
         let targetNames = Set(targets.map(\.name))
         var decided: [String: Bool] = [:]
         for pass in passes {
@@ -1120,6 +1129,6 @@ extension SceneRenderGraph {
                 decided[pass.target] = pass.operation == .copy || pass.draw?.clears != false
             }
         }
-        return Set(decided.filter { $0.value }.keys).subtracting([output])
+        return decided
     }
 }

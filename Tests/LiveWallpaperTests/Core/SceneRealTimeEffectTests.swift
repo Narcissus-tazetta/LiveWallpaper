@@ -48,11 +48,14 @@ final class SceneRealTimeEffectTests: XCTestCase {
     }
 
     /// BGRA.
-    private func frame(_ effect: SceneEffect, file: String, time: Double, realTime: Bool) throws -> [UInt8] {
+    private func frame(
+        _ effect: SceneEffect?, file: String, time: Double, realTime: Bool, shake: SceneCameraShake? = nil
+    ) throws -> [UInt8] {
         var layer = SceneLayer(name: "picture", imageFile: file)
-        layer.effects = [effect]
+        layer.effects = effect.map { [$0] } ?? []
         var scene = SceneDocument(canvasWidth: size, canvasHeight: size, layers: [layer])
         scene.loopSeconds = 60
+        scene.cameraShake = shake
         let renderer = try SceneRenderer(document: scene, videoPath: video.path)
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm, width: size, height: size, mipmapped: false
@@ -396,6 +399,56 @@ final class SceneRealTimeEffectTests: XCTestCase {
             let realEnd = try frame(effect, file: file, time: 59.98, realTime: true)
             XCTAssertNotEqual(end, realEnd, "\(effect.kind): on real time the motion is not bent")
         }
+    }
+
+    /// A converted shader whose red is the fraction of 0.37 × time: a sawtooth no bend of
+    /// the time can close.
+    private func sawtoothShader() -> SceneEffect {
+        let draw = SceneRenderGraph.Draw(
+            vertex: .init(source: """
+            #include <metal_stdlib>
+            using namespace metal;
+            struct V { float4 position [[position]]; };
+            vertex V vertexMain(uint id [[vertex_id]]) {
+                float2 p[] = {float2(-1,-1), float2(3,-1), float2(-1,3)};
+                return {float4(p[id],0,1)};
+            }
+            """, entryPoint: "vertexMain"),
+            fragment: .init(source: """
+            #include <metal_stdlib>
+            using namespace metal;
+            fragment float4 fragmentMain(constant float& time [[buffer(0)]]) { return float4(fract(time * 0.37), 0, 0, 1); }
+            """, entryPoint: "fragmentMain", uniforms: Data(repeating: 0, count: 16), updates: [.init(offset: 0, value: .time)]),
+            vertices: Data(repeating: 0, count: 12), vertexStride: 4, vertexCount: 3,
+            attributes: [], textures: [.init(index: 0, source: "input")]
+        )
+        var effect = SceneEffect(kind: .shader)
+        effect.renderGraph = SceneRenderGraph(
+            targets: [.init(name: "work")], passes: [.init(operation: .draw, target: "work", draw: draw)], output: "work"
+        )
+        return effect
+    }
+
+    func testABakedLoopFadesAConvertedShaderIntoItsStart() throws {
+        let file = try writeGradient()
+        let shader = sawtoothShader()
+        func red(_ time: Double, live: Bool) throws -> Int { Int(try frame(shader, file: file, time: time, realTime: live)[2]) }
+        XCTAssertEqual(try red(25, live: false), try red(25, live: true), "past the fade the shader runs on its own time")
+        // fract(0.37 × 60) = 0.2 is where the loop's end left it; drawn as it is, the start is 0.
+        XCTAssertEqual(try red(0, live: false), try red(60, live: true))
+        XCTAssertLessThanOrEqual(abs(try red(0, live: false) - red(59.98, live: false)), 2, "the baked loop closes")
+        XCTAssertEqual(try red(0, live: true), 0)
+    }
+
+    func testABakedLoopKeepsTheCameraShakeAndCloses() throws {
+        let file = try writeGradient()
+        let shake = SceneCameraShake(speed: 0.3, amplitude: 4, roughness: 1)
+        let live = try frame(nil, file: file, time: 25, realTime: true, shake: shake)
+        XCTAssertEqual(try frame(nil, file: file, time: 25, realTime: false, shake: shake), live)
+        let start = try frame(nil, file: file, time: 0, realTime: false, shake: shake)
+        let end = try frame(nil, file: file, time: 59.98, realTime: false, shake: shake)
+        XCTAssertLessThanOrEqual(zip(start, end).map { abs(Int($0) - Int($1)) }.max() ?? 0, 3, "the baked loop closes")
+        XCTAssertNotEqual(end, try frame(nil, file: file, time: 59.98, realTime: true, shake: shake))
     }
 
     func testAClampedPatternDriftsOffWithoutWrappingRound() throws {

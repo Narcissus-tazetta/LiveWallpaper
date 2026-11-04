@@ -143,6 +143,8 @@ final class SceneRenderer {
             format == .rgba16Float ? compositeWide : composite
         }
 
+        let library: MTLLibrary
+
         func compositeFetch(for format: MTLPixelFormat) -> MTLRenderPipelineState? {
             format == .rgba16Float ? compositeFetchWide : compositeFetch
         }
@@ -167,6 +169,9 @@ final class SceneRenderer {
 
     private let pipeline: Pipeline
     private var graphRenderers: [UUID: SceneRenderGraphRenderer] = [:]
+    /// Per converted shader: its picture one loop later, and the fade into its own.
+    private var loopFadeTargets: [UUID: (later: MTLTexture, faded: MTLTexture)] = [:]
+    private var loopFadePipelines: [UInt: MTLRenderPipelineState] = [:]
     private var modelRenderer: SceneModelRenderer?
     private var modelImages: [String: MTLTexture] = [:]
     private var modelDepthTexture: MTLTexture?
@@ -443,7 +448,7 @@ final class SceneRenderer {
         // (y up, from the canvas's bottom left) and its zoom shrinks it about its middle.
         // The editor's own zoom takes precedence.
         if let camera = document.camera, !camera.perspective, let path = camera.path, input.viewport == SceneFrameInput.rest.viewport {
-            let (eye, _, _, zoom) = path.transform(at: input.time)
+            let (eye, _, _, zoom) = path.transform(at: pathTime(path.period, input: input))
             let size = SIMD2(Float(document.canvasWidth), Float(document.canvasHeight))
             let window = size / zoom
             let origin = (size - window) / 2 + SIMD2(eye.x, eye.y)
@@ -476,10 +481,13 @@ final class SceneRenderer {
                     result[file] = try finishingImage(file)
                 }
             }
-            finished = try finishingRenderer!.encode(
-                input: canvas, images: finishingImages, time: input.time, cursor: input.cursor, audio: input.audio,
-                commandBuffer: commandBuffer
-            )
+            let finisher = finishingRenderer!
+            finished = try encodeClosingLoop(finisher, id: Self.finishingID, frame: input, commandBuffer: commandBuffer) { time in
+                try finisher.encode(
+                    input: canvas, images: finishingImages, time: time, cursor: input.cursor, audio: input.audio,
+                    commandBuffer: commandBuffer
+                )
+            }
         }
         try compositePass(
             commandBuffer: commandBuffer, destination: target, base: finished,
@@ -500,6 +508,7 @@ final class SceneRenderer {
         }
         let evaluated = try frame ?? frameEvaluator.evaluate(document, input: input, timeOfDay: timeOfDay)
         rigs!.setPlaybackOverrides(evaluated.rigPlayback)
+        rigs!.setLoop(bakedLoop(input))
         lastFrame = evaluated
         try prepareMediaArtwork(input.media)
         let placements = placementEvaluator!.evaluate(time: input.time)
@@ -530,7 +539,12 @@ final class SceneRenderer {
         for layer in ordered {
             guard let evaluatedLayer = evaluated.layers[layer.id], evaluatedLayer.layer.isVisible,
                   let file = layer.videoFile else { continue }
-            if let time = evaluatedLayer.videoTime { videoTimes[file] = time } else if videoTimes[file] == nil { videoTimes[file] = input.time }
+            if let time = evaluatedLayer.videoTime {
+                videoTimes[file] = time
+            } else if videoTimes[file] == nil {
+                // A baked loop plays the video through whole times, as it times the scene's other motions.
+                videoTimes[file] = videoFrames[file].map { pathTime($0.duration, input: input) } ?? input.time
+            }
         }
         for (file, time) in videoTimes {
             guard let frames = videoFrames[file] else { continue }
@@ -1225,7 +1239,7 @@ final class SceneRenderer {
             return state
         }
         if let path = scene?.path, var moved = state, !moved.isPlacedByScript {
-            (moved.eye, moved.center, moved.up, _) = path.transform(at: input.time)
+            (moved.eye, moved.center, moved.up, _) = path.transform(at: pathTime(path.period, input: input))
             state = moved
         }
         // Fog and highlights on a solid model of a canvas scene are measured from a point
@@ -1517,38 +1531,30 @@ final class SceneRenderer {
         Float(effect.values[SceneEffect.textureAspectKey] ?? 0)
     }
 
-    /// How far a motion at `rate` per second has gone by the frame, wrapped to one
-    /// `cycle` (the distance after which it looks the same). A baked loop keeps the
-    /// rate through its first half, then eases onto a whole number of cycles by the
-    /// end, so the loop closes with no jump in place or speed. Rounding the rates
-    /// themselves instead changed every speed for the whole loop and stopped the sines
-    /// of a sway slower than half a turn per loop. A motion that `keepsDirection` (a
-    /// scroll, a travelling wave) eases onto at least one cycle its own way rather
-    /// than winding back; a swing eases onto the nearest count, which may be none.
+    /// The baked loop's length, nil when drawn on real time.
+    private func bakedLoop(_ input: SceneFrameInput) -> Double? {
+        input.isRealTime ? nil : Double(max(document.loopSeconds, 1))
+    }
+
+    /// Keys the finishing passes' loop fade among the layers' and effects'.
+    private static let finishingID = UUID()
+
+    /// The time into a motion that repeats every `period` seconds: the frame's own on
+    /// real time, bent in a baked loop to play it whole times (SceneLoopTiming).
+    private func pathTime(_ period: Double, input: SceneFrameInput) -> Double {
+        guard let loop = bakedLoop(input), period > 0 else { return input.time }
+        return SceneLoopTiming.phase(rate: 1, cycle: period, keepsDirection: true, time: input.time, loop: loop)
+    }
+
+    /// SceneLoopTiming.phase at the frame's time.
     private func loopPhase(_ rate: Double, cycle: Double, keepsDirection: Bool, input: SceneFrameInput) -> Float {
-        guard !input.isRealTime else {
-            // Wrapped in Double: hours of real time lose the phase in Float.
-            return Float((rate * input.time).truncatingRemainder(dividingBy: cycle))
-        }
-        let loop = Double(max(document.loopSeconds, 1))
-        var time = input.time.truncatingRemainder(dividingBy: loop)
-        if time < 0 { time += loop }
-        let late = max(0, time / loop * 2 - 1)
-        let ease = late * late * (3 - 2 * late)
-        let cycles = rate * loop / cycle
-        var whole = cycles.rounded()
-        if keepsDirection, rate != 0, abs(whole) < 1 { whole = rate < 0 ? -1 : 1 }
-        return Float((rate * time - ease * (cycles - whole) * cycle).truncatingRemainder(dividingBy: cycle))
+        Float(SceneLoopTiming.phase(rate: rate, cycle: cycle, keepsDirection: keepsDirection, time: input.time, loop: bakedLoop(input)))
     }
 
     /// `rate × time` with nothing wrapped or bent: the frame's own time drawn live, the
     /// time within the loop in a bake.
     private func unwrappedShift(_ rate: Double, input: SceneFrameInput) -> Float {
-        guard !input.isRealTime else { return Float(rate * input.time) }
-        let loop = Double(max(document.loopSeconds, 1))
-        var time = input.time.truncatingRemainder(dividingBy: loop)
-        if time < 0 { time += loop }
-        return Float(rate * time)
+        Float(rate * (bakedLoop(input).map { SceneLoopTiming.timeInLoop(input.time, loop: $0) } ?? input.time))
     }
 
     /// `loopPhase` for a speed in radians per second.
@@ -1615,12 +1621,15 @@ final class SceneRenderer {
                                                  commandBuffer: commandBuffer, input: input, canvasSource: canvasSource)
                 effects = []
             }
-            source = try graph.encode(input: source, images: images, time: input.time,
-                                      cursor: input.cursor, audio: input.audio, meshes: lastFrame?.meshes ?? [],
-                                      layerFromCanvas: graph.usesLayerPlacement ? layerFromCanvas(layer) : matrix_identity_float3x3,
-                                      pointerPresses: input.pointerPresses, parallax: input.parallax,
-                                      background: canvasSource ?? blackTexture,
-                                      commandBuffer: commandBuffer)
+            let picture = source
+            source = try encodeClosingLoop(graph, id: layer.id, frame: input, commandBuffer: commandBuffer) { time in
+                try graph.encode(input: picture, images: images, time: time,
+                                 cursor: input.cursor, audio: input.audio, meshes: lastFrame?.meshes ?? [],
+                                 layerFromCanvas: graph.usesLayerPlacement ? layerFromCanvas(layer) : matrix_identity_float3x3,
+                                 pointerPresses: input.pointerPresses, parallax: input.parallax,
+                                 background: canvasSource ?? blackTexture,
+                                 commandBuffer: commandBuffer)
+            }
         }
         guard !effects.isEmpty else {
             return source
@@ -1630,6 +1639,73 @@ final class SceneRenderer {
         let height = layer.capturesCanvas ? source.height : max(min(Int(shown.y.rounded()), source.height), 16)
         return try encodeEffects(effects, on: source, layer: layer, width: width, height: height,
                                  commandBuffer: commandBuffer, input: input, canvasSource: canvasSource)
+    }
+
+    /// How long a baked loop takes to fade a converted shader from its picture one loop
+    /// later into its own.
+    private static let loopFadeSeconds = 2.0
+
+    /// A converted shader's picture at the frame. Its time feeds a formula a bake cannot
+    /// bend, so where the picture depends on the time alone a baked loop's first seconds
+    /// fade in from the picture one loop later, which is where the loop's last frame left
+    /// it. A shader that carries earlier frames, or steps by the frame time, draws as it is.
+    private func encodeClosingLoop(
+        _ graph: SceneRenderGraphRenderer, id: UUID, frame input: SceneFrameInput, commandBuffer: MTLCommandBuffer,
+        encode: (Double) throws -> MTLTexture
+    ) throws -> MTLTexture {
+        guard let loop = bakedLoop(input), graph.graph.uses(.time), !graph.graph.uses(.frameTime), !graph.graph.carriesFrames
+        else { return try encode(input.time) }
+        let fade = min(Self.loopFadeSeconds, loop / 4)
+        let elapsed = SceneLoopTiming.timeInLoop(input.time, loop: loop)
+        guard elapsed < fade else { return try encode(input.time) }
+        let laterPicture = try encode(input.time + loop)
+        var targets = loopFadeTargets[id]
+        if targets.map({ $0.later.width != laterPicture.width || $0.later.height != laterPicture.height
+            || $0.later.pixelFormat != laterPicture.pixelFormat }) ?? true {
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: laterPicture.pixelFormat, width: laterPicture.width, height: laterPicture.height, mipmapped: false
+            )
+            descriptor.usage = [.renderTarget, .shaderRead]
+            descriptor.storageMode = .private
+            guard let later = device.makeTexture(descriptor: descriptor), let faded = device.makeTexture(descriptor: descriptor) else {
+                throw RendererError.textureAllocationFailed
+            }
+            targets = (later, faded)
+            loopFadeTargets[id] = targets
+        }
+        let (later, faded) = targets!
+        // The shader draws both pictures into its own output, so the later one is set aside first.
+        guard let blit = commandBuffer.makeBlitCommandEncoder() else { throw RendererError.textureAllocationFailed }
+        blit.copy(from: laterPicture, to: later)
+        blit.endEncoding()
+        let now = try encode(input.time)
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = faded
+        pass.colorAttachments[0].loadAction = .dontCare
+        pass.colorAttachments[0].storeAction = .store
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else {
+            throw RendererError.textureAllocationFailed
+        }
+        encoder.setRenderPipelineState(try loopFadePipeline(faded.pixelFormat))
+        encoder.setFragmentTexture(later, index: 0)
+        encoder.setFragmentTexture(now, index: 1)
+        let progress = elapsed / fade
+        var weight = Float(progress * progress * (3 - 2 * progress))
+        encoder.setFragmentBytes(&weight, length: MemoryLayout<Float>.stride, index: 0)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        encoder.endEncoding()
+        return faded
+    }
+
+    private func loopFadePipeline(_ format: MTLPixelFormat) throws -> MTLRenderPipelineState {
+        if let state = loopFadePipelines[format.rawValue] { return state }
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.vertexFunction = pipeline.library.makeFunction(name: "scene_vertex")
+        descriptor.fragmentFunction = pipeline.library.makeFunction(name: "scene_loop_fade")
+        descriptor.colorAttachments[0].pixelFormat = format
+        let state = try device.makeRenderPipelineState(descriptor: descriptor)
+        loopFadePipelines[format.rawValue] = state
+        return state
     }
 
     private func drawsSkeleton(_ layer: SceneLayer) -> Bool {
@@ -1653,13 +1729,16 @@ final class SceneRenderer {
 
         for effect in effects {
             if let graph = graphRenderers[effect.id] {
-                current = try graph.encode(input: current, images: graphResources[effect.id]!, time: input.time,
-                                           cursor: input.cursor, values: effect.values, audio: input.audio,
-                                           meshes: lastFrame?.meshes ?? [],
-                                           layerFromCanvas: graph.usesLayerPlacement ? layerFromCanvas(layer) : matrix_identity_float3x3,
-                                      pointerPresses: input.pointerPresses, parallax: input.parallax,
-                                      background: canvasSource ?? blackTexture,
-                                           commandBuffer: commandBuffer)
+                let picture = current
+                current = try encodeClosingLoop(graph, id: effect.id, frame: input, commandBuffer: commandBuffer) { time in
+                    try graph.encode(input: picture, images: graphResources[effect.id]!, time: time,
+                                     cursor: input.cursor, values: effect.values, audio: input.audio,
+                                     meshes: lastFrame?.meshes ?? [],
+                                     layerFromCanvas: graph.usesLayerPlacement ? layerFromCanvas(layer) : matrix_identity_float3x3,
+                                     pointerPresses: input.pointerPresses, parallax: input.parallax,
+                                     background: canvasSource ?? blackTexture,
+                                     commandBuffer: commandBuffer)
+                }
                 continue
             }
             let isLayerTarget = startsWithLayerTarget ? (standardIndex % 2 == 0) : (standardIndex % 2 != 0)
@@ -2261,7 +2340,8 @@ final class SceneRenderer {
             shift = input.parallax * Float(min(max(layer.parallaxDepth, 0), 1)) * Self.maxParallaxTravel
         }
         if let shake = document.cameraShake {
-            let offset = shake.offset(at: input.time)
+            let angles = loopAngles(shake.angularSpeeds, input: input)
+            let offset = shake.offset(angles: SIMD2(Double(angles[0]), Double(angles[1])))
             shift += SIMD2(Float(offset.x / document.aspectRatio), Float(offset.y))
         }
         return shift
@@ -2502,6 +2582,7 @@ final class SceneRenderer {
         if rigs?.skeletons != document.rigs {
             rigs = try SceneSkeletonRegistry(document.rigs)
             graphRenderers.removeAll()
+            loopFadeTargets.removeAll()
         }
         placementEvaluator = try ScenePlacementEvaluator(layers: document.layers, rigs: rigs!)
         lastPlacements.removeAll()
@@ -2569,6 +2650,7 @@ final class SceneRenderer {
             }
         }
         graphRenderers = graphRenderers.filter { graphs[$0.key] != nil }
+        loopFadeTargets = loopFadeTargets.filter { graphs[$0.key] != nil }
         for (id, graph) in graphs where graphRenderers[id]?.graph != graph {
             graphRenderers[id] = try SceneRenderGraphRenderer(graph: graph, device: device, rigs: rigs, pool: graphTexturePool)
         }
@@ -2930,7 +3012,8 @@ final class SceneRenderer {
             particleSystemAddWide: state(vertex: "particle_system_vertex", fragment: "particle_system_fragment", format: .rgba16Float, additive: true),
             compositeFetch: compositeFetch,
             compositeWide: state(fragment: "scene_composite", format: .rgba16Float),
-            compositeFetchWide: compositeFetchWide
+            compositeFetchWide: compositeFetchWide,
+            library: library
         )
         sharedPipeline = pipeline
         return pipeline
@@ -2965,6 +3048,12 @@ final class SceneRenderer {
         out.position = float4(p * 2.0 - 1.0, 0.0, 1.0);
         out.uv = float2(p.x, 1.0 - p.y);
         return out;
+    }
+
+    fragment float4 scene_loop_fade(VertexOut in [[stage_in]], texture2d<float> later [[texture(0)]],
+                                    texture2d<float> now [[texture(1)]], constant float &weight [[buffer(0)]]) {
+        constexpr sampler s(filter::nearest);
+        return mix(later.sample(s, in.uv), now.sample(s, in.uv), weight);
     }
 
     // MARK: composite

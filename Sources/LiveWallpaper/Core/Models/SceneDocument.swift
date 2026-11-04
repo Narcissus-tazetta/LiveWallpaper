@@ -1594,10 +1594,13 @@ struct SceneCameraShake: Codable, Equatable {
     /// Bends the path's reach: its length is raised to roughness³.
     var roughness: Double
 
-    /// How far the view moves at `time` seconds, in canvas heights (+y down).
-    func offset(at time: Double) -> SIMD2<Double> {
-        let t = speed * speed * time
-        var x = cos(t), y = sin(1.333 * t)
+    /// Radians per second of the path's two sines (x, y).
+    var angularSpeeds: [Double] { [speed * speed, 1.333 * speed * speed] }
+
+    /// How far the view moves, in canvas heights (+y down), once its sines reach
+    /// `angles`: `angularSpeeds` × time, or a baked loop's bent version of that.
+    func offset(angles: SIMD2<Double>) -> SIMD2<Double> {
+        var x = cos(angles.x), y = sin(angles.y)
         let exponent = roughness * roughness * roughness
         let length = (x * x + y * y).squareRoot()
         if exponent > 0.001, exponent != 1, length > 0 {

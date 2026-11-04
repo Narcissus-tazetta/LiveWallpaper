@@ -31,6 +31,22 @@ final class SceneSkeletonTests: XCTestCase {
         XCTAssertEqual(pose.attachments["tip"]?.columns.3, SIMD4(3, 0, 0, 1))
     }
 
+    func testABakedLoopKeepsAClipsSpeedAndClosesOnWholePlays() throws {
+        // 0.7 s a play: 85.7 plays a minute, not a whole number. The clip ends where it starts.
+        let skeleton = SceneSkeleton(
+            bones: [.init(name: "root", rest: .init(), inverseBind: identity)],
+            clips: [.init(name: "move", framesPerSecond: 10, frameCount: 7, tracks: [
+                .init(bone: 0, transforms: [0, 2, 4, 6, 6, 4, 2, 0].map { .init(translation: [Float($0), 0, 0]) })
+            ])], playback: [.init(clip: 0)]
+        )
+        let live = try SceneSkeletonEvaluator(skeleton), baked = try SceneSkeletonEvaluator(skeleton)
+        baked.setLoop(60)
+        func x(_ evaluator: SceneSkeletonEvaluator, _ time: Double) -> Float { evaluator.evaluate(time: time).matrices[0].columns.3.x }
+        XCTAssertEqual(x(baked, 25), x(live, 25), "the first half plays at the clip's speed")
+        XCTAssertEqual(x(baked, 59.999), x(baked, 0), accuracy: 0.05, "the baked loop closes")
+        XCTAssertNotEqual(x(live, 59.999), x(live, 0), accuracy: 0.05)
+    }
+
     func testInterpolationLoopReverseAndClampedEnd() throws {
         var skeleton = SceneSkeleton(
             bones: [.init(name: "root", rest: .init(), inverseBind: identity)],
