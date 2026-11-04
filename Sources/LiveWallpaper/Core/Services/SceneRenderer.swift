@@ -524,9 +524,16 @@ final class SceneRenderer {
         for layer in ordered where layer.kind == .text {
             try prepareText(evaluated.layers[layer.id]!.layer)
         }
-        for file in Set(ordered.filter { evaluated.layers[$0.id]!.layer.isVisible }.compactMap(\.videoFile)) {
+        // A video follows the scene's time unless a script holds a layer showing it at its own.
+        var videoTimes: [String: Double] = [:]
+        for layer in ordered {
+            guard let evaluatedLayer = evaluated.layers[layer.id], evaluatedLayer.layer.isVisible,
+                  let file = layer.videoFile else { continue }
+            if let time = evaluatedLayer.videoTime { videoTimes[file] = time } else if videoTimes[file] == nil { videoTimes[file] = input.time }
+        }
+        for (file, time) in videoTimes {
             guard let frames = videoFrames[file] else { continue }
-            if decodesVideoAhead { frames.request(input.time) } else { try frames.advance(to: input.time) }
+            if decodesVideoAhead { frames.request(time) } else { try frames.advance(to: time) }
             videoFramesShown[file] = frames.frame
         }
         let visibleLayers = ordered.filter { layer in

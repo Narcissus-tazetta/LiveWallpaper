@@ -329,7 +329,7 @@ final class SceneScriptRuntime {
 
     /// Built once: readOutput runs for every target of every frame.
     private enum OutputKeys {
-        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text", "world", "modelValues"]
+        static let item: Set = ["id", "values", "appearance", "effects", "particles", "rigs", "order", "text", "world", "modelValues", "videoTime"]
         static let appearance: Set = ["isVisible", "tint", "blendMode", "parallaxDepth", "depthStrength", "depthFollowsCursor",
                                       "depthAutoMotion", "depthAutoCycles", "cursorMask", "clearCursorMask"]
         static let appearanceRanges: [String: ClosedRange<Double>] = [
@@ -600,7 +600,8 @@ final class SceneScriptRuntime {
     private static func readText(_ raw: Any, layer: SceneLayer) throws -> SceneScriptTextValues {
         guard layer.text != nil else { throw failure("text: target is not a text layer") }
         let text = try object(raw, path: "text")
-        try keys(text, allowed: ["string", "color"], path: "text")
+        try keys(text, allowed: ["string", "color", "horizontalAlignment", "verticalAlignment", "pointSize"], path: "text")
+        try numbers(text, ranges: ["pointSize": SceneText.pointSizeRange], path: "text")
         if let string = text["string"] {
             guard let string = string as? String, string.count <= SceneText.maximumLength else {
                 throw failure("text.string: expected a string of at most \(SceneText.maximumLength) characters")
@@ -748,6 +749,11 @@ final class SceneScriptRuntime {
                 adjustment.modelValues = try decode([String: Double].self, values)
             }
             if let raw = item["text"] { adjustment.text = try readText(raw, layer: layer) }
+            if item["videoTime"] != nil {
+                guard layer.videoFile != nil else { throw failure("videoTime: target is not a video layer") }
+                try numbers(item, ranges: ["videoTime": 0 ... 1e7], path: "output")
+                adjustment.videoTime = (item["videoTime"] as? NSNumber)?.doubleValue
+            }
             var drawable = layer
             adjustment.appearance?.apply(to: &drawable)
             for index in drawable.effects.indices {

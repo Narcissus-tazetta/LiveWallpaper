@@ -154,6 +154,9 @@ struct SceneScriptAdjustment {
     var particles: SceneScriptParticleValues?
     var particleControl: SceneParticleSimulator.Control?
     var text: SceneScriptTextValues?
+    /// Where in its video a video layer is, in seconds, once a script controls it; nil
+    /// follows the scene's time.
+    var videoTime: Double?
     /// In a scene seen through its camera: the layer's placement now (column-major).
     var world: simd_float4x4?
     var modelValues: [String: Double]?
@@ -256,9 +259,15 @@ struct SceneScriptTextValues: Decodable {
 
     var string: String?
     var color: Color?
+    var horizontalAlignment: SceneTextHorizontalAlignment?
+    var verticalAlignment: SceneTextVerticalAlignment?
+    var pointSize: Double?
 
     func apply(to text: inout SceneText) {
         if let string { text.string = string }
+        if let horizontalAlignment { text.horizontalAlignment = horizontalAlignment }
+        if let verticalAlignment { text.verticalAlignment = verticalAlignment }
+        if let pointSize { text.pointSize = pointSize }
         if let color { text.color = RGBAColor(red: color.red, green: color.green, blue: color.blue, alpha: text.color.alpha) }
     }
 }

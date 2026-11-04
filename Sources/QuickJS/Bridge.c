@@ -303,7 +303,11 @@ static JSContext *new_context(LWJSProgram *program) {
     JS_FreeValue(context, result);
     JSValue global = JS_GetGlobalObject(context);
     JSValue console = JS_NewObject(context);
-    JS_SetPropertyStr(context, console, "log", JS_NewCFunction(context, console_log, "log", 1));
+    // Scripts written for browsers log their errors and warnings too; they share one log.
+    static const char *const console_names[] = {"log", "info", "debug", "warn", "error"};
+    for (size_t i = 0; i < sizeof(console_names) / sizeof(console_names[0]); i++) {
+        JS_SetPropertyStr(context, console, console_names[i], JS_NewCFunction(context, console_log, console_names[i], 1));
+    }
     JS_SetPropertyStr(context, global, "console", console);
     JS_SetPropertyStr(context, global, "__lwjs_emitMesh", JS_NewCFunction(context, emit_mesh, "emitMesh", 4));
     JS_SetPropertyStr(context, global, "__lwjs_emitModels", JS_NewCFunction(context, emit_models, "emitModels", 1));

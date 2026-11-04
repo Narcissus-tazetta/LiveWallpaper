@@ -12,6 +12,8 @@ struct SceneEvaluatedFrame {
         var color: SceneLinkValues
         /// In a scene seen through its camera: where scripts placed the layer, when they did.
         var world: simd_float4x4?
+        /// Where in its video a video layer is, once a script controls it.
+        var videoTime: Double?
     }
     var input: SceneFrameInput
     var layers: [UUID: Layer]
@@ -111,6 +113,7 @@ final class SceneFrameEvaluator {
         }
         if let text = adjustment.text { text.apply(to: &layer.layer.text!) }
         if let world = adjustment.world { layer.world = world }
+        if let videoTime = adjustment.videoTime { layer.videoTime = videoTime }
         if let modelValues = adjustment.modelValues { layer.layer.modelValues = modelValues }
     }
 
