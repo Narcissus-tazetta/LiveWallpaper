@@ -15,7 +15,8 @@ struct SceneFrameInput: Equatable {
     /// first shown.
     var time: Double = 0
     /// Real-time effects take `time` at their own speed. Otherwise (a baked loop, a
-    /// preview of it) their speeds are rounded to whole repeats per loop.
+    /// preview of it) they keep their speed through the loop's first half and ease onto
+    /// whole repeats over the second, so the loop closes.
     var isRealTime = false
     /// The part of the canvas drawn into the target: origin and size in canvas UV.
     /// Only the editor zooms; everything else draws the whole canvas.
@@ -1397,61 +1398,70 @@ final class SceneRenderer {
         }
     }
 
-    /// A speed in radians per second, rounded to whole turns per loop unless drawn
-    /// on real time; a motion that would round to none keeps one turn.
-    private func loopSpeed(_ speed: Double, input: SceneFrameInput) -> Float {
-        guard !input.isRealTime, speed != 0 else {
-            return Float(speed)
-        }
-        let loop = Double(max(document.loopSeconds, 1))
-        let turns = max((abs(speed) * loop / (2 * .pi)).rounded(), 1)
-        return Float((speed < 0 ? -1 : 1) * turns * 2 * .pi / loop)
-    }
-
-    private func realTimeValues(_ effect: SceneEffect, input: SceneFrameInput) -> RealTimeEffectValues {
+    private func realTimeValues(_ effect: SceneEffect, input: SceneFrameInput, aspect: Float) -> RealTimeEffectValues {
         func value(_ key: String) -> Float {
             Float(effect.value(key))
+        }
+        // A pattern shifted by whole repeats looks the same only when it repeats; a
+        // clamped one keeps its real shift and cannot close a baked loop.
+        let patternRepeats = effect.value(SceneEffect.patternClampsKey) == 0
+        func patternShift(_ rate: Double) -> Float {
+            patternRepeats ? loopPhase(rate, cycle: 1, keepsDirection: true, input: input) : unwrappedShift(rate, input: input)
+        }
+        // The pulse and the swing add noise read along (1/12, 1/36) × noiseSpeed per second.
+        func noiseShifts(_ speed: Double) -> [Float] {
+            [patternShift(speed / 12), patternShift(speed / 36)]
         }
         switch effect.kind {
         case .travelingWaves:
             typealias Key = SceneEffect.WaveKey
+            // Waves run one way, so a baked loop never winds them back.
+            let speed2 = effect.value(Key.speed2)
             return RealTimeEffectValues([
-                loopSpeed(effect.value(Key.speed), input: input), value(Key.scale), value(Key.amplitude),
-                value(Key.exponent), value(Key.angle), value(Key.dual),
-                loopSpeed(effect.value(Key.speed2), input: input), value(Key.scale2), value(Key.offset2),
-                value(Key.exponent2), value(Key.angle2)
+                loopAngle(effect.value(Key.speed), keepsDirection: true, input: input), value(Key.scale),
+                value(Key.amplitude), value(Key.exponent), value(Key.angle), value(Key.dual),
+                loopAngle(speed2, keepsDirection: true, input: input), value(Key.scale2), value(Key.offset2),
+                value(Key.exponent2), value(Key.angle2), Float(speed2)
             ])
         case .flowShake:
             typealias Key = SceneEffect.FlowShakeKey
             let speed = effect.value(Key.speed)
-            // The irregular swing sums sines at these multiples of the speed; each is
-            // rounded on its own so a baked loop still closes.
+            // The irregular swing sums sines at these multiples of the speed; each closes
+            // a baked loop on its own.
             let multiples = [1, -0.16161616, 0.0083333, -0.00019841]
-            return RealTimeEffectValues([
-                loopSpeed(speed, input: input), value(Key.amplitude), value(Key.frictionX),
-                value(Key.frictionY), value(Key.boundsMin), value(Key.boundsMax), value(Key.side),
-                value(Key.irregular)
-            ] + multiples.map { input.isRealTime ? Float(speed * $0) : loopSpeedAllowingStill(speed * $0) })
+            return RealTimeEffectValues(
+                loopAngles([speed], input: input) + [
+                    value(Key.amplitude), value(Key.frictionX), value(Key.frictionY), value(Key.boundsMin),
+                    value(Key.boundsMax), value(Key.side), value(Key.irregular)
+                ] + loopAngles(multiples.map { speed * $0 }, input: input)
+            )
         case .flowMap:
             typealias Key = SceneEffect.FlowMapKey
             return RealTimeEffectValues([
-                loopRate(effect.value(Key.speed), input: input), value(Key.strength), value(Key.feather),
+                loopPhase(effect.value(Key.speed), cycle: 1, keepsDirection: true, input: input),
+                value(Key.strength), value(Key.feather),
                 value(Key.phaseScale)
             ])
         case .normalRipples:
             typealias Key = SceneEffect.RipplesKey
-            // Its pattern drifts along two axes at once; a baked loop does not close
-            // exactly (only the desktop draws it live).
+            // Two copies of the pattern drift opposite ways while both scroll; each axis of
+            // each copy, in pattern repeats, closes a baked loop on its own.
+            let drift = effect.value(Key.animationSpeed) * effect.value(Key.animationSpeed)
+            let scrollAngle = effect.value(Key.scrollAngle)
+            let scroll = SIMD2(-sin(scrollAngle), cos(scrollAngle)) * effect.value(Key.scrollSpeed) * effect.value(Key.scrollSpeed)
+            let stored = Double(textureAspect(effect))
+            let repeats = SIMD2(stored > 0 ? stored : Double(aspect), effect.value(Key.ratio)) * effect.value(Key.scale)
+            let first = (scroll + drift) * repeats, second = (scroll - drift) * repeats
             return RealTimeEffectValues([
                 value(Key.animationSpeed), value(Key.scale), value(Key.scrollSpeed), value(Key.scrollAngle),
                 value(Key.ratio), value(Key.strength), textureAspect(effect), value(Key.specular),
                 value(Key.specularPower), value(Key.specularStrength), value(Key.specularRed),
                 value(Key.specularGreen), value(Key.specularBlue)
-            ])
+            ] + [first.x, first.y, second.x, second.y].map(patternShift))
         case .noiseDrift:
             typealias Key = SceneEffect.NoiseDriftKey
             return RealTimeEffectValues([
-                loopRate(effect.value(Key.speed), input: input), value(Key.scale), value(Key.scaleX),
+                patternShift(effect.value(Key.speed)), value(Key.scale), value(Key.scaleX),
                 value(Key.amount), value(Key.angle), textureAspect(effect)
             ])
         case .noiseSway:
@@ -1459,36 +1469,31 @@ final class SceneRenderer {
             let speed = effect.value(Key.speed)
             let multiples = [1, -0.16161616, 0.0083333, -0.00019841, -0.5, 0.041666666, -0.0013888889, 0.000024801587]
             return RealTimeEffectValues(
-                multiples.map { input.isRealTime ? Float(speed * $0) : loopSpeedAllowingStill(speed * $0) } + [
+                loopAngles(multiples.map { speed * $0 }, input: input) + [
                     value(Key.strength), value(Key.phase), value(Key.power), value(Key.noiseScale),
                     value(Key.ratio), value(Key.angle)
                 ]
             )
         case .pulseBlend:
             typealias Key = SceneEffect.PulseKey
-            // The noise term wanders on its own; a baked loop does not close exactly.
             return RealTimeEffectValues([
-                loopSpeed(effect.value(Key.speed), input: input), value(Key.phase), value(Key.amount),
-                value(Key.boundsMin), value(Key.boundsMax), value(Key.noiseSpeed), value(Key.noiseAmount),
+                loopAngle(effect.value(Key.speed), keepsDirection: false, input: input), value(Key.phase),
+                value(Key.amount), value(Key.boundsMin), value(Key.boundsMax), value(Key.noiseSpeed), value(Key.noiseAmount),
                 value(Key.power), value(Key.lowRed), value(Key.lowGreen), value(Key.lowBlue),
                 value(Key.highRed), value(Key.highGreen), value(Key.highBlue), value(Key.blendMode),
                 value(Key.pulsesColor), value(Key.pulsesOpacity)
-            ])
+            ] + noiseShifts(effect.value(Key.noiseSpeed)))
         case .uvScroll:
             typealias Key = SceneEffect.ScrollKey
-            func speed(_ raw: Double, repeats: Double) -> Float {
-                let perSecond = raw * abs(raw)
-                guard !input.isRealTime, repeats != 0, perSecond != 0 else {
-                    return Float(perSecond)
-                }
-                // Whole wraps of the repeated picture per loop, at least one.
-                let loop = Double(max(document.loopSeconds, 1))
-                let wraps = max((abs(perSecond * repeats) * loop).rounded(), 1)
-                return Float((perSecond < 0 ? -1 : 1) * wraps / (abs(repeats) * loop))
+            // The picture repeats every 1 / repeats of the layer, so a loop closes on whole
+            // wraps of that; with no repeat nothing moves.
+            func shift(_ raw: Double, repeats: Double) -> Float {
+                guard repeats != 0 else { return 0 }
+                return loopPhase(raw * abs(raw), cycle: 1 / abs(repeats), keepsDirection: true, input: input)
             }
             let repeatX = effect.value(Key.repeatX), repeatY = effect.value(Key.repeatY)
             return RealTimeEffectValues([
-                speed(effect.value(Key.speedX), repeats: repeatX), speed(effect.value(Key.speedY), repeats: repeatY),
+                shift(effect.value(Key.speedX), repeats: repeatX), shift(effect.value(Key.speedY), repeats: repeatY),
                 Float(repeatX), Float(repeatY)
             ])
         case .opacityMask:
@@ -1496,26 +1501,14 @@ final class SceneRenderer {
         case .axisSwing:
             typealias Key = SceneEffect.AxisSwingKey
             return RealTimeEffectValues([
-                loopSpeed(effect.value(Key.speed), input: input), value(Key.phase), value(Key.amount),
-                value(Key.x0), value(Key.y0), value(Key.x1), value(Key.y1), value(Key.size),
+                loopAngle(effect.value(Key.speed), keepsDirection: false, input: input), value(Key.phase),
+                value(Key.amount), value(Key.x0), value(Key.y0), value(Key.x1), value(Key.y1), value(Key.size),
                 value(Key.center), value(Key.feather), value(Key.doubleSided), value(Key.noise),
                 value(Key.noiseSpeed), value(Key.noiseAmount), textureAspect(effect)
-            ])
+            ] + noiseShifts(effect.value(Key.noiseSpeed)))
         default:
             return RealTimeEffectValues([])
         }
-    }
-
-    /// A rate in cycles per second, rounded to whole cycles per loop unless drawn on
-    /// real time; a motion that would round to none keeps one cycle, or a slow drift
-    /// would stop altogether in a baked loop.
-    private func loopRate(_ rate: Double, input: SceneFrameInput) -> Float {
-        guard !input.isRealTime, rate != 0 else {
-            return Float(rate)
-        }
-        let loop = Double(max(document.loopSeconds, 1))
-        let cycles = max((abs(rate) * loop).rounded(), 1)
-        return Float((rate < 0 ? -1 : 1) * cycles / loop)
     }
 
     /// The stored picture's width over height when the effect names it, else the
@@ -1524,11 +1517,47 @@ final class SceneRenderer {
         Float(effect.values[SceneEffect.textureAspectKey] ?? 0)
     }
 
-    /// Like loopSpeed, but a speed too slow for one turn per loop stands still.
-    private func loopSpeedAllowingStill(_ speed: Double) -> Float {
+    /// How far a motion at `rate` per second has gone by the frame, wrapped to one
+    /// `cycle` (the distance after which it looks the same). A baked loop keeps the
+    /// rate through its first half, then eases onto a whole number of cycles by the
+    /// end, so the loop closes with no jump in place or speed. Rounding the rates
+    /// themselves instead changed every speed for the whole loop and stopped the sines
+    /// of a sway slower than half a turn per loop. A motion that `keepsDirection` (a
+    /// scroll, a travelling wave) eases onto at least one cycle its own way rather
+    /// than winding back; a swing eases onto the nearest count, which may be none.
+    private func loopPhase(_ rate: Double, cycle: Double, keepsDirection: Bool, input: SceneFrameInput) -> Float {
+        guard !input.isRealTime else {
+            // Wrapped in Double: hours of real time lose the phase in Float.
+            return Float((rate * input.time).truncatingRemainder(dividingBy: cycle))
+        }
         let loop = Double(max(document.loopSeconds, 1))
-        let turns = (speed * loop / (2 * .pi)).rounded()
-        return Float(turns * 2 * .pi / loop)
+        var time = input.time.truncatingRemainder(dividingBy: loop)
+        if time < 0 { time += loop }
+        let late = max(0, time / loop * 2 - 1)
+        let ease = late * late * (3 - 2 * late)
+        let cycles = rate * loop / cycle
+        var whole = cycles.rounded()
+        if keepsDirection, rate != 0, abs(whole) < 1 { whole = rate < 0 ? -1 : 1 }
+        return Float((rate * time - ease * (cycles - whole) * cycle).truncatingRemainder(dividingBy: cycle))
+    }
+
+    /// `rate × time` with nothing wrapped or bent: the frame's own time drawn live, the
+    /// time within the loop in a bake.
+    private func unwrappedShift(_ rate: Double, input: SceneFrameInput) -> Float {
+        guard !input.isRealTime else { return Float(rate * input.time) }
+        let loop = Double(max(document.loopSeconds, 1))
+        var time = input.time.truncatingRemainder(dividingBy: loop)
+        if time < 0 { time += loop }
+        return Float(rate * time)
+    }
+
+    /// `loopPhase` for a speed in radians per second.
+    private func loopAngle(_ speed: Double, keepsDirection: Bool, input: SceneFrameInput) -> Float {
+        loopPhase(speed, cycle: 2 * .pi, keepsDirection: keepsDirection, input: input)
+    }
+
+    private func loopAngles(_ speeds: [Double], input: SceneFrameInput) -> [Float] {
+        speeds.map { loopAngle($0, keepsDirection: false, input: input) }
     }
 
     /// Runs the layer's effects and returns the texture to composite.
@@ -1666,13 +1695,13 @@ final class SceneRenderer {
                 overlay: paintTint(override),
                 hasMask: mask == nil ? 0 : 1,
                 fixedEdge: Int32(SceneFixedEdge.allCases.firstIndex(of: effect.fixedEdge) ?? 0),
-                // A baked loop reads its own time within the loop, so the rounded
-                // speeds land exactly where the loop starts again.
+                // A baked loop reads its own time within the loop, so motions that
+                // repeat whole times per loop land exactly where it starts again.
                 time: Float(input.isRealTime ? input.time : Double(phase) * Double(max(document.loopSeconds, 1))),
                 hasTimeOffset: timeOffset == nil ? 0 : 1,
                 patternClamps: effect.value(SceneEffect.patternClampsKey) != 0 ? 1 : 0
             )
-            var realTime = realTimeValues(effect, input: input)
+            var realTime = realTimeValues(effect, input: input, aspect: aspect)
             let pass = MTLRenderPassDescriptor()
             pass.colorAttachments[0].texture = destination
             pass.colorAttachments[0].loadAction = .dontCare
@@ -3178,11 +3207,11 @@ final class SceneRenderer {
 
     float layerAspect(float stored, constant EffectUniforms &u) { return stored > 0.0 ? stored : u.aspect; }
 
-    // Flow map (values: rate, strength, feather, phaseScale). Two pairs of copies a
+    // Flow map (values: cycles at this frame, strength, feather, phaseScale). Two pairs of copies a
     // quarter cycle apart, each pair crossfading as one copy resets.
     float4 flowMap(texture2d<float> src, texture2d<float> flow, texture2d<float> pattern, sampler s, float2 uv,
                    constant EffectUniforms &u, constant float *v) {
-        float t = u.time * v[0];
+        float t = v[0];
         float4 cycles = fract(float4(t, t + 0.5, 0.25 + t, 0.75 + t));
         float2 edges = float2(0.5 - v[2], 0.5 + v[2]);
         float blend = smoothstep(edges.x, edges.y, 2.0 * abs(cycles.x - 0.5));
@@ -3198,16 +3227,16 @@ final class SceneRenderer {
     }
 
     // Normal ripples (values: animationSpeed, scale, scrollSpeed, scrollAngle, ratio,
-    // strength, textureAspect, specular, power, strength, rgb).
+    // strength, textureAspect, specular, power, strength, rgb, then the two copies'
+    // shifts at this frame in pattern repeats).
     float4 normalRipples(texture2d<float> src, texture2d<float> mask, texture2d<float> pattern, sampler s, float2 uv,
                          constant EffectUniforms &u, constant float *v) {
         float m = u.hasMask != 0 ? mask.sample(s, uv).r : 1.0;
-        float2 scroll = float2(-sin(v[3]), cos(v[3])) * v[2] * v[2] * u.time;
-        float drift = u.time * v[0] * v[0];
-        float4 coords = float4(uv + drift + scroll, uv * 1.333 - drift + scroll) * v[1];
+        float4 coords = float4(uv, uv * 1.333) * v[1];
         float aspect = layerAspect(v[6], u);
         coords.xz *= aspect;
         coords.yw *= v[4];
+        coords += float4(v[13], v[14], v[15], v[16]);
         float3 n1 = samplePattern(pattern, coords.xy, u).xyz * 2.0 - 1.0;
         float3 n2 = samplePattern(pattern, coords.zw, u).xyz * 2.0 - 1.0;
         float3 normal = normalize(float3(n1.xy + n2.xy, n1.z));
@@ -3220,7 +3249,7 @@ final class SceneRenderer {
         return result;
     }
 
-    // Noise drift (values: rate, scale, scaleX, amount, angle, textureAspect).
+    // Noise drift (values: shift at this frame, scale, scaleX, amount, angle, textureAspect).
     float4 noiseDrift(texture2d<float> src, texture2d<float> mask, texture2d<float> pattern, sampler s, float2 uv,
                       constant EffectUniforms &u, constant float *v) {
         float m = u.hasMask != 0 ? mask.sample(s, uv).r : 1.0;
@@ -3228,7 +3257,7 @@ final class SceneRenderer {
         noiseUV.x *= layerAspect(v[5], u);
         noiseUV *= v[1];
         noiseUV.x *= v[2];
-        noiseUV.x += u.time * v[0];
+        noiseUV.x += v[0];
         float noise = samplePattern(pattern, noiseUV, u).x;
         float2 offset = rotate2(float2((noise * 2.0 - 1.0) * v[3] * m, 0.0), v[4] + 1.57079632679);
         float2 moved = uv + offset;
@@ -3238,7 +3267,7 @@ final class SceneRenderer {
         return src.sample(s, moved);
     }
 
-    // Noise sway (values: eight sine speeds, strength, phase, power, noiseScale,
+    // Noise sway (values: the eight sines' angles at this frame, strength, phase, power, noiseScale,
     // ratio, angle).
     float4 noiseSway(texture2d<float> src, texture2d<float> mask, texture2d<float> pattern, sampler s, float2 uv,
                      constant EffectUniforms &u, constant float *v) {
@@ -3248,8 +3277,8 @@ final class SceneRenderer {
         float amplitude = v[8] * v[8] * 0.005 * (u.hasMask != 0 ? mask.sample(s, uv).r : 1.0);
         float3 noise = samplePattern(pattern, uv * v[11], u).rgb;
         float phase = (noise.g * 3.14159265359 * 2.0 + turned.x * 10.0 + turned.y * 5.0) * v[9];
-        float4 sines = sin(phase + u.time * float4(v[0], v[1], v[2], v[3]));
-        float4 cosines = sin(0.4 + phase + u.time * float4(v[4], v[5], v[6], v[7]));
+        float4 sines = sin(phase + float4(v[0], v[1], v[2], v[3]));
+        float4 cosines = sin(0.4 + phase + float4(v[4], v[5], v[6], v[7]));
         sines = pow(abs(sines), float4(v[10])) * sign(sines);
         cosines = pow(abs(cosines), float4(v[10])) * sign(cosines);
         float2 offset = float2(axes.x * dot(sines, float4(amplitude)), axes.y * dot(cosines, float4(amplitude)));
@@ -3311,15 +3340,15 @@ final class SceneRenderer {
         return mix(a, blended, amount);
     }
 
-    // Pulse (values: speed, phase, amount, boundsMin, boundsMax, noiseSpeed,
-    // noiseAmount, power, low rgb, high rgb, blendMode, pulsesColor, pulsesOpacity).
+    // Pulse (values: angle at this frame, phase, amount, boundsMin, boundsMax, noiseSpeed,
+    // noiseAmount, power, low rgb, high rgb, blendMode, pulsesColor, pulsesOpacity, noise shift).
     float4 pulseBlend(texture2d<float> src, texture2d<float> mask, texture2d<float> pattern, sampler s, float2 uv,
                       constant EffectUniforms &u, constant float *v) {
         float4 sampled = src.sample(s, uv);
         // Blends work on the colour itself, not on colour × opacity.
         float4 colour = sampled.a > 0.0 ? float4(sampled.rgb / sampled.a, sampled.a) : sampled;
-        float pulse = smoothstep(v[3], v[4], sin(u.time * v[0] + (v[1] - 1.57079632679)) * 0.5 + 0.5) * v[2];
-        pulse += samplePattern(pattern, float2(u.time * 0.08333333, u.time * 0.02777777) * v[5], u).r * v[6];
+        float pulse = smoothstep(v[3], v[4], sin(v[0] + (v[1] - 1.57079632679)) * 0.5 + 0.5) * v[2];
+        pulse += samplePattern(pattern, float2(v[17], v[18]), u).r * v[6];
         pulse = pow(pulse, v[7]);
         float4 result = colour;
         if (v[15] != 0.0) {
@@ -3334,17 +3363,17 @@ final class SceneRenderer {
         return float4(max(result.rgb, 0.0) * result.a, result.a);
     }
 
-    // UV scroll (values: speedX, speedY per second, repeatX, repeatY).
+    // UV scroll (values: shift x and y at this frame, repeatX, repeatY).
     float4 uvScroll(texture2d<float> src, sampler s, float2 uv, constant EffectUniforms &u, constant float *v) {
-        return src.sample(s, fract((uv + float2(v[0], v[1]) * u.time) * float2(v[2], v[3])));
+        return src.sample(s, fract((uv + float2(v[0], v[1])) * float2(v[2], v[3])));
     }
 
-    // Axis swing (values: speed, phase, amount, x0, y0, x1, y1, size, center,
-    // feather, doubleSided, noise, noiseSpeed, noiseAmount, textureAspect).
+    // Axis swing (values: angle at this frame, phase, amount, x0, y0, x1, y1, size, center,
+    // feather, doubleSided, noise, noiseSpeed, noiseAmount, textureAspect, noise shift).
     float4 axisSwing(texture2d<float> src, texture2d<float> mask, texture2d<float> pattern, sampler s, float2 uv,
                      constant EffectUniforms &u, constant float *v) {
         float aspect = layerAspect(v[14], u);
-        float swing = sin(u.time * v[0] + v[1] * 6.28318530718) * v[2];
+        float swing = sin(v[0] + v[1] * 6.28318530718) * v[2];
         float2 p0 = float2(v[3] * aspect, v[4]), p1 = float2(v[5] * aspect, v[6]);
         float2 q = float2(uv.x * aspect, uv.y);
         float2 axis = normalize(p1 - p0);
@@ -3352,7 +3381,7 @@ final class SceneRenderer {
         float2 delta = q - (p0 + (p1 - p0) * v[8]);
         float along = dot(axis, delta), side = dot(across, delta);
         if (v[11] != 0.0) {
-            float noise = samplePattern(pattern, float2(u.time * 0.08333333, u.time * 0.02777777) * v[12], u).r * 3.141 * 2.0;
+            float noise = samplePattern(pattern, float2(v[15], v[16]), u).r * 3.141 * 2.0;
             swing = clamp(swing + sin(noise) * v[13], -1.0, 1.0);
         }
         q += axis * swing * side * along + across * swing * swing * side;
@@ -3368,8 +3397,8 @@ final class SceneRenderer {
         return src.sample(s, mix(uv, q, weight));
     }
 
-    // Travelling waves (values: speed, scale, amplitude, exponent, angle, dual,
-    // speed2, scale2, offset2, exponent2, angle2). The direction turns (0, 1) by the
+    // Travelling waves (values: angle at this frame, scale, amplitude, exponent, angle, dual,
+    // second angle at this frame, scale2, offset2, exponent2, angle2, speed2). The direction turns (0, 1) by the
     // angle; the picture moves across it by sin(phase)^exponent × amplitude², scaled
     // by the mask where the pixel is.
     float4 travelingWaves(texture2d<float> src, texture2d<float> mask, texture2d<float> timeOffset, sampler s,
@@ -3377,12 +3406,12 @@ final class SceneRenderer {
         float m = u.hasMask != 0 ? mask.sample(s, uv).r : 1.0;
         float delay = u.hasTimeOffset != 0 ? timeOffset.sample(s, uv).r * TAU : 0.0;
         float2 direction = float2(-sin(v[4]), cos(v[4]));
-        float phase = u.time * v[0] + dot(uv, direction) * v[1] + delay;
+        float phase = v[0] + dot(uv, direction) * v[1] + delay;
         float wave = sin(phase);
         float shaped = pow(abs(wave), v[3]) * sign(wave);
         if (v[5] != 0.0) {
             float2 direction2 = float2(-sin(v[10]), cos(v[10]));
-            float phase2 = (u.time + v[8]) * v[6] + dot(uv, direction2) * v[7] + delay;
+            float phase2 = v[6] + v[8] * v[11] + dot(uv, direction2) * v[7] + delay;
             float wave2 = sin(phase2);
             shaped *= pow(abs(wave2), v[9]) * sign(wave2);
         }
@@ -3390,8 +3419,8 @@ final class SceneRenderer {
         return src.sample(s, uv + shaped * across * v[2] * v[2] * m);
     }
 
-    // Flow shake (values: speed, amplitude, frictionX, frictionY, boundsMin,
-    // boundsMax, side, irregular, then the four speeds of the irregular swing). The
+    // Flow shake (values: the swing's angle at this frame, amplitude, frictionX, frictionY, boundsMin,
+    // boundsMax, side, irregular, then the four angles of the irregular swing). The
     // flow map holds each pixel's vector around 0.498; the mask is read where the
     // moved pixel comes from.
     float4 flowShake(texture2d<float> src, texture2d<float> mask, texture2d<float> flow, texture2d<float> timeOffset,
@@ -3401,13 +3430,13 @@ final class SceneRenderer {
         float2 friction = float2(v[2], v[3]);
         float offset;
         if (v[7] != 0.0) {
-            float4 angles = delay + fract(float4(v[8], v[9], v[10], v[11]) * u.time / TAU) * TAU;
+            float4 angles = delay + float4(v[8], v[9], v[10], v[11]);
             float4 rising = step(0.0, cos(angles));
             float4 sines = sin(angles) * 0.498 + 0.5;
             sines = mix(1.0 - pow(1.0 - sines, float4(friction.x)), pow(sines, float4(friction.y)), rising);
             offset = dot(float4(0.5), sines);
         } else {
-            float angle = v[0] * u.time + delay;
+            float angle = v[0] + delay;
             offset = sin(fract(angle / TAU) * TAU) * 0.498 + 0.5;
             offset = mix(1.0 - pow(1.0 - offset, friction.x), pow(offset, friction.y), step(0.0, cos(angle)));
         }
