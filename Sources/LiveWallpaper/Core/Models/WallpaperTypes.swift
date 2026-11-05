@@ -46,6 +46,30 @@ enum QualityPreset: String {
     case quality
 }
 
+enum BakeQuality: String, CaseIterable, Identifiable, Sendable {
+    case standard
+    case high
+    case maximum
+
+    var id: String { rawValue }
+
+    var compressionQuality: Double {
+        switch self {
+        case .standard: return 0.8
+        case .high: return 0.9
+        case .maximum: return 1.0
+        }
+    }
+
+    var bytesPerPixelSecond: Double {
+        switch self {
+        case .standard: return 0.57
+        case .high: return 1.78
+        case .maximum: return 9.05
+        }
+    }
+}
+
 enum DesktopLevelOffset: Int {
     case minusOne = -1
     case zero = 0

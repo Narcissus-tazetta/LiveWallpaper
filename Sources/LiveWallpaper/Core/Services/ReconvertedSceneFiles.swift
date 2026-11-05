@@ -15,8 +15,10 @@ enum ReconvertedSceneFiles {
         let preparedVideo = staging.appendingPathComponent("wallpaper.mp4")
         let document = try SceneStore.importScene(from: source, videoPath: preparedVideo.path)
         let permitted = SceneScriptPermissions.restored(document, path: videoPath)
-        try await SceneVideoBaker.bake(document: permitted, videoPath: preparedVideo.path,
-                                       userProperties: userProperties, stillOnly: true, to: preparedVideo) { _ in }
+        try await SceneVideoBaker.bake(
+            document: permitted, videoPath: preparedVideo.path,
+            userProperties: userProperties, stillOnly: true, quality: BakeQuality.maximum.compressionQuality, to: preparedVideo
+        ) { _ in }
         let preparedPreview = VideoThumbnailGenerator.expectedSidecarURL(for: preparedVideo.path)
         try writePreview(video: preparedVideo, destination: preparedPreview)
         let scene = SceneStore.folderURL(forVideoPath: videoPath)

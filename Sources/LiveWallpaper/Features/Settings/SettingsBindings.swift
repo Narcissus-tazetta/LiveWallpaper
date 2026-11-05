@@ -73,6 +73,10 @@ extension SettingsView {
         modelBinding(model.qualityPreset) { model.setQualityPreset($0) }
     }
 
+    var bakeQualityBinding: Binding<BakeQuality> {
+        modelBinding(model.bakeQuality) { model.setBakeQuality($0) }
+    }
+
     var workProfileBinding: Binding<WorkProfile> {
         modelBinding(model.workProfile) { model.setWorkProfile($0) }
     }

@@ -21,6 +21,11 @@ final class PackageImporter {
         case invalidChecksum(String)
         case extractionFailed
         case unsafeFileReference(String)
+        case packageTooLarge(Int64, max: Int64)
+        case extractedSizeTooLarge(Int64, max: Int64)
+        case metadataTooLarge(Int64, max: Int64)
+        case excessiveEntryCount(Int, max: Int)
+        case insufficientDiskSpace(requiredBytes: Int64, availableBytes: Int64)
 
         var errorDescription: String? {
             switch self {
@@ -44,16 +49,75 @@ final class PackageImporter {
                 return NSLocalizedString("パッケージの展開に失敗しました", comment: "")
             case let .unsafeFileReference(name):
                 return String(format: NSLocalizedString("不正なファイル参照が含まれています: %@", comment: ""), name)
+            case let .packageTooLarge(size, max):
+                let formatter = ByteCountFormatter()
+                formatter.countStyle = .file
+                let sizeText = formatter.string(fromByteCount: size)
+                let maxText = formatter.string(fromByteCount: max)
+                let template = NSLocalizedString("パッケージのサイズが大きすぎます(%@ / 上限%@)", comment: "")
+                return String(format: template, sizeText, maxText)
+            case let .extractedSizeTooLarge(size, max):
+                let formatter = ByteCountFormatter()
+                formatter.countStyle = .file
+                let sizeText = formatter.string(fromByteCount: size)
+                let maxText = formatter.string(fromByteCount: max)
+                let template = NSLocalizedString("展開後のサイズが大きすぎます(%@ / 上限%@)", comment: "")
+                return String(format: template, sizeText, maxText)
+            case let .metadataTooLarge(size, max):
+                let formatter = ByteCountFormatter()
+                formatter.countStyle = .file
+                let sizeText = formatter.string(fromByteCount: size)
+                let maxText = formatter.string(fromByteCount: max)
+                let template = NSLocalizedString("マニフェストのサイズが大きすぎます(%@ / 上限%@)", comment: "")
+                return String(format: template, sizeText, maxText)
+            case let .insufficientDiskSpace(required, available):
+                let formatter = ByteCountFormatter()
+                formatter.countStyle = .file
+                let template = NSLocalizedString("空き容量が不足しているため、パッケージを展開できません(必要: %@、空き: %@)", comment: "")
+                return String(format: template, formatter.string(fromByteCount: required), formatter.string(fromByteCount: available))
+            case let .excessiveEntryCount(count, max):
+                let template = NSLocalizedString("パッケージ内のファイル数が多すぎます(%d / 上限%d)", comment: "")
+                return String(format: template, count, max)
             }
         }
     }
 
+    struct Limits: Equatable {
+        var maximumPackageFileBytes: Int64
+        var maximumExtractedBytes: Int64
+        var maximumEntryCount: Int
+        var maximumMetadataBytes: Int64
+
+        /// Packages the user exports themselves are not size-capped by the exporter
+        /// (a maximum-quality 4K scene video alone is several GB), so the cap only has
+        /// to stop archives that could never fit on disk.
+        static let local = Limits(
+            maximumPackageFileBytes: 16 * 1024 * 1024 * 1024,
+            maximumExtractedBytes: 32 * 1024 * 1024 * 1024,
+            maximumEntryCount: 20_000,
+            maximumMetadataBytes: 10 * 1024 * 1024
+        )
+
+        /// Store packages are capped at upload time, so anything bigger is not from the Store.
+        static let store = Limits(
+            maximumPackageFileBytes: 500 * 1024 * 1024,
+            maximumExtractedBytes: 2 * 1024 * 1024 * 1024,
+            maximumEntryCount: 1_000,
+            maximumMetadataBytes: 10 * 1024 * 1024
+        )
+    }
+
+    /// Free space that must remain after extraction, so a large import cannot fill the disk.
+    static let extractionHeadroomBytes: Int64 = 2 * 1024 * 1024 * 1024
+
     private let fileManager: FileManager
     private let videosDirectory: URL?
+    private let limits: Limits
 
-    init(fileManager: FileManager = .default, videosDirectory: URL? = nil) {
+    init(fileManager: FileManager = .default, videosDirectory: URL? = nil, limits: Limits = .local) {
         self.fileManager = fileManager
         self.videosDirectory = videosDirectory
+        self.limits = limits
     }
 
     func importPackage(
@@ -70,7 +134,30 @@ final class PackageImporter {
             }
         }
 
+        let inspection = try Self.inspectZipArchive(at: packageURL, limits: limits)
+        let availableBytes = StorageUsage.availableDiskSpace(for: tempDir)
+        guard inspection.totalUncompressedBytes + Self.extractionHeadroomBytes <= availableBytes else {
+            throw ImportError.insufficientDiskSpace(
+                requiredBytes: inspection.totalUncompressedBytes + Self.extractionHeadroomBytes, availableBytes: availableBytes
+            )
+        }
         try extractPackage(from: packageURL, to: tempDir)
+        if let enumerator = fileManager.enumerator(
+            at: tempDir,
+            includingPropertiesForKeys: [.isSymbolicLinkKey],
+            options: []
+        ) {
+            while let fileURL = enumerator.nextObject() as? URL {
+                let values = try fileURL.resourceValues(forKeys: [.isSymbolicLinkKey])
+                if values.isSymbolicLink == true {
+                    throw ImportError.unsafeFileReference(fileURL.lastPathComponent)
+                }
+            }
+        }
+        let extractedSize = StorageUsage.directoryAllocatedSize(at: tempDir)
+        guard extractedSize <= limits.maximumExtractedBytes else {
+            throw ImportError.extractedSizeTooLarge(extractedSize, max: limits.maximumExtractedBytes)
+        }
         let (manifest, packageRootDir) = try loadManifest(from: tempDir)
         try validateManifest(manifest)
         try preflightVideos(
@@ -240,6 +327,125 @@ final class PackageImporter {
         }
     }
 
+    struct ZipArchiveInspection {
+        let totalEntries: Int
+        let totalUncompressedBytes: Int64
+    }
+
+    @discardableResult
+    static func inspectZipArchive(at fileURL: URL, limits: Limits = .local) throws -> ZipArchiveInspection {
+        let attrs = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        let archiveSize = (attrs[.size] as? Int64) ?? 0
+        guard archiveSize <= limits.maximumPackageFileBytes else {
+            throw ImportError.packageTooLarge(archiveSize, max: limits.maximumPackageFileBytes)
+        }
+        guard archiveSize >= 22 else {
+            throw ImportError.invalidPackageFormat
+        }
+
+        let fileHandle = try FileHandle(forReadingFrom: fileURL)
+        defer { try? fileHandle.close() }
+
+        let searchSize = min(UInt64(archiveSize), 65535 + 22)
+        try fileHandle.seek(toOffset: UInt64(archiveSize) - searchSize)
+        guard let tailData = try fileHandle.readToEnd() else {
+            throw ImportError.invalidPackageFormat
+        }
+
+        var eocdOffsetInTail: Int?
+        let sig: [UInt8] = [0x50, 0x4B, 0x05, 0x06]
+        if tailData.count >= 22 {
+            for i in stride(from: tailData.count - 22, through: 0, by: -1) {
+                if tailData[i] == sig[0] && tailData[i + 1] == sig[1] && tailData[i + 2] == sig[2] && tailData[i + 3] == sig[3] {
+                    eocdOffsetInTail = i
+                    break
+                }
+            }
+        }
+        guard let eocdOffsetInTail else {
+            throw ImportError.invalidPackageFormat
+        }
+
+        let eocd = tailData.subdata(in: eocdOffsetInTail..<tailData.count)
+        guard eocd.count >= 22 else { throw ImportError.invalidPackageFormat }
+
+        let totalEntries = Int(readUInt16(from: eocd, at: 10))
+        let cdSize = UInt64(readUInt32(from: eocd, at: 12))
+        let cdOffset = UInt64(readUInt32(from: eocd, at: 16))
+
+        guard totalEntries <= limits.maximumEntryCount else {
+            throw ImportError.excessiveEntryCount(totalEntries, max: limits.maximumEntryCount)
+        }
+        guard cdOffset + cdSize <= UInt64(archiveSize) else {
+            throw ImportError.invalidPackageFormat
+        }
+
+        try fileHandle.seek(toOffset: cdOffset)
+        guard let cdData = try fileHandle.read(upToCount: Int(cdSize)), cdData.count == Int(cdSize) else {
+            throw ImportError.invalidPackageFormat
+        }
+
+        var offset = 0
+        var totalUncompressed: Int64 = 0
+
+        for _ in 0..<totalEntries {
+            guard offset + 46 <= cdData.count else { throw ImportError.invalidPackageFormat }
+            let headerSig = readUInt32(from: cdData, at: offset)
+            guard headerSig == 0x02014B50 else { throw ImportError.invalidPackageFormat }
+
+            let uncompressedSize = UInt64(readUInt32(from: cdData, at: offset + 24))
+            let filenameLen = Int(readUInt16(from: cdData, at: offset + 28))
+            let extraLen = Int(readUInt16(from: cdData, at: offset + 30))
+            let commentLen = Int(readUInt16(from: cdData, at: offset + 32))
+            let externalAttr = readUInt32(from: cdData, at: offset + 38)
+
+            let unixMode = (externalAttr >> 16) & 0o170000
+            if unixMode == 0o120000 {
+                throw ImportError.unsafeFileReference("symlink")
+            }
+
+            let nameStart = offset + 46
+            guard nameStart + filenameLen <= cdData.count else { throw ImportError.invalidPackageFormat }
+            let nameData = cdData.subdata(in: (cdData.startIndex + nameStart)..<(cdData.startIndex + nameStart + filenameLen))
+            guard let name = String(data: nameData, encoding: .utf8) else {
+                throw ImportError.invalidPackageFormat
+            }
+
+            if name.split(separator: "/").contains("..") || name.hasPrefix("/") || name.contains("\\") || name.contains("\0") {
+                throw ImportError.unsafeFileReference(name)
+            }
+
+            totalUncompressed += Int64(uncompressedSize)
+            guard totalUncompressed <= limits.maximumExtractedBytes else {
+                throw ImportError.extractedSizeTooLarge(totalUncompressed, max: limits.maximumExtractedBytes)
+            }
+
+            offset = nameStart + filenameLen + extraLen + commentLen
+        }
+
+        guard offset == cdData.count else {
+            throw ImportError.invalidPackageFormat
+        }
+
+        return ZipArchiveInspection(totalEntries: totalEntries, totalUncompressedBytes: totalUncompressed)
+    }
+
+    private static func readUInt16(from data: Data, at offset: Int) -> UInt16 {
+        guard offset + 2 <= data.count else { return 0 }
+        let idx = data.startIndex + offset
+        return UInt16(data[idx]) | (UInt16(data[idx + 1]) << 8)
+    }
+
+    private static func readUInt32(from data: Data, at offset: Int) -> UInt32 {
+        guard offset + 4 <= data.count else { return 0 }
+        let idx = data.startIndex + offset
+        let b0 = UInt32(data[idx])
+        let b1 = UInt32(data[idx + 1]) << 8
+        let b2 = UInt32(data[idx + 2]) << 16
+        let b3 = UInt32(data[idx + 3]) << 24
+        return b0 | b1 | b2 | b3
+    }
+
     private func extractPackage(from packageURL: URL, to targetDir: URL) throws {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
@@ -271,6 +477,12 @@ final class PackageImporter {
             packageRootDir = tempDir.appendingPathComponent("content")
         } else {
             throw ImportError.missingMetadata
+        }
+
+        let metadataAttrs = try fileManager.attributesOfItem(atPath: metadataURL.path)
+        let metadataSize = (metadataAttrs[.size] as? Int64) ?? 0
+        guard metadataSize <= limits.maximumMetadataBytes else {
+            throw ImportError.metadataTooLarge(metadataSize, max: limits.maximumMetadataBytes)
         }
 
         let data = try Data(contentsOf: metadataURL)
@@ -346,7 +558,10 @@ final class PackageImporter {
         from packageRoot: URL
     ) throws -> URL {
         let sourceFileName = video.source.fileName
-        guard Self.isSafePathComponent(video.id), Self.isSafePathComponent(sourceFileName) else {
+        guard Self.isSafePathComponent(video.id) else {
+            throw ImportError.unsafeFileReference(video.id)
+        }
+        guard Self.isSafePathComponent(sourceFileName) else {
             throw ImportError.unsafeFileReference(sourceFileName)
         }
         let videosDir = packageRoot.appendingPathComponent("videos", isDirectory: true)

@@ -235,7 +235,9 @@ final class PackageExporter {
             try SceneStore.copyScene(videoPath: videoPath, to: snapshotFolder)
             let isStale = model.scenesBaking.contains(videoPath) || SceneStore.isNewerThanVideo(videoPath: videoPath)
             if !document.hasUnapprovedScripts, isStale {
-                try await SceneVideoBaker.bake(document: document, videoPath: videoURL.path, to: videoURL) { _ in }
+                try await SceneVideoBaker.bake(
+                    document: document, videoPath: videoURL.path, quality: BakeQuality.maximum.compressionQuality, to: videoURL
+                ) { _ in }
             } else {
                 try fileManager.copyItem(atPath: videoPath, toPath: videoURL.path)
             }

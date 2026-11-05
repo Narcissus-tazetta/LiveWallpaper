@@ -233,6 +233,7 @@ final class WallpaperModel: ObservableObject {
     @Published var frameRateLimit: FrameRateLimit = .off
     @Published var decodeMode: DecodeMode = .automatic
     @Published var qualityPreset: QualityPreset = .auto
+    @Published var bakeQuality: BakeQuality = .high
     @Published var workProfile: WorkProfile = .normal
     @Published var autoFrameRateEnabled: Bool = true
     @Published var batteryAwareQualityEnabled: Bool = true

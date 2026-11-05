@@ -14,6 +14,11 @@ extension SettingsView {
     "ログイン時に自動起動する",
     "音声を再生する",
     "音量",
+    "書き出し画質",
+    "画質",
+    "最高",
+    "高",
+    "標準",
   ]
 
   var videoSettingsSection: some View {
@@ -52,6 +57,17 @@ extension SettingsView {
         .font(.caption)
       }
       .disabled(!model.audioEnabled)
+
+      Picker(model.localizedString("書き出し画質"), selection: bakeQualityBinding) {
+        Text(model.localizedString("最高")).tag(BakeQuality.maximum)
+        Text(model.localizedString("高")).tag(BakeQuality.high)
+        Text(model.localizedString("標準")).tag(BakeQuality.standard)
+      }
+      .pickerStyle(.menu)
+
+      Text(model.localizedString("変更は次回以降の書き出しに適用。既存の動画は変わりません"))
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
   }
 }

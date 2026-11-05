@@ -7,9 +7,30 @@ enum SceneAIWork: Equatable {
     case estimatingDepth
 }
 
+enum SceneBakeError: LocalizedError {
+    case insufficientDiskSpace(requiredBytes: Int64, availableBytes: Int64)
+
+    var errorDescription: String? {
+        switch self {
+        case let .insufficientDiskSpace(required, available):
+            let formatter = ByteCountFormatter()
+            formatter.countStyle = .file
+            let reqText = formatter.string(fromByteCount: required)
+            let availText = formatter.string(fromByteCount: available)
+            let template = NSLocalizedString(
+                "空き容量が不足しているため、動画の書き出しを中止しました(必要: %@、空き: %@)",
+                comment: ""
+            )
+            return String(format: template, reqText, availText)
+        }
+    }
+}
+
 extension Notification.Name {
     /// object: the video path whose baked video was rewritten.
     static let sceneDidBake = Notification.Name("SceneDidBake")
+    /// object: the video path whose bake failed, userInfo: ["error": errorDescription].
+    static let sceneBakeDidFail = Notification.Name("SceneBakeDidFail")
 }
 
 private final class SceneSaveCoordinator: @unchecked Sendable {
@@ -65,6 +86,12 @@ extension WallpaperModel {
 
     func isScene(path: String) -> Bool {
         sceneDocumentsByPath[path] != nil
+    }
+
+    func setBakeQuality(_ quality: BakeQuality) {
+        guard bakeQuality != quality else { return }
+        bakeQuality = quality
+        UserDefaults.standard.set(quality.rawValue, forKey: PrefsKey.bakeQuality)
     }
 
     /// Scenes only ever live in the app's own folder, so this reads local files only
@@ -1102,7 +1129,9 @@ extension WallpaperModel {
         sceneBakeGenerations[path] = generation
         sceneBakingTimesOfDay[path] = timeOfDay
         scenesBakeRunning.insert(path)
-        AppLog.windowRefresh.info("scene bake start path=\(path, privacy: .public)")
+        AppLog.windowRefresh.info(
+            "scene bake start path=\(path, privacy: .public), quality=\(self.bakeQuality.rawValue, privacy: .public)"
+        )
         sceneBakeTasks[path] = Task { [weak self] in
             guard let self else {
                 return
@@ -1115,6 +1144,12 @@ extension WallpaperModel {
                 return
             } catch {
                 self.sceneBakeFailures[path] = error.localizedDescription
+                self.sceneErrorMessage = error.localizedDescription
+                NotificationCenter.default.post(
+                    name: .sceneBakeDidFail,
+                    object: path,
+                    userInfo: ["error": error.localizedDescription]
+                )
                 AppLog.windowRefresh.error("scene bake failed: \(error.localizedDescription, privacy: .public)")
                 succeeded = false
             }
@@ -1179,12 +1214,23 @@ extension WallpaperModel {
         let stagedOutput = output.deletingLastPathComponent().appendingPathComponent(".scene-\(UUID().uuidString).mp4")
         defer { removeLeftovers(of: [stagedOutput]) }
         if document.isAnimated, !stillOnly {
+            let capacity = StorageUsage.checkBakeCapacity(
+                outputURL: output,
+                document: document,
+                quality: bakeQuality
+            )
+            guard capacity.isSufficient else {
+                throw SceneBakeError.insufficientDiskSpace(
+                    requiredBytes: capacity.requiredBytes,
+                    availableBytes: capacity.availableBytes
+                )
+            }
             sceneBakeProgress[videoPath] = 0
         }
         let throttle = MediaImportProgressThrottle()
         let userProps = SceneMetalLayer.loadUserProperties(forVideoPath: videoPath)
         try await SceneVideoBaker.bake(
-            document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProps, stillOnly: stillOnly, to: stagedOutput
+            document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProps, stillOnly: stillOnly, quality: bakeQuality.compressionQuality, to: stagedOutput
         ) { [weak self] value in
             guard throttle.shouldReport(value) else { return }
             Task { @MainActor [weak self] in
@@ -1245,6 +1291,75 @@ extension WallpaperModel {
                 return now.timeIntervalSince(modified) > 3600
             }
         removeLeftovers(of: abandoned)
+    }
+
+    func allReferencedVideoPaths() -> Set<String> {
+        var paths = Set(libraryVideoPaths)
+        if let currentVideoPath { paths.insert(currentVideoPath) }
+        if let lockScreenVideoPath { paths.insert(lockScreenVideoPath) }
+        if let screenSaverVideoPath { paths.insert(screenSaverVideoPath) }
+        paths.formUnion(videoOverrideByScreenID.values)
+        paths.formUnion(videoBySpaceUUID.values)
+        paths.formUnion(importedExternalWallpaperPaths.values)
+        paths.formUnion(wallpaperPresentationByPath.keys)
+        paths.formUnion(wallpaperEditByPath.keys)
+        paths.formUnion(registeredVideoPaths)
+        paths.formUnion(sceneDocumentsByPath.keys)
+        paths.formUnion(scenesBaking)
+        paths.formUnion(scenesBakeRunning)
+        paths.formUnion(sceneStaleVideoPaths)
+        paths.formUnion(sceneComparisonSnapshots.keys)
+        for playlist in playlists {
+            paths.formUnion(playlist.videoPaths)
+        }
+        for rule in scheduleRules {
+            if let path = rule.target.videoPath {
+                paths.insert(path)
+            }
+        }
+        for (_, target) in focusModeAssignments {
+            if let path = target.videoPath {
+                paths.insert(path)
+            }
+        }
+        return paths
+    }
+
+    /// Every stored preference value as text, so a video named in any preference key counts as in use.
+    func preferencesProtectedText() -> String {
+        UserDefaults.standard.dictionaryRepresentation().description
+    }
+
+    func autoCleanOrphansAndExpiredBackups(now: Date = Date()) {
+        guard let videosDir = cacheDirectoryURL() else { return }
+        let referenced = allReferencedVideoPaths()
+        let orphans = StorageUsage.findOrphanVideos(
+            in: videosDir,
+            referencedVideoPaths: referenced,
+            protectedText: preferencesProtectedText(),
+            now: now,
+            olderThanDays: 7
+        )
+        if !orphans.isEmpty {
+            do {
+                _ = try StorageUsage.deleteOrphans(orphans)
+                AppLog.persistence.info("cleaned \(orphans.count) orphan videos")
+            } catch {
+                AppLog.persistence.error("orphan video cleanup failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let backupsDir = appSupport.appendingPathComponent("LiveWallpaper/AuthorSettingsBackups", isDirectory: true)
+            let expired = StorageUsage.findExpiredAuthorSettingsBackups(in: backupsDir, keepLatestCount: 3, maxAgeDays: 30, now: now)
+            if !expired.isEmpty {
+                do {
+                    _ = try StorageUsage.deleteBackups(expired)
+                    AppLog.persistence.info("cleaned \(expired.count) expired author settings backups")
+                } catch {
+                    AppLog.persistence.error("author settings backup cleanup failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
     }
 
     // MARK: - Desktop

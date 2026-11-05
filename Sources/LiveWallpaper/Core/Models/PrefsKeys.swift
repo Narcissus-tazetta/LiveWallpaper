@@ -12,6 +12,7 @@ enum PrefsKey {
     static let autoFrameRateEnabled = "autoFrameRateEnabled"
     static let autoSwitchIntervalMinutes = "autoSwitchIntervalMinutes"
     static let autoUpdateEnabled = "autoUpdateEnabled"
+    static let bakeQuality = "bakeQuality"
     static let batteryAwareQualityEnabled = "batteryAwareQualityEnabled"
     static let clickThrough = "clickThrough"
     static let webWallpaperInteraction = "webWallpaperInteraction"

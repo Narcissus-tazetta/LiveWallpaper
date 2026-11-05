@@ -39,7 +39,7 @@ final class StoreCatalogController: ObservableObject {
         self.session = session
         self.fileManager = fileManager
         endpointURL = baseURL ?? StoreClient.baseURL
-        self.packageImporter = packageImporter ?? PackageImporter()
+        self.packageImporter = packageImporter ?? PackageImporter(limits: .store)
     }
 
     func loadIfNeeded() async {
@@ -165,18 +165,43 @@ final class StoreCatalogController: ObservableObject {
             .appendingPathComponent("\(UUID().uuidString).lwpkg")
 
         do {
-            // .lwpkgは最大500MBまで許容するため、data(from:)で全体をメモリに
-            // バッファせず、download(from:)でディスクへストリーミングしてから
-            // チャンク単位でハッシュを計算する。
-            let (downloadedFile, response) = try await session.download(from: url)
+            // download(from:) only returns after the whole body is on disk, so an oversized
+            // response would fill the disk before any size check could run. Stream instead and
+            // stop as soon as the cap is crossed.
+            let maxBytes = Int64(StoreClient.maxUploadBytes)
+            let (bytes, response) = try await session.bytes(from: url)
             guard let http = response as? HTTPURLResponse,
                   (200 ..< 300).contains(http.statusCode)
             else {
-                try? fileManager.removeItem(at: downloadedFile)
                 throw StoreClientError.invalidResponse
             }
-            try fileManager.moveItem(at: downloadedFile, to: tempFile)
+            if response.expectedContentLength > maxBytes {
+                throw StoreClientError.fileTooLarge(sizeBytes: Int(response.expectedContentLength), maxBytes: StoreClient.maxUploadBytes)
+            }
+            fileManager.createFile(atPath: tempFile.path, contents: nil)
             defer { try? fileManager.removeItem(at: tempFile) }
+            let handle = try FileHandle(forWritingTo: tempFile)
+            defer { try? handle.close() }
+            var buffer = Data()
+            buffer.reserveCapacity(1 << 20)
+            var written: Int64 = 0
+            for try await byte in bytes {
+                buffer.append(byte)
+                if buffer.count >= 1 << 20 {
+                    written += Int64(buffer.count)
+                    guard written <= maxBytes else {
+                        throw StoreClientError.fileTooLarge(sizeBytes: Int(written), maxBytes: StoreClient.maxUploadBytes)
+                    }
+                    try handle.write(contentsOf: buffer)
+                    buffer.removeAll(keepingCapacity: true)
+                }
+            }
+            written += Int64(buffer.count)
+            guard written <= maxBytes else {
+                throw StoreClientError.fileTooLarge(sizeBytes: Int(written), maxBytes: StoreClient.maxUploadBytes)
+            }
+            try handle.write(contentsOf: buffer)
+            try handle.close()
 
             let actualSHA256 = try Self.sha256Hex(ofFileAt: tempFile)
             guard actualSHA256.caseInsensitiveCompare(entry.sha256) == .orderedSame else {

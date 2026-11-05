@@ -56,7 +56,12 @@ enum SceneStore {
     }
 
     private static func read(folder: URL, format: StoredFormat = .scene) throws -> (document: SceneDocument, prepared: StoredFormat.Prepared) {
-        let prepared = try format.prepare(Data(contentsOf: folder.appendingPathComponent(documentFileName)))
+        let sceneFile = folder.appendingPathComponent(documentFileName)
+        let sceneSize = (try? FileManager.default.attributesOfItem(atPath: sceneFile.path)[.size] as? Int64) ?? 0
+        guard sceneSize <= maximumSceneJSONBytes else {
+            throw ImportError.sceneDefinitionTooLarge(sceneSize, max: maximumSceneJSONBytes)
+        }
+        let prepared = try format.prepare(Data(contentsOf: sceneFile))
         let decoder = JSONDecoder()
         decoder.userInfo[.sceneFolder] = folder
         return (try decoder.decode(SceneDocument.self, from: prepared.data), prepared)
@@ -375,19 +380,34 @@ enum SceneStore {
 
     enum ImportError: LocalizedError {
         case unsafeFile(String)
+        case sceneDefinitionTooLarge(Int64, max: Int64)
 
         var errorDescription: String? {
             switch self {
             case let .unsafeFile(name):
                 return String(format: NSLocalizedString("パッケージに不正なファイル参照が含まれています: %@", comment: ""), name)
+            case let .sceneDefinitionTooLarge(size, max):
+                let formatter = ByteCountFormatter()
+                formatter.countStyle = .file
+                let sizeText = formatter.string(fromByteCount: size)
+                let maxText = formatter.string(fromByteCount: max)
+                let template = NSLocalizedString("シーン定義のサイズが大きすぎます(%@ / 上限%@)", comment: "")
+                return String(format: template, sizeText, maxText)
             }
         }
     }
+
+    static let maximumSceneJSONBytes: Int64 = 500 * 1024 * 1024
 
     /// Installs a scene from an unpacked package next to the imported video. The
     /// package comes from anyone: only plain files that scene.json names, with plain
     /// names, are copied.
     static func importScene(from source: URL, videoPath: String, videoIsOutOfDate: Bool = false) throws -> SceneDocument {
+        let sceneFile = source.appendingPathComponent(documentFileName)
+        let sceneSize = (try? FileManager.default.attributesOfItem(atPath: sceneFile.path)[.size] as? Int64) ?? 0
+        guard sceneSize <= maximumSceneJSONBytes else {
+            throw ImportError.sceneDefinitionTooLarge(sceneSize, max: maximumSceneJSONBytes)
+        }
         var document = try decode(folder: source)
         let root = source.resolvingSymlinksInPath().standardizedFileURL.path
         var names = referencedFiles(of: document).union([documentFileName])

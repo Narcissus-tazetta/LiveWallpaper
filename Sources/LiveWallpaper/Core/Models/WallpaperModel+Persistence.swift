@@ -22,6 +22,7 @@ extension WallpaperModel {
         restorePinCurrentVideo()
         restorePresentationAndEditState()
         persistPlaylistStateImmediately()
+        autoCleanOrphansAndExpiredBackups()
     }
 
     // Web壁紙の機能フラグ復元前はWebだけのキューが空に見えるため、
@@ -99,6 +100,13 @@ extension WallpaperModel {
            let restoredQuality = QualityPreset(rawValue: qualityValue)
         {
             qualityPreset = restoredQuality
+        }
+        if let bakeQualityValue = UserDefaults.standard.string(forKey: PrefsKey.bakeQuality),
+           let restoredBakeQuality = BakeQuality(rawValue: bakeQualityValue)
+        {
+            bakeQuality = restoredBakeQuality
+        } else {
+            bakeQuality = .high
         }
         autoFrameRateEnabled =
             UserDefaults.standard.object(forKey: PrefsKey.autoFrameRateEnabled) as? Bool ?? true
@@ -645,6 +653,7 @@ extension WallpaperModel {
         setDecodeMode(.automatic)
         setWorkProfile(.normal)
         setQualityPreset(.auto)
+        setBakeQuality(.high)
         setPlaylistPlaybackEnabled(false)
         setShufflePlaybackEnabled(false)
         setVideoLoopEnabled(true)

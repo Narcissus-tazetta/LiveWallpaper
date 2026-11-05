@@ -55,6 +55,7 @@ enum SceneVideoBaker {
         timeOfDay: SceneTimeOfDay? = nil,
         userProperties: [String: WebPropertyValue]? = nil,
         stillOnly: Bool = false,
+        quality: Double = BakeQuality.high.compressionQuality,
         to outputURL: URL,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> Statistics? {
@@ -63,7 +64,7 @@ enum SceneVideoBaker {
             try Task.checkCancellation()
             if document.isAnimated, !stillOnly {
                 return try await render(
-                    document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProperties, outputURL: outputURL, progress: progress
+                    document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProperties, quality: quality, outputURL: outputURL, progress: progress
                 )
             } else {
                 try await renderStill(document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProperties, outputURL: outputURL)
@@ -116,6 +117,7 @@ enum SceneVideoBaker {
         videoPath: String,
         timeOfDay: SceneTimeOfDay,
         userProperties: [String: WebPropertyValue]?,
+        quality: Double,
         outputURL: URL,
         progress: @Sendable (Double) -> Void
     ) async throws -> Statistics {
@@ -145,8 +147,8 @@ enum SceneVideoBaker {
         }
         // Both candidates are encoded from the same rendered frames, so whichever wins
         // is encoded exactly once and no frame is rendered twice.
-        let full = try makeSink(url: tmpURL, width: width, height: height, fps: fps)
-        var reduced: Sink? = try makeSink(url: tmp30URL, width: width, height: height, fps: reducedFramesPerSecond)
+        let full = try makeSink(url: tmpURL, width: width, height: height, fps: fps, quality: quality)
+        var reduced: Sink? = try makeSink(url: tmp30URL, width: width, height: height, fps: reducedFramesPerSecond, quality: quality)
 
         var textureCache: CVMetalTextureCache?
         CVMetalTextureCacheCreate(nil, nil, renderer.device, nil, &textureCache)
@@ -239,7 +241,7 @@ enum SceneVideoBaker {
         }
         try Task.checkCancellation()
         try installVideo(chosen.url, at: outputURL)
-        AppLog.windowRefresh.notice("[bake] Selected \(chosen.fps, privacy: .public)fps for \(outputURL.lastPathComponent, privacy: .public) (hold PSNR avg: \(stats.averagePSNR, privacy: .public) dB, min: \(stats.minimumPSNR, privacy: .public) dB, changed max: \(stats.maximumChangedFraction * 100, privacy: .public)%)")
+        AppLog.windowRefresh.notice("[bake] Selected \(chosen.fps, privacy: .public)fps, quality=\(quality, privacy: .public) for \(outputURL.lastPathComponent, privacy: .public) (hold PSNR avg: \(stats.averagePSNR, privacy: .public) dB, min: \(stats.minimumPSNR, privacy: .public) dB, changed max: \(stats.maximumChangedFraction * 100, privacy: .public)%)")
         return Statistics(holdStats: stats, reducedDisqualifiedAtFrame: reducedDisqualifiedAtFrame)
     }
 
@@ -251,7 +253,7 @@ enum SceneVideoBaker {
         let adaptor: AVAssetWriterInputPixelBufferAdaptor
     }
 
-    private static func makeSink(url: URL, width: Int, height: Int, fps: Int) throws -> Sink {
+    private static func makeSink(url: URL, width: Int, height: Int, fps: Int, quality: Double) throws -> Sink {
         let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.hevc,
@@ -260,7 +262,7 @@ enum SceneVideoBaker {
             AVVideoCompressionPropertiesKey: [
                 // Rate control changes texture detail across the loop boundary even when
                 // the rendered frames meet; fixed quality keeps that change out of the seam.
-                kVTCompressionPropertyKey_Quality as String: 1.0,
+                kVTCompressionPropertyKey_Quality as String: quality,
                 AVVideoExpectedSourceFrameRateKey: fps
             ],
             AVVideoColorPropertiesKey: [
