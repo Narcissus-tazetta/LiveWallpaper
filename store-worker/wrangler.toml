@@ -1,5 +1,10 @@
 name = "livewallpaper-store"
 main = "src/index.ts"
+
+# Share links (/w/:id) are built from the client's baseURL, so the custom domain is what users see.
+# workers.dev stays enabled because already-installed apps still call it.
+workers_dev = true
+routes = [{ pattern = "store.livewallpaper.prason.dev", custom_domain = true }]
 compatibility_date = "2026-07-01"
 
 [[r2_buckets]]

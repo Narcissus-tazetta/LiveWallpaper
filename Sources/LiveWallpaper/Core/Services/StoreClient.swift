@@ -75,11 +75,11 @@ enum StoreClientError: LocalizedError {
 
 /// issue #20 のStore共有(アップロード)フロー。既存の PackageExporter/PackageManifestBuilder
 /// をそのまま流用して単体動画の .lwpkg を組み立て、Cloudflare Worker
-/// (store-worker/, https://livewallpaper-store.ibaragiakira2007.workers.dev) へ
+/// (store-worker/, https://store.livewallpaper.prason.dev) へ
 /// アップロードする。ダウンロード/カタログ閲覧側は StoreCatalogController が担当する。
 @MainActor
 final class StoreClient {
-    static let baseURL = URL(string: "https://livewallpaper-store.ibaragiakira2007.workers.dev")!
+    static let baseURL = URL(string: "https://store.livewallpaper.prason.dev")!
     /// store-worker/src/index.ts の MAX_UPLOAD_BYTES と一致させること
     static let maxUploadBytes = 500 * 1024 * 1024
 
