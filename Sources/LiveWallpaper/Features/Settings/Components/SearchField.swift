@@ -57,7 +57,10 @@ struct SearchField: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Color.accentColor.opacity(isFocused.wrappedValue ? 1 : 0), lineWidth: 1.5)
+                .strokeBorder(
+                    Color.accentColor.opacity(isFocused.wrappedValue ? 1 : 0),
+                    lineWidth: 1.5
+                )
         )
         .motionAnimation(Motion.quick, value: text.isEmpty)
         .motionAnimation(Motion.quick, value: isFocused.wrappedValue)

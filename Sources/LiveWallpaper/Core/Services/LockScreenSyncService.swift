@@ -23,13 +23,25 @@ enum LockScreenSyncError: LocalizedError {
         case .applicationSupportUnavailable:
             return NSLocalizedString("Application Support フォルダを取得できませんでした。", comment: "")
         case let .aerialsDirectoryMissing(url):
-            return String(format: NSLocalizedString("macOS の Aerial ディレクトリが見つかりません: %@", comment: ""), url.path)
+            return String(
+                format: NSLocalizedString("macOS の Aerial ディレクトリが見つかりません: %@", comment: ""),
+                url.path
+            )
         case let .manifestMissing(url):
-            return String(format: NSLocalizedString("macOS の Aerial manifest が見つかりません: %@", comment: ""), url.path)
+            return String(
+                format: NSLocalizedString("macOS の Aerial manifest が見つかりません: %@", comment: ""),
+                url.path
+            )
         case let .invalidManifest(url):
-            return String(format: NSLocalizedString("macOS の Aerial manifest を読み込めませんでした: %@", comment: ""), url.path)
+            return String(
+                format: NSLocalizedString("macOS の Aerial manifest を読み込めませんでした: %@", comment: ""),
+                url.path
+            )
         case .noDownloadedAerials:
-            return NSLocalizedString("ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。", comment: "")
+            return NSLocalizedString(
+                "ダウンロード済みのダイナミック壁紙が見つかりません。システム設定で Apple のダイナミック壁紙を1つダウンロードしてください。",
+                comment: ""
+            )
         case let .exportFailed(message):
             return message
         case let .invalidVideo(message):
@@ -278,7 +290,10 @@ final class LockScreenSyncService {
         }
 
         do {
-            try restoreWallpaperStoreBackup(restartServices: true, preferredBackupFileName: leaseBackup)
+            try restoreWallpaperStoreBackup(
+                restartServices: true,
+                preferredBackupFileName: leaseBackup
+            )
         } catch LockScreenSyncError.backupUnavailable {
         } catch {
             restoreErrors.append(error)
@@ -315,13 +330,19 @@ final class LockScreenSyncService {
     }
 
     func restoreWallpaperStoreBackup() throws {
-        try restoreWallpaperStoreBackup(restartServices: true, preferredBackupFileName: activeLease?.storeBackupFileName)
+        try restoreWallpaperStoreBackup(
+            restartServices: true,
+            preferredBackupFileName: activeLease?.storeBackupFileName
+        )
     }
 
     /// `preferredBackupFileName` is the backup from before the current borrow. Without
     /// one (a lease from an older version) the old guess applies, which can be an
     /// older wallpaper than the one replaced.
-    private func restoreWallpaperStoreBackup(restartServices: Bool, preferredBackupFileName: String?) throws {
+    private func restoreWallpaperStoreBackup(
+        restartServices: Bool,
+        preferredBackupFileName: String?
+    ) throws {
         guard let indexURL = wallpaperStoreIndexURL else {
             throw LockScreenSyncError.wallpaperStoreUnavailable
         }
@@ -375,7 +396,8 @@ final class LockScreenSyncService {
         do {
             try UserDefaults.standard.set(JSONEncoder().encode(lease), forKey: leaseDefaultsKey)
         } catch {
-            AppLog.lockScreenSync.error("saving lease failed error=\(error.localizedDescription, privacy: .public)")
+            AppLog.lockScreenSync
+                .error("saving lease failed error=\(error.localizedDescription, privacy: .public)")
         }
         UserDefaults.standard.set(asset.id, forKey: legacyBorrowedAerialIDKey)
         UserDefaults.standard.set(asset.name, forKey: legacyBorrowedAerialNameKey)
@@ -585,9 +607,13 @@ final class LockScreenSyncService {
         let legacyName = legacyWallpaperStoreBackup(for: indexURL).lastPathComponent
         let names: [String]
         do {
-            names = try fileManager.contentsOfDirectory(atPath: indexURL.deletingLastPathComponent().path)
+            names = try fileManager
+                .contentsOfDirectory(atPath: indexURL.deletingLastPathComponent().path)
         } catch {
-            AppLog.lockScreenSync.error("listing store backups failed error=\(error.localizedDescription, privacy: .public)")
+            AppLog.lockScreenSync
+                .error(
+                    "listing store backups failed error=\(error.localizedDescription, privacy: .public)"
+                )
             return []
         }
         return names
@@ -603,7 +629,8 @@ final class LockScreenSyncService {
             return
         }
         let backups = timestampedWallpaperStoreBackups(for: indexURL)
-        var doomed = backups.dropFirst(Self.keptStoreBackupCount).filter { $0.lastPathComponent != kept }
+        var doomed = backups.dropFirst(Self.keptStoreBackupCount)
+            .filter { $0.lastPathComponent != kept }
         let legacy = legacyWallpaperStoreBackup(for: indexURL)
         if fileManager.fileExists(atPath: legacy.path) {
             doomed.append(legacy)

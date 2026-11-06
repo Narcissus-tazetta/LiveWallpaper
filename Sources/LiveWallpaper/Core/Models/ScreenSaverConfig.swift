@@ -33,8 +33,11 @@ struct ScreenSaverConfig: Codable, Equatable {
     /// `home` must be the real user home: inside the screen saver sandbox
     /// NSHomeDirectory() points at the host's container instead.
     static func fileURL(home: URL) -> URL {
-        home.appendingPathComponent("Library/Application Support/LiveWallpaper/ScreenSaver", isDirectory: true)
-            .appendingPathComponent("config.json")
+        home.appendingPathComponent(
+            "Library/Application Support/LiveWallpaper/ScreenSaver",
+            isDirectory: true
+        )
+        .appendingPathComponent("config.json")
     }
 
     func display(forDisplayID displayID: String?) -> Display? {

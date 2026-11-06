@@ -1,6 +1,6 @@
 import Foundation
 
-struct StorageUsage {
+enum StorageUsage {
     /// 2 GiB headroom required in addition to estimated export size.
     static let bakeHeadroomBytes: Int64 = 2 * 1024 * 1024 * 1024
 
@@ -38,17 +38,22 @@ struct StorageUsage {
 
     /// Available space on the volume hosting the destination URL.
     static func availableDiskSpace(for destinationURL: URL) -> Int64 {
-        let directoryURL = destinationURL.hasDirectoryPath ? destinationURL : destinationURL.deletingLastPathComponent()
-        if let values = try? directoryURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
-           let available = values.volumeAvailableCapacityForImportantUsage {
+        let directoryURL = destinationURL.hasDirectoryPath ? destinationURL : destinationURL
+            .deletingLastPathComponent()
+        if let values = try? directoryURL
+            .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]),
+            let available = values.volumeAvailableCapacityForImportantUsage
+        {
             return available
         }
         if let values = try? directoryURL.resourceValues(forKeys: [.volumeAvailableCapacityKey]),
-           let available = values.volumeAvailableCapacity {
+           let available = values.volumeAvailableCapacity
+        {
             return Int64(available)
         }
         if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: directoryURL.path),
-           let freeSize = attrs[.systemFreeSize] as? Int64 {
+           let freeSize = attrs[.systemFreeSize] as? Int64
+        {
             return freeSize
         }
         return Int64.max
@@ -77,7 +82,8 @@ struct StorageUsage {
         var thumbnailCacheBytes: Int64 = 0
 
         var totalBytes: Int64 {
-            videosBytes + authorSettingsBackupsBytes + aerialBackupsBytes + externalScenesBytes + thumbnailCacheBytes
+            videosBytes + authorSettingsBackupsBytes + aerialBackupsBytes + externalScenesBytes +
+                thumbnailCacheBytes
         }
     }
 
@@ -86,37 +92,70 @@ struct StorageUsage {
         guard fm.fileExists(atPath: url.path) else { return 0 }
         guard let enumerator = fm.enumerator(
             at: url,
-            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .fileSizeKey, .isRegularFileKey],
+            includingPropertiesForKeys: [
+                .totalFileAllocatedSizeKey,
+                .fileAllocatedSizeKey,
+                .fileSizeKey,
+                .isRegularFileKey
+            ],
             options: []
         ) else { return 0 }
 
         var total: Int64 = 0
         for case let fileURL as URL in enumerator {
-            guard let values = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .fileSizeKey, .isRegularFileKey]),
-                  values.isRegularFile == true else { continue }
-            total += Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? values.fileSize ?? 0)
+            guard let values = try? fileURL.resourceValues(forKeys: [
+                .totalFileAllocatedSizeKey,
+                .fileAllocatedSizeKey,
+                .fileSizeKey,
+                .isRegularFileKey
+            ]),
+                values.isRegularFile == true else { continue }
+            total +=
+                Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? values
+                    .fileSize ?? 0)
         }
         return total
     }
 
     static func currentBreakdown() -> StorageBreakdown {
-        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+        guard let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
             return StorageBreakdown()
         }
         let base = appSupport.appendingPathComponent("LiveWallpaper", isDirectory: true)
         return StorageBreakdown(
-            videosBytes: directoryAllocatedSize(at: base.appendingPathComponent("Videos", isDirectory: true)),
-            authorSettingsBackupsBytes: directoryAllocatedSize(at: base.appendingPathComponent("AuthorSettingsBackups", isDirectory: true)),
-            aerialBackupsBytes: directoryAllocatedSize(at: base.appendingPathComponent("AerialBackups", isDirectory: true)),
-            externalScenesBytes: directoryAllocatedSize(at: base.appendingPathComponent("ExternalScenes", isDirectory: true)),
-            thumbnailCacheBytes: directoryAllocatedSize(at: base.appendingPathComponent("ThumbnailCache", isDirectory: true))
+            videosBytes: directoryAllocatedSize(at: base.appendingPathComponent(
+                "Videos",
+                isDirectory: true
+            )),
+            authorSettingsBackupsBytes: directoryAllocatedSize(at: base.appendingPathComponent(
+                "AuthorSettingsBackups",
+                isDirectory: true
+            )),
+            aerialBackupsBytes: directoryAllocatedSize(at: base.appendingPathComponent(
+                "AerialBackups",
+                isDirectory: true
+            )),
+            externalScenesBytes: directoryAllocatedSize(at: base.appendingPathComponent(
+                "ExternalScenes",
+                isDirectory: true
+            )),
+            thumbnailCacheBytes: directoryAllocatedSize(at: base.appendingPathComponent(
+                "ThumbnailCache",
+                isDirectory: true
+            ))
         )
     }
 
     // MARK: - Orphan Videos
 
     struct OrphanVideoItem: Equatable, Identifiable {
-        var id: String { stem }
+        var id: String {
+            stem
+        }
+
         let stem: String
         let files: [URL]
         let totalAllocatedBytes: Int64
@@ -137,7 +176,8 @@ struct StorageUsage {
         return name
     }
 
-    /// Finds files in `videosDirectory` that do not correspond to any path in `referencedVideoPaths`.
+    /// Finds files in `videosDirectory` that do not correspond to any path in
+    /// `referencedVideoPaths`.
     static func findOrphanVideos(
         in videosDirectory: URL,
         referencedVideoPaths: Set<String>,
@@ -147,7 +187,18 @@ struct StorageUsage {
     ) -> [OrphanVideoItem] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: videosDirectory.path),
-              let contents = try? fm.contentsOfDirectory(at: videosDirectory, includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey, .isDirectoryKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .fileSizeKey], options: [.skipsSubdirectoryDescendants])
+              let contents = try? fm.contentsOfDirectory(
+                  at: videosDirectory,
+                  includingPropertiesForKeys: [
+                      .contentModificationDateKey,
+                      .isRegularFileKey,
+                      .isDirectoryKey,
+                      .totalFileAllocatedSizeKey,
+                      .fileAllocatedSizeKey,
+                      .fileSizeKey
+                  ],
+                  options: [.skipsSubdirectoryDescendants]
+              )
         else {
             return []
         }
@@ -184,7 +235,8 @@ struct StorageUsage {
             if !protectedText.isEmpty, protectedText.contains(stem) {
                 continue
             }
-            let matchesReferenced = fileURLs.contains { referencedStandardizedPaths.contains($0.standardizedFileURL.path) }
+            let matchesReferenced = fileURLs
+                .contains { referencedStandardizedPaths.contains($0.standardizedFileURL.path) }
             if matchesReferenced {
                 continue
             }
@@ -193,14 +245,25 @@ struct StorageUsage {
             var latestDate: Date = .distantPast
 
             for url in fileURLs {
-                let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                let isDirectory = (
+                    try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
+                ) ??
+                    false
                 if isDirectory {
                     totalBytes += directoryAllocatedSize(at: url)
                 } else {
-                    let values = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .fileSizeKey])
-                    totalBytes += Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? values?.fileSize ?? 0)
+                    let values = try? url.resourceValues(forKeys: [
+                        .totalFileAllocatedSizeKey,
+                        .fileAllocatedSizeKey,
+                        .fileSizeKey
+                    ])
+                    totalBytes +=
+                        Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? values?
+                            .fileSize ?? 0)
                 }
-                if let modDate = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate {
+                if let modDate = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate
+                {
                     if modDate > latestDate {
                         latestDate = modDate
                     }
@@ -232,13 +295,11 @@ struct StorageUsage {
         var freedBytes: Int64 = 0
         var firstError: Error?
         for orphan in orphans {
-            for file in orphan.files {
-                if fm.fileExists(atPath: file.path) {
-                    do {
-                        try fm.removeItem(at: file)
-                    } catch {
-                        if firstError == nil { firstError = error }
-                    }
+            for file in orphan.files where fm.fileExists(atPath: file.path) {
+                do {
+                    try fm.removeItem(at: file)
+                } catch {
+                    if firstError == nil { firstError = error }
                 }
             }
             freedBytes += orphan.totalAllocatedBytes
@@ -250,7 +311,10 @@ struct StorageUsage {
     // MARK: - Backups
 
     struct BackupItem: Equatable, Identifiable {
-        var id: String { url.lastPathComponent }
+        var id: String {
+            url.lastPathComponent
+        }
+
         let url: URL
         let modificationDate: Date
         let totalAllocatedBytes: Int64
@@ -265,7 +329,11 @@ struct StorageUsage {
     ) -> [BackupItem] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: backupsDirectory.path),
-              let subdirs = try? fm.contentsOfDirectory(at: backupsDirectory, includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey], options: [.skipsSubdirectoryDescendants])
+              let subdirs = try? fm.contentsOfDirectory(
+                  at: backupsDirectory,
+                  includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
+                  options: [.skipsSubdirectoryDescendants]
+              )
         else {
             return []
         }
@@ -275,9 +343,14 @@ struct StorageUsage {
             guard (try? dir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
                 continue
             }
-            let modDate = (try? dir.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let modDate = (try? dir.resourceValues(forKeys: [.contentModificationDateKey])
+                .contentModificationDate) ?? .distantPast
             let size = directoryAllocatedSize(at: dir)
-            allItems.append(BackupItem(url: dir, modificationDate: modDate, totalAllocatedBytes: size))
+            allItems.append(BackupItem(
+                url: dir,
+                modificationDate: modDate,
+                totalAllocatedBytes: size
+            ))
         }
 
         // Sort newest first
@@ -295,20 +368,41 @@ struct StorageUsage {
     static func findBackups(in directory: URL) -> [BackupItem] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: directory.path),
-              let files = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .fileSizeKey], options: [.skipsSubdirectoryDescendants])
+              let files = try? fm.contentsOfDirectory(
+                  at: directory,
+                  includingPropertiesForKeys: [
+                      .contentModificationDateKey,
+                      .isRegularFileKey,
+                      .totalFileAllocatedSizeKey,
+                      .fileAllocatedSizeKey,
+                      .fileSizeKey
+                  ],
+                  options: [.skipsSubdirectoryDescendants]
+              )
         else {
             return []
         }
 
         var items: [BackupItem] = []
         for file in files {
-            guard (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+            guard (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            else {
                 continue
             }
-            let modDate = (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-            let values = try? file.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .fileSizeKey])
-            let size = Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? values?.fileSize ?? 0)
-            items.append(BackupItem(url: file, modificationDate: modDate, totalAllocatedBytes: size))
+            let modDate = (try? file.resourceValues(forKeys: [.contentModificationDateKey])
+                .contentModificationDate) ?? .distantPast
+            let values = try? file.resourceValues(forKeys: [
+                .totalFileAllocatedSizeKey,
+                .fileAllocatedSizeKey,
+                .fileSizeKey
+            ])
+            let size = Int64(values?.totalFileAllocatedSize ?? values?.fileAllocatedSize ?? values?
+                .fileSize ?? 0)
+            items.append(BackupItem(
+                url: file,
+                modificationDate: modDate,
+                totalAllocatedBytes: size
+            ))
         }
         return items.sorted { $0.modificationDate > $1.modificationDate }
     }
@@ -319,14 +413,12 @@ struct StorageUsage {
         let fm = FileManager.default
         var freedBytes: Int64 = 0
         var firstError: Error?
-        for backup in backups {
-            if fm.fileExists(atPath: backup.url.path) {
-                do {
-                    try fm.removeItem(at: backup.url)
-                    freedBytes += backup.totalAllocatedBytes
-                } catch {
-                    if firstError == nil { firstError = error }
-                }
+        for backup in backups where fm.fileExists(atPath: backup.url.path) {
+            do {
+                try fm.removeItem(at: backup.url)
+                freedBytes += backup.totalAllocatedBytes
+            } catch {
+                if firstError == nil { firstError = error }
             }
         }
         if let firstError { throw firstError }

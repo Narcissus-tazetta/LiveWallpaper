@@ -46,20 +46,32 @@ struct ScenePreset: Codable, Equatable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
-        builtIn = try? container.decodeIfPresent(BuiltIn.self, forKey: .builtIn)
-        effects = ((try? container.decode([FailableDecodable<ScenePresetEffect>].self, forKey: .effects)) ?? [])
-            .compactMap(\.value)
-        parallaxDepth = (try? container.decode(Double.self, forKey: .parallaxDepth)) ?? 0
-        cursorMask = try? container.decodeIfPresent(SceneCursorMask.self, forKey: .cursorMask)
-        wantsDepth = (try? container.decode(Bool.self, forKey: .wantsDepth)) ?? false
-        depthStrength = (try? container.decode(Double.self, forKey: .depthStrength)) ?? 0.5
-        depthFollowsCursor = (try? container.decode(Bool.self, forKey: .depthFollowsCursor)) ?? true
-        depthAutoMotion = (try? container.decode(Double.self, forKey: .depthAutoMotion)) ?? 0
-        depthAutoCycles = (try? container.decode(Int.self, forKey: .depthAutoCycles)) ?? 1
-        particleLayers = ((try? container.decode([FailableDecodable<SceneLayer>].self, forKey: .particleLayers)) ?? [])
-            .compactMap(\.value)
-            .filter { $0.kind == .particles && $0.particles != nil }
-        includesPaint = (try? container.decode(Bool.self, forKey: .includesPaint)) ?? false
+        builtIn = container.decodeLenientIfPresent(BuiltIn.self, forKey: .builtIn)
+        effects = container.decodeLenient(
+            [FailableDecodable<ScenePresetEffect>].self,
+            forKey: .effects,
+            default: []
+        )
+        .compactMap(\.value)
+        parallaxDepth = container.decodeLenient(Double.self, forKey: .parallaxDepth, default: 0)
+        cursorMask = container.decodeLenientIfPresent(SceneCursorMask.self, forKey: .cursorMask)
+        wantsDepth = container.decodeLenient(Bool.self, forKey: .wantsDepth, default: false)
+        depthStrength = container.decodeLenient(Double.self, forKey: .depthStrength, default: 0.5)
+        depthFollowsCursor = container.decodeLenient(
+            Bool.self,
+            forKey: .depthFollowsCursor,
+            default: true
+        )
+        depthAutoMotion = container.decodeLenient(Double.self, forKey: .depthAutoMotion, default: 0)
+        depthAutoCycles = container.decodeLenient(Int.self, forKey: .depthAutoCycles, default: 1)
+        particleLayers = container.decodeLenient(
+            [FailableDecodable<SceneLayer>].self,
+            forKey: .particleLayers,
+            default: []
+        )
+        .compactMap(\.value)
+        .filter { $0.kind == .particles && $0.particles != nil }
+        includesPaint = container.decodeLenient(Bool.self, forKey: .includesPaint, default: false)
     }
 
     /// Files a stored preset keeps next to its preset.json.
@@ -95,8 +107,12 @@ struct ScenePresetEffect: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         effect = try container.decode(SceneEffect.self, forKey: .effect)
-        wantsMask = (try? container.decode(Bool.self, forKey: .wantsMask)) ?? false
-        movesToOwnLayer = (try? container.decode(Bool.self, forKey: .movesToOwnLayer)) ?? false
+        wantsMask = container.decodeLenient(Bool.self, forKey: .wantsMask, default: false)
+        movesToOwnLayer = container.decodeLenient(
+            Bool.self,
+            forKey: .movesToOwnLayer,
+            default: false
+        )
     }
 }
 
@@ -236,7 +252,10 @@ extension ScenePreset {
         }
         document.layers.insert(contentsOf: added, at: index + 1)
         let addedIDs = Set(layer.effects.map(\.id) + added.map(\.id))
-        return (document, ScenePresetGuide(presetName: name, layerID: layerID, steps: steps, addedIDs: addedIDs))
+        return (
+            document,
+            ScenePresetGuide(presetName: name, layerID: layerID, steps: steps, addedIDs: addedIDs)
+        )
     }
 
     /// A preset of the layer's current look. Without `includingPaint`, painted files

@@ -30,7 +30,7 @@ extension View {
     /// Controls that float over content (the playback bar, toolbar buttons) get Liquid Glass
     /// where the OS has it; earlier systems fall back to a material with a hairline edge.
     @ViewBuilder
-    func floatingGlass<S: InsettableShape>(in shape: S) -> some View {
+    func floatingGlass(in shape: some InsettableShape) -> some View {
         if #available(macOS 26, *) {
             glassEffect(.regular, in: shape)
         } else {

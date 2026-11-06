@@ -22,7 +22,10 @@ struct SceneUserPropertiesPanel: View {
                         Spacer()
                     }
                     if properties.isEmpty {
-                        Text(model.localizedString("項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。"))
+                        Text(model
+                            .localizedString(
+                                "項目を追加すると、利用者が「作品の設定」で値を変えられます。スクリプトでは ctx.userProperties.<ID> で読めます。"
+                            ))
                             .font(.caption).foregroundColor(.secondary)
                     }
                     ForEach(properties) { property in
@@ -49,7 +52,9 @@ struct SceneUserPropertiesPanel: View {
 
     private func add(kind: String, existing: [LocalWebProperty]) {
         var number = existing.count + 1
-        while existing.contains(where: { $0.id == "property\(number)" }) { number += 1 }
+        while existing.contains(where: { $0.id == "property\(number)" }) {
+            number += 1
+        }
         var property = LocalWebProperty(
             id: "property\(number)", kind: kind, label: ["default": kindName(kind)], value: .null
         )
@@ -72,7 +77,8 @@ struct SceneUserPropertiesPanel: View {
 
     private func update(_ id: String, _ change: @escaping (inout LocalWebProperty) -> Void) {
         model.updateSceneProperties(path: path) { properties in
-            if let index = properties.firstIndex(where: { $0.id == id }) { change(&properties[index]) }
+            if let index = properties
+                .firstIndex(where: { $0.id == id }) { change(&properties[index]) }
         }
     }
 
@@ -88,9 +94,12 @@ struct SceneUserPropertiesPanel: View {
                 TextField(model.localizedString("ID"), text: Binding(
                     get: { property.id },
                     set: { value in
-                        // Scripts name the property by this ID, so it must stay unique and non-empty.
+                        // Scripts name the property by this ID, so it must stay unique and
+                        // non-empty.
                         let clean = value.filter { $0.isLetter || $0.isNumber || $0 == "_" }
-                        guard !clean.isEmpty, !all.contains(where: { $0.id == clean && $0.id != id }) else { return }
+                        guard !clean.isEmpty,
+                              !all.contains(where: { $0.id == clean && $0.id != id })
+                        else { return }
                         update(id) { $0.id = clean }
                     }
                 ))
@@ -105,45 +114,70 @@ struct SceneUserPropertiesPanel: View {
             switch property.kind {
             case "slider":
                 HStack {
-                    numberField(model.localizedString("最小値"), property.minimum ?? 0) { value in update(id) { $0.minimum = value } }
-                    numberField(model.localizedString("最大値"), property.maximum ?? 1) { value in update(id) { $0.maximum = value } }
-                    numberField(model.localizedString("初期値"), property.value.number) { value in update(id) { $0.value = .number(value) } }
+                    numberField(model.localizedString("最小値"), property.minimum ?? 0) { value in
+                        update(id) { $0.minimum = value }
+                    }
+                    numberField(model.localizedString("最大値"), property.maximum ?? 1) { value in
+                        update(id) { $0.maximum = value }
+                    }
+                    numberField(model.localizedString("初期値"), property.value.number) { value in
+                        update(id) { $0.value = .number(value) }
+                    }
                 }
             case "bool":
                 Toggle(model.localizedString("初期値"), isOn: Binding(
-                    get: { property.value.bool }, set: { value in update(id) { $0.value = .bool(value) } }
+                    get: { property.value.bool },
+                    set: { value in update(id) { $0.value = .bool(value) } }
                 )).toggleStyle(.checkbox)
             case "combo":
                 TextField(model.localizedString("選択肢（カンマ区切り）"), text: Binding(
-                    get: { (property.options ?? []).map { $0.value.string }.joined(separator: ", ") },
+                    get: { (property.options ?? []).map(\.value.string).joined(separator: ", ") },
                     set: { text in
-                        let values = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                        let values = text.split(separator: ",")
+                            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
                         update(id) { property in
-                            property.options = values.map { .init(label: ["default": $0], value: .string($0)) }
-                            if !values.contains(property.value.string), let first = values.first { property.value = .string(first) }
+                            property.options = values.map { .init(
+                                label: ["default": $0],
+                                value: .string($0)
+                            ) }
+                            if !values.contains(property.value.string),
+                               let first = values.first { property.value = .string(first) }
                         }
                     }
                 ))
             case "textinput":
                 TextField(model.localizedString("初期値"), text: Binding(
-                    get: { property.value.string }, set: { value in update(id) { $0.value = .string(value) } }
+                    get: { property.value.string },
+                    set: { value in update(id) { $0.value = .string(value) } }
                 ))
             default:
                 ColorPicker(model.localizedString("初期値"), selection: Binding(
                     get: {
-                        let c = property.value.string.split(separator: " ").compactMap { Double($0) }
-                        return c.count >= 3 ? Color(.sRGB, red: c[0], green: c[1], blue: c[2]) : .white
+                        let c = property.value.string.split(separator: " ")
+                            .compactMap { Double($0) }
+                        return c
+                            .count >= 3 ? Color(.sRGB, red: c[0], green: c[1], blue: c[2]) : .white
                     },
                     set: { color in
                         guard let rgb = NSColor(color).usingColorSpace(.sRGB) else { return }
-                        update(id) { $0.value = .string("\(rgb.redComponent) \(rgb.greenComponent) \(rgb.blueComponent)") }
+                        update(id) {
+                            $0
+                                .value =
+                                .string(
+                                    "\(rgb.redComponent) \(rgb.greenComponent) \(rgb.blueComponent)"
+                                )
+                        }
                     }
                 ), supportsOpacity: false)
             }
         }
     }
 
-    private func numberField(_ title: String, _ value: Double, set: @escaping (Double) -> Void) -> some View {
+    private func numberField(
+        _ title: String,
+        _ value: Double,
+        set: @escaping (Double) -> Void
+    ) -> some View {
         HStack(spacing: 4) {
             Text(title).font(.caption).foregroundColor(.secondary)
             TextField("", value: Binding(get: { value }, set: set), format: .number)

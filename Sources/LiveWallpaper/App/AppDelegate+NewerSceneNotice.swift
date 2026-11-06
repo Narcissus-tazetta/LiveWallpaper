@@ -17,7 +17,7 @@ extension AppDelegate {
         openSettings()
         guard let window = settingsWindowController?.window else { return }
         guard window.attachedSheet == nil else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.presentNewerSceneNotice() }
+            window.afterAttachedSheetEnds { [weak self] in self?.presentNewerSceneNotice() }
             return
         }
         wallpaperModel.scenesFromNewerVersion = []

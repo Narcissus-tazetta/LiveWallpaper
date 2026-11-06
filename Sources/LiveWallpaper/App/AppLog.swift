@@ -36,7 +36,7 @@ enum AppLog {
     static let events = AppLogger(category: "events")
 }
 
-struct AppLogger: Sendable {
+struct AppLogger {
     let category: String
     private let logger: Logger
 
@@ -96,7 +96,10 @@ struct AppLogMessage: ExpressibleByStringInterpolation {
             text += literal
         }
 
-        mutating func appendInterpolation(_ value: some BinaryInteger, privacy: AppLogPrivacy = .public) {
+        mutating func appendInterpolation(
+            _ value: some BinaryInteger,
+            privacy: AppLogPrivacy = .public
+        ) {
             append(String(value), privacy: privacy)
         }
 
@@ -109,7 +112,7 @@ struct AppLogMessage: ExpressibleByStringInterpolation {
             privacy: AppLogPrivacy = .public
         ) {
             switch format {
-            case .fixed(let precision):
+            case let .fixed(precision):
                 append(String(format: "%.\(precision)f", value), privacy: privacy)
             case nil:
                 append("\(value)", privacy: privacy)

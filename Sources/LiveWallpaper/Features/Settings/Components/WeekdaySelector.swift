@@ -53,7 +53,8 @@ struct WeekdaySelector: NSViewRepresentable {
         }
 
         @objc func segmentChanged(_ sender: NSSegmentedControl) {
-            let selected = Set((0 ..< 7).filter { sender.isSelected(forSegment: $0) }.map { $0 + 1 })
+            let selected = Set((0 ..< 7).filter { sender.isSelected(forSegment: $0) }
+                .map { $0 + 1 })
             // 全曜日を選んだ状態は「毎日」= 空集合として正規化しておく
             // (weekdays.isEmpty が「毎日」を意味する ScheduleRule の規約に合わせる)。
             // 全部外した場合も空集合になり、毎日として全選択の表示に戻る。

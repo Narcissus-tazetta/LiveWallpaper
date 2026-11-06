@@ -48,16 +48,19 @@ struct SceneRenderGraph: Codable, Equatable {
         /// `lightOrigin`, `lightAxis` and `lightColor` are those of the scripted light `key`.
         enum Value: String, Codable {
             case time, cursor, textureSize, boneMatrices, boneOpacity, effectValue, audioSpectrum
-            case pointer, previousPointer, layerFromCanvas, canvasFromLayer, screenFromLayer, frameTime, pointerState
+            case pointer, previousPointer, layerFromCanvas, canvasFromLayer, screenFromLayer,
+                 frameTime, pointerState
             case parallaxPosition, texelSize, texelOffsets
             case modelViewProjection, model, normalModel, viewProjection, layerAlpha, layerColor
             case eyePosition, ambientColor, skylightColor, shadowMatrix
             case lightOrigin, lightAxis, lightColor
             /// The number of mip levels of the texture named by `texture`.
             case mipLevels
-            /// The size of what is drawn and its aspect ratio (width over height). Inferred, not measured.
+            /// The size of what is drawn and its aspect ratio (width over height). Inferred, not
+            /// measured.
             case screen
         }
+
         var offset: Int
         var value: Value
         var texture: String?
@@ -78,7 +81,8 @@ struct SceneRenderGraph: Codable, Equatable {
         /// A vertex component of a model a script made, which lays its vertices out itself.
         enum Semantic: String, Codable, CaseIterable {
             case position, normal, tangentSigned, uv, color
-            /// Bone indices as four 32-bit words (not floats), then their weights; they come last so the
+            /// Bone indices as four 32-bit words (not floats), then their weights; they come last
+            /// so the
             /// bit positions of the components above stay as they were.
             case joints, weights
 
@@ -91,6 +95,7 @@ struct SceneRenderGraph: Codable, Equatable {
                 }
             }
         }
+
         var location: Int
         var offset: Int
         var format: Format
@@ -108,6 +113,7 @@ struct SceneRenderGraph: Codable, Equatable {
             var textures: [Texture]?
             var fragmentUniforms: Data?
         }
+
         var vertex: Stage
         var fragment: Stage
         /// Ignored when `dynamic` is set.
@@ -173,7 +179,8 @@ struct SceneRenderGraph: Codable, Equatable {
     var readsBackground: Bool {
         passes.contains { pass in
             pass.source == Self.background || (pass.draw.map { draw in
-                (draw.textures + (draw.commands ?? []).flatMap { $0.textures ?? [] }).contains { $0.source == Self.background }
+                (draw.textures + (draw.commands ?? []).flatMap { $0.textures ?? [] })
+                    .contains { $0.source == Self.background }
             } ?? false)
         }
     }
@@ -214,7 +221,7 @@ struct SceneMeshMaterial: Codable, Equatable {
     var draw: SceneRenderGraph.Draw
     /// Resource name to a plain file name in the scene folder.
     var images: [String: String]
-    var values: [String: Double]? = nil
+    var values: [String: Double]?
 }
 
 /// A layer a script made from its own geometry, as it should look this frame.
@@ -227,8 +234,8 @@ struct SceneModelLayerFrame: Equatable {
         var vertices: [Float]
         /// Triangles by vertex index; nil draws the vertices three at a time.
         var indices: [UInt32]?
-        var vertexBuffer: (any MTLBuffer)? = nil
-        var indexBuffer: (any MTLBuffer)? = nil
+        var vertexBuffer: (any MTLBuffer)?
+        var indexBuffer: (any MTLBuffer)?
 
         init(
             material: Int?,
@@ -248,7 +255,9 @@ struct SceneModelLayerFrame: Equatable {
 
         var stride: Int {
             SceneRenderGraph.Attribute.Semantic.allCases.enumerated()
-                .reduce(0) { $0 + (components & (1 << UInt32($1.offset)) != 0 ? $1.element.floats : 0) }
+                .reduce(0) {
+                    $0 + (components & (1 << UInt32($1.offset)) != 0 ? $1.element.floats : 0)
+                }
         }
 
         static func == (lhs: Shape, rhs: Shape) -> Bool {
@@ -258,6 +267,7 @@ struct SceneModelLayerFrame: Equatable {
                 && lhs.indices == rhs.indices
         }
     }
+
     /// Stable for the life of the layer.
     var serial: UInt32
     /// The layer's place in the drawing order, shared with the scene's layers.

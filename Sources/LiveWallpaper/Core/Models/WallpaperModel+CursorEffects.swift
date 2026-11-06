@@ -26,7 +26,10 @@ extension WallpaperModel {
         }
         cursorEffects = settings
         do {
-            try UserDefaults.standard.set(JSONEncoder().encode(settings), forKey: PrefsKey.cursorEffectsData)
+            try UserDefaults.standard.set(
+                JSONEncoder().encode(settings),
+                forKey: PrefsKey.cursorEffectsData
+            )
         } catch {
             recordPersistenceFailure(key: PrefsKey.cursorEffectsData, error: error)
         }
@@ -50,7 +53,8 @@ extension WallpaperModel {
         if reduceMotionFreezeActive {
             return .reduceMotion
         }
-        return cursorPowerBlockReason ?? ((batteryReduceLoadActive || batteryFreezeActive) ? .battery : nil)
+        return cursorPowerBlockReason ??
+            ((batteryReduceLoadActive || batteryFreezeActive) ? .battery : nil)
     }
 
     var cursorSpotlightBlockReason: CursorEffectBlockReason? {
@@ -104,12 +108,19 @@ extension WallpaperModel {
 
     /// An edit in the editor, recorded for undo. Edits with the same `coalescingKey`
     /// between two presses (a colour dragged in the colour panel) make one step.
-    func editCursorEffectsOverride(_ settings: CursorEffectsSettings?, path: String, coalescingKey: String?) {
+    func editCursorEffectsOverride(
+        _ settings: CursorEffectsSettings?,
+        path: String,
+        coalescingKey: String?
+    ) {
         let previous = cursorEffectsByPath[path]
         guard previous != settings else {
             return
         }
-        cursorEffectsHistories[path, default: EditHistory()].record(previous, coalescingKey: coalescingKey)
+        cursorEffectsHistories[path, default: EditHistory()].record(
+            previous,
+            coalescingKey: coalescingKey
+        )
         setCursorEffectsOverride(settings, path: path)
     }
 
@@ -177,11 +188,14 @@ extension WallpaperModel {
 
     private func cursorEffectTargets() -> [CursorEffectTarget] {
         playerViews.compactMap { view in
-            guard let window = view.window, let displayID = displayIDByWindow[ObjectIdentifier(window)] else {
+            guard let window = view.window,
+                  let displayID = displayIDByWindow[ObjectIdentifier(window)]
+            else {
                 return nil
             }
             return CursorEffectTarget(
-                view: view, displayID: displayID, settings: effectiveCursorEffects(forDisplayID: displayID)
+                view: view, displayID: displayID,
+                settings: effectiveCursorEffects(forDisplayID: displayID)
             )
         }
     }
@@ -196,7 +210,8 @@ extension WallpaperModel {
             $videoBySpaceUUID.map { _ in () }.eraseToAnyPublisher(),
             $currentSpaceUUIDByDisplayID.map { _ in () }.eraseToAnyPublisher(),
             // Turning sound reaction on or off decides whether the scene is drawn live.
-            NotificationCenter.default.publisher(for: SceneSoundReaction.didChange).map { _ in () }.eraseToAnyPublisher()
+            NotificationCenter.default.publisher(for: SceneSoundReaction.didChange).map { _ in () }
+                .eraseToAnyPublisher()
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] in
@@ -234,14 +249,17 @@ extension WallpaperModel {
         }
         cursorEffectsObservers = [
             NSWorkspace.shared.notificationCenter.addObserver(
-                forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main, using: handler
+                forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main,
+                using: handler
             ),
             NotificationCenter.default.addObserver(
-                forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main, using: handler
+                forName: .NSProcessInfoPowerStateDidChange, object: nil, queue: .main,
+                using: handler
             ),
             NotificationCenter.default.addObserver(
-                forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main, using: handler
-            ),
+                forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main,
+                using: handler
+            )
         ]
     }
 
@@ -255,7 +273,8 @@ extension WallpaperModel {
         if isLowPowerModeOn != lowPower {
             isLowPowerModeOn = lowPower
         }
-        let hot = ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue
+        let hot = ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious
+            .rawValue
         if isThermallyConstrained != hot {
             isThermallyConstrained = hot
         }
@@ -328,7 +347,8 @@ extension WallpaperModel {
             guard let frame = view.window?.frame else {
                 continue
             }
-            let local: CGPoint? = frame.contains(location) && !coveredDisplayIDs.contains(target.displayID)
+            let local: CGPoint? = frame.contains(location) && !coveredDisplayIDs
+                .contains(target.displayID)
                 ? CGPoint(x: location.x - frame.minX, y: location.y - frame.minY)
                 : nil
 
@@ -355,7 +375,8 @@ extension WallpaperModel {
             }
             if spotlight, settings.spotlightEnabled {
                 view.setSpotlight(
-                    radius: settings.spotlightRadius, opacity: settings.spotlightOpacity, center: local
+                    radius: settings.spotlightRadius, opacity: settings.spotlightOpacity,
+                    center: local
                 )
             }
             if motion, settings.trailEnabled {
@@ -384,11 +405,12 @@ extension WallpaperModel {
     private func updateClickMonitor(targets: [CursorEffectTarget]) {
         let clickActive = clickAllowed && targets.contains { $0.settings.clickEnabled }
         if clickActive, clickMonitor == nil {
-            clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.handleClick(at: NSEvent.mouseLocation)
+            clickMonitor = NSEvent
+                .addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+                    MainActor.assumeIsolated {
+                        self?.handleClick(at: NSEvent.mouseLocation)
+                    }
                 }
-            }
         } else if !clickActive, let monitor = clickMonitor {
             NSEvent.removeMonitor(monitor)
             clickMonitor = nil
@@ -402,7 +424,10 @@ extension WallpaperModel {
             !coveredDisplayIDs.contains($0.displayID) && $0.view.sceneScriptsUsePointer
         }
         if active, scenePressMonitor == nil {
-            scenePressMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { [weak self] event in
+            scenePressMonitor = NSEvent.addGlobalMonitorForEvents(matching: [
+                .leftMouseDown,
+                .leftMouseUp
+            ]) { [weak self] event in
                 let isDown = event.type == .leftMouseDown
                 MainActor.assumeIsolated {
                     self?.handleScenePress(at: NSEvent.mouseLocation, isDown: isDown)
@@ -427,7 +452,10 @@ extension WallpaperModel {
             guard let frame = target.view.window?.frame, frame.contains(location) else {
                 continue
             }
-            target.view.addScenePointerPress(CGPoint(x: location.x - frame.minX, y: location.y - frame.minY), isDown: isDown)
+            target.view.addScenePointerPress(
+                CGPoint(x: location.x - frame.minX, y: location.y - frame.minY),
+                isDown: isDown
+            )
         }
     }
 
@@ -438,9 +466,11 @@ extension WallpaperModel {
         return DesktopClickDetector.isDesktopClick(
             at: CGPoint(x: location.x, y: primaryHeight - location.y),
             windows: Self.onScreenWindows(),
-            finderPID: NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
+            finderPID: NSRunningApplication
+                .runningApplications(withBundleIdentifier: "com.apple.finder")
                 .first?.processIdentifier,
-            dockPID: NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock")
+            dockPID: NSRunningApplication
+                .runningApplications(withBundleIdentifier: "com.apple.dock")
                 .first?.processIdentifier,
             ownPID: ProcessInfo.processInfo.processIdentifier,
             screenSizes: NSScreen.screens.map(\.frame.size)
@@ -458,13 +488,17 @@ extension WallpaperModel {
             }
             target.view.showClick(
                 at: CGPoint(x: location.x - frame.minX, y: location.y - frame.minY),
-                style: settings.clickStyle, color: settings.clickColor, customColor: settings.clickCustomColor
+                style: settings.clickStyle, color: settings.clickColor,
+                customColor: settings.clickCustomColor
             )
         }
     }
 
     static func onScreenWindows() -> [OnScreenWindow] {
-        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+        guard let list = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly],
+            kCGNullWindowID
+        ) as? [[String: Any]] else {
             return []
         }
         return list.compactMap { info in

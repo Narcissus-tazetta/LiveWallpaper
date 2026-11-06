@@ -1,35 +1,55 @@
 import Foundation
 
-final class PackageArchiveWriter {
+/// Unchecked because FileManager is not marked Sendable, though Apple documents it as safe
+/// to call from any thread; the only stored property is immutable.
+final class PackageArchiveWriter: @unchecked Sendable {
+    enum ArchiveError: LocalizedError {
+        case zipCreationFailed(ProcessRunner.Failure)
+        case moveFailed(Error)
+
+        var errorDescription: String? {
+            switch self {
+            case let .zipCreationFailed(failure):
+                return "ZIP creation failed: \(failure.localizedDescription)"
+            case let .moveFailed(error):
+                return "Failed to write package to destination: \(error.localizedDescription)"
+            }
+        }
+    }
+
     private let fileManager: FileManager
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
     }
 
-    func createPackage(from contentDir: URL, outputURL: URL) throws {
+    func createPackage(from contentDir: URL, outputURL: URL) async throws {
+        try await BlockingWork.run { [self] in
+            try createPackageSynchronously(from: contentDir, outputURL: outputURL)
+        }
+    }
+
+    private func createPackageSynchronously(from contentDir: URL, outputURL: URL) throws {
         let outputDir = outputURL.deletingLastPathComponent()
         let tempOutputURL = outputDir.appendingPathComponent("\(UUID().uuidString).lwpkg")
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        task.arguments = [
-            "-c",
-            "-k",
-            "--sequesterRsrc",
-            "--keepParent",
-            contentDir.path,
-            tempOutputURL.path
-        ]
-        try task.run()
-        task.waitUntilExit()
-
-        guard task.terminationStatus == 0 else {
-            throw NSError(
-                domain: "PackageExporter",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "ZIP creation failed"]
+        do {
+            try ProcessRunner.runSynchronously(
+                "/usr/bin/ditto",
+                arguments: [
+                    "-c",
+                    "-k",
+                    "--sequesterRsrc",
+                    "--keepParent",
+                    contentDir.path,
+                    tempOutputURL.path
+                ]
             )
+        } catch let failure as ProcessRunner.Failure {
+            AppLog.persistence
+                .error("package archive failed: \(failure.localizedDescription, privacy: .public)")
+            removePartialOutput(tempOutputURL)
+            throw ArchiveError.zipCreationFailed(failure)
         }
 
         do {
@@ -39,14 +59,20 @@ final class PackageArchiveWriter {
                 try fileManager.moveItem(at: tempOutputURL, to: outputURL)
             }
         } catch {
-            try? fileManager.removeItem(at: tempOutputURL)
-            throw NSError(
-                domain: "PackageExporter",
-                code: -2,
-                userInfo: [
-                    NSLocalizedDescriptionKey: "Failed to write package to destination",
-                    NSUnderlyingErrorKey: error
-                ]
+            removePartialOutput(tempOutputURL)
+            throw ArchiveError.moveFailed(error)
+        }
+    }
+
+    private func removePartialOutput(_ url: URL) {
+        guard fileManager.fileExists(atPath: url.path) else {
+            return
+        }
+        do {
+            try fileManager.removeItem(at: url)
+        } catch {
+            AppLog.persistence.error(
+                "could not remove partial package \(url.path, privacy: .public): \(error.localizedDescription, privacy: .public)"
             )
         }
     }

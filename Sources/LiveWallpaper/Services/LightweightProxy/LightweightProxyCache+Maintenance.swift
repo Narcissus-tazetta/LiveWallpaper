@@ -135,7 +135,7 @@ extension LightweightProxyCache {
         metadataFlushWorkItem = nil
 
         let snapshot = metadata
-        guard let metadataURL = self.metadataURL else {
+        guard let metadataURL else {
             return
         }
         ioQueue.async {
@@ -143,7 +143,10 @@ extension LightweightProxyCache {
                 let data = try JSONEncoder().encode(snapshot)
                 try data.write(to: metadataURL, options: .atomic)
             } catch {
-                AppLog.proxyCache.error("metadata flush failed error=\(error.localizedDescription, privacy: .public)")
+                AppLog.proxyCache
+                    .error(
+                        "metadata flush failed error=\(error.localizedDescription, privacy: .public)"
+                    )
             }
         }
     }
@@ -157,7 +160,7 @@ extension LightweightProxyCache {
         metadataFlushWorkItem = nil
 
         let snapshot = metadata
-        guard let metadataURL = self.metadataURL else {
+        guard let metadataURL else {
             return
         }
         ioQueue.sync {
@@ -165,7 +168,10 @@ extension LightweightProxyCache {
                 let data = try JSONEncoder().encode(snapshot)
                 try data.write(to: metadataURL, options: .atomic)
             } catch {
-                AppLog.proxyCache.error("metadata flush failed error=\(error.localizedDescription, privacy: .public)")
+                AppLog.proxyCache
+                    .error(
+                        "metadata flush failed error=\(error.localizedDescription, privacy: .public)"
+                    )
             }
         }
     }
@@ -179,6 +185,9 @@ extension LightweightProxyCache {
     }
 
     nonisolated static func metadataFileURL() -> URL? {
-        DiskCacheLayout.metadataFileURL(subfolder: "LightweightProxyCache", metadataFileName: metadataFileName)
+        DiskCacheLayout.metadataFileURL(
+            subfolder: "LightweightProxyCache",
+            metadataFileName: metadataFileName
+        )
     }
 }

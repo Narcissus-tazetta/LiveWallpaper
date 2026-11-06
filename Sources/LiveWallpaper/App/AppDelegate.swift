@@ -114,11 +114,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// ダークモード切替検出。非公開の AppleInterfaceThemeChangedNotification ではなく、
     /// NSApp.effectiveAppearance への集中KVOという公式に推奨される方式を使う。
     private func setupAppearanceObserver() {
-        appearanceObserver = NSApp.observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
-            MainActor.assumeIsolated {
-                self?.wallpaperModel.evaluateSchedule(trigger: .appearanceChanged)
+        appearanceObserver = NSApp
+            .observe(\.effectiveAppearance, options: [.new]) { [weak self] _, _ in
+                MainActor.assumeIsolated {
+                    self?.wallpaperModel.evaluateSchedule(trigger: .appearanceChanged)
+                }
             }
-        }
     }
 
     deinit {

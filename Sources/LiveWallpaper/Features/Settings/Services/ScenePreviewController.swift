@@ -54,7 +54,12 @@ final class ScenePreviewController: ObservableObject {
     /// Origin and size in canvas UV.
     var viewport: SIMD4<Float> {
         let size = 1 / zoom
-        return SIMD4(Float(center.x - size / 2), Float(center.y - size / 2), Float(size), Float(size))
+        return SIMD4(
+            Float(center.x - size / 2),
+            Float(center.y - size / 2),
+            Float(size),
+            Float(size)
+        )
     }
 
     /// Keeps `point` (canvas UV) under the pointer.

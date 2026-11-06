@@ -5,7 +5,7 @@ extension SettingsView {
     static let webWallpaperSearchKeywords: [String] = [
         "Web壁紙",
         "Web壁紙機能を有効にする",
-        "URL",
+        "URL"
     ]
 
     var webWallpaperSettingsSection: some View {

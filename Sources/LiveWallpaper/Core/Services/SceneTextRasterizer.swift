@@ -63,7 +63,10 @@ enum SceneTextRasterizer {
             return nil
         }
         let scale = SIMD2(abs(text.scaleX), abs(text.scaleY))
-        let size = SIMD2(layout.maxX - layout.minX + 2 * text.paddingX, layout.maxY - layout.minY + 2 * text.paddingY) * scale
+        let size = SIMD2(
+            layout.maxX - layout.minX + 2 * text.paddingX,
+            layout.maxY - layout.minY + 2 * text.paddingY
+        ) * scale
         let fit = min(1, Double(maxTextureEdge) / max(size.x, size.y, 1))
         let width = max(Int((size.x * fit).rounded(.up)), 1)
         let height = max(Int((size.y * fit).rounded(.up)), 1)
@@ -78,18 +81,26 @@ enum SceneTextRasterizer {
             for (index, font) in layout.fonts.enumerated() {
                 let glyphs = layout.glyphs.filter { $0.fontIndex == index }
                 guard !glyphs.isEmpty else { continue }
-                CTFontDrawGlyphs(font, glyphs.map(\.glyph), glyphs.map { CGPoint(x: $0.x, y: $0.y) }, glyphs.count, context)
+                CTFontDrawGlyphs(
+                    font,
+                    glyphs.map(\.glyph),
+                    glyphs.map { CGPoint(x: $0.x, y: $0.y) },
+                    glyphs.count,
+                    context
+                )
             }
         }
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
         let drew: Bool
         if let style = text.style, !style.isEmpty {
-            // Outline, blur and shadow are read off a distance field of the glyphs, as the shader does.
+            // Outline, blur and shadow are read off a distance field of the glyphs, as the shader
+            // does.
             var coverage = [UInt8](repeating: 0, count: width * height)
             drew = coverage.withUnsafeMutableBytes { buffer in
                 guard let context = CGContext(
                     data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                    bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue
+                    bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                    bitmapInfo: CGImageAlphaInfo.none.rawValue
                 ) else { return false }
                 context.setFillColor(gray: 1, alpha: 1)
                 drawGlyphs(into: context)
@@ -128,15 +139,19 @@ enum SceneTextRasterizer {
     /// The pixel size FreeType uses for a point size at 300 dpi; it takes the size in
     /// 26.6 fixed point, dropping the rest.
     static func pixelSize(pointSize: Double) -> Double {
-        let points = min(max(pointSize, SceneText.pointSizeRange.lowerBound), SceneText.pointSizeRange.upperBound)
+        let points = min(
+            max(pointSize, SceneText.pointSizeRange.lowerBound),
+            SceneText.pointSizeRange.upperBound
+        )
         return (points * 64).rounded(.down) / 64 * 300 / 72
     }
 
     static func font(_ text: SceneText, fontURL: URL?) throws -> CTFont {
         let size = pixelSize(pointSize: text.pointSize)
         if let fontURL {
-            guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(fontURL as CFURL) as? [CTFontDescriptor],
-                  let descriptor = descriptors.first
+            guard let descriptors =
+                CTFontManagerCreateFontDescriptorsFromURL(fontURL as CFURL) as? [CTFontDescriptor],
+                let descriptor = descriptors.first
             else { throw Failure.unreadableFont(fontURL.lastPathComponent) }
             return CTFontCreateWithFontDescriptor(descriptor, size, nil)
         }
@@ -186,10 +201,16 @@ enum SceneTextRasterizer {
         // line height to the nearest pixel.
         let ascender = CTFontGetAscent(base).rounded(.up)
         let descender = (-CTFontGetDescent(base)).rounded(.down)
-        let lineHeight = (CTFontGetAscent(base) + CTFontGetDescent(base) + CTFontGetLeading(base)).rounded() + text.lineSpacing
+        let lineHeight = (CTFontGetAscent(base) + CTFontGetDescent(base) + CTFontGetLeading(base))
+            .rounded() + text.lineSpacing
         var fonts: [CTFont] = [base]
-        let measured = breakLines(text) { shape($0, base: base, letterSpacing: text.letterSpacing, fonts: &fonts) }
-            .map { measure($0, text: text) }
+        let measured = breakLines(text) { shape(
+            $0,
+            base: base,
+            letterSpacing: text.letterSpacing,
+            fonts: &fonts
+        ) }
+        .map { measure($0, text: text) }
 
         let blockWidth = measured.map { $0.maxX - $0.minX }.max() ?? 0
         var minX = 0.0, maxX = 0.0, inkMinY = 0.0, inkMaxY = 0.0
@@ -207,8 +228,12 @@ enum SceneTextRasterizer {
             case .right: blockWidth - width
             }
             for (glyph, pen) in line.glyphs {
-                glyphs.append(Glyph(glyph: glyph.glyph, fontIndex: glyph.fontIndex,
-                                    x: start + pen + glyph.offsetX, y: baseline + glyph.offsetY))
+                glyphs.append(Glyph(
+                    glyph: glyph.glyph,
+                    fontIndex: glyph.fontIndex,
+                    x: start + pen + glyph.offsetX,
+                    y: baseline + glyph.offsetY
+                ))
             }
         }
         let rows = Double(measured.count)
@@ -233,8 +258,16 @@ enum SceneTextRasterizer {
     }
 
     /// Glyphs of one paragraph; fonts CoreText falls back to are added to `fonts`.
-    private static func shape(_ string: String, base: CTFont, letterSpacing: Double, fonts: inout [CTFont]) -> [ShapedGlyph] {
-        let attributed = NSAttributedString(string: string, attributes: [.init(kCTFontAttributeName as String): base])
+    private static func shape(
+        _ string: String,
+        base: CTFont,
+        letterSpacing: Double,
+        fonts: inout [CTFont]
+    ) -> [ShapedGlyph] {
+        let attributed = NSAttributedString(
+            string: string,
+            attributes: [.init(kCTFontAttributeName as String): base]
+        )
         let line = CTLineCreateWithAttributedString(attributed)
         let scalars = Array(string.unicodeScalars)
         let utf16Starts = scalarUTF16Offsets(string)
@@ -244,7 +277,8 @@ enum SceneTextRasterizer {
             let count = CTRunGetGlyphCount(run)
             guard count > 0 else { continue }
             let attributes = CTRunGetAttributes(run) as NSDictionary
-            let runFont = attributes[kCTFontAttributeName as String].map { $0 as! CTFont } ?? base // swiftlint:disable:this force_cast
+            let runFont = attributes[kCTFontAttributeName as String]
+                .map { $0 as! CTFont } ?? base // swiftlint:disable:this force_cast
             let fontIndex: Int
             if let existing = fonts.firstIndex(where: { CFEqual($0, runFont) }) {
                 fontIndex = existing
@@ -268,7 +302,8 @@ enum SceneTextRasterizer {
                 let empty = box.isEmpty || box.isNull
                 result.append(ShapedGlyph(
                     glyph: glyphs[index], fontIndex: fontIndex, cluster: indices[index],
-                    character: scalars.indices.contains(scalarIndex) ? scalars[scalarIndex].value : 0,
+                    character: scalars.indices.contains(scalarIndex) ? scalars[scalarIndex]
+                        .value : 0,
                     // The advance is truncated to whole pixels before the spacing is added.
                     advance: Double(advances[index].width).rounded(.down) + letterSpacing,
                     offsetX: (Double(positions[index].x) - ctPen).rounded(.down),
@@ -297,7 +332,10 @@ enum SceneTextRasterizer {
         for paragraph in paragraphs {
             var remaining = shape(paragraph)
             while true {
-                guard let maxWidth = text.maxWidth, let cut = wrapIndex(remaining, maxWidth: maxWidth) else {
+                guard let maxWidth = text.maxWidth, let cut = wrapIndex(
+                    remaining,
+                    maxWidth: maxWidth
+                ) else {
                     lines.append(Line(glyphs: remaining, wrapped: false))
                     break
                 }
@@ -305,7 +343,9 @@ enum SceneTextRasterizer {
                     var kept = Array(remaining[..<cut])
                     if text.truncatesWithEllipsis {
                         let ellipsisWidth = ellipsis.first.map { $0.offsetX + $0.right } ?? 0
-                        while !kept.isEmpty, kept.reduce(0, { $0 + $1.advance }) + ellipsisWidth > maxWidth {
+                        while !kept.isEmpty,
+                              kept.reduce(0, { $0 + $1.advance }) + ellipsisWidth > maxWidth
+                        {
                             kept.removeLast()
                         }
                         kept += ellipsis
@@ -324,7 +364,8 @@ enum SceneTextRasterizer {
     private static func wrapIndex(_ glyphs: [ShapedGlyph], maxWidth: Double) -> Int? {
         var pen = 0.0
         for (index, glyph) in glyphs.enumerated() {
-            if index > 0, !isBreakingSpace(glyph.character), glyph.cluster != glyphs[index - 1].cluster,
+            if index > 0, !isBreakingSpace(glyph.character),
+               glyph.cluster != glyphs[index - 1].cluster,
                pen + glyph.offsetX + glyph.right > maxWidth
             {
                 return index
@@ -349,7 +390,9 @@ enum SceneTextRasterizer {
         let spaces = glyphs.indices.filter { isBreakingSpace(glyphs[$0].character) }
         if text.justifies, line.wrapped, let maxWidth = text.maxWidth, !spaces.isEmpty {
             let extra = (maxWidth - (maxX - minX)) / Double(spaces.count)
-            for index in spaces { glyphs[index].advance += extra }
+            for index in spaces {
+                glyphs[index].advance += extra
+            }
             maxX = minX + maxWidth
         }
         var placed: [(glyph: ShapedGlyph, pen: Double)] = []

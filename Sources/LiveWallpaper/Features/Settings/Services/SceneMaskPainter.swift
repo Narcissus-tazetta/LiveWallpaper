@@ -1,7 +1,8 @@
 import Foundation
 
 /// Paints an effect's mask (where it applies), its time offset (when it moves), or
-/// a flow map (which way it flows) on the editor preview. Strokes show on the preview immediately and are
+/// a flow map (which way it flows) on the editor preview. Strokes show on the preview immediately
+/// and are
 /// saved as a new file when each stroke ends, so the scene's undo history covers them.
 @MainActor
 final class SceneMaskPainter: ObservableObject {
@@ -56,7 +57,10 @@ final class SceneMaskPainter: ObservableObject {
     func begin(_ target: Target, existingFile: String?, layerPixelSize: CGSize) {
         end()
         let maxEdge = target.kind.isGrey ? Self.maxMaskEdge : Self.maxFlowEdge
-        let scale = min(1, Double(maxEdge) / Double(max(layerPixelSize.width, layerPixelSize.height, 1)))
+        let scale = min(
+            1,
+            Double(maxEdge) / Double(max(layerPixelSize.width, layerPixelSize.height, 1))
+        )
         width = max(Int(Double(layerPixelSize.width) * scale), 8)
         height = max(Int(Double(layerPixelSize.height) * scale), 8)
         self.target = target
@@ -80,7 +84,8 @@ final class SceneMaskPainter: ObservableObject {
         if let existingFile {
             do {
                 bytes = try SceneStore.readPaintImage(
-                    existingFile, width: width, height: height, target: target.kind, videoPath: target.path
+                    existingFile, width: width, height: height, target: target.kind,
+                    videoPath: target.path
                 )
             } catch {
                 onError?(error)
@@ -122,7 +127,10 @@ final class SceneMaskPainter: ObservableObject {
         for y in stride(from: step / 2, to: height, by: step) {
             for x in stride(from: step / 2, to: width, by: step) {
                 let index = (y * width + x) * 4
-                let stored = SIMD2((Float(bytes[index]) - 128) / 127, (Float(bytes[index + 1]) - 128) / 127)
+                let stored = SIMD2(
+                    (Float(bytes[index]) - 128) / 127,
+                    (Float(bytes[index + 1]) - 128) / 127
+                )
                 let flow = target?.storesFlowReversed == true ? -stored : stored
                 guard (flow.x * flow.x + flow.y * flow.y) > 0.01 else {
                     continue
@@ -152,7 +160,10 @@ final class SceneMaskPainter: ObservableObject {
         guard target != nil, let lastPoint else {
             return
         }
-        let delta = SIMD2<Float>((point.x - lastPoint.x) * Float(width), (point.y - lastPoint.y) * Float(height))
+        let delta = SIMD2<Float>(
+            (point.x - lastPoint.x) * Float(width),
+            (point.y - lastPoint.y) * Float(height)
+        )
         let length = (delta.x * delta.x + delta.y * delta.y).squareRoot()
         guard length > 0.5 else {
             return
@@ -242,11 +253,17 @@ final class SceneMaskPainter: ObservableObject {
                 guard distance < radius else {
                     continue
                 }
-                let falloff = distance <= inner ? 1 : 1 - (distance - inner) / max(radius - inner, 0.001)
+                let falloff = distance <= inner ? 1 : 1 - (distance - inner) / max(
+                    radius - inner,
+                    0.001
+                )
                 let index = (y * width + x) * bytesPerPixel
                 if target.kind.isGrey {
                     let value = Float(bytes[index])
-                    let updated = tool == .paint ? max(value, falloff * 255) : min(value, (1 - falloff) * 255)
+                    let updated = tool == .paint ? max(value, falloff * 255) : min(
+                        value,
+                        (1 - falloff) * 255
+                    )
                     if UInt8(updated.rounded()) != bytes[index] {
                         bytes[index] = UInt8(updated.rounded())
                         strokeChanged = true
@@ -272,7 +289,8 @@ final class SceneMaskPainter: ObservableObject {
             return
         }
         previewLayer?.setPaintOverride(ScenePaintOverride(
-            effectID: target.effectID, target: target.kind, width: width, height: height, bytes: bytes
+            effectID: target.effectID, target: target.kind, width: width, height: height,
+            bytes: bytes
         ))
         onPreviewChange?()
     }
@@ -286,7 +304,11 @@ final class SceneMaskPainter: ObservableObject {
                 bytes, width: width, height: height, target: target.kind, videoPath: target.path
             )
             currentFile = fileName
-            let bounds = target.kind == .mask ? SceneAreaBounds.of(bytes, width: width, height: height) : nil
+            let bounds = target.kind == .mask ? SceneAreaBounds.of(
+                bytes,
+                width: width,
+                height: height
+            ) : nil
             onCommit?(target, fileName, bounds)
         } catch {
             onError?(error)

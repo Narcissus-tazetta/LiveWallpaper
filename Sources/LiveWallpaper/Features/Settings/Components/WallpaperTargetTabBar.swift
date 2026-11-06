@@ -21,9 +21,13 @@ extension SettingsView {
 
             Spacer(minLength: 8)
 
-            Text(String(format: model.localizedString("%@: %@"), model.localizedString("表示"), currentDisplayModeSummaryText()))
-                .font(.caption)
-                .foregroundColor(.secondary)
+            Text(String(
+                format: model.localizedString("%@: %@"),
+                model.localizedString("表示"),
+                currentDisplayModeSummaryText()
+            ))
+            .font(.caption)
+            .foregroundColor(.secondary)
         }
     }
 
@@ -34,9 +38,9 @@ extension SettingsView {
         switch scope {
         case .shared:
             return true
-        case .display(let id):
+        case let .display(id):
             return model.availableDisplayScreens().contains { $0.id == id }
-        case .space(let uuid):
+        case let .space(uuid):
             return showsSpaceScopeOptions
                 && model.knownDesktopSpaces.contains { $0.uuid == uuid }
         }
@@ -54,7 +58,7 @@ extension SettingsView {
 
     /// 接続が切れた画面を選択したままにならないよう解決した現在の画面ID。
     var resolvedDisplayOverrideScreenID: String? {
-        guard case .display(let id) = selectedScope, isScopeSelectable(selectedScope) else {
+        guard case let .display(id) = selectedScope, isScopeSelectable(selectedScope) else {
             return nil
         }
         return id
@@ -63,7 +67,7 @@ extension SettingsView {
     /// 削除された Space を選択したままにならないよう解決した現在の Space uuid。
     /// (割り当てデータ自体は保持される。UIスコープの選択だけを解除する)
     var resolvedSpaceScopeUUID: String? {
-        guard case .space(let uuid) = selectedScope, isScopeSelectable(selectedScope) else {
+        guard case let .space(uuid) = selectedScope, isScopeSelectable(selectedScope) else {
             return nil
         }
         return uuid
@@ -184,7 +188,9 @@ extension SettingsView {
         let tint = targetTint(for: target)
         let showsDisplayPicker =
             target == .desktop
-            && (model.availableDisplayScreens().count > 1 || showsSpaceScopeOptions || model.hasPinOnConnectedScreen)
+                &&
+                (model.availableDisplayScreens().count > 1 || showsSpaceScopeOptions || model
+                    .hasPinOnConnectedScreen)
 
         // カード全体を1つの Button にするとシェブロンのメニューと当たり判定が
         // 競合するため、本体(選択)とシェブロン(画面切り替え)を別コントロール
@@ -201,12 +207,15 @@ extension SettingsView {
 
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
-                            Label(targetTitle(for: target), systemImage: targetIconName(for: target))
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(isSelected ? tint : .primary)
-                                // Wrapping splits single long words (e.g. "Schreibtisch") mid-word.
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
+                            Label(
+                                targetTitle(for: target),
+                                systemImage: targetIconName(for: target)
+                            )
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(isSelected ? tint : .primary)
+                            // Wrapping splits single long words (e.g. "Schreibtisch") mid-word.
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                             if target == .desktop, model.manualPauseActive {
                                 Label(model.localizedString("一時停止中"), systemImage: "pause.fill")
                                     .font(.system(size: 9, weight: .semibold))
@@ -253,7 +262,10 @@ extension SettingsView {
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .strokeBorder(tint, lineWidth: 1.5)
                         )
-                        .matchedGeometryEffect(id: "selectedAssignmentTarget", in: tabSelectionNamespace)
+                        .matchedGeometryEffect(
+                            id: "selectedAssignmentTarget",
+                            in: tabSelectionNamespace
+                        )
                 }
             }
         }

@@ -53,7 +53,8 @@ extension WallpaperModel {
             pinCurrentVideo: pinCurrentVideo,
             playlistPlaybackEnabled: playlistPlaybackEnabled,
             videoLoopEnabled: videoLoopEnabled,
-            currentRunsInRealTime: currentVideoPath.flatMap { sceneDocumentsByPath[$0]?.requiresRealTimePlayback } ?? false
+            currentRunsInRealTime: currentVideoPath
+                .flatMap { sceneDocumentsByPath[$0]?.requiresRealTimePlayback } ?? false
         )
     }
 

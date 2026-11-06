@@ -51,26 +51,44 @@ extension SceneModelRenderer {
     /// A map in which nothing casts a shadow.
     func openShadow() throws -> MTLTexture {
         if let texture = shadowState.open { return texture }
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r32Float, width: 1, height: 1, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .r32Float,
+            width: 1,
+            height: 1,
+            mipmapped: false
+        )
         descriptor.usage = .shaderRead
-        guard let texture = device.makeTexture(descriptor: descriptor) else { throw ModelError(detail: "shadow texture allocation failed") }
+        guard let texture = device.makeTexture(descriptor: descriptor)
+        else { throw ModelError(detail: "shadow texture allocation failed") }
         var far = Self.shadowFarthest
-        texture.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &far, bytesPerRow: 4)
+        texture.replace(
+            region: MTLRegionMake2D(0, 0, 1, 1),
+            mipmapLevel: 0,
+            withBytes: &far,
+            bytesPerRow: 4
+        )
         shadowState.open = texture
         return texture
     }
 
     /// `skin` is the byte offsets of the joints and weights for a caster a rig poses.
-    private func shadowPipeline(stride: Int, skin: (joints: Int, weights: Int)? = nil) throws -> MTLRenderPipelineState {
+    private func shadowPipeline(
+        stride: Int,
+        skin: (joints: Int, weights: Int)? = nil
+    ) throws -> MTLRenderPipelineState {
         let key = ShadowPipelineKey(stride: stride, joints: skin?.joints, weights: skin?.weights)
         if let pipeline = shadowState.pipelines[key] { return pipeline }
         if shadowState.functions == nil {
             let library = try device.makeLibrary(source: Self.shadowSource, options: nil)
-            shadowState.functions = (library.makeFunction(name: "shadowVertex")!, library.makeFunction(name: "shadowFragment")!,
-                                     library.makeFunction(name: "skinnedShadowVertex")!)
+            shadowState.functions = (
+                library.makeFunction(name: "shadowVertex")!,
+                library.makeFunction(name: "shadowFragment")!,
+                library.makeFunction(name: "skinnedShadowVertex")!
+            )
         }
         let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.vertexFunction = skin == nil ? shadowState.functions!.0 : shadowState.functions!.2
+        descriptor.vertexFunction = skin == nil ? shadowState.functions!.0 : shadowState.functions!
+            .2
         descriptor.fragmentFunction = shadowState.functions!.1
         let vertices = MTLVertexDescriptor()
         vertices.attributes[0].format = .float3
@@ -94,10 +112,14 @@ extension SceneModelRenderer {
     }
 
     /// Byte offsets of the joints and weights in a shape's vertices; nil without both.
-    private static func skinOffsets(_ shape: SceneModelLayerFrame.Shape) -> (joints: Int, weights: Int)? {
+    private static func skinOffsets(_ shape: SceneModelLayerFrame
+        .Shape) -> (joints: Int, weights: Int)?
+    {
         var offset = 0
         var joints: Int?, weights: Int?
-        for (bit, semantic) in SceneRenderGraph.Attribute.Semantic.allCases.enumerated() where shape.components & (1 << UInt32(bit)) != 0 {
+        for (bit, semantic) in SceneRenderGraph.Attribute.Semantic.allCases.enumerated()
+            where shape.components & (1 << UInt32(bit)) != 0
+        {
             if semantic == .joints { joints = offset }
             if semantic == .weights { weights = offset }
             offset += semantic.floats * 4
@@ -119,13 +141,19 @@ extension SceneModelRenderer {
         for index in casters.indices {
             let key = ShadowBoundsKey(
                 world: casters[index].world, pose: poses[index],
-                shapes: casters[index].shapes.filter { !$0.vertices.isEmpty && $0.components & 1 != 0 }
+                shapes: casters[index].shapes
+                    .filter { !$0.vertices.isEmpty && $0.components & 1 != 0 }
             )
             var box = previous.first { $0.key.isSame(as: key) }
             if box == nil {
-                var casterLow = SIMD3<Float>(repeating: .infinity), casterHigh = SIMD3<Float>(repeating: -.infinity)
+                var casterLow = SIMD3<Float>(repeating: .infinity),
+                    casterHigh = SIMD3<Float>(repeating: -.infinity)
                 for shape in key.shapes {
-                    let (shapeLow, shapeHigh) = Self.bounds(of: shape, pose: key.pose, world: key.world)
+                    let (shapeLow, shapeHigh) = Self.bounds(
+                        of: shape,
+                        pose: key.pose,
+                        world: key.world
+                    )
                     casterLow = simd_min(casterLow, shapeLow)
                     casterHigh = simd_max(casterHigh, shapeHigh)
                 }
@@ -144,7 +172,8 @@ extension SceneModelRenderer {
     ) -> (SIMD3<Float>, SIMD3<Float>) {
         let stride = shape.stride
         let skin = pose == nil ? nil : skinOffsets(shape)
-        let count = shape.vertices.count >= stride ? (shape.vertices.count - stride) / stride + 1 : 0
+        let count = shape.vertices
+            .count >= stride ? (shape.vertices.count - stride) / stride + 1 : 0
         var low = SIMD3<Float>(repeating: .infinity), high = SIMD3<Float>(repeating: -.infinity)
         shape.vertices.withUnsafeBufferPointer { vertices in
             for vertex in 0 ..< count {
@@ -156,7 +185,8 @@ extension SceneModelRenderer {
                     for slot in 0 ..< 4 {
                         let weight = vertices[start + skin.weights / 4 + slot]
                         let joint = Int(vertices[start + skin.joints / 4 + slot].bitPattern)
-                        if weight > 0, pose.indices.contains(joint) { position += pose[joint] * p * weight }
+                        if weight > 0,
+                           pose.indices.contains(joint) { position += pose[joint] * p * weight }
                     }
                 }
                 let placed = world * position
@@ -167,17 +197,35 @@ extension SceneModelRenderer {
         return (low, high)
     }
 
-    private func shadowTarget(width: Int, height: Int, slot: Int) throws -> (color: MTLTexture, depth: MTLTexture) {
-        if let existing = shadowState.targets[slot], existing.color.width == width, existing.color.height == height {
+    private func shadowTarget(
+        width: Int,
+        height: Int,
+        slot: Int
+    ) throws -> (color: MTLTexture, depth: MTLTexture) {
+        if let existing = shadowState.targets[slot], existing.color.width == width,
+           existing.color.height == height
+        {
             return existing
         }
-        let color = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r32Float, width: width, height: height, mipmapped: false)
+        let color = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .r32Float,
+            width: width,
+            height: height,
+            mipmapped: false
+        )
         color.usage = [.renderTarget, .shaderRead]
         color.storageMode = .private
-        let depth = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Self.depthFormat, width: width, height: height, mipmapped: false)
+        let depth = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: Self.depthFormat,
+            width: width,
+            height: height,
+            mipmapped: false
+        )
         depth.usage = .renderTarget
         depth.storageMode = .private
-        guard let colorTexture = device.makeTexture(descriptor: color), let depthTexture = device.makeTexture(descriptor: depth) else {
+        guard let colorTexture = device.makeTexture(descriptor: color),
+              let depthTexture = device.makeTexture(descriptor: depth)
+        else {
             throw ModelError(detail: "shadow texture allocation failed")
         }
         shadowState.targets[slot] = (colorTexture, depthTexture)
@@ -186,7 +234,11 @@ extension SceneModelRenderer {
 
     /// A camera at `eye` looking along `forward` with a square 90° view widened to
     /// `fov` degrees, taking scene pixels to clip space.
-    private static func shadowPerspective(eye: SIMD3<Float>, forward: SIMD3<Float>, fov: Float) -> simd_float4x4 {
+    private static func shadowPerspective(
+        eye: SIMD3<Float>,
+        forward: SIMD3<Float>,
+        fov: Float
+    ) -> simd_float4x4 {
         let up: SIMD3<Float> = abs(forward.y) > 0.99 ? SIMD3(0, 0, 1) : SIMD3(0, 1, 0)
         return shadowPerspective(eye: eye, forward: forward, up: up, fov: fov)
     }
@@ -197,7 +249,12 @@ extension SceneModelRenderer {
         let near: Float = 1, far = shadowDepthFar
         let f = 1 / tan(fov * .pi / 360)
         let projection = simd_float4x4(columns: (
-            SIMD4(f, 0, 0, 0), SIMD4(0, f, 0, 0), SIMD4(0, 0, far / (near - far), -1), SIMD4(0, 0, near * far / (near - far), 0)
+            SIMD4(f, 0, 0, 0), SIMD4(0, f, 0, 0), SIMD4(0, 0, far / (near - far), -1), SIMD4(
+                0,
+                0,
+                near * far / (near - far),
+                0
+            )
         ))
         let right = simd_normalize(simd_cross(forward, up))
         let y = simd_cross(right, forward)
@@ -218,31 +275,56 @@ extension SceneModelRenderer {
         let near: Float = 1, far = shadowDepthFar
         let a = far / (far - near), b = -near * far / (far - near)
         return simd_float4x4(columns: (
-            SIMD4(right.x, up.x, a * forward.x, forward.x), SIMD4(right.y, up.y, a * forward.y, forward.y),
+            SIMD4(right.x, up.x, a * forward.x, forward.x), SIMD4(
+                right.y,
+                up.y,
+                a * forward.y,
+                forward.y
+            ),
             SIMD4(right.z, up.z, a * forward.z, forward.z),
-            SIMD4(-simd_dot(right, eye), -simd_dot(up, eye), a * -simd_dot(forward, eye) + b, -simd_dot(forward, eye))
+            SIMD4(
+                -simd_dot(right, eye),
+                -simd_dot(up, eye),
+                a * -simd_dot(forward, eye) + b,
+                -simd_dot(forward, eye)
+            )
         ))
     }
 
     /// Faces of a point light's atlas: forward, right and up of each, as the converter's
     /// lookup reads them.
     private static let atlasFaces: [(SIMD3<Float>, SIMD3<Float>, SIMD3<Float>)] = [
-        (SIMD3(1, 0, 0), SIMD3(0, 0, -1), SIMD3(0, 1, 0)), (SIMD3(-1, 0, 0), SIMD3(0, 0, 1), SIMD3(0, 1, 0)),
-        (SIMD3(0, 1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, -1)), (SIMD3(0, -1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, 1)),
-        (SIMD3(0, 0, 1), SIMD3(1, 0, 0), SIMD3(0, 1, 0)), (SIMD3(0, 0, -1), SIMD3(-1, 0, 0), SIMD3(0, 1, 0))
+        (SIMD3(1, 0, 0), SIMD3(0, 0, -1), SIMD3(0, 1, 0)), (
+            SIMD3(-1, 0, 0),
+            SIMD3(0, 0, 1),
+            SIMD3(0, 1, 0)
+        ),
+        (SIMD3(0, 1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, -1)), (
+            SIMD3(0, -1, 0),
+            SIMD3(1, 0, 0),
+            SIMD3(0, 0, 1)
+        ),
+        (SIMD3(0, 0, 1), SIMD3(1, 0, 0), SIMD3(0, 1, 0)), (
+            SIMD3(0, 0, -1),
+            SIMD3(-1, 0, 0),
+            SIMD3(0, 1, 0)
+        )
     ]
 
     /// Draws one shadow map per light of `lights` from the solid models in `casters`.
     /// A caster with a rig is posed by it at `time` when `rigs` holds it.
     func renderShadows(
-        lights: [SceneShadowLight], casters: [SceneModelLayerFrame], commandBuffer: MTLCommandBuffer,
+        lights: [SceneShadowLight], casters: [SceneModelLayerFrame],
+        commandBuffer: MTLCommandBuffer,
         rigs: SceneSkeletonRegistry? = nil, time: Double = 0
     ) throws -> Shadows {
         let casters = casters.filter(\.castsShadow)
-        let poses: [Int: [simd_float4x4]] = try Dictionary(uniqueKeysWithValues: casters.indices.compactMap { index in
-            guard let rig = casters[index].rig, let rigs, rigs.skeletons[rig] != nil else { return nil }
-            return (index, try rigs.evaluator(rig).evaluate(time: time).matrices)
-        })
+        let poses: [Int: [simd_float4x4]] = try Dictionary(uniqueKeysWithValues: casters.indices
+            .compactMap { index in
+                guard let rig = casters[index].rig, let rigs,
+                      rigs.skeletons[rig] != nil else { return nil }
+                return try (index, rigs.evaluator(rig).evaluate(time: time).matrices)
+            })
         shadowState.targets = shadowState.targets.filter { $0.key < lights.count }
         let size = Self.shadowSize
         var bounds: (center: SIMD3<Float>, radius: Float)?
@@ -258,11 +340,20 @@ extension SceneModelRenderer {
             let origin = SIMD3(light.origin.map(Float.init))
             let axis = simd_normalize(SIMD3(light.axis.map(Float.init)))
             let atlas = light.kind == .point
-            let target = try shadowTarget(width: atlas ? size * 3 : size, height: atlas ? size * 2 : size, slot: slot)
+            let target = try shadowTarget(
+                width: atlas ? size * 3 : size,
+                height: atlas ? size * 2 : size,
+                slot: slot
+            )
             let pass = MTLRenderPassDescriptor()
             pass.colorAttachments[0].texture = target.color
             pass.colorAttachments[0].loadAction = .clear
-            pass.colorAttachments[0].clearColor = MTLClearColor(red: Double(Self.shadowFarthest), green: 0, blue: 0, alpha: 0)
+            pass.colorAttachments[0].clearColor = MTLClearColor(
+                red: Double(Self.shadowFarthest),
+                green: 0,
+                blue: 0,
+                alpha: 0
+            )
             pass.colorAttachments[0].storeAction = .store
             pass.depthAttachment.texture = target.depth
             pass.depthAttachment.loadAction = .clear
@@ -284,9 +375,15 @@ extension SceneModelRenderer {
             switch light.kind {
             case .point:
                 for (face, basis) in Self.atlasFaces.enumerated() {
-                    let transform = Self.atlasFace(eye: origin, forward: basis.0, right: basis.1, up: basis.2)
+                    let transform = Self.atlasFace(
+                        eye: origin,
+                        forward: basis.0,
+                        right: basis.1,
+                        up: basis.2
+                    )
                     let viewport = MTLViewport(
-                        originX: Double(face % 3 * size), originY: Double(face / 3 * size), width: Double(size), height: Double(size),
+                        originX: Double(face % 3 * size), originY: Double(face / 3 * size),
+                        width: Double(size), height: Double(size),
                         znear: 0, zfar: 1
                     )
                     views.append((transform, viewport))
@@ -294,7 +391,11 @@ extension SceneModelRenderer {
                 matrices.append(matrix_identity_float4x4)
             case .spot:
                 // Wide enough for the whole cone, with a margin for its soft edge.
-                let transform = Self.shadowPerspective(eye: origin, forward: axis, fov: min(Float(light.outerCone) * 2 + 4, 170))
+                let transform = Self.shadowPerspective(
+                    eye: origin,
+                    forward: axis,
+                    fov: min(Float(light.outerCone) * 2 + 4, 170)
+                )
                 views.append((transform, nil))
                 matrices.append(transform)
             case .directional:
@@ -307,8 +408,12 @@ extension SceneModelRenderer {
                     SIMD4(right.x / radius, y.x / radius, axis.x / (2 * radius), 0),
                     SIMD4(right.y / radius, y.y / radius, axis.y / (2 * radius), 0),
                     SIMD4(right.z / radius, y.z / radius, axis.z / (2 * radius), 0),
-                    SIMD4(-simd_dot(right, center) / radius, -simd_dot(y, center) / radius,
-                          (-simd_dot(axis, center) + radius) / (2 * radius), 1)
+                    SIMD4(
+                        -simd_dot(right, center) / radius,
+                        -simd_dot(y, center) / radius,
+                        (-simd_dot(axis, center) + radius) / (2 * radius),
+                        1
+                    )
                 ))
                 views.append((transform, nil))
                 matrices.append(transform)
@@ -316,23 +421,41 @@ extension SceneModelRenderer {
             for (transform, viewport) in views {
                 if let viewport {
                     encoder.setViewport(viewport)
-                    encoder.setScissorRect(MTLScissorRect(x: Int(viewport.originX), y: Int(viewport.originY), width: size, height: size))
+                    encoder.setScissorRect(MTLScissorRect(
+                        x: Int(viewport.originX),
+                        y: Int(viewport.originY),
+                        width: size,
+                        height: size
+                    ))
                 }
                 for (index, layer) in casters.enumerated() {
-                    for shape in layer.shapes where !shape.vertices.isEmpty && shape.components & 1 != 0 {
+                    for shape in layer.shapes
+                        where !shape.vertices.isEmpty && shape.components & 1 != 0
+                    {
                         if let indices = shape.indices {
                             if indices.count < 3 { continue }
                         } else if shape.vertices.count / shape.stride < 3 {
                             continue
                         }
                         let skin = poses[index] == nil ? nil : Self.skinOffsets(shape)
-                        encoder.setRenderPipelineState(try shadowPipeline(stride: shape.stride * 4, skin: skin))
+                        try encoder.setRenderPipelineState(shadowPipeline(
+                            stride: shape.stride * 4,
+                            skin: skin
+                        ))
                         if skin != nil, let pose = poses[index] {
                             try pose.withUnsafeBytes { bytes in
                                 if bytes.count <= 4096 {
-                                    encoder.setVertexBytes(bytes.baseAddress!, length: bytes.count, index: 3)
+                                    encoder.setVertexBytes(
+                                        bytes.baseAddress!,
+                                        length: bytes.count,
+                                        index: 3
+                                    )
                                 } else {
-                                    guard let buffer = device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+                                    guard let buffer = device.makeBuffer(
+                                        bytes: bytes.baseAddress!,
+                                        length: bytes.count,
+                                        options: .storageModeShared
+                                    )
                                     else { throw ModelError(detail: "bone allocation failed") }
                                     encoder.setVertexBuffer(buffer, offset: 0, index: 3)
                                 }
@@ -342,14 +465,26 @@ extension SceneModelRenderer {
                             transform: transform, model: layer.world, light: SIMD4(origin, 0),
                             axis: SIMD4(axis, light.kind == .directional ? 1 : 0)
                         )
-                        encoder.setVertexBytes(&uniforms, length: MemoryLayout<ShadowUniforms>.stride, index: 0)
-                        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<ShadowUniforms>.stride, index: 0)
+                        encoder.setVertexBytes(
+                            &uniforms,
+                            length: MemoryLayout<ShadowUniforms>.stride,
+                            index: 0
+                        )
+                        encoder.setFragmentBytes(
+                            &uniforms,
+                            length: MemoryLayout<ShadowUniforms>.stride,
+                            index: 0
+                        )
                         let vertexBuffer: any MTLBuffer
                         if let cached = shape.vertexBuffer {
                             vertexBuffer = cached
                         } else {
                             guard let buffer = shape.vertices.withUnsafeBytes({
-                                device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)
+                                device.makeBuffer(
+                                    bytes: $0.baseAddress!,
+                                    length: $0.count,
+                                    options: .storageModeShared
+                                )
                             }) else { throw ModelError(detail: "vertex allocation failed") }
                             vertexBuffer = buffer
                         }
@@ -360,15 +495,28 @@ extension SceneModelRenderer {
                                 indexBuffer = cached
                             } else {
                                 guard let buffer = indices.withUnsafeBytes({
-                                    device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)
+                                    device.makeBuffer(
+                                        bytes: $0.baseAddress!,
+                                        length: $0.count,
+                                        options: .storageModeShared
+                                    )
                                 }) else { throw ModelError(detail: "index allocation failed") }
                                 indexBuffer = buffer
                             }
-                            encoder.drawIndexedPrimitives(type: .triangle, indexCount: indices.count, indexType: .uint32,
-                                                          indexBuffer: indexBuffer, indexBufferOffset: 0)
+                            encoder.drawIndexedPrimitives(
+                                type: .triangle,
+                                indexCount: indices.count,
+                                indexType: .uint32,
+                                indexBuffer: indexBuffer,
+                                indexBufferOffset: 0
+                            )
                         } else {
                             let count = shape.vertices.count / shape.stride / 3 * 3
-                            if count > 0 { encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: count) }
+                            if count > 0 { encoder.drawPrimitives(
+                                type: .triangle,
+                                vertexStart: 0,
+                                vertexCount: count
+                            ) }
                         }
                     }
                 }
@@ -403,7 +551,10 @@ extension SceneModelRenderer {
             world == other.world && pose == other.pose && shapes.count == other.shapes.count
                 && zip(shapes, other.shapes).allSatisfy { a, b in
                     a.components == b.components && a.vertices.count == b.vertices.count
-                        && a.vertices.withUnsafeBufferPointer { x in b.vertices.withUnsafeBufferPointer { y in x.baseAddress == y.baseAddress } }
+                        && a.vertices
+                        .withUnsafeBufferPointer { x in b.vertices.withUnsafeBufferPointer { y in
+                            x.baseAddress == y.baseAddress
+                        } }
                 }
         }
     }

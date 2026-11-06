@@ -20,7 +20,8 @@ struct TrimTimelineWindow: Equatable {
 
     init(start: Double, duration: Double) {
         self.start = start.isFinite ? start : 0
-        self.duration = duration.isFinite ? max(duration, Self.minimumDuration) : Self.minimumDuration
+        self.duration = duration.isFinite ? max(duration, Self.minimumDuration) : Self
+            .minimumDuration
     }
 
     static func full(assetDuration: Double) -> TrimTimelineWindow {

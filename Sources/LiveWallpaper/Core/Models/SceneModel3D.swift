@@ -29,12 +29,19 @@ struct SceneModelSurface: Codable, Equatable {
     var repeats = true
 
     var images: [String] {
-        [baseColorImage, metallicRoughnessImage, normalImage, occlusionImage, emissiveImage].compactMap { $0 }
+        [baseColorImage, metallicRoughnessImage, normalImage, occlusionImage, emissiveImage]
+            .compactMap { $0 }
     }
 
     var isValid: Bool {
         baseColor.count == 4 && emissive.count == 3
-            && (baseColor + emissive + [metallic, roughness, alphaCutoff, normalScale, occlusionStrength]).allSatisfy(\.isFinite)
+            && (baseColor + emissive + [
+                metallic,
+                roughness,
+                alphaCutoff,
+                normalScale,
+                occlusionStrength
+            ]).allSatisfy(\.isFinite)
     }
 }
 
@@ -56,19 +63,30 @@ struct SceneModelPlacement: Codable, Equatable {
     var depth: Double = 0
 
     var isValid: Bool {
-        center.count == 3 && size.count == 2 && (center + size + [unitScale, turn, tilt, depth]).allSatisfy(\.isFinite) && unitScale > 0
+        center.count == 3 && size.count == 2 && (center + size + [unitScale, turn, tilt, depth])
+            .allSatisfy(\.isFinite) && unitScale > 0
     }
 
     /// From the model's units to scene pixels (origin bottom left, y up, z toward the viewer).
-    func world(transform: SceneTransform, canvasWidth: Double, canvasHeight: Double) -> simd_float4x4 {
+    func world(
+        transform: SceneTransform,
+        canvasWidth: Double,
+        canvasHeight: Double
+    ) -> simd_float4x4 {
         let position = SIMD3(
-            Float((0.5 + transform.offsetX) * canvasWidth), Float((0.5 - transform.offsetY) * canvasHeight), Float(depth)
+            Float((0.5 + transform.offsetX) * canvasWidth),
+            Float((0.5 - transform.offsetY) * canvasHeight), Float(depth)
         )
         let scale = SIMD3(
-            Float(transform.scale * unitScale), Float((transform.scaleY ?? transform.scale) * unitScale), Float(transform.scale * unitScale)
+            Float(transform.scale * unitScale),
+            Float((transform.scaleY ?? transform.scale) * unitScale),
+            Float(transform.scale * unitScale)
         )
         // The layer's rotation is clockwise on the canvas, which is negative about +z.
-        let roll = simd_float4x4(simd_quatf(angle: Float(-transform.rotation * .pi / 180), axis: SIMD3(0, 0, 1)))
+        let roll = simd_float4x4(simd_quatf(
+            angle: Float(-transform.rotation * .pi / 180),
+            axis: SIMD3(0, 0, 1)
+        ))
         let lean = simd_float4x4(simd_quatf(angle: Float(-tilt * .pi / 180), axis: SIMD3(1, 0, 0)))
         let spin = simd_float4x4(simd_quatf(angle: Float(turn * .pi / 180), axis: SIMD3(0, 1, 0)))
         var translate = matrix_identity_float4x4
@@ -105,11 +123,14 @@ struct SceneModelStage: Codable, Equatable {
         /// Point lights cast none.
         var castsShadow = true
 
-        var casts: Bool { castsShadow && kind != .point }
+        var casts: Bool {
+            castsShadow && kind != .point
+        }
 
         var isValid: Bool {
             color.count == 3 && position.count == 3
-                && (color + position + [intensity, azimuth, elevation, range, coneAngle]).allSatisfy(\.isFinite)
+                && (color + position + [intensity, azimuth, elevation, range, coneAngle])
+                .allSatisfy(\.isFinite)
                 && range > 0 && (1 ... 89).contains(coneAngle)
         }
 
@@ -126,7 +147,9 @@ struct SceneModelStage: Codable, Equatable {
         var height: Double = 0.85
         var opacity: Double = 0.6
 
-        var isValid: Bool { [height, opacity].allSatisfy(\.isFinite) }
+        var isValid: Bool {
+            [height, opacity].allSatisfy(\.isFinite)
+        }
     }
 
     /// 0 shows the models without perspective; otherwise the vertical field of view in degrees.
@@ -142,8 +165,10 @@ struct SceneModelStage: Codable, Equatable {
 
     var isValid: Bool {
         skyColor.count == 3 && groundColor.count == 3 && lights.count <= Self.maximumLights
-            && (skyColor + groundColor + [fieldOfView, orbitAzimuth, orbitElevation]).allSatisfy(\.isFinite)
-            && (0 ..< 120).contains(fieldOfView) && lights.allSatisfy(\.isValid) && (floor?.isValid ?? true)
+            && (skyColor + groundColor + [fieldOfView, orbitAzimuth, orbitElevation])
+            .allSatisfy(\.isFinite)
+            && (0 ..< 120).contains(fieldOfView) && lights
+            .allSatisfy(\.isValid) && (floor?.isValid ?? true)
     }
 
     /// The scene camera the renderer lights models with: the lights as script-movable
@@ -157,7 +182,11 @@ struct SceneModelStage: Codable, Equatable {
             let axis = -light.fromDirection
             let color = light.color.map { $0 * light.intensity }
             dynamic.append(SceneDynamicLight(
-                objectID: -1 - index, origin: [Double(origin.x), Double(origin.y), Double(origin.z)],
+                objectID: -1 - index, origin: [
+                    Double(origin.x),
+                    Double(origin.y),
+                    Double(origin.z)
+                ],
                 axis: [Double(axis.x), Double(axis.y), Double(axis.z)], color: color
             ))
             if light.casts {
@@ -170,19 +199,34 @@ struct SceneModelStage: Codable, Equatable {
             }
         }
         return SceneCamera(
-            perspective: false, eye: [center.x, center.y, 2000], center: [center.x, center.y, 0], up: [0, 1, 0],
-            fov: fieldOfView, nearZ: 1, farZ: 50000, ambientColor: groundColor, skylightColor: skyColor,
+            perspective: false, eye: [center.x, center.y, 2000], center: [center.x, center.y, 0],
+            up: [
+                0,
+                1,
+                0
+            ],
+            fov: fieldOfView, nearZ: 1, farZ: 50000, ambientColor: groundColor,
+            skylightColor: skyColor,
             shadowLights: shadows.isEmpty ? nil : shadows, dynamicLights: dynamic
         )
     }
 
-    private func lightOrigin(_ light: Light, canvasWidth: Double, canvasHeight: Double) -> SIMD3<Float> {
+    private func lightOrigin(
+        _ light: Light,
+        canvasWidth: Double,
+        canvasHeight: Double
+    ) -> SIMD3<Float> {
         switch light.kind {
         case .directional:
             // Far along where it comes from; only its direction is used.
-            SIMD3(Float(canvasWidth / 2), Float(canvasHeight / 2), 0) + light.fromDirection * Float(canvasHeight * 10)
+            SIMD3(Float(canvasWidth / 2), Float(canvasHeight / 2), 0) + light
+                .fromDirection * Float(canvasHeight * 10)
         case .point, .spot:
-            SIMD3(Float(light.position[0] * canvasWidth), Float((1 - light.position[1]) * canvasHeight), Float(light.position[2]))
+            SIMD3(
+                Float(light.position[0] * canvasWidth),
+                Float((1 - light.position[1]) * canvasHeight),
+                Float(light.position[2])
+            )
         }
     }
 
@@ -211,7 +255,11 @@ struct SceneModelStage: Codable, Equatable {
     /// Scene pixels to clip space for a target showing `viewport` of the canvas (origin
     /// and size in canvas UV, y down): the canvas plane maps as the flat canvas does when
     /// the view is not turned. Returns the eye too.
-    func viewProjection(canvasWidth: Double, canvasHeight: Double, viewport: SIMD4<Float>) -> (simd_float4x4, SIMD3<Float>) {
+    func viewProjection(
+        canvasWidth: Double,
+        canvasHeight: Double,
+        viewport: SIMD4<Float>
+    ) -> (simd_float4x4, SIMD3<Float>) {
         let w = Float(canvasWidth), h = Float(canvasHeight)
         let center = SIMD3(w / 2, h / 2, 0)
         let turn = simd_quatf(angle: Float(orbitAzimuth * .pi / 180), axis: SIMD3(0, 1, 0))
@@ -229,20 +277,39 @@ struct SceneModelStage: Codable, Equatable {
                 SIMD4(f * h / w, 0, 0, 0), SIMD4(0, f, 0, 0),
                 SIMD4(0, 0, far / (near - far), -1), SIMD4(0, 0, near * far / (near - far), 0)
             ))
-            return (Self.viewportAdjust(viewport) * projection * Self.lookAt(eye: eye, center: center, up: up), eye)
+            return (
+                Self.viewportAdjust(viewport) * projection * Self.lookAt(
+                    eye: eye,
+                    center: center,
+                    up: up
+                ),
+                eye
+            )
         }
         eye = center + backward * 2000
         let depthRange: Float = 40000
         projection = simd_float4x4(columns: (
-            SIMD4(2 / w, 0, 0, 0), SIMD4(0, 2 / h, 0, 0), SIMD4(0, 0, -1 / depthRange, 0), SIMD4(0, 0, 0.5, 1)
+            SIMD4(2 / w, 0, 0, 0), SIMD4(0, 2 / h, 0, 0), SIMD4(0, 0, -1 / depthRange, 0), SIMD4(
+                0,
+                0,
+                0.5,
+                1
+            )
         ))
         // Turned about the canvas centre, which stays where it is.
         var toCenter = matrix_identity_float4x4
         toCenter.columns.3 = SIMD4(-center, 1)
-        return (Self.viewportAdjust(viewport) * projection * simd_float4x4(turn.inverse) * toCenter, eye)
+        return (
+            Self.viewportAdjust(viewport) * projection * simd_float4x4(turn.inverse) * toCenter,
+            eye
+        )
     }
 
-    private static func lookAt(eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>) -> simd_float4x4 {
+    private static func lookAt(
+        eye: SIMD3<Float>,
+        center: SIMD3<Float>,
+        up: SIMD3<Float>
+    ) -> simd_float4x4 {
         let z = simd_normalize(eye - center)
         let x = simd_normalize(simd_cross(up, z))
         let y = simd_cross(z, x)

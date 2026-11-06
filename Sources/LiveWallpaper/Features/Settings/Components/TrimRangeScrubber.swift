@@ -422,7 +422,7 @@ struct TrimRangeScrubber: View {
     }
 
     /// トラックボードのピンチでズーム。指の下の時刻を軸にする。
-    private func magnifyGesture(width: CGFloat) -> some Gesture {
+    private func magnifyGesture(width _: CGFloat) -> some Gesture {
         MagnificationGesture()
             .onChanged { scale in
                 guard assetDuration > 0, scale.isFinite, scale > 0 else {

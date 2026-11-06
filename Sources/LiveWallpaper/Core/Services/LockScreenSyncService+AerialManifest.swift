@@ -25,7 +25,7 @@ struct AerialManifestResolver {
 
     init(fileManager: FileManager, aerialsBaseURL: URL?) {
         self.fileManager = fileManager
-        self.injectedAerialsBaseURL = aerialsBaseURL
+        injectedAerialsBaseURL = aerialsBaseURL
     }
 
     func resolvePaths() throws -> AerialsPaths {
@@ -92,8 +92,10 @@ struct AerialManifestResolver {
         }
 
         return candidates.sorted { lhs, rhs in
-            let leftOrder = manifestAssets.first(where: { $0.id == lhs.id })?.preferredOrder ?? Int.max
-            let rightOrder = manifestAssets.first(where: { $0.id == rhs.id })?.preferredOrder ?? Int.max
+            let leftOrder = manifestAssets.first(where: { $0.id == lhs.id })?.preferredOrder ?? Int
+                .max
+            let rightOrder = manifestAssets.first(where: { $0.id == rhs.id })?.preferredOrder ?? Int
+                .max
             return leftOrder < rightOrder
         }.first!
     }

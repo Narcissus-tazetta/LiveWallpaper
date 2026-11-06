@@ -4,7 +4,7 @@ import Foundation
 /// opposed to SceneParticles, whose positions are a function of the loop phase.
 /// Lengths are canvas pixels in the layer's own space, x right and y up; times are
 /// seconds; a fraction of a particle's life runs 0...1.
-struct SceneParticleSystem: Codable, Equatable, Sendable {
+struct SceneParticleSystem: Codable, Equatable {
     enum Blend: String, Codable, CaseIterable {
         /// Covers what is below, ignoring the particle's alpha.
         case opaque
@@ -130,9 +130,17 @@ struct SceneParticleSystem: Codable, Equatable, Sendable {
             return Self.shaped(loudness, low: low, high: high, exponent: exponent)
         }
 
-        private static func shaped(_ loudness: Double, low: Double, high: Double, exponent: Double) -> Double {
+        private static func shaped(
+            _ loudness: Double,
+            low: Double,
+            high: Double,
+            exponent: Double
+        ) -> Double {
             // low == high is unmeasured; a step at the bound is the only reading that stays finite.
-            let t = high == low ? (loudness >= high ? 1 : 0) : min(max((loudness - low) / (high - low), 0), 1)
+            let t = high == low ? (loudness >= high ? 1 : 0) : min(
+                max((loudness - low) / (high - low), 0),
+                1
+            )
             return pow(t * t * (3 - 2 * t), exponent)
         }
     }
@@ -217,7 +225,8 @@ struct SceneParticleSystem: Codable, Equatable, Sendable {
     /// Maps a value of the particle or the scene onto one of its properties.
     struct Remap: Codable, Equatable {
         enum Input: String, Codable {
-            case lifetimeFraction, particleSystemTime, runtime, timeOfDay, speed, distanceToControlPoint
+            case lifetimeFraction, particleSystemTime, runtime, timeOfDay, speed,
+                 distanceToControlPoint
         }
 
         enum Output: String, Codable {
@@ -465,7 +474,8 @@ struct SceneParticleSystem: Codable, Equatable, Sendable {
 
     /// Every image this system and its children draw.
     var textureFiles: [String] {
-        [textureFile, refraction?.normalFile].compactMap { $0 } + children.flatMap(\.system.value.textureFiles)
+        [textureFile, refraction?.normalFile].compactMap { $0 } + children
+            .flatMap(\.system.value.textureFiles)
     }
 
     var normalFiles: [String] {
@@ -478,12 +488,17 @@ struct SceneParticleSystem: Codable, Equatable, Sendable {
 
     /// The longest a particle of this system or its children can live.
     var longestLifetime: Double {
-        ([max(initial.lifetime.min, initial.lifetime.max)] + children.map(\.system.value.longestLifetime)).max() ?? 0
+        ([max(initial.lifetime.min, initial.lifetime.max)] + children
+            .map(\.system.value.longestLifetime)).max() ?? 0
     }
 
     /// What a new layer starts as: soft lights born along the bottom edge that drift
     /// up and sway, already filling the screen on the first frame.
-    static func risingLights(canvasWidth: Double, canvasHeight: Double, textureFile: String?) -> SceneParticleSystem {
+    static func risingLights(
+        canvasWidth: Double,
+        canvasHeight: Double,
+        textureFile: String?
+    ) -> SceneParticleSystem {
         var system = SceneParticleSystem()
         system.maxCount = 400
         system.startTime = 10
@@ -500,16 +515,25 @@ struct SceneParticleSystem: Codable, Equatable, Sendable {
         system.initial.alpha = Range(0.3, 1)
         system.initial.colorMin = [1, 0.85, 0.6]
         system.initial.colorMax = [1, 1, 1]
-        system.initial.velocity = VectorRange([-15, canvasHeight * 0.04, 0], [15, canvasHeight * 0.1, 0])
+        system.initial.velocity = VectorRange(
+            [-15, canvasHeight * 0.04, 0],
+            [15, canvasHeight * 0.1, 0]
+        )
         system.behaviors = [
             .movement(gravity: [0, 0, 0], drag: 0),
             .alphaFade(fadeIn: 0.15, fadeOut: 0.6),
-            .oscillatePosition(Oscillation(frequency: Range(0.3, 1), amplitude: Range(4, 16), phase: Range(0, 2 * .pi), mask: [1, 0, 0])),
+            .oscillatePosition(Oscillation(
+                frequency: Range(0.3, 1),
+                amplitude: Range(4, 16),
+                phase: Range(0, 2 * .pi),
+                mask: [1, 0, 0]
+            ))
         ]
         return system
     }
 
     var usesPointer: Bool {
-        controlPoints.contains { $0.anchor == .pointer } || children.contains { $0.system.value.usesPointer }
+        controlPoints.contains { $0.anchor == .pointer } || children
+            .contains { $0.system.value.usesPointer }
     }
 }

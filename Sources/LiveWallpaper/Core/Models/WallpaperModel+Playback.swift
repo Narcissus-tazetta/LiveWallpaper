@@ -215,7 +215,10 @@ extension WallpaperModel {
         let player = createConfiguredPlayer(muted: !audioEnabled)
         player.volume = audioVolume
         sharedPlayer = player
-        sharedPlayerAudioController = PlayerAudioTrackController(player: player, isAudioEnabled: audioEnabled)
+        sharedPlayerAudioController = PlayerAudioTrackController(
+            player: player,
+            isAudioEnabled: audioEnabled
+        )
         return player
     }
 

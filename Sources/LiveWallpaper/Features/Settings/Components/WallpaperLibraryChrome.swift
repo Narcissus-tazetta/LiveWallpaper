@@ -91,7 +91,8 @@ extension SettingsView {
         VStack(spacing: 14) {
             Text(model.localizedString("好きな動画を壁紙にしましょう"))
                 .font(.title3.weight(.semibold))
-            Text(model.localizedString("動画・GIF・画像をここへドラッグするか、下のボタンから選んでください。追加した壁紙はすぐにデスクトップで再生されます。"))
+            Text(model
+                .localizedString("動画・GIF・画像をここへドラッグするか、下のボタンから選んでください。追加した壁紙はすぐにデスクトップで再生されます。"))
                 .font(.callout)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -115,7 +116,8 @@ extension SettingsView {
                 .buttonStyle(.bordered)
                 .controlSize(.large)
 
-                // The toolbar's Web button is icon-only, so first-time users get a labelled one here.
+                // The toolbar's Web button is icon-only, so first-time users get a labelled one
+                // here.
                 if selectedAssignmentTarget == .desktop, activeDisplayOverrideScreenID == nil,
                    model.webWallpaperFeatureEnabled
                 {

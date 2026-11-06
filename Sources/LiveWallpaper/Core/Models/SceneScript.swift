@@ -3,7 +3,10 @@ import simd
 
 struct SceneScript: Codable, Equatable, Identifiable {
     static let apiVersion = 4
-    static func supports(version: Int) -> Bool { (1 ... apiVersion).contains(version) }
+    static func supports(version: Int) -> Bool {
+        (1 ... apiVersion).contains(version)
+    }
+
     static let maximumCount = 32
     var id = UUID()
     var name = "JavaScript"
@@ -16,7 +19,8 @@ struct SceneScript: Codable, Equatable, Identifiable {
     var usesCursor = false
     /// The track playing in Music or Spotify, which needs their automation permission.
     var usesMedia = false
-    /// Reads the system audio as `ctx.audio`; a script that only mentions registerAudioBuffers reads it too.
+    /// Reads the system audio as `ctx.audio`; a script that only mentions registerAudioBuffers
+    /// reads it too.
     var readsAudio = false
     var layerIDs: [UUID]
     var targetsAllLayers = false
@@ -26,7 +30,8 @@ struct SceneScript: Codable, Equatable, Identifiable {
     var executionRevision = 0
 
     enum CodingKeys: String, CodingKey {
-        case id, name, source, modules, version, isEnabled, usesTime, usesTimeOfDay, usesCursor, usesMedia, readsAudio, layerIDs, targetsAllLayers, params
+        case id, name, source, modules, version, isEnabled, usesTime, usesTimeOfDay, usesCursor,
+             usesMedia, readsAudio, layerIDs, targetsAllLayers, params
     }
 
     init(source: String, layerIDs: [UUID]) {
@@ -51,37 +56,50 @@ struct SceneScript: Codable, Equatable, Identifiable {
         targetsAllLayers = try c.decodeIfPresent(Bool.self, forKey: .targetsAllLayers) ?? false
         params = try c.decode([String: Double].self, forKey: .params)
         guard (modules?.count ?? 0) <= 2048,
-              (modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <= 4194304,
+              (modules?.reduce(0) { $0 + $1.key.utf8.count + $1.value.utf8.count } ?? 0) <=
+              4_194_304,
               modules?.allSatisfy({ !$0.key.contains("\0") && !$0.value.contains("\0") }) != false,
               source.utf8.count <= 65536, layerIDs.count <= 512, params.count <= 64,
               params.allSatisfy({ $0.key.utf8.count <= 128 && $0.value.isFinite })
         else {
-            throw DecodingError.dataCorruptedError(forKey: .source, in: c, debugDescription: "Script input exceeds supported limits")
+            throw DecodingError.dataCorruptedError(
+                forKey: .source,
+                in: c,
+                debugDescription: "Script input exceeds supported limits"
+            )
         }
     }
 
-    var canRun: Bool { isEnabled && isAuthorized && Self.supports(version: version) }
+    var canRun: Bool {
+        isEnabled && isAuthorized && Self.supports(version: version)
+    }
 
     var requiresLiveInteraction: Bool {
         guard canRun else { return false }
         guard usesCursor || usesMedia || usesTimeOfDay else { return false }
         guard let modules, !modules.isEmpty else { return true }
-        let needsCursor = usesCursor && (userCode.contains("cursor") || userCode.contains("pointer") || userCode.contains("mouse"))
-        let needsMedia = usesMedia && (userCode.contains("media") || userCode.contains("mediaThumbnail"))
+        let needsCursor = usesCursor &&
+            (userCode.contains("cursor") || userCode.contains("pointer") || userCode
+                .contains("mouse"))
+        let needsMedia = usesMedia &&
+            (userCode.contains("media") || userCode.contains("mediaThumbnail"))
         let needsClock = usesTimeOfDay && userCode.contains("wallClock")
         return needsCursor || needsMedia || needsClock
     }
 
     /// Reads the system audio every frame.
-    var usesAudio: Bool { canRun && (readsAudio || userCode.contains("registerAudioBuffers")) }
+    var usesAudio: Bool {
+        canRun && (readsAudio || userCode.contains("registerAudioBuffers"))
+    }
 
     /// The script and its modules without the imported runtime bridge, which declares
     /// cursor, media and audio stubs even when the scene's own code uses none of them.
     private var userCode: String {
-        let runtimeModules: Set<String> = [
+        let runtimeModules: Set = [
             "scene-bridge", "scene-types", "scene-config", "WEColor", "WEMath", "WEVector"
         ]
-        return source + "\n" + (modules ?? [:]).filter { !runtimeModules.contains($0.key) }.values.joined(separator: "\n")
+        return source + "\n" + (modules ?? [:]).filter { !runtimeModules.contains($0.key) }.values
+            .joined(separator: "\n")
     }
 
     func targetLayerIDs(in layers: [SceneLayer]) -> [UUID] {
@@ -98,7 +116,9 @@ struct SceneScriptIssue: Error, LocalizedError, Equatable {
     var isTemporary = false
     /// Only a part of the script failed; the rest keeps running.
     var isPartial = false
-    var errorDescription: String? { "\(name): \(message)" }
+    var errorDescription: String? {
+        "\(name): \(message)"
+    }
 }
 
 struct SceneScriptOutput {
@@ -187,7 +207,9 @@ struct SceneScriptEffectValues: Decodable {
         if let centerY { effect.centerY = centerY }
         if let reversed { effect.reversed = reversed }
         if let values {
-            for (key, value) in values { effect.values[key] = value }
+            for (key, value) in values {
+                effect.values[key] = value
+            }
         }
     }
 }
@@ -268,7 +290,12 @@ struct SceneScriptTextValues: Decodable {
         if let horizontalAlignment { text.horizontalAlignment = horizontalAlignment }
         if let verticalAlignment { text.verticalAlignment = verticalAlignment }
         if let pointSize { text.pointSize = pointSize }
-        if let color { text.color = RGBAColor(red: color.red, green: color.green, blue: color.blue, alpha: text.color.alpha) }
+        if let color { text.color = RGBAColor(
+            red: color.red,
+            green: color.green,
+            blue: color.blue,
+            alpha: text.color.alpha
+        ) }
     }
 }
 
@@ -294,7 +321,8 @@ struct SceneScriptPlaybackValues: Decodable {
 
 extension SceneLayer {
     var scriptRigIDs: Set<UUID> {
-        Set((placement?.steps.compactMap(\.skeletonID) ?? []) + (renderGraph?.passes.compactMap { $0.draw?.skeletonID } ?? [])
+        Set((placement?.steps.compactMap(\.skeletonID) ?? []) +
+            (renderGraph?.passes.compactMap { $0.draw?.skeletonID } ?? [])
             + (model?.skeleton.map { [$0] } ?? []))
     }
 }

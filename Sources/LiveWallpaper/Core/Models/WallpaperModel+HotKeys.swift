@@ -9,7 +9,8 @@ extension WallpaperModel {
 
     /// 起動時の復元。保存済みの割り当てを読み込み、無い操作は既定値で埋める。
     func restoreHotKeysState() {
-        hotKeysEnabled = UserDefaults.standard.object(forKey: Self.hotKeysEnabledKey) as? Bool ?? false
+        hotKeysEnabled = UserDefaults.standard
+            .object(forKey: Self.hotKeysEnabledKey) as? Bool ?? false
 
         var combos: [HotKeyAction: HotKeyCombo] = [:]
         if let decoded = UserDefaults.standard.decodedJSON(
@@ -73,7 +74,10 @@ extension WallpaperModel {
             encodable[action.rawValue] = combo
         }
         do {
-            try UserDefaults.standard.set(JSONEncoder().encode(encodable), forKey: Self.hotKeyCombosKey)
+            try UserDefaults.standard.set(
+                JSONEncoder().encode(encodable),
+                forKey: Self.hotKeyCombosKey
+            )
         } catch {
             recordPersistenceFailure(key: Self.hotKeyCombosKey, error: error)
         }

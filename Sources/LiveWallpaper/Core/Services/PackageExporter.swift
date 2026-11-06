@@ -34,11 +34,7 @@ final class PackageExporter {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
-        defer {
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                try? FileManager.default.removeItem(at: tempDir)
-            }
-        }
+        defer { BlockingWork.removeInBackground(tempDir) }
 
         let contentDir = tempDir.appendingPathComponent("content")
         try fileManager.createDirectory(at: contentDir, withIntermediateDirectories: true)
@@ -61,7 +57,12 @@ final class PackageExporter {
             videoMap[path] = videoId
 
             if includeVideos {
-                let snapshot = try await snapshotVideo(model: model, videoPath: path, videoId: videoId, contentDir: contentDir)
+                let snapshot = try await snapshotVideo(
+                    model: model,
+                    videoPath: path,
+                    videoId: videoId,
+                    contentDir: contentDir
+                )
                 mediaPathsByVideoID[videoId] = snapshot.path
                 let attrs = try fileManager.attributesOfItem(atPath: snapshot.path)
                 let fileSize = attrs[.size] as? UInt64 ?? 0
@@ -100,7 +101,7 @@ final class PackageExporter {
         let manifestURL = contentDir.appendingPathComponent("metadata.json")
         try manifestData.write(to: manifestURL)
 
-        try archiveWriter.createPackage(from: contentDir, outputURL: outputURL)
+        try await archiveWriter.createPackage(from: contentDir, outputURL: outputURL)
     }
 
     func exportSingleWallpaper(
@@ -122,7 +123,7 @@ final class PackageExporter {
             )
             outputURLs.append(packageURL)
         }
-        let videoURL = try copyOriginalVideo(
+        let videoURL = try await copyOriginalVideo(
             from: URL(fileURLWithPath: videoPath),
             to: outputFolderURL,
             baseFileName: baseFileName
@@ -144,11 +145,7 @@ final class PackageExporter {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
 
-        defer {
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                try? FileManager.default.removeItem(at: tempDir)
-            }
-        }
+        defer { BlockingWork.removeInBackground(tempDir) }
 
         let contentDir = tempDir.appendingPathComponent("content")
         try fileManager.createDirectory(at: contentDir, withIntermediateDirectories: true)
@@ -161,12 +158,20 @@ final class PackageExporter {
         let videoId = UUID().uuidString
         var videoThumbnails: [String: String] = [:]
 
-        let packagedVideoURL = try await snapshotVideo(model: model, videoPath: videoPath, videoId: videoId, contentDir: contentDir)
+        let packagedVideoURL = try await snapshotVideo(
+            model: model,
+            videoPath: videoPath,
+            videoId: videoId,
+            contentDir: contentDir
+        )
         if let maximumStorePackageBytes,
-           fileManager.fileExists(atPath: contentDir.appendingPathComponent("scenes/\(videoId)/scene.json").path)
+           fileManager
+           .fileExists(atPath: contentDir.appendingPathComponent("scenes/\(videoId)/scene.json")
+               .path)
         {
             try await StoreSceneVideoCompressor.compressIfNeeded(
-                videoURL: packagedVideoURL, contentDirectory: contentDir, maximumPackageBytes: maximumStorePackageBytes
+                videoURL: packagedVideoURL, contentDirectory: contentDir,
+                maximumPackageBytes: maximumStorePackageBytes
             )
         }
         let attrs = try fileManager.attributesOfItem(atPath: packagedVideoURL.path)
@@ -202,11 +207,14 @@ final class PackageExporter {
 
         let packageFileName = "\(baseFileName).lwpkg"
         let packageURL = outputFolderURL.appendingPathComponent(packageFileName)
-        try archiveWriter.createPackage(from: contentDir, outputURL: packageURL)
+        try await archiveWriter.createPackage(from: contentDir, outputURL: packageURL)
         if let maximumStorePackageBytes {
-            let bytes = try fileManager.attributesOfItem(atPath: packageURL.path)[.size] as! Int
+            let bytes = try packageURL.regularFileSize()
             guard bytes <= maximumStorePackageBytes else {
-                throw StoreClientError.fileTooLarge(sizeBytes: bytes, maxBytes: maximumStorePackageBytes)
+                throw StoreClientError.fileTooLarge(
+                    sizeBytes: bytes,
+                    maxBytes: maximumStorePackageBytes
+                )
             }
         }
         return packageURL
@@ -225,51 +233,72 @@ final class PackageExporter {
             // Its video predates the edits, and baking would run scripts nobody allowed.
             if document.hasUnapprovedScripts, SceneStore.isNewerThanVideo(videoPath: videoPath) {
                 throw ExportError.sceneAwaitingScriptApproval(String(
-                    format: model.localizedString("「%@」には未許可のスクリプトがあり、動画が最新の編集を反映していません。スクリプトを許可するか停止してから書き出してください。"),
+                    format: model
+                        .localizedString(
+                            "「%@」には未許可のスクリプトがあり、動画が最新の編集を反映していません。スクリプトを許可するか停止してから書き出してください。"
+                        ),
                     model.registeredVideoDisplayName(for: videoPath)
                 ))
             }
             let snapshotFolder = SceneStore.folderURL(forVideoPath: videoURL.path)
-            // Capture assets before suspending: another edit may prune the originals
-            // while the snapshot is being rendered.
+            // Capture assets before suspending, on the main actor: another edit may prune the
+            // originals while the snapshot is being rendered, and scene saves run here.
             try SceneStore.copyScene(videoPath: videoPath, to: snapshotFolder)
-            let isStale = model.scenesBaking.contains(videoPath) || SceneStore.isNewerThanVideo(videoPath: videoPath)
+            let isStale = model.scenesBaking.contains(videoPath) || SceneStore
+                .isNewerThanVideo(videoPath: videoPath)
             if !document.hasUnapprovedScripts, isStale {
                 try await SceneVideoBaker.bake(
-                    document: document, videoPath: videoURL.path, quality: BakeQuality.maximum.compressionQuality, to: videoURL
+                    document: document, videoPath: videoURL.path,
+                    quality: BakeQuality.maximum.compressionQuality, to: videoURL
                 ) { _ in }
             } else {
-                try fileManager.copyItem(atPath: videoPath, toPath: videoURL.path)
+                try await copyItem(atPath: videoPath, toPath: videoURL.path)
             }
             let scenesDirectory = contentDir.appendingPathComponent("scenes", isDirectory: true)
             try fileManager.createDirectory(at: scenesDirectory, withIntermediateDirectories: true)
-            try fileManager.moveItem(at: snapshotFolder, to: scenesDirectory.appendingPathComponent(videoId))
+            try fileManager.moveItem(
+                at: snapshotFolder,
+                to: scenesDirectory.appendingPathComponent(videoId)
+            )
         } else {
-            try fileManager.copyItem(atPath: videoPath, toPath: videoURL.path)
+            try await copyItem(atPath: videoPath, toPath: videoURL.path)
         }
         return videoURL
     }
 
-    private func markPackagedScene(videoId: String, contentDir: URL, manifest: inout PackageManifest) throws {
-        guard fileManager.fileExists(atPath: contentDir.appendingPathComponent("scenes/\(videoId)/scene.json").path),
-              let index = manifest.videos.firstIndex(where: { $0.id == videoId })
+    private func markPackagedScene(
+        videoId: String,
+        contentDir: URL,
+        manifest: inout PackageManifest
+    ) throws {
+        guard fileManager
+            .fileExists(atPath: contentDir.appendingPathComponent("scenes/\(videoId)/scene.json")
+                .path),
+            let index = manifest.videos.firstIndex(where: { $0.id == videoId })
         else { return }
         let source = contentDir.appendingPathComponent("scenes/\(videoId)/scene.json")
         let document = try JSONDecoder().decode(SceneDocument.self, from: Data(contentsOf: source))
-        if document.scripts.isEmpty {
-            manifest.videos[index].scene = true
-        } else {
+        if let apiVersion = document.scripts.map(\.version).max() {
             // Older importers understand scene=true and would erase unknown script fields on edit.
-            manifest.videos[index].scriptScene = .init(apiVersion: document.scripts.map(\.version).max()!)
+            manifest.videos[index].scriptScene = .init(apiVersion: apiVersion)
             manifest.videos[index].scene = nil
+        } else {
+            manifest.videos[index].scene = true
         }
+    }
+
+    /// Videos run to gigabytes; copying one on the main actor would freeze the app.
+    private func copyItem(atPath source: String, toPath destination: String) async throws {
+        let files = SendableFileManager(manager: fileManager)
+        try await BlockingWork
+            .run { try files.manager.copyItem(atPath: source, toPath: destination) }
     }
 
     private func copyOriginalVideo(
         from sourceURL: URL,
         to outputFolderURL: URL,
         baseFileName: String
-    ) throws -> URL {
+    ) async throws -> URL {
         let fileExtension = sourceURL.pathExtension.isEmpty ? "mov" : sourceURL.pathExtension
         let videoFileName = "\(baseFileName).\(fileExtension)"
         let videoOutputURL = outputFolderURL.appendingPathComponent(videoFileName)
@@ -280,7 +309,7 @@ final class PackageExporter {
         if fileManager.fileExists(atPath: videoOutputURL.path) {
             try fileManager.removeItem(at: videoOutputURL)
         }
-        try fileManager.copyItem(at: sourceURL, to: videoOutputURL)
+        try await copyItem(atPath: sourceURL.path, toPath: videoOutputURL.path)
         return videoOutputURL
     }
 }

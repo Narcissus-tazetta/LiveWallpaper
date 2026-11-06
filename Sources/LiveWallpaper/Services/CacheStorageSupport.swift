@@ -1,16 +1,16 @@
 import CryptoKit
 import Foundation
 
-/// `DiskThumbnailCache`・`LightweightProxyCache`・`RemoteThumbnailCache` が共通で
-/// 使う、状態を持たない純粋なヘルパー。3つとも Application Support 配下の専用
-/// サブフォルダへ `metadata.json` + ハッシュ化ファイル名のデータを保存する、という
-/// 同じディスクレイアウトを使うため、そのレイアウト計算とキーのハッシュ化だけを
-/// ここへ集約する。
-///
-/// メタデータの永続化(debounceされたflush)やLRU退避は各キャッシュの状態
-/// (`ioQueue`・`metadataDirty`・在メモリキャッシュ辞書など)に密結合しており、
-/// キャッシュごとに追加のクリーンアップ(在メモリ画像の破棄、passthroughエントリの
-/// 扱い等)も異なるため、あえて統合していない。
+// `DiskThumbnailCache`・`LightweightProxyCache`・`RemoteThumbnailCache` が共通で
+// 使う、状態を持たない純粋なヘルパー。3つとも Application Support 配下の専用
+// サブフォルダへ `metadata.json` + ハッシュ化ファイル名のデータを保存する、という
+// 同じディスクレイアウトを使うため、そのレイアウト計算とキーのハッシュ化だけを
+// ここへ集約する。
+//
+// メタデータの永続化(debounceされたflush)やLRU退避は各キャッシュの状態
+// (`ioQueue`・`metadataDirty`・在メモリキャッシュ辞書など)に密結合しており、
+// キャッシュごとに追加のクリーンアップ(在メモリ画像の破棄、passthroughエントリの
+// 扱い等)も異なるため、あえて統合していない。
 
 enum CacheKeyHashing {
     /// キャッシュファイル名に使う、ソースパス/IDの短いcontent-addressedハッシュ。
@@ -31,7 +31,7 @@ protocol SourceTrackedCacheEntry {
 enum SourceValidityCheck {
     /// エントリ記録時点と実ファイルのサイズ・更新日時が一致するか。不一致なら
     /// ソースが差し替えられている(= キャッシュは無効)とみなす。
-    static func isValid<Entry: SourceTrackedCacheEntry>(path: String, entry: Entry) -> Bool {
+    static func isValid(path: String, entry: some SourceTrackedCacheEntry) -> Bool {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
               let fileSize = attributes[.size] as? NSNumber,
               let modifiedDate = attributes[.modificationDate] as? Date

@@ -64,7 +64,8 @@ extension SettingsView {
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 3)
                                 .background(.ultraThinMaterial, in: Capsule())
-                                // Steps aside for the hover "⋯" button, which takes the same corner.
+                                // Steps aside for the hover "⋯" button, which takes the same
+                                // corner.
                                 .padding(.trailing, isHovered ? 28 : 0)
                                 .transition(Motion.pop)
                         }
@@ -206,7 +207,10 @@ extension SettingsView {
     }
 
     @ViewBuilder
-    private func webWallpaperMenuItems(source: WebWallpaperSource, isSelectable: Bool) -> some View {
+    private func webWallpaperMenuItems(
+        source: WebWallpaperSource,
+        isSelectable: Bool
+    ) -> some View {
         Button(model.localizedString("適用")) {
             withMotion {
                 model.stopExternalWallpaper()
@@ -214,7 +218,9 @@ extension SettingsView {
             }
         }
         .disabled(!isSelectable)
-        if model.availableDisplayScreens().count > 1 || model.webOverrideByScreenID.values.contains(source.id) {
+        if model.availableDisplayScreens().count > 1 || model.webOverrideByScreenID.values
+            .contains(source.id)
+        {
             webDisplayOverrideMenu(sourceID: source.id)
         }
         Divider()
@@ -257,7 +263,10 @@ extension SettingsView {
     }
 
     /// プレイリスト編集中に名前行へ出すチェックボックス。ON=そのプレイリストに含まれる。
-    private func webWallpaperPlaylistMembershipCheckbox(sourceID: UUID, playlistID: UUID) -> some View {
+    private func webWallpaperPlaylistMembershipCheckbox(
+        sourceID: UUID,
+        playlistID: UUID
+    ) -> some View {
         membershipCheckbox(
             isOn: { model.playlistContainsWebWallpaper(playlistID, sourceID: sourceID) },
             setOn: { isOn in
@@ -298,7 +307,6 @@ extension SettingsView {
 
     /// この Web 壁紙を特定のディスプレイに固定表示するメニュー。
     /// 選択で割り当て、割り当て済みの画面を選ぶと解除(トグル)。
-    @ViewBuilder
     func webDisplayOverrideMenu(sourceID: UUID) -> some View {
         Menu(model.localizedString("ディスプレイに割り当て…")) {
             ForEach(model.availableDisplayScreens()) { screen in

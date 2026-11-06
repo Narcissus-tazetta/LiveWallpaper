@@ -43,7 +43,8 @@ final class SceneHitTester {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
         else {
-            AppLog.windowRefresh.error("hit test image unreadable: \(url.lastPathComponent, privacy: .public)")
+            AppLog.windowRefresh
+                .error("hit test image unreadable: \(url.lastPathComponent, privacy: .public)")
             return nil
         }
         guard ![.none, .noneSkipFirst, .noneSkipLast].contains(image.alphaInfo) else {
@@ -54,8 +55,10 @@ final class SceneHitTester {
         var bytes = [UInt8](repeating: 0, count: width * height)
         let drew: Bool = bytes.withUnsafeMutableBytes { buffer in
             guard let context = CGContext(
-                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
-                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: width,
+                space: CGColorSpaceCreateDeviceGray(),
+                bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue
             ) else {
                 return false
             }

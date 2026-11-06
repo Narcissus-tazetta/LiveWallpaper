@@ -7,7 +7,7 @@ extension SettingsView {
         "スクリーンセーバーとして使う",
         "インストール",
         "アンインストール",
-        "アプリを終了してもロック画面とスクリーンセーバーを残す",
+        "アプリを終了してもロック画面とスクリーンセーバーを残す"
     ]
 
     /// One setting covers the lock screen and the screen saver, so both of their panels
@@ -203,7 +203,10 @@ extension SettingsView {
     }
 
     private static func systemHasSettingsPane(_ bundleID: String) -> Bool {
-        let directory = URL(fileURLWithPath: "/System/Library/ExtensionKit/Extensions", isDirectory: true)
+        let directory = URL(
+            fileURLWithPath: "/System/Library/ExtensionKit/Extensions",
+            isDirectory: true
+        )
         let extensions = (try? FileManager.default.contentsOfDirectory(
             at: directory, includingPropertiesForKeys: nil
         )) ?? []

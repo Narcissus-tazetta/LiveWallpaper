@@ -17,7 +17,9 @@ final class SceneMetalLayer: CAMetalLayer {
     @MainActor private final class TickTarget: NSObject {
         weak var layer: SceneMetalLayer?
 
-        init(layer: SceneMetalLayer) { self.layer = layer }
+        init(layer: SceneMetalLayer) {
+            self.layer = layer
+        }
 
         @objc func tick(_ sender: AnyObject) {
             if let layer { layer.tick() } else { invalidate(sender) }
@@ -70,6 +72,7 @@ final class SceneMetalLayer: CAMetalLayer {
             redraw()
         }
     }
+
     private let mediaSubscriptionID = UUID()
     private var isSubscribedToMedia = false
     private var isSubscribedToSpectrum = false
@@ -80,6 +83,7 @@ final class SceneMetalLayer: CAMetalLayer {
         var palette: SceneMediaPalette?
         var data: Data?
     }
+
     private var artwork: Artwork?
     private var loadingVideos: Set<String> = []
     /// The screen whose per-screen storage area the scene's scripts use. nil (the
@@ -87,6 +91,7 @@ final class SceneMetalLayer: CAMetalLayer {
     var storageScreen: String? {
         didSet { if storageScreen != oldValue { storage = nil } }
     }
+
     private var storage: SceneScriptStorage.Session?
     var scriptIssueHandler: (([SceneScriptIssue]) -> Void)?
     var soundHandler: (([UUID: SceneScriptedSound]) -> Void)?
@@ -102,7 +107,8 @@ final class SceneMetalLayer: CAMetalLayer {
     }
 
     static func loadUserProperties(forVideoPath videoPath: String) -> [String: WebPropertyValue]? {
-        guard let settings = try? LocalWebSettings.loadScene(videoPath: videoPath), !settings.values.isEmpty else { return nil }
+        guard let settings = try? LocalWebSettings.loadScene(videoPath: videoPath),
+              !settings.values.isEmpty else { return nil }
         return settings.values
     }
 
@@ -118,6 +124,7 @@ final class SceneMetalLayer: CAMetalLayer {
             }
         }
     }
+
     /// The part of the day the scene's links see.
     var timeOfDay: SceneTimeOfDay = .day {
         didSet {
@@ -127,6 +134,7 @@ final class SceneMetalLayer: CAMetalLayer {
             }
         }
     }
+
     /// The editor's stand-in cursor, -1...1 per axis (+y down); while set, the real
     /// pointer is ignored. nil follows setCursor.
     var simulatedCursor: SIMD2<Float>? {
@@ -141,6 +149,7 @@ final class SceneMetalLayer: CAMetalLayer {
             }
         }
     }
+
     /// The view whose display drives the ticks.
     weak var hostView: NSView?
     /// Called after each frame is encoded, for overlays that follow the animation.
@@ -154,6 +163,7 @@ final class SceneMetalLayer: CAMetalLayer {
             setNeedsDisplay()
         }
     }
+
     var maximumFramesPerSecond: Float? {
         didSet {
             if maximumFramesPerSecond != oldValue {
@@ -190,14 +200,24 @@ final class SceneMetalLayer: CAMetalLayer {
         // before presenting, so a third one is never needed.
         maximumDrawableCount = 2
         needsDisplayOnBoundsChange = true
-        actions = ["bounds": NSNull(), "position": NSNull(), "contents": NSNull(), "hidden": NSNull()]
+        actions = [
+            "bounds": NSNull(),
+            "position": NSNull(),
+            "contents": NSNull(),
+            "hidden": NSNull()
+        ]
         // Posted on the main thread by SceneSoundReaction.setEnabled.
         NotificationCenter.default.addObserver(
-            tickTarget, selector: #selector(TickTarget.soundReactionDidChange(_:)), name: SceneSoundReaction.didChange, object: nil
+            tickTarget, selector: #selector(TickTarget.soundReactionDidChange(_:)),
+            name: SceneSoundReaction.didChange, object: nil
         )
     }
 
-    func show(_ document: SceneDocument, videoPath: String, userProperties: [String: WebPropertyValue]? = nil) throws {
+    func show(
+        _ document: SceneDocument,
+        videoPath: String,
+        userProperties: [String: WebPropertyValue]? = nil
+    ) throws {
         let changedVideo = self.videoPath != videoPath
         if changedVideo {
             scriptWorker = SceneScriptWorker()
@@ -270,7 +290,10 @@ final class SceneMetalLayer: CAMetalLayer {
                         self.redraw()
                     }
                 } catch {
-                    AppLog.windowRefresh.error("scene video failed: \(error.localizedDescription, privacy: .public)")
+                    AppLog.windowRefresh
+                        .error(
+                            "scene video failed: \(error.localizedDescription, privacy: .public)"
+                        )
                 }
                 self?.loadingVideos.remove(video.file)
                 // A scene shown meanwhile may need a file of the same name.
@@ -284,23 +307,31 @@ final class SceneMetalLayer: CAMetalLayer {
             || renderer?.document.layers.contains { $0.isVisible && $0.usesMediaArtwork } == true
         let wantsSpectrum = renderer?.document.usesAudio == true
             && videoPath.map { SceneSoundReaction.isEnabled(videoPath: $0) } == true
-        guard wantsMedia != isSubscribedToMedia || wantsSpectrum != isSubscribedToSpectrum else { return }
+        guard wantsMedia != isSubscribedToMedia || wantsSpectrum != isSubscribedToSpectrum
+        else { return }
         isSubscribedToMedia = wantsMedia
         isSubscribedToSpectrum = wantsSpectrum
         if !wantsMedia { media = nil }
         if !wantsSpectrum { setAudio(nil) }
         MainActor.assumeIsolated {
-            LocalWebIntegration.shared.update(id: mediaSubscriptionID, subscription: wantsMedia || wantsSpectrum ? .init(
-                sceneSpectrum: wantsSpectrum, media: wantsMedia,
-                receiveSceneSpectrum: { [weak self] values in self?.receiveSpectrum(values) },
-                receiveMedia: { [weak self] value, enabled in self?.receiveMedia(value, isAvailable: enabled) }
-            ) : nil)
+            LocalWebIntegration.shared.update(
+                id: mediaSubscriptionID,
+                subscription: wantsMedia || wantsSpectrum ? .init(
+                    sceneSpectrum: wantsSpectrum, media: wantsMedia,
+                    receiveSceneSpectrum: { [weak self] values in self?.receiveSpectrum(values) },
+                    receiveMedia: { [weak self] value, enabled in self?.receiveMedia(
+                        value,
+                        isAvailable: enabled
+                    ) }
+                ) : nil
+            )
         }
     }
 
     /// 64 bands per channel, left first, as SceneAudioAnalyzer makes them.
     private func receiveSpectrum(_ values: [Float]) {
-        guard isSubscribedToSpectrum, values.count == 2 * SceneAudioSpectrum.bandCount else { return }
+        guard isSubscribedToSpectrum,
+              values.count == 2 * SceneAudioSpectrum.bandCount else { return }
         let count = SceneAudioSpectrum.bandCount
         setAudio(SceneAudioSpectrum(left: Array(values[..<count]), right: Array(values[count...])))
     }
@@ -321,18 +352,30 @@ final class SceneMetalLayer: CAMetalLayer {
         if artwork?.source != value.artwork {
             var decoded: SceneMediaPalette?
             var imageData: Data?
-            if let comma = value.artwork.firstIndex(of: ","), value.artwork.hasPrefix("data:image/"),
-               let data = Data(base64Encoded: String(value.artwork[value.artwork.index(after: comma)...])) {
+            if let comma = value.artwork.firstIndex(of: ","),
+               value.artwork.hasPrefix("data:image/"),
+               let data =
+               Data(base64Encoded: String(value.artwork[value.artwork.index(after: comma)...]))
+            {
                 imageData = data
                 do { decoded = try SceneMediaPalette(imageData: data) } catch {
-                    AppLog.windowRefresh.error("media artwork colours failed: \(error.localizedDescription, privacy: .public)")
+                    AppLog.windowRefresh
+                        .error(
+                            "media artwork colours failed: \(error.localizedDescription, privacy: .public)"
+                        )
                 }
             }
-            artwork = Artwork(source: value.artwork, id: value.artwork.isEmpty ? "" : "\(value.artwork.utf8.count):\(value.artwork.hashValue)",
-                              palette: decoded, data: imageData)
+            artwork = Artwork(
+                source: value.artwork,
+                id: value.artwork
+                    .isEmpty ? "" : "\(value.artwork.utf8.count):\(value.artwork.hashValue)",
+                palette: decoded,
+                data: imageData
+            )
         }
         media = SceneMediaState(
-            isAvailable: true, playback: SceneMediaState.Playback(rawValue: value.state) ?? .stopped,
+            isAvailable: true,
+            playback: SceneMediaState.Playback(rawValue: value.state) ?? .stopped,
             title: value.title, artist: value.artist, album: value.album, position: value.position,
             duration: value.duration,
             artworkID: artwork?.id ?? "", palette: artwork?.palette, artworkData: artwork?.data
@@ -381,7 +424,10 @@ final class SceneMetalLayer: CAMetalLayer {
         do {
             try renderer?.setPaintOverride(override)
         } catch {
-            AppLog.windowRefresh.error("scene paint preview failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error(
+                    "scene paint preview failed: \(error.localizedDescription, privacy: .public)"
+                )
         }
         redraw()
     }
@@ -393,16 +439,23 @@ final class SceneMetalLayer: CAMetalLayer {
         guard simulatedCursor == nil else {
             return
         }
-        applyCursor(uv: cursor.flatMap(canvasUV(of:)), parallax: SIMD2(Float(parallax.x), Float(-parallax.y)))
+        applyCursor(
+            uv: cursor.flatMap(canvasUV(of:)),
+            parallax: SIMD2(Float(parallax.x), Float(-parallax.y))
+        )
     }
 
     /// A press or release of the primary button on the desktop, at `point` in this
     /// layer's coordinates (origin bottom-left).
     func addPointerPress(at point: CGPoint, isDown: Bool) {
         guard simulatedCursor == nil, let position = canvasUV(of: point),
-              renderer?.document.scripts.contains(where: { $0.canRun && $0.usesCursor }) == true else { return }
+              renderer?.document.scripts.contains(where: { $0.canRun && $0.usesCursor }) == true
+        else { return }
         // A script run that never comes (a stopped script) must not grow this forever.
-        pendingPointerPresses = Array((pendingPointerPresses + [.init(isDown: isDown, position: position)]).suffix(32))
+        pendingPointerPresses = Array((pendingPointerPresses + [.init(
+            isDown: isDown,
+            position: position
+        )]).suffix(32))
         redraw()
     }
 
@@ -437,7 +490,10 @@ final class SceneMetalLayer: CAMetalLayer {
     /// Canvas UV → a point in this layer's coordinates (origin bottom-left).
     func point(ofCanvasUV uv: SIMD2<Float>) -> CGPoint {
         let viewUV = (uv - SIMD2(viewport.x, viewport.y)) / SIMD2(viewport.z, viewport.w)
-        return CGPoint(x: CGFloat(viewUV.x) * bounds.width, y: CGFloat(1 - viewUV.y) * bounds.height)
+        return CGPoint(
+            x: CGFloat(viewUV.x) * bounds.width,
+            y: CGFloat(1 - viewUV.y) * bounds.height
+        )
     }
 
     override func layoutSublayers() {
@@ -467,29 +523,47 @@ final class SceneMetalLayer: CAMetalLayer {
                 input.screenSize = SIMD2(Int(drawableSize.width), Int(drawableSize.height))
             }
             let requestedTimeOfDay = timeOfDay
-            let storage = storage ?? SceneScriptStorage.shared.session(path: videoPath!, screen: storageScreen)
+            let storage = storage ?? SceneScriptStorage.shared.session(
+                path: videoPath!,
+                screen: storageScreen
+            )
             self.storage = storage
-            scriptWorker.evaluate(document, input: input, timeOfDay: requestedTimeOfDay, storage: storage) { [weak self] result in
+            scriptWorker.evaluate(
+                document,
+                input: input,
+                timeOfDay: requestedTimeOfDay,
+                storage: storage
+            ) { [weak self] result in
                 guard let self else { return }
-                self.isEvaluatingScript = false
-                if self.scriptGeneration == generation, self.renderer?.document == document,
-                   self.timeOfDay == requestedTimeOfDay {
+                isEvaluatingScript = false
+                if scriptGeneration == generation, self.renderer?.document == document,
+                   timeOfDay == requestedTimeOfDay
+                {
                     switch result {
                     case let .success(frame):
-                        self.scriptIssueHandler?(frame.issues)
-                        self.scriptLogHandler?(frame.logs)
-                        if !frame.sounds.isEmpty { self.soundHandler?(frame.sounds) }
-                        // A script paused for running out of time keeps the clock going, so it can resume.
-                        self.stoppedScriptIDs = Set(frame.issues.filter { !$0.isTemporary }.map(\.scriptID))
-                        self.draw(input: frame.input, frame: frame)
-                        self.updateTicking()
+                        scriptIssueHandler?(frame.issues)
+                        scriptLogHandler?(frame.logs)
+                        if !frame.sounds.isEmpty { soundHandler?(frame.sounds) }
+                        // A script paused for running out of time keeps the clock going, so it can
+                        // resume.
+                        stoppedScriptIDs = Set(frame.issues.filter { !$0.isTemporary }
+                            .map(\.scriptID))
+                        draw(input: frame.input, frame: frame)
+                        updateTicking()
                     case let .failure(error):
-                        AppLog.windowRefresh.error("script frame failed: \(error.localizedDescription, privacy: .public)")
-                        self.scriptIssueHandler?([SceneScriptIssue(scriptID: document.scripts.first!.id,
-                                                                  name: "JavaScript", message: error.localizedDescription)])
+                        AppLog.windowRefresh
+                            .error(
+                                "script frame failed: \(error.localizedDescription, privacy: .public)"
+                            )
+                        scriptIssueHandler?([SceneScriptIssue(
+                            scriptID: document.scripts.first!.id,
+                            name: "JavaScript",
+                            message: error
+                                .localizedDescription
+                        )])
                     }
                 }
-                if self.needsScriptEvaluation { self.redraw() }
+                if needsScriptEvaluation { redraw() }
             }
         } else {
             draw(input: current, frame: nil)
@@ -506,7 +580,10 @@ final class SceneMetalLayer: CAMetalLayer {
             return
         }
         let scale = contentsScale
-        let size = CGSize(width: (bounds.width * scale).rounded(), height: (bounds.height * scale).rounded())
+        let size = CGSize(
+            width: (bounds.width * scale).rounded(),
+            height: (bounds.height * scale).rounded()
+        )
         if drawableSize != size {
             drawableSize = size
         }
@@ -517,9 +594,15 @@ final class SceneMetalLayer: CAMetalLayer {
             return
         }
         do {
-            try renderer.encode(into: drawable.texture, commandBuffer: commandBuffer, input: input, frame: frame)
+            try renderer.encode(
+                into: drawable.texture,
+                commandBuffer: commandBuffer,
+                input: input,
+                frame: frame
+            )
         } catch {
-            AppLog.windowRefresh.error("scene render failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error("scene render failed: \(error.localizedDescription, privacy: .public)")
             return
         }
         isFrameInFlight = true
@@ -559,7 +642,8 @@ final class SceneMetalLayer: CAMetalLayer {
             return false
         }
         let animated = renderer.document.layers.contains(where: \.isAnimated)
-            || renderer.document.scripts.contains { $0.canRun && $0.usesTime && !stoppedScriptIDs.contains($0.id) }
+            || renderer.document.scripts
+            .contains { $0.canRun && $0.usesTime && !stoppedScriptIDs.contains($0.id) }
         return animated && clock().isRunning
     }
 
@@ -602,7 +686,13 @@ final class SceneMetalLayer: CAMetalLayer {
         guard poller == nil else {
             return
         }
-        let timer = Timer(timeInterval: 0.5, target: tickTarget, selector: #selector(TickTarget.poll(_:)), userInfo: nil, repeats: true)
+        let timer = Timer(
+            timeInterval: 0.5,
+            target: tickTarget,
+            selector: #selector(TickTarget.poll(_:)),
+            userInfo: nil,
+            repeats: true
+        )
         timer.tolerance = 0.2
         RunLoop.main.add(timer, forMode: .common)
         poller = timer
@@ -626,15 +716,23 @@ final class SceneMetalLayer: CAMetalLayer {
         lastStep = CACurrentMediaTime()
         tickRateApplied = tickRateCap
         if #available(macOS 14, *), let hostView {
-            let link = hostView.displayLink(target: tickTarget, selector: #selector(TickTarget.tick(_:)))
+            let link = hostView.displayLink(
+                target: tickTarget,
+                selector: #selector(TickTarget.tick(_:))
+            )
             let cap = tickRateApplied
-            link.preferredFrameRateRange = CAFrameRateRange(minimum: min(30, cap), maximum: cap, preferred: cap)
+            link.preferredFrameRateRange = CAFrameRateRange(
+                minimum: min(30, cap),
+                maximum: cap,
+                preferred: cap
+            )
             link.add(to: .main, forMode: .common)
             ticker = link
         } else {
             let fps = Double(tickRateApplied)
             let timer = Timer(
-                timeInterval: 1 / max(fps, 30), target: tickTarget, selector: #selector(TickTarget.tick(_:)), userInfo: nil, repeats: true
+                timeInterval: 1 / max(fps, 30), target: tickTarget,
+                selector: #selector(TickTarget.tick(_:)), userInfo: nil, repeats: true
             )
             RunLoop.main.add(timer, forMode: .common)
             ticker = timer
@@ -683,7 +781,8 @@ final class SceneMetalLayer: CAMetalLayer {
         let dt = now - lastStep
         lastStep = now
         if isEasing {
-            let k = Float(renderer?.document.parallaxResponse.map { min($0 * dt, 1) } ?? 1 - exp(-dt / Self.parallaxTimeConstant))
+            let k = Float(renderer?.document.parallaxResponse
+                .map { min($0 * dt, 1) } ?? 1 - exp(-dt / Self.parallaxTimeConstant))
             let delta = target.parallax - current.parallax
             if abs(delta.x) < 0.001, abs(delta.y) < 0.001 {
                 current.parallax = target.parallax

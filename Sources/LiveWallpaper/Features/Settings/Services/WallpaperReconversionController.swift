@@ -39,7 +39,10 @@ final class WallpaperReconversionController: NSObject, ObservableObject {
         providerExit?.cancel()
     }
 
-    func start(itemIDs: [String], completion: @escaping (WallpaperReconversionStatus) async -> [String]) {
+    func start(
+        itemIDs: [String],
+        completion: @escaping (WallpaperReconversionStatus) async -> [String]
+    ) {
         guard !isRunning else { return }
         isRunning = true
         status = nil
@@ -57,22 +60,28 @@ final class WallpaperReconversionController: NSObject, ObservableObject {
                     return
                 }
                 do {
-                    _ = try await NSWorkspace.shared.openApplication(at: application, configuration: .init())
+                    _ = try await NSWorkspace.shared.openApplication(
+                        at: application,
+                        configuration: .init()
+                    )
                 } catch {
-                    AppLog.externalWallpapers.error("cannot launch provider: \(error.localizedDescription, privacy: .public)")
+                    AppLog.externalWallpapers
+                        .error(
+                            "cannot launch provider: \(error.localizedDescription, privacy: .public)"
+                        )
                     fail("壁紙の取り込み元アプリを起動できませんでした。")
                     return
                 }
             }
-            for _ in 0..<20 {
+            for _ in 0 ..< 20 {
                 guard !Task.isCancelled, !receivedReply else { return }
                 DistributedNotificationCenter.default().postNotificationName(
                     .init("com.livewallpaper.reconvertAll"), object: id,
                     userInfo: ["itemIDs": itemIDs], deliverImmediately: true
                 )
-                do { try await Task.sleep(nanoseconds: 500_000_000) }
-                catch is CancellationError { return }
-                catch { preconditionFailure("Unexpected sleep error: \(error)") }
+                do { try await Task.sleep(nanoseconds: 500_000_000) } catch is CancellationError {
+                    return
+                } catch { preconditionFailure("Unexpected sleep error: \(error)") }
             }
             if !receivedReply {
                 fail("取り込み元アプリから応答がありません。最新版に更新して起動し直してください。")
@@ -88,7 +97,8 @@ final class WallpaperReconversionController: NSObject, ObservableObject {
     }
 
     private func providerPID() -> pid_t? {
-        let url = ExternalWallpaperProviderMonitor.directoryURL.appendingPathComponent("we-import.json")
+        let url = ExternalWallpaperProviderMonitor.directoryURL
+            .appendingPathComponent("we-import.json")
         guard let data = try? Data(contentsOf: url),
               let manifest = try? JSONDecoder().decode(ExternalWallpaperManifest.self, from: data),
               kill(manifest.processIdentifier, 0) == 0 else { return nil }
@@ -98,12 +108,19 @@ final class WallpaperReconversionController: NSObject, ObservableObject {
     @objc private func receive(_ notification: Notification) {
         guard let text = notification.userInfo?["status"] as? String else { return }
         do {
-            let value = try JSONDecoder().decode(WallpaperReconversionStatus.self, from: Data(text.utf8))
+            let value = try JSONDecoder().decode(
+                WallpaperReconversionStatus.self,
+                from: Data(text.utf8)
+            )
             guard value.requestID == requestID, isRunning else { return }
             receivedReply = true
             status = value
             if providerExit == nil, let pid = providerPID() {
-                let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
+                let source = DispatchSource.makeProcessSource(
+                    identifier: pid,
+                    eventMask: .exit,
+                    queue: .main
+                )
                 source.setEventHandler { [weak self] in
                     self?.fail("再変換中に取り込み元アプリが終了しました。もう一度実行してください。")
                 }
@@ -122,7 +139,10 @@ final class WallpaperReconversionController: NSObject, ObservableObject {
                 }
             }
         } catch {
-            AppLog.externalWallpapers.error("invalid reconversion status: \(error.localizedDescription, privacy: .public)")
+            AppLog.externalWallpapers
+                .error(
+                    "invalid reconversion status: \(error.localizedDescription, privacy: .public)"
+                )
             fail("再変換の進捗を読み取れませんでした。")
         }
     }

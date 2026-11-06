@@ -49,7 +49,8 @@ extension AppDelegate {
         let queryItems = components?.queryItems ?? []
 
         func boolParam(_ names: [String]) -> Bool? {
-            guard let value = queryItems.first(where: { names.contains($0.name.lowercased()) })?.value?
+            guard let value = queryItems.first(where: { names.contains($0.name.lowercased()) })?
+                .value?
                 .lowercased()
             else {
                 return nil

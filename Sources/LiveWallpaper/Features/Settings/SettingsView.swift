@@ -153,7 +153,7 @@ struct SettingsView: View {
         return applyDialogAndSheetModifiers(modified3)
     }
 
-    private func applyMainModifiers<V: View>(_ view: V) -> some View {
+    private func applyMainModifiers(_ view: some View) -> some View {
         view
             .frame(
                 minWidth: 780, idealWidth: 780, maxWidth: .infinity,
@@ -172,7 +172,7 @@ struct SettingsView: View {
             .background(InitialFocusSink().frame(width: 0, height: 0))
     }
 
-    private func applyNotificationAndChangeModifiers<V: View>(_ view: V) -> some View {
+    private func applyNotificationAndChangeModifiers(_ view: some View) -> some View {
         view
             .onChange(of: model.webWallpaperSources) { sources in
                 webThumbnailStore.prune(validSourceIDs: Set(sources.map(\.id)))
@@ -225,7 +225,9 @@ struct SettingsView: View {
             .onReceive(NotificationCenter.default.publisher(for: .thumbnailCacheDidClear)) { _ in
                 thumbnailCache.clear()
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            .onReceive(NotificationCenter.default
+                .publisher(for: NSApplication.didBecomeActiveNotification))
+            { _ in
                 model.refreshDesktopIconsVisibility()
                 model.refreshWindowBoundsAccessForCoverage()
             }
@@ -257,9 +259,12 @@ struct SettingsView: View {
                     fitEditor.invalidateStillImage(path: path)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .reconvertedWebWallpaper)) { note in
+            .onReceive(NotificationCenter.default
+                .publisher(for: .reconvertedWebWallpaper))
+            { note in
                 if let id = note.object as? UUID,
-                   let source = model.webWallpaperSources.first(where: { $0.id == id }) {
+                   let source = model.webWallpaperSources.first(where: { $0.id == id })
+                {
                     webThumbnailStore.remove(sourceID: id)
                     webThumbnailStore.loadIfNeeded(for: source)
                 }
@@ -302,7 +307,7 @@ struct SettingsView: View {
         }
     }
 
-    private func applyLifecycleModifiers<V: View>(_ view: V) -> some View {
+    private func applyLifecycleModifiers(_ view: some View) -> some View {
         view
             .onAppear {
                 pruneMissingWallpaperThumbnails()
@@ -325,7 +330,7 @@ struct SettingsView: View {
             }
     }
 
-    private func applyDialogAndSheetModifiers<V: View>(_ view: V) -> some View {
+    private func applyDialogAndSheetModifiers(_ view: some View) -> some View {
         view
             .sheet(item: $authorSettingsContext) { context in
                 LocalWebSettingsSheet(model: model, context: context)
@@ -363,7 +368,10 @@ struct SettingsView: View {
                     Button(model.localizedString(reason.localizationKey)) {
                         if let entry = storeReportTargetEntry {
                             Task {
-                                await storeCatalog.report(entry: entry, reason: reason.localizationKey)
+                                await storeCatalog.report(
+                                    entry: entry,
+                                    reason: reason.localizationKey
+                                )
                             }
                         }
                         storeReportTargetEntry = nil
@@ -656,7 +664,9 @@ struct SettingsView: View {
                             noContentText: "",
                             noMatchText: model.localizedString("該当する設定がありません"),
                             clearButtonTitle: model.localizedString("検索をクリア"),
-                            onClearSearch: { settingsSearchText = ""; isSettingsSearchFocused = true }
+                            onClearSearch: {
+                                settingsSearchText = ""; isSettingsSearchFocused = true
+                            }
                         )
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -677,8 +687,8 @@ struct SettingsView: View {
 
     /// 壁紙・編集・Store は各パネルが自前のカードで区切られているため、grouped Form の
     /// セクションに入れず直接並べる(Form に入れるとカードが二重の箱になる)。
-    private func tabScrollPane<Content: View>(
-        @ViewBuilder content: () -> Content
+    private func tabScrollPane(
+        @ViewBuilder content: () -> some View
     ) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {

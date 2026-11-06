@@ -7,7 +7,9 @@ import simd
 final class SceneModelRenderer {
     struct ModelError: LocalizedError {
         let detail: String
-        var errorDescription: String? { "Scene model layer: \(detail)" }
+        var errorDescription: String? {
+            "Scene model layer: \(detail)"
+        }
     }
 
     private struct Material {
@@ -42,9 +44,13 @@ final class SceneModelRenderer {
             guard let material else { continue }
             try Self.validate(material)
             let vertex = try device.makeLibrary(source: material.draw.vertex.source, options: nil)
-            let fragment = try device.makeLibrary(source: material.draw.fragment.source, options: nil)
+            let fragment = try device.makeLibrary(
+                source: material.draw.fragment.source,
+                options: nil
+            )
             guard let vertexFunction = vertex.makeFunction(name: material.draw.vertex.entryPoint),
-                  let fragmentFunction = fragment.makeFunction(name: material.draw.fragment.entryPoint)
+                  let fragmentFunction = fragment
+                  .makeFunction(name: material.draw.fragment.entryPoint)
             else { throw ModelError(detail: "material \(material.path) has no entry point") }
             let samplers = try material.draw.textures.map { texture -> MTLSamplerState in
                 let descriptor = MTLSamplerDescriptor()
@@ -59,12 +65,21 @@ final class SceneModelRenderer {
                 }
                 return sampler
             }
-            compiled[index] = Material(source: material, vertex: vertexFunction, fragment: fragmentFunction, samplers: samplers)
+            compiled[index] = Material(
+                source: material,
+                vertex: vertexFunction,
+                fragment: fragmentFunction,
+                samplers: samplers
+            )
         }
         // Inferred, not traced: white opaque colour, a normal facing the viewer, the tangent
         // along x and zero texture coordinates.
         let values: [Float] = [0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1]
-        guard let buffer = device.makeBuffer(bytes: values, length: values.count * 4, options: .storageModeShared) else {
+        guard let buffer = device.makeBuffer(
+            bytes: values,
+            length: values.count * 4,
+            options: .storageModeShared
+        ) else {
             throw ModelError(detail: "buffer allocation failed")
         }
         defaults = buffer
@@ -72,7 +87,8 @@ final class SceneModelRenderer {
 
     /// Image files the materials sample, by resource name.
     var imageFiles: Set<String> {
-        Set(materials.compactMap { $0 }.flatMap(\.images.values).filter { Self.layerObjectID($0) == nil })
+        Set(materials.compactMap { $0 }.flatMap(\.images.values)
+            .filter { Self.layerObjectID($0) == nil })
     }
 
     /// The object ids of the layers whose pictures the materials sample (`layer:<id>`).
@@ -81,9 +97,19 @@ final class SceneModelRenderer {
     }
 
     private lazy var blackTexture: MTLTexture = {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: 1, height: 1, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm,
+            width: 1,
+            height: 1,
+            mipmapped: false
+        )
         let texture = device.makeTexture(descriptor: descriptor)!
-        texture.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: [0, 0, 0, 255] as [UInt8], bytesPerRow: 4)
+        texture.replace(
+            region: MTLRegionMake2D(0, 0, 1, 1),
+            mipmapLevel: 0,
+            withBytes: [0, 0, 0, 255] as [UInt8],
+            bytesPerRow: 4
+        )
         return texture
     }()
 
@@ -98,33 +124,47 @@ final class SceneModelRenderer {
 
     private static func validate(_ material: SceneMeshMaterial) throws {
         let draw = material.draw
-        guard draw.dynamic == nil, draw.skeleton == nil, draw.skeletonID == nil, draw.commands == nil,
+        guard draw.dynamic == nil, draw.skeleton == nil, draw.skeletonID == nil,
+              draw.commands == nil,
               !draw.attributes.isEmpty, draw.attributes.allSatisfy({ $0.semantic != nil }),
               Set(draw.attributes.map(\.location)).count == draw.attributes.count,
               draw.textures.allSatisfy({
-                  (0 ..< 16).contains($0.index) && (material.images[$0.source] != nil || shadowSlot($0.source) != nil || $0.source == Self.mipHistorySource)
+                  (0 ..< 16)
+                      .contains($0.index) &&
+                      (material.images[$0.source] != nil || shadowSlot($0.source) != nil || $0
+                          .source == Self.mipHistorySource)
               })
         else { throw ModelError(detail: "material \(material.path) is invalid") }
         for stage in [draw.vertex, draw.fragment] {
             for update in stage.updates {
                 if update.value == .effectValue {
-                    guard (1...4).contains(update.components ?? 1), update.key != nil else {
-                        throw ModelError(detail: "material \(material.path) has an invalid property update")
+                    guard (1 ... 4).contains(update.components ?? 1), update.key != nil else {
+                        throw ModelError(
+                            detail: "material \(material.path) has an invalid property update"
+                        )
                     }
                 }
                 let bytes: Int = switch update.value {
                 case .modelViewProjection, .model, .viewProjection, .shadowMatrix, .boneMatrices: 64
                 case .layerAlpha, .time, .frameTime, .mipLevels: 4
                 case .normalModel: 48
-                case .layerColor, .eyePosition, .ambientColor, .skylightColor, .screen, .lightOrigin, .lightAxis, .lightColor: 12
+                case .layerColor, .eyePosition, .ambientColor, .skylightColor, .screen,
+                     .lightOrigin,
+                     .lightAxis, .lightColor: 12
                 case .textureSize: 16
                 case .effectValue: 4 * (update.components ?? 1)
-                default: throw ModelError(detail: "material \(material.path) reads \(update.value.rawValue)")
+                default: throw ModelError(
+                        detail: "material \(material.path) reads \(update.value.rawValue)"
+                    )
                 }
                 guard update.offset >= 0, update.offset + bytes <= stage.uniforms.count else {
-                    throw ModelError(detail: "material \(material.path) has a uniform outside its block")
+                    throw ModelError(
+                        detail: "material \(material.path) has a uniform outside its block"
+                    )
                 }
-                if update.value == .textureSize, !(update.texture.map { material.images[$0] != nil } ?? false) {
+                if update.value == .textureSize,
+                   !(update.texture.map { material.images[$0] != nil } ?? false)
+                {
                     throw ModelError(detail: "material \(material.path) sizes an unknown texture")
                 }
             }
@@ -132,7 +172,8 @@ final class SceneModelRenderer {
     }
 
     private func pipeline(
-        material index: Int, components: UInt32, format: MTLPixelFormat, blend: SceneRenderGraph.Draw.Blend?
+        material index: Int, components: UInt32, format: MTLPixelFormat,
+        blend: SceneRenderGraph.Draw.Blend?
     ) throws -> MTLRenderPipelineState {
         let key = PipelineKey(material: index, components: components, format: format, blend: blend)
         if let pipeline = pipelines[key] { return pipeline }
@@ -144,7 +185,9 @@ final class SceneModelRenderer {
         let vertices = MTLVertexDescriptor()
         var offsets: [SceneRenderGraph.Attribute.Semantic: Int] = [:]
         var stride = 0
-        for (bit, semantic) in SceneRenderGraph.Attribute.Semantic.allCases.enumerated() where components & (1 << UInt32(bit)) != 0 {
+        for (bit, semantic) in SceneRenderGraph.Attribute.Semantic.allCases.enumerated()
+            where components & (1 << UInt32(bit)) != 0
+        {
             offsets[semantic] = stride
             stride += semantic.floats * 4
         }
@@ -164,7 +207,9 @@ final class SceneModelRenderer {
                 }
             }
             if semantic == .joints || semantic == .weights, offsets[semantic] == nil {
-                throw ModelError(detail: "material \(material.source.path) skins vertices that have no bone data")
+                throw ModelError(
+                    detail: "material \(material.source.path) skins vertices that have no bone data"
+                )
             }
             if let offset = offsets[semantic] {
                 element.offset = offset
@@ -191,7 +236,8 @@ final class SceneModelRenderer {
             let source: MTLBlendFactor = weighted ? .sourceAlpha : .one
             attachment.sourceRGBBlendFactor = source
             attachment.sourceAlphaBlendFactor = source
-            let destination: MTLBlendFactor = blend == .sourceOver || blend == .alphaOver ? .oneMinusSourceAlpha : .one
+            let destination: MTLBlendFactor = blend == .sourceOver || blend == .alphaOver ?
+                .oneMinusSourceAlpha : .one
             attachment.destinationRGBBlendFactor = destination
             attachment.destinationAlphaBlendFactor = destination
             if blend == .maximum {
@@ -251,7 +297,8 @@ final class SceneModelRenderer {
 
     /// Draws `layer` into the encoder's target, which has a depth attachment of `depthFormat`.
     func draw(
-        _ layer: SceneModelLayerFrame, view: View, images: [String: MTLTexture], layerPictures: [Int: MTLTexture] = [:],
+        _ layer: SceneModelLayerFrame, view: View, images: [String: MTLTexture],
+        layerPictures: [Int: MTLTexture] = [:],
         frame: SceneRenderGraphRenderer.FrameValues, time: Double, cursor: SIMD2<Float>?,
         audio: SceneAudioSpectrum?, format: MTLPixelFormat, encoder: MTLRenderCommandEncoder,
         mipHistory: MTLTexture? = nil, rigs: SceneSkeletonRegistry? = nil
@@ -261,32 +308,45 @@ final class SceneModelRenderer {
             return try rigs.evaluator(id).evaluate(time: time)
         }
         let values = SceneRenderGraphRenderer.ModelValues(
-            modelViewProjection: view.viewProjection * layer.world, model: layer.world, viewProjection: view.viewProjection,
-            alpha: layer.alpha, color: layer.color, eye: view.eye, ambient: view.ambient, skylight: view.skylight,
+            modelViewProjection: view.viewProjection * layer.world, model: layer.world,
+            viewProjection: view.viewProjection,
+            alpha: layer.alpha, color: layer.color, eye: view.eye, ambient: view.ambient,
+            skylight: view.skylight,
             shadowMatrices: view.shadows?.matrices ?? [], lights: view.lights, screen: view.screen
         )
         for shape in layer.shapes {
-            guard let index = shape.material, let material = compiled[index], !shape.vertices.isEmpty, shape.stride > 0 else { continue }
+            guard let index = shape.material, let material = compiled[index],
+                  !shape.vertices.isEmpty, shape.stride > 0 else { continue }
             if let indices = shape.indices {
                 if indices.count < 3 { continue }
             } else if shape.vertices.count / shape.stride < 3 {
                 continue
             }
             let draw = material.source.draw
-            var resources: [String: MTLTexture] = [Self.mipHistorySource: mipHistory ?? blackTexture]
+            var resources: [String: MTLTexture] =
+                [Self.mipHistorySource: mipHistory ?? blackTexture]
             for (name, file) in material.source.images {
                 if let id = Self.layerObjectID(file) {
                     // A layer that is not drawn this frame leaves its slot black.
                     resources[name] = layerPictures[id] ?? blackTexture
                     continue
                 }
-                guard let texture = images[file] else { throw ModelError(detail: "image \(file) is missing") }
+                guard let texture = images[file]
+                else { throw ModelError(detail: "image \(file) is missing") }
                 resources[name] = texture
             }
             // Measured: an opaque material stays opaque whatever the alpha of its vertices or
             // of the layer.
-            encoder.setRenderPipelineState(try pipeline(material: index, components: shape.components, format: format, blend: draw.blend))
-            encoder.setDepthStencilState(depthState(test: draw.depthTest == true, write: draw.depthWrite == true))
+            try encoder.setRenderPipelineState(pipeline(
+                material: index,
+                components: shape.components,
+                format: format,
+                blend: draw.blend
+            ))
+            encoder.setDepthStencilState(depthState(
+                test: draw.depthTest == true,
+                write: draw.depthWrite == true
+            ))
             encoder.setFrontFacing(.counterClockwise)
             let cull: MTLCullMode = switch draw.cull {
             case .back: .back
@@ -296,24 +356,44 @@ final class SceneModelRenderer {
             encoder.setCullMode(cull)
             for (stage, isVertex) in [(draw.vertex, true), (draw.fragment, false)] {
                 for update in stage.updates where update.value == .boneMatrices {
-                    guard let pose, update.offset + pose.matrices.count * (update.stride ?? 64) <= stage.uniforms.count,
+                    guard let pose,
+                          update.offset + pose.matrices.count * (update.stride ?? 64) <= stage
+                          .uniforms.count,
                           (update.stride ?? 64) >= 64
-                    else { throw ModelError(detail: "material \(material.source.path) needs a pose that fits its bone array") }
+                    else {
+                        throw ModelError(
+                            detail: "material \(material.source.path) needs a pose that fits its bone array"
+                        )
+                    }
                 }
                 let data = SceneRenderGraphRenderer.updatedUniforms(
-                    stage, frame: frame, model: values, resources: resources, time: time, cursor: cursor, pose: pose,
-                    effectValues: (material.source.values ?? [:]).merging(layer.materialValues) { _, new in new }, audio: audio
+                    stage, frame: frame, model: values, resources: resources, time: time,
+                    cursor: cursor, pose: pose,
+                    effectValues: (material.source.values ?? [:])
+                        .merging(layer.materialValues) { _, new in new }, audio: audio
                 ) ?? stage.uniforms
                 guard !data.isEmpty else { continue }
                 try data.withUnsafeBytes { bytes in
                     if bytes.count <= 4096 {
                         if isVertex {
-                            encoder.setVertexBytes(bytes.baseAddress!, length: bytes.count, index: 0)
+                            encoder.setVertexBytes(
+                                bytes.baseAddress!,
+                                length: bytes.count,
+                                index: 0
+                            )
                         } else {
-                            encoder.setFragmentBytes(bytes.baseAddress!, length: bytes.count, index: 0)
+                            encoder.setFragmentBytes(
+                                bytes.baseAddress!,
+                                length: bytes.count,
+                                index: 0
+                            )
                         }
                     } else {
-                        guard let buffer = device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+                        guard let buffer = device.makeBuffer(
+                            bytes: bytes.baseAddress!,
+                            length: bytes.count,
+                            options: .storageModeShared
+                        )
                         else { throw ModelError(detail: "uniform allocation failed") }
                         if isVertex { encoder.setVertexBuffer(buffer, offset: 0, index: 0) } else {
                             encoder.setFragmentBuffer(buffer, offset: 0, index: 0)
@@ -322,16 +402,15 @@ final class SceneModelRenderer {
                 }
             }
             for (binding, sampler) in zip(draw.textures, material.samplers) {
-                let texture: MTLTexture
-                if let slot = Self.shadowSlot(binding.source) {
+                let texture: MTLTexture = if let slot = Self.shadowSlot(binding.source) {
                     // Light reaches everywhere when the frame holds no shadow map.
                     if let shadows = view.shadows, shadows.textures.indices.contains(slot) {
-                        texture = shadows.textures[slot]
+                        shadows.textures[slot]
                     } else {
-                        texture = try openShadow()
+                        try openShadow()
                     }
                 } else {
-                    texture = resources[binding.source]!
+                    resources[binding.source]!
                 }
                 encoder.setVertexTexture(texture, index: binding.index)
                 encoder.setFragmentTexture(texture, index: binding.index)
@@ -343,7 +422,11 @@ final class SceneModelRenderer {
                 vertexBuffer = cached
             } else {
                 guard let buffer = shape.vertices.withUnsafeBytes({
-                    device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)
+                    device.makeBuffer(
+                        bytes: $0.baseAddress!,
+                        length: $0.count,
+                        options: .storageModeShared
+                    )
                 }) else { throw ModelError(detail: "vertex allocation failed") }
                 vertexBuffer = buffer
             }
@@ -355,15 +438,28 @@ final class SceneModelRenderer {
                     indexBuffer = cached
                 } else {
                     guard let buffer = indices.withUnsafeBytes({
-                        device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)
+                        device.makeBuffer(
+                            bytes: $0.baseAddress!,
+                            length: $0.count,
+                            options: .storageModeShared
+                        )
                     }) else { throw ModelError(detail: "index allocation failed") }
                     indexBuffer = buffer
                 }
-                encoder.drawIndexedPrimitives(type: .triangle, indexCount: indices.count, indexType: .uint32,
-                                              indexBuffer: indexBuffer, indexBufferOffset: 0)
+                encoder.drawIndexedPrimitives(
+                    type: .triangle,
+                    indexCount: indices.count,
+                    indexType: .uint32,
+                    indexBuffer: indexBuffer,
+                    indexBufferOffset: 0
+                )
             } else {
                 let count = shape.vertices.count / shape.stride / 3 * 3
-                if count > 0 { encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: count) }
+                if count > 0 { encoder.drawPrimitives(
+                    type: .triangle,
+                    vertexStart: 0,
+                    vertexCount: count
+                ) }
             }
         }
     }
@@ -402,7 +498,10 @@ final class SceneModelRenderer {
     ) throws {
         if planeFunctions == nil {
             let library = try device.makeLibrary(source: Self.planeSource, options: nil)
-            planeFunctions = (library.makeFunction(name: "planeVertex")!, library.makeFunction(name: "planeFragment")!)
+            planeFunctions = (
+                library.makeFunction(name: "planeVertex")!,
+                library.makeFunction(name: "planeFragment")!
+            )
             let descriptor = MTLSamplerDescriptor()
             descriptor.minFilter = .linear
             descriptor.magFilter = .linear
@@ -420,7 +519,8 @@ final class SceneModelRenderer {
                 attachment.isBlendingEnabled = true
                 attachment.sourceRGBBlendFactor = .one
                 attachment.sourceAlphaBlendFactor = .one
-                let destination: MTLBlendFactor = space.blending == .additive ? .one : .oneMinusSourceAlpha
+                let destination: MTLBlendFactor = space
+                    .blending == .additive ? .one : .oneMinusSourceAlpha
                 attachment.destinationRGBBlendFactor = destination
                 attachment.destinationAlphaBlendFactor = destination
             }
@@ -431,8 +531,16 @@ final class SceneModelRenderer {
         encoder.setFrontFacing(.counterClockwise)
         encoder.setCullMode(space.cull == .back ? .back : space.cull == .front ? .front : .none)
         var uniforms = (transform, color, UInt32(space.blending != .normal ? 1 : 0))
-        encoder.setVertexBytes(&uniforms, length: MemoryLayout<(simd_float4x4, SIMD4<Float>, UInt32)>.stride, index: 0)
-        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<(simd_float4x4, SIMD4<Float>, UInt32)>.stride, index: 0)
+        encoder.setVertexBytes(
+            &uniforms,
+            length: MemoryLayout<(simd_float4x4, SIMD4<Float>, UInt32)>.stride,
+            index: 0
+        )
+        encoder.setFragmentBytes(
+            &uniforms,
+            length: MemoryLayout<(simd_float4x4, SIMD4<Float>, UInt32)>.stride,
+            index: 0
+        )
         encoder.setFragmentTexture(picture, index: 0)
         encoder.setFragmentSamplerState(planeSampler, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
@@ -441,7 +549,8 @@ final class SceneModelRenderer {
     // MARK: Particles drawn in space
 
     struct SpaceParticleStyle {
-        /// Sprites in layer pixels (y up) → canvas UV (y down): `origin + column0 * x + column1 * y`.
+        /// Sprites in layer pixels (y up) → canvas UV (y down): `origin + column0 * x + column1 *
+        /// y`.
         var column0: SIMD2<Float>
         var column1: SIMD2<Float>
         var origin: SIMD2<Float>
@@ -540,11 +649,15 @@ final class SceneModelRenderer {
     /// the scene, so they scale with distance, are hidden by nearer geometry and take the fog.
     func drawParticles(
         instances: MTLBuffer, count: Int, texture: MTLTexture, world: simd_float4x4, view: View,
-        style: SpaceParticleStyle, depthTest: Bool, depthWrite: Bool, format: MTLPixelFormat, encoder: MTLRenderCommandEncoder
+        style: SpaceParticleStyle, depthTest: Bool, depthWrite: Bool, format: MTLPixelFormat,
+        encoder: MTLRenderCommandEncoder
     ) throws {
         if particleFunctions == nil {
             let library = try device.makeLibrary(source: Self.particleSource, options: nil)
-            particleFunctions = (library.makeFunction(name: "spaceParticleVertex")!, library.makeFunction(name: "spaceParticleFragment")!)
+            particleFunctions = (
+                library.makeFunction(name: "spaceParticleVertex")!,
+                library.makeFunction(name: "spaceParticleFragment")!
+            )
         }
         let key = "\(style.blend.rawValue)-\(format.rawValue)"
         if particlePipelines[key] == nil {
@@ -564,27 +677,63 @@ final class SceneModelRenderer {
         }
         func zone(_ zone: SceneFog.Zone?) -> (SIMD4<Float>, SIMD4<Float>) {
             guard let zone else { return (.zero, .zero) }
-            return (SIMD4(Float(zone.start), Float(zone.end - zone.start), Float(zone.startDensity), Float(zone.endDensity - zone.startDensity)),
-                    SIMD4(Float(zone.color[0]), Float(zone.color[1]), Float(zone.color[2]), 1))
+            return (
+                SIMD4(
+                    Float(zone.start),
+                    Float(zone.end - zone.start),
+                    Float(zone.startDensity),
+                    Float(zone.endDensity - zone.startDensity)
+                ),
+                SIMD4(Float(zone.color[0]), Float(zone.color[1]), Float(zone.color[2]), 1)
+            )
         }
         let (distanceParams, distanceColor) = zone(style.fog?.distance)
         let (heightParams, heightColor) = zone(style.fog?.height)
         var uniforms = SpaceParticleUniforms(
-            viewProjection: view.viewProjection, world: world, eye: SIMD4(view.eye.x, view.eye.y, view.eye.z, 0),
-            cameraRight: SIMD4(view.cameraRight, 0), cameraUp: SIMD4(view.cameraUp, 0), plane: style.plane,
-            mapping: SIMD4(lowHalf: style.column0, highHalf: style.column1), origin: SIMD4(lowHalf: style.origin, highHalf: .zero), tint: style.tint,
-            shading: SIMD4(style.brightness, style.cutout?.x ?? 0, style.cutout?.y ?? 0, style.cutout?.z ?? 1),
+            viewProjection: view.viewProjection, world: world, eye: SIMD4(
+                view.eye.x,
+                view.eye.y,
+                view.eye.z,
+                0
+            ),
+            cameraRight: SIMD4(view.cameraRight, 0), cameraUp: SIMD4(view.cameraUp, 0),
+            plane: style.plane,
+            mapping: SIMD4(lowHalf: style.column0, highHalf: style.column1), origin: SIMD4(
+                lowHalf: style.origin,
+                highHalf: .zero
+            ), tint: style.tint,
+            shading: SIMD4(
+                style.brightness,
+                style.cutout?.x ?? 0,
+                style.cutout?.y ?? 0,
+                style.cutout?.z ?? 1
+            ),
             flags: SIMD4(style.blend == .opaque ? 0 : 1, style.cutout == nil ? 0 : 1, 0, 0),
-            distanceParams: distanceParams, distanceColor: distanceColor, heightParams: heightParams, heightColor: heightColor
+            distanceParams: distanceParams, distanceColor: distanceColor,
+            heightParams: heightParams,
+            heightColor: heightColor
         )
         encoder.setRenderPipelineState(particlePipelines[key]!)
         encoder.setDepthStencilState(depthState(test: depthTest, write: depthWrite))
         encoder.setCullMode(.none)
         encoder.setVertexBuffer(instances, offset: 0, index: 0)
-        encoder.setVertexBytes(&uniforms, length: MemoryLayout<SpaceParticleUniforms>.stride, index: 1)
-        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<SpaceParticleUniforms>.stride, index: 1)
+        encoder.setVertexBytes(
+            &uniforms,
+            length: MemoryLayout<SpaceParticleUniforms>.stride,
+            index: 1
+        )
+        encoder.setFragmentBytes(
+            &uniforms,
+            length: MemoryLayout<SpaceParticleUniforms>.stride,
+            index: 1
+        )
         encoder.setFragmentTexture(texture, index: 0)
-        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: count)
+        encoder.drawPrimitives(
+            type: .triangleStrip,
+            vertexStart: 0,
+            vertexCount: 4,
+            instanceCount: count
+        )
     }
 
     /// A camera looking from `eye` to `center` with a vertical field of view, for a target
@@ -610,16 +759,26 @@ final class SceneModelRenderer {
     /// half the height over tan(fov / 2). Only this case was measured.
     static func unitPerspective(_ camera: SceneCameraState, aspect: Float) -> simd_float4x4 {
         let f = 1 / tan(camera.fov * .pi / 360)
-        return simd_float4x4(columns: (SIMD4(f / aspect, 0, 0, 0), SIMD4(0, f, 0, 0), SIMD4(0, 0, 0, 0), SIMD4(0, 0, 0.5, 1)))
+        return simd_float4x4(columns: (
+            SIMD4(f / aspect, 0, 0, 0),
+            SIMD4(0, f, 0, 0),
+            SIMD4(0, 0, 0, 0),
+            SIMD4(0, 0, 0.5, 1)
+        ))
     }
 
     private static let canvasDepthRange: Float = 40000
 
     /// Scene pixels (origin bottom left, y up) to the clip space of a target that shows
     /// `viewport` (origin and size in canvas UV, y down) of the canvas. Depth follows the scene z
-    /// (larger is nearer; measured: overlapping opaque models are ordered by z, not by layer order),
+    /// (larger is nearer; measured: overlapping opaque models are ordered by z, not by layer
+    /// order),
     /// without scaling the picture.
-    static func canvasProjection(width: Double, height: Double, viewport: SIMD4<Float>) -> simd_float4x4 {
+    static func canvasProjection(
+        width: Double,
+        height: Double,
+        viewport: SIMD4<Float>
+    ) -> simd_float4x4 {
         let w = Float(width), h = Float(height)
         let vx = viewport.x, vy = viewport.y, vw = viewport.z, vh = viewport.w
         return simd_float4x4(columns: (

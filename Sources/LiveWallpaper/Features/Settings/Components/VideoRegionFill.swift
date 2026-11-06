@@ -7,7 +7,10 @@ extension View {
         GeometryReader { geo in
             let regionWidth = max(Double(region.width) * videoAspectRatio, 0.0001)
             let regionHeight = max(Double(region.height), 0.0001)
-            let scale = max(Double(geo.size.width) / regionWidth, Double(geo.size.height) / regionHeight)
+            let scale = max(
+                Double(geo.size.width) / regionWidth,
+                Double(geo.size.height) / regionHeight
+            )
             let size = CGSize(width: videoAspectRatio * scale, height: scale)
             self
                 .frame(width: size.width, height: size.height)

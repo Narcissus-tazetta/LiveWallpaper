@@ -4,8 +4,8 @@ import SwiftUI
 /// 呼び出し側は既にローカライズ済みの文言/Viewを渡す(このコンポーネント自体は文言を持たない)。
 struct SearchEmptyState<NoContent: View, NoMatch: View>: View {
     var isSearchActive: Bool
-    var clearButtonTitle: String? = nil
-    var onClearSearch: (() -> Void)? = nil
+    var clearButtonTitle: String?
+    var onClearSearch: (() -> Void)?
     @ViewBuilder var noContent: () -> NoContent
     @ViewBuilder var noMatch: () -> NoMatch
 

@@ -72,16 +72,23 @@ struct SceneBloom: Codable, Equatable {
 
     var graph: SceneRenderGraph {
         func draw(
-            _ fragment: String, uniforms: Data, updates: [SceneRenderGraph.UniformUpdate] = [], textures: [String]
+            _ fragment: String, uniforms: Data, updates: [SceneRenderGraph.UniformUpdate] = [],
+            textures: [String]
         ) -> SceneRenderGraph.Draw {
             SceneRenderGraph.Draw(
                 vertex: .init(source: Self.vertex, entryPoint: "vertexMain"),
-                fragment: .init(source: fragment, entryPoint: "fragmentMain", uniforms: uniforms, updates: updates),
-                vertices: Data(repeating: 0, count: 12), vertexStride: 4, vertexCount: 3, attributes: [],
+                fragment: .init(
+                    source: fragment,
+                    entryPoint: "fragmentMain",
+                    uniforms: uniforms,
+                    updates: updates
+                ),
+                vertices: Data(repeating: 0, count: 12), vertexStride: 4, vertexCount: 3,
+                attributes: [],
                 textures: textures.enumerated().map { .init(index: $0.offset, source: $0.element) }
             )
         }
-        // Half-float targets keep colours above white until the glow is added.
+        /// Half-float targets keep colours above white until the glow is added.
         func target(_ name: String, fit: Int? = nil) -> SceneRenderGraph.Target {
             var target = SceneRenderGraph.Target(name: name, format: .rgba16Float)
             target.fit = fit
@@ -98,16 +105,26 @@ struct SceneBloom: Codable, Equatable {
         let horizontal = blur("bright", direction: [1, 0])
         let vertical = blur("blurH", direction: [0, 1])
         return SceneRenderGraph(
-            targets: [target("bright", fit: 640), target("blurH", fit: 640), target("blurV", fit: 640), target("out")],
+            targets: [
+                target("bright", fit: 640),
+                target("blurH", fit: 640),
+                target("blurV", fit: 640),
+                target("out")
+            ],
             passes: [
                 .init(operation: .draw, target: "bright", draw: draw(
-                    Self.brightPass, uniforms: Self.floats([Float(threshold), 0, 0, 0]), textures: ["input"]
+                    Self.brightPass, uniforms: Self.floats([Float(threshold), 0, 0, 0]),
+                    textures: ["input"]
                 )),
                 .init(operation: .draw, target: "blurH", draw: horizontal),
                 .init(operation: .draw, target: "blurV", draw: vertical),
                 .init(operation: .draw, target: "out", draw: draw(
-                    Self.compositePass, uniforms: Self.floats([Float(strength), 0, 0, 0]), textures: ["input", "blurV"]
-                )),
+                    Self.compositePass, uniforms: Self.floats([Float(strength), 0, 0, 0]),
+                    textures: [
+                        "input",
+                        "blurV"
+                    ]
+                ))
             ],
             output: "out"
         )

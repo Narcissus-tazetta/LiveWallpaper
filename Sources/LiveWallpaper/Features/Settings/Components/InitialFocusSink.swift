@@ -7,7 +7,9 @@ import SwiftUI
 /// 見えないダミービュー。自身が代わりにファーストレスポンダを引き受ける。
 struct InitialFocusSink: NSViewRepresentable {
     final class SinkView: NSView {
-        override var acceptsFirstResponder: Bool { true }
+        override var acceptsFirstResponder: Bool {
+            true
+        }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -21,9 +23,9 @@ struct InitialFocusSink: NSViewRepresentable {
         }
     }
 
-    func makeNSView(context: Context) -> SinkView {
+    func makeNSView(context _: Context) -> SinkView {
         SinkView(frame: .zero)
     }
 
-    func updateNSView(_ nsView: SinkView, context: Context) {}
+    func updateNSView(_: SinkView, context _: Context) {}
 }

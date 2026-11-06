@@ -13,7 +13,8 @@ final class SceneScriptStorage: @unchecked Sendable {
     static let saveDelay: TimeInterval = 1
 
     static let shared = SceneScriptStorage(
-        directory: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        directory: FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("LiveWallpaper/SceneScriptStorage", isDirectory: true)
     )
 
@@ -76,7 +77,8 @@ final class SceneScriptStorage: @unchecked Sendable {
             lock.withLock {
                 for area in cleared {
                     guard let values = areas.removeValue(forKey: area) else { continue }
-                    used -= values.values.reduce(0) { $0 + $1.count + SceneScriptStorage.entryOverhead }
+                    used -= values.values
+                        .reduce(0) { $0 + $1.count + SceneScriptStorage.entryOverhead }
                     changed()
                 }
             }
@@ -88,9 +90,10 @@ final class SceneScriptStorage: @unchecked Sendable {
             isDirty = true
             guard !isSavePending else { return }
             isSavePending = true
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + SceneScriptStorage.saveDelay) { [self] in
-                save()
-            }
+            DispatchQueue.global(qos: .utility)
+                .asyncAfter(deadline: .now() + SceneScriptStorage.saveDelay) { [self] in
+                    save()
+                }
         }
 
         func save() {
@@ -106,15 +109,24 @@ final class SceneScriptStorage: @unchecked Sendable {
                     return try PropertyListEncoder.binary.encode(areas)
                 }
             } catch {
-                AppLog.persistence.error("scene script storage encode failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.persistence
+                    .error(
+                        "scene script storage encode failed: \(error.localizedDescription, privacy: .public)"
+                    )
                 return
             }
             guard !data.isEmpty else { return }
             do {
-                try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try FileManager.default.createDirectory(
+                    at: file.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
                 try data.write(to: file, options: .atomic)
             } catch {
-                AppLog.persistence.error("scene script storage save failed \(file.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                AppLog.persistence
+                    .error(
+                        "scene script storage save failed \(file.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                    )
             }
         }
     }
@@ -160,21 +172,30 @@ final class SceneScriptStorage: @unchecked Sendable {
 
     /// Writes every pending change now, for quitting.
     func flush() {
-        for store in lock.withLock({ Array(stores.values) }) { store.save() }
+        for store in lock.withLock({ Array(stores.values) }) {
+            store.save()
+        }
     }
 
     private func store(path: String) -> Store {
         lock.withLock {
             let key = URL(fileURLWithPath: path).standardizedFileURL.path
             if let store = stores[key] { return store }
-            let digest = SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
+            let digest = SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }
+                .joined()
             let file = directory.appendingPathComponent(digest + ".plist")
             var areas: [Area: [Data: Data]] = [:]
             if FileManager.default.fileExists(atPath: file.path) {
                 do {
-                    areas = try PropertyListDecoder().decode([Area: [Data: Data]].self, from: Data(contentsOf: file))
+                    areas = try PropertyListDecoder().decode(
+                        [Area: [Data: Data]].self,
+                        from: Data(contentsOf: file)
+                    )
                 } catch {
-                    AppLog.persistence.error("scene script storage unreadable, starting empty \(file.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                    AppLog.persistence
+                        .error(
+                            "scene script storage unreadable, starting empty \(file.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                        )
                 }
             }
             let store = Store(areas: areas, file: file)

@@ -145,7 +145,10 @@ extension SettingsView {
         cleanupOldWallpaperShareFolders(in: rootURL)
 
         let shareFolderURL = rootURL.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: shareFolderURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: shareFolderURL,
+            withIntermediateDirectories: true
+        )
         return shareFolderURL
     }
 
@@ -180,7 +183,11 @@ extension SettingsView {
         }
 
         let picker = NSSharingServicePicker(items: urls)
-        picker.show(relativeTo: sharePickerAnchorRect(in: view, window: window), of: view, preferredEdge: .maxY)
+        picker.show(
+            relativeTo: sharePickerAnchorRect(in: view, window: window),
+            of: view,
+            preferredEdge: .maxY
+        )
     }
 
     func sharePickerAnchorRect(in view: NSView, window: NSWindow) -> NSRect {

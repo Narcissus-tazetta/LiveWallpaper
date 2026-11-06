@@ -87,8 +87,10 @@ extension WallpaperModel {
 
     func restoreWallpaperTransitionSettings() {
         wallpaperTransitionDuration =
-            UserDefaults.standard.object(forKey: PrefsKey.wallpaperTransitionDuration) as? Double ?? 0.5
-        wallpaperTransitionStyle = UserDefaults.standard.string(forKey: PrefsKey.wallpaperTransitionStyle)
+            UserDefaults.standard
+                .object(forKey: PrefsKey.wallpaperTransitionDuration) as? Double ?? 0.5
+        wallpaperTransitionStyle = UserDefaults.standard
+            .string(forKey: PrefsKey.wallpaperTransitionStyle)
             .flatMap(WallpaperTransitionStyle.init(rawValue:)) ?? .crossfade
     }
 
@@ -112,11 +114,10 @@ extension WallpaperModel {
         defer { wallpaperTransitionNestingDepth -= 1 }
 
         let wasWeb = isWebWallpaperActive
-        let targetIsWeb: Bool
-        if case .web = target {
-            targetIsWeb = true
+        let targetIsWeb = if case .web = target {
+            true
         } else {
-            targetIsWeb = false
+            false
         }
         let retired = wasWeb ? nil : retireSharedPlayerForTransition()
         retired?.retain()
@@ -131,7 +132,9 @@ extension WallpaperModel {
             finishOverlayTransitionWhenReady(
                 overlays,
                 targetIsWeb: targetIsWeb,
-                deadline: Date().addingTimeInterval(targetIsWeb ? Self.webReadyTimeout : Self.videoReadyTimeout),
+                deadline: Date()
+                    .addingTimeInterval(targetIsWeb ? Self.webReadyTimeout : Self
+                        .videoReadyTimeout),
                 completion: { retired?.release() }
             )
             startAudioTransition(from: retired?.player)
@@ -171,13 +174,18 @@ extension WallpaperModel {
                 heldByView[ObjectIdentifier(view)] = held
             }
         }
-        transitionViews(playerViews, livePlayer: { $0.player }, change: change, completion: { view in
-            guard let held = heldByView[ObjectIdentifier(view)] else {
-                return nil
+        transitionViews(
+            playerViews,
+            livePlayer: { $0.player },
+            change: change,
+            completion: { view in
+                guard let held = heldByView[ObjectIdentifier(view)] else {
+                    return nil
+                }
+                held.retain()
+                return { held.release() }
             }
-            held.retain()
-            return { held.release() }
-        })
+        )
         // Effects that are running took their own hold; drop the setup one.
         for held in heldByView.values {
             held.release()
@@ -219,7 +227,12 @@ extension WallpaperModel {
                 continue
             }
             let generation = view.beginTransition(from: player, still: layer.contents)
-            pinned.append(Pinned(view: view, generation: generation, player: view.player, still: layer.contents))
+            pinned.append(Pinned(
+                view: view,
+                generation: generation,
+                player: view.player,
+                still: layer.contents
+            ))
         }
         change()
         // Same run loop turn as beginTransition, so nothing has been rendered yet;
@@ -227,7 +240,10 @@ extension WallpaperModel {
         for entry in pinned {
             let layer = entry.view.playerLayer
             let unchanged = entry.view.player === entry.player
-                && (entry.view.player != nil || (layer.contents as AnyObject?) === (entry.still as AnyObject?))
+                &&
+                (entry.view
+                    .player != nil || (layer.contents as AnyObject?) ===
+                    (entry.still as AnyObject?))
             if unchanged || !playerViews.contains(where: { $0 === entry.view }) {
                 entry.view.cancelTransition()
                 continue
@@ -257,7 +273,10 @@ extension WallpaperModel {
             completion()
             return
         }
-        let progress = Self.newContentProgress(view.playerLayer, firstObservedTime: firstObservedTime)
+        let progress = Self.newContentProgress(
+            view.playerLayer,
+            firstObservedTime: firstObservedTime
+        )
         guard progress.isShowing || Date() >= deadline else {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self] in
                 self?.finishTransitionWhenReady(
@@ -268,7 +287,8 @@ extension WallpaperModel {
             return
         }
         if !progress.isShowing {
-            AppLog.windowRefresh.error("transition: new content not on screen before timeout; finishing anyway")
+            AppLog.windowRefresh
+                .error("transition: new content not on screen before timeout; finishing anyway")
         }
         view.finishTransition(
             generation: generation,
@@ -290,7 +310,9 @@ extension WallpaperModel {
         guard let player = layer.player else {
             return (layer.contents != nil, nil)
         }
-        guard let item = player.currentItem, item.status == .readyToPlay, layer.isReadyForDisplay else {
+        guard let item = player.currentItem, item.status == .readyToPlay,
+              layer.isReadyForDisplay
+        else {
             return (false, firstObservedTime)
         }
         let now = player.currentTime()
@@ -310,7 +332,11 @@ extension WallpaperModel {
         guard let player = sharedPlayer else {
             return nil
         }
-        let held = TransitionHeldPlayer(player: player, looper: sharedLooper, ownsPlayer: true) { [weak self] held in
+        let held = TransitionHeldPlayer(
+            player: player,
+            looper: sharedLooper,
+            ownsPlayer: true
+        ) { [weak self] held in
             self?.transitionHeldPlayers.removeValue(forKey: ObjectIdentifier(held.player))
         }
         transitionHeldPlayers[ObjectIdentifier(player)] = held
@@ -326,7 +352,11 @@ extension WallpaperModel {
         if let existing = transitionHeldPlayers[ObjectIdentifier(player)] {
             return existing
         }
-        let held = TransitionHeldPlayer(player: player, looper: nil, ownsPlayer: false) { [weak self] held in
+        let held = TransitionHeldPlayer(
+            player: player,
+            looper: nil,
+            ownsPlayer: false
+        ) { [weak self] held in
             self?.transitionHeldPlayers.removeValue(forKey: ObjectIdentifier(held.player))
         }
         transitionHeldPlayers[ObjectIdentifier(player)] = held
@@ -376,7 +406,11 @@ extension WallpaperModel {
             overlay.contentView = container
             overlay.setFrame(window.frame, display: false)
             overlay.order(.above, relativeTo: window.windowNumber)
-            overlays.append(TransitionOverlay(window: overlay, content: content, blackout: blackout))
+            overlays.append(TransitionOverlay(
+                window: overlay,
+                content: content,
+                blackout: blackout
+            ))
             if let playerView = content as? PlayerView {
                 presentationCacheByPlayerView.removeValue(forKey: ObjectIdentifier(playerView))
             }
@@ -411,19 +445,21 @@ extension WallpaperModel {
             wallpaperTransitionStyle == .dipToBlack ? wallpaperTransitionDuration / 2 : 0
         )
         var observedTimes = firstObservedTimes
-        let isReady: Bool
-        if targetIsWeb {
-            isReady = !webPlayerViews.isEmpty
+        let isReady: Bool = if targetIsWeb {
+            !webPlayerViews.isEmpty
                 && (webWallpaperLoadState == .loaded || webWallpaperLoadState == .failed)
         } else {
-            isReady = !playerViews.isEmpty && playerViews.allSatisfy { view in
+            !playerViews.isEmpty && playerViews.allSatisfy { view in
                 let key = ObjectIdentifier(view)
-                let progress = Self.newContentProgress(view.playerLayer, firstObservedTime: observedTimes[key])
+                let progress = Self.newContentProgress(
+                    view.playerLayer,
+                    firstObservedTime: observedTimes[key]
+                )
                 observedTimes[key] = progress.firstObservedTime
                 return progress.isShowing
             }
         }
-        guard (isReady || Date() >= deadline), Date() >= notBefore else {
+        guard isReady || Date() >= deadline, Date() >= notBefore else {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
                 self?.finishOverlayTransitionWhenReady(
                     overlays, targetIsWeb: targetIsWeb, deadline: deadline, notBefore: notBefore,
@@ -433,7 +469,8 @@ extension WallpaperModel {
             return
         }
         if !isReady {
-            AppLog.windowRefresh.error("transition: new wallpaper view not ready before timeout; finishing anyway")
+            AppLog.windowRefresh
+                .error("transition: new wallpaper view not ready before timeout; finishing anyway")
         }
         let revealDuration = wallpaperTransitionStyle == .dipToBlack
             ? wallpaperTransitionDuration / 2

@@ -92,7 +92,11 @@ extension WebDisplayAdjustment.Color {
         for blue in 0 ..< size {
             for green in 0 ..< size {
                 for red in 0 ..< size {
-                    let color = apply(red: Float(red) * scale, green: Float(green) * scale, blue: Float(blue) * scale)
+                    let color = apply(
+                        red: Float(red) * scale,
+                        green: Float(green) * scale,
+                        blue: Float(blue) * scale
+                    )
                     cube += [color.x, color.y, color.z, 1]
                 }
             }
@@ -100,6 +104,10 @@ extension WebDisplayAdjustment.Color {
         let filter = CIFilter(name: "CIColorCube")!
         filter.setValue(size, forKey: "inputCubeDimension")
         filter.setValue(cube.withUnsafeBufferPointer { Data(buffer: $0) }, forKey: "inputCubeData")
-        return [CIFilter(name: "CILinearToSRGBToneCurve")!, filter, CIFilter(name: "CISRGBToneCurveToLinear")!]
+        return [
+            CIFilter(name: "CILinearToSRGBToneCurve")!,
+            filter,
+            CIFilter(name: "CISRGBToneCurveToLinear")!
+        ]
     }
 }

@@ -65,7 +65,12 @@ extension WallpaperModel {
         let time = ScheduleTimeOfDay(hour: components.hour ?? 0, minute: components.minute ?? 0)
         let sun = location.map {
             ScheduleSunTimes(
-                SolarDay.compute(for: now, latitude: $0.latitude, longitude: $0.longitude, calendar: calendar),
+                SolarDay.compute(
+                    for: now,
+                    latitude: $0.latitude,
+                    longitude: $0.longitude,
+                    calendar: calendar
+                ),
                 calendar: calendar
             )
         }
@@ -301,7 +306,8 @@ extension WallpaperModel {
         }
         let location = SolarLocation.fromTimeZone(timeZone)
         if location == nil {
-            AppLog.schedule.error("no zone.tab entry for time zone \(timeZone.identifier, privacy: .public)")
+            AppLog.schedule
+                .error("no zone.tab entry for time zone \(timeZone.identifier, privacy: .public)")
         }
         timeZoneSolarLocationCache = (timeZone.identifier, location)
         return location

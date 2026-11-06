@@ -20,13 +20,15 @@ extension SceneDocument {
     func rendersSame(as other: SceneDocument) -> Bool {
         func drawn(_ document: SceneDocument) -> SceneDocument {
             var copy = document
-            for index in copy.layers.indices {
-                if !copy.scripts.contains(where: \.canRun) {
+            if !copy.scripts.contains(where: \.canRun) {
+                for index in copy.layers.indices {
                     copy.layers[index].name = ""
                     copy.layers[index].isLocked = false
                 }
             }
-            for index in copy.scripts.indices { copy.scripts[index].name = "" }
+            for index in copy.scripts.indices {
+                copy.scripts[index].name = ""
+            }
             return copy
         }
         return drawn(self) == drawn(other)
@@ -46,7 +48,8 @@ extension SceneDocument {
             otherWithoutLayers.layers = []
             if withoutLayers != otherWithoutLayers {
                 try Self.collectChanges(
-                    Self.jsonObject(otherWithoutLayers), Self.jsonObject(withoutLayers), path: "", into: &paths
+                    Self.jsonObject(otherWithoutLayers), Self.jsonObject(withoutLayers), path: "",
+                    into: &paths
                 )
             }
             for index in layers.indices where layers[index] != other.layers[index] {
@@ -56,7 +59,12 @@ extension SceneDocument {
                 )
             }
         } else {
-            try Self.collectChanges(Self.jsonObject(other), Self.jsonObject(self), path: "", into: &paths)
+            try Self.collectChanges(
+                Self.jsonObject(other),
+                Self.jsonObject(self),
+                path: "",
+                into: &paths
+            )
         }
         return paths.sorted().joined(separator: ",")
     }
@@ -65,11 +73,21 @@ extension SceneDocument {
         try JSONSerialization.jsonObject(with: JSONEncoder().encode(value))
     }
 
-    private static func collectChanges(_ old: Any?, _ new: Any?, path: String, into paths: inout [String]) {
+    private static func collectChanges(
+        _ old: Any?,
+        _ new: Any?,
+        path: String,
+        into paths: inout [String]
+    ) {
         switch (old, new) {
         case let (old as [String: Any], new as [String: Any]):
             for key in Set(old.keys).union(new.keys) {
-                collectChanges(old[key], new[key], path: path.isEmpty ? key : "\(path).\(key)", into: &paths)
+                collectChanges(
+                    old[key],
+                    new[key],
+                    path: path.isEmpty ? key : "\(path).\(key)",
+                    into: &paths
+                )
             }
         case let (old as [Any], new as [Any]) where old.count == new.count:
             for index in old.indices {

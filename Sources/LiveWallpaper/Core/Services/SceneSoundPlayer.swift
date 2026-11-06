@@ -33,8 +33,9 @@ final class SceneSoundPlayer {
             self.owner = owner
         }
 
-        // Voice is a nested class, so it does not inherit the player's main-actor isolation; reading
-        // the owner's masterVolume needs it spelled out or newer compilers reject the access.
+        /// Voice is a nested class, so it does not inherit the player's main-actor isolation;
+        /// reading
+        /// the owner's masterVolume needs it spelled out or newer compilers reject the access.
         @MainActor var volume: Float {
             Float(min(max(script?.volume ?? sound.volume, 0), 1)) * owner.masterVolume
         }
@@ -56,8 +57,11 @@ final class SceneSoundPlayer {
     private(set) var key: String?
     private var sounds: [SceneSound] = []
     private var voices: [Voice] = []
+    // swiftlint:disable:next inclusive_language
     var masterVolume: Float = 1 {
-        didSet { for voice in voices { voice.player?.volume = voice.volume } }
+        didSet { for voice in voices {
+            voice.player?.volume = voice.volume
+        } }
     }
 
     var isActive = false {
@@ -87,7 +91,11 @@ final class SceneSoundPlayer {
         self.key = key
         sounds = newSounds
         for sound in newSounds where !sound.files.isEmpty {
-            voices.append(Voice(sound: sound, urls: sound.files.map { folder.appendingPathComponent($0) }, owner: self))
+            voices.append(Voice(
+                sound: sound,
+                urls: sound.files.map { folder.appendingPathComponent($0) },
+                owner: self
+            ))
         }
         if isActive { voices.forEach(reconcile) }
     }
@@ -153,7 +161,11 @@ final class SceneSoundPlayer {
         case .loop:
             begin(voice)
         case .random:
-            voice.started ? waitThenPlay(voice) : begin(voice)
+            if voice.started {
+                waitThenPlay(voice)
+            } else {
+                begin(voice)
+            }
         case .single:
             if !voice.started { begin(voice) }
         }
@@ -161,25 +173,31 @@ final class SceneSoundPlayer {
 
     private func begin(_ voice: Voice) {
         voice.started = true
-        let index = voice.sound.mode == .random ? Int.random(in: 0 ..< voice.urls.count) : voice.nextIndex % voice.urls.count
+        let index = voice.sound.mode == .random ? Int.random(in: 0 ..< voice.urls.count) : voice
+            .nextIndex % voice.urls.count
         voice.nextIndex = index + 1
         let url = voice.urls[index]
         do {
             let player = try AVAudioPlayer(contentsOf: url)
             player.delegate = voice
-            // One looping file needs no hand-over; with several, the next one starts when this ends.
+            // One looping file needs no hand-over; with several, the next one starts when this
+            // ends.
             player.numberOfLoops = voice.sound.mode == .loop && voice.urls.count == 1 ? -1 : 0
             player.volume = voice.volume
             voice.player = player
             play(player, voice: voice)
         } catch {
-            AppLog.sceneSound.error("scene sound unreadable file=\(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            AppLog.sceneSound
+                .error(
+                    "scene sound unreadable file=\(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
         }
     }
 
     private func play(_ player: AVAudioPlayer, voice: Voice) {
         if !player.play() {
-            AppLog.sceneSound.error("scene sound did not start name=\(voice.sound.name, privacy: .public)")
+            AppLog.sceneSound
+                .error("scene sound did not start name=\(voice.sound.name, privacy: .public)")
         }
     }
 

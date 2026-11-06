@@ -25,7 +25,9 @@ enum StoreSortOption: String, CaseIterable, Identifiable {
     case newest
     case popular
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 }
 
 /// GET /entries/:id/status のレスポンス。/catalog と違いstatus='published'に
@@ -60,6 +62,11 @@ enum StoreReportReason: String, CaseIterable, Identifiable {
     case copyright = "著作権侵害の疑い"
     case spam = "スパムまたは無関係なコンテンツ"
 
-    var id: String { rawValue }
-    var localizationKey: String { rawValue }
+    var id: String {
+        rawValue
+    }
+
+    var localizationKey: String {
+        rawValue
+    }
 }

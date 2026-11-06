@@ -162,7 +162,8 @@ final class ScenePreviewNSView: NSView {
             // Only while the settings window can actually be seen.
             let visible = window?.occlusionState.contains(.visible) ?? false
             return SceneClockReading(
-                time: controller?.time ?? CACurrentMediaTime(), isRunning: clockState.isPlaying && visible
+                time: controller?.time ?? CACurrentMediaTime(),
+                isRunning: clockState.isPlaying && visible
             )
         }
         sceneLayer?.didDraw = { [weak self] in
@@ -202,7 +203,7 @@ final class ScenePreviewNSView: NSView {
         screenOutlineLayer.lineDashPattern = [4, 3]
     }
 
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         nil
     }
 
@@ -215,7 +216,8 @@ final class ScenePreviewNSView: NSView {
             let userProps = SceneMetalLayer.loadUserProperties(forVideoPath: videoPath)
             try sceneLayer?.show(document, videoPath: videoPath, userProperties: userProps)
         } catch {
-            AppLog.windowRefresh.error("scene preview failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error("scene preview failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -251,7 +253,12 @@ final class ScenePreviewNSView: NSView {
         let rects = visibleRegions.map { region in
             let a = point(SIMD2(Float(region.minX), Float(region.minY)))
             let b = point(SIMD2(Float(region.maxX), Float(region.maxY)))
-            return CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
+            return CGRect(
+                x: min(a.x, b.x),
+                y: min(a.y, b.y),
+                width: abs(a.x - b.x),
+                height: abs(a.y - b.y)
+            )
         }
         func isCropped(_ region: CGRect) -> Bool {
             region.width < 0.999 || region.height < 0.999
@@ -284,7 +291,10 @@ final class ScenePreviewNSView: NSView {
         }
         for (index, shape) in markerLayers.enumerated() {
             guard index < markers.count,
-                  let canvas = renderer.canvasUV(layerUV: markers[index].point, layerID: markers[index].layerID)
+                  let canvas = renderer.canvasUV(
+                      layerUV: markers[index].point,
+                      layerID: markers[index].layerID
+                  )
             else {
                 shape.isHidden = true
                 continue
@@ -292,7 +302,12 @@ final class ScenePreviewNSView: NSView {
             let marker = markers[index]
             let center = point(canvas)
             let radius: CGFloat = marker.isSelected ? 7 : 5
-            let rect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+            let rect = CGRect(
+                x: center.x - radius,
+                y: center.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            )
             switch marker.style {
             case .anchor:
                 shape.path = CGPath(rect: rect.insetBy(dx: 1, dy: 1), transform: nil)
@@ -322,26 +337,37 @@ final class ScenePreviewNSView: NSView {
         guard case let .arrange(id?) = interaction else {
             return nil
         }
-        guard let layer = sceneLayer?.renderer?.currentLayer(layerID: id), layer.isVisible else { return nil }
+        guard let layer = sceneLayer?.renderer?.currentLayer(layerID: id),
+              layer.isVisible else { return nil }
         return layer
     }
 
     /// The selected layer's corners (top-left, top-right, bottom-right, bottom-left)
     /// and rotation handle, in this layer's coordinates.
-    private func frame(of layer: SceneLayer, renderer: SceneRenderer) -> (corners: [CGPoint], rotate: CGPoint)? {
+    private func frame(
+        of layer: SceneLayer,
+        renderer: SceneRenderer
+    ) -> (corners: [CGPoint], rotate: CGPoint)? {
         guard let transform = renderer.currentTransform(layerID: layer.id) else {
             return nil
         }
         let corners = [SIMD2<Float>(0, 0), SIMD2(1, 0), SIMD2(1, 1), SIMD2(0, 1)].map { uv in
             point(renderer.canvasUV(layerUV: uv, layer: layer, transform: transform))
         }
-        let top = CGPoint(x: (corners[0].x + corners[1].x) / 2, y: (corners[0].y + corners[1].y) / 2)
-        let middle = CGPoint(x: (corners[0].x + corners[2].x) / 2, y: (corners[0].y + corners[2].y) / 2)
+        let top = CGPoint(
+            x: (corners[0].x + corners[1].x) / 2,
+            y: (corners[0].y + corners[1].y) / 2
+        )
+        let middle = CGPoint(
+            x: (corners[0].x + corners[2].x) / 2,
+            y: (corners[0].y + corners[2].y) / 2
+        )
         let dx = top.x - middle.x
         let dy = top.y - middle.y
         let length = max((dx * dx + dy * dy).squareRoot(), 0.001)
         let rotate = CGPoint(
-            x: top.x + dx / length * Self.rotateHandleDistance, y: top.y + dy / length * Self.rotateHandleDistance
+            x: top.x + dx / length * Self.rotateHandleDistance,
+            y: top.y + dy / length * Self.rotateHandleDistance
         )
         return (corners, rotate)
     }
@@ -369,10 +395,18 @@ final class ScenePreviewNSView: NSView {
         for corner in frame.corners {
             handles.addRect(CGRect(x: corner.x - r, y: corner.y - r, width: r * 2, height: r * 2))
         }
-        let top = CGPoint(x: (frame.corners[0].x + frame.corners[1].x) / 2, y: (frame.corners[0].y + frame.corners[1].y) / 2)
+        let top = CGPoint(
+            x: (frame.corners[0].x + frame.corners[1].x) / 2,
+            y: (frame.corners[0].y + frame.corners[1].y) / 2
+        )
         handles.move(to: top)
         handles.addLine(to: frame.rotate)
-        handles.addEllipse(in: CGRect(x: frame.rotate.x - r, y: frame.rotate.y - r, width: r * 2, height: r * 2))
+        handles.addEllipse(in: CGRect(
+            x: frame.rotate.x - r,
+            y: frame.rotate.y - r,
+            width: r * 2,
+            height: r * 2
+        ))
         handleLayer.path = handles
         handleLayer.isHidden = false
     }
@@ -399,7 +433,8 @@ final class ScenePreviewNSView: NSView {
     }
 
     private func layoutBrush(renderer: SceneRenderer) {
-        guard case let .paint(layerID) = interaction, let painter, painter.target != nil, let pointer,
+        guard case let .paint(layerID) = interaction, let painter, painter.target != nil,
+              let pointer,
               let sceneLayer, let canvas = sceneLayer.canvasUV(of: pointer),
               let center = renderer.layerUV(canvasUV: canvas, layerID: layerID)
         else {
@@ -432,8 +467,14 @@ final class ScenePreviewNSView: NSView {
         }
         let path = CGMutablePath()
         for arrow in painter.flowArrows(columns: 24) {
-            guard let start = renderer.canvasUV(layerUV: arrow.position - arrow.flow * 0.4, layerID: layerID),
-                  let end = renderer.canvasUV(layerUV: arrow.position + arrow.flow * 0.4, layerID: layerID)
+            guard let start = renderer.canvasUV(
+                layerUV: arrow.position - arrow.flow * 0.4,
+                layerID: layerID
+            ),
+                let end = renderer.canvasUV(
+                    layerUV: arrow.position + arrow.flow * 0.4,
+                    layerID: layerID
+                )
             else {
                 continue
             }
@@ -450,9 +491,15 @@ final class ScenePreviewNSView: NSView {
             let head = min(length * 0.4, 5)
             let ux = dx / length
             let uy = dy / length
-            path.move(to: CGPoint(x: b.x - ux * head - uy * head * 0.6, y: b.y - uy * head + ux * head * 0.6))
+            path.move(to: CGPoint(
+                x: b.x - ux * head - uy * head * 0.6,
+                y: b.y - uy * head + ux * head * 0.6
+            ))
             path.addLine(to: b)
-            path.addLine(to: CGPoint(x: b.x - ux * head + uy * head * 0.6, y: b.y - uy * head - ux * head * 0.6))
+            path.addLine(to: CGPoint(
+                x: b.x - ux * head + uy * head * 0.6,
+                y: b.y - uy * head - ux * head * 0.6
+            ))
         }
         flowLayer.path = path
         flowLayer.isHidden = false
@@ -491,7 +538,8 @@ final class ScenePreviewNSView: NSView {
             ) { [weak self, weak window] _ in
                 MainActor.assumeIsolated {
                     self?.sceneLayer?.clockDidChange()
-                    self?.controller?.setWindowVisible(window?.occlusionState.contains(.visible) ?? false)
+                    self?.controller?
+                        .setWindowVisible(window?.occlusionState.contains(.visible) ?? false)
                 }
             }
         }
@@ -608,7 +656,10 @@ final class ScenePreviewNSView: NSView {
         guard let controller, let canvas = canvasPoint(of: event) else {
             return
         }
-        controller.zoom(by: 1 + event.magnification, around: SIMD2(Double(canvas.x), Double(canvas.y)))
+        controller.zoom(
+            by: 1 + event.magnification,
+            around: SIMD2(Double(canvas.x), Double(canvas.y))
+        )
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -620,7 +671,8 @@ final class ScenePreviewNSView: NSView {
             guard let canvas = canvasPoint(of: event) else {
                 return
             }
-            let factor = exp(Double(event.scrollingDeltaY) * (event.hasPreciseScrollingDeltas ? 0.01 : 0.1))
+            let factor =
+                exp(Double(event.scrollingDeltaY) * (event.hasPreciseScrollingDeltas ? 0.01 : 0.1))
             controller.zoom(by: factor, around: SIMD2(Double(canvas.x), Double(canvas.y)))
             return
         }
@@ -662,14 +714,22 @@ final class ScenePreviewNSView: NSView {
         {
             if distance(location, frame.rotate) <= Self.handleRadius + 3 {
                 let drawn = renderer.currentTransform(layerID: layer.id)!
-                drag = .rotate(layerID: layer.id, start: transform, from: canvas,
-                               center: SIMD2(Float(drawn.offsetX), Float(drawn.offsetY)) + 0.5)
+                drag = .rotate(
+                    layerID: layer.id,
+                    start: transform,
+                    from: canvas,
+                    center: SIMD2(Float(drawn.offsetX), Float(drawn.offsetY)) + 0.5
+                )
                 return
             }
             if frame.corners.contains(where: { distance(location, $0) <= Self.handleRadius + 3 }) {
                 let drawn = renderer.currentTransform(layerID: layer.id)!
-                drag = .scale(layerID: layer.id, start: transform, from: canvas,
-                              center: SIMD2(Float(drawn.offsetX), Float(drawn.offsetY)) + 0.5)
+                drag = .scale(
+                    layerID: layer.id,
+                    start: transform,
+                    from: canvas,
+                    center: SIMD2(Float(drawn.offsetX), Float(drawn.offsetY)) + 0.5
+                )
                 return
             }
         }
@@ -694,20 +754,27 @@ final class ScenePreviewNSView: NSView {
     private func hitLayer(at canvas: SIMD2<Float>, renderer: SceneRenderer) -> SceneLayer? {
         for saved in renderer.document.layers.reversed() {
             let layer = renderer.currentLayer(layerID: saved.id)!
-            guard layer.isVisible, !layer.isLocked, layer.kind == .image || layer.modelPlacement != nil,
+            guard layer.isVisible, !layer.isLocked,
+                  layer.kind == .image || layer.modelPlacement != nil,
                   renderer.currentOpacity(layerID: layer.id)! > 0.02 else { continue }
             if layer.modelPlacement != nil {
                 // A model is picked anywhere in its footprint.
-                if let uv = renderer.layerUV(canvasUV: canvas, layerID: layer.id), (0 ... 1).contains(uv.x), (0 ... 1).contains(uv.y) {
+                if let uv = renderer.layerUV(canvasUV: canvas, layerID: layer.id),
+                   (0 ... 1).contains(uv.x), (0 ... 1).contains(uv.y)
+                {
                     return layer
                 }
                 continue
             }
-            guard let uv = renderer.layerUV(canvasUV: canvas, layerID: layer.id), let videoPath = sceneLayer?.videoPath
+            guard let uv = renderer.layerUV(canvasUV: canvas, layerID: layer.id),
+                  let videoPath = sceneLayer?.videoPath
             else {
                 continue
             }
-            if hitTester.isOpaque(fileURL: SceneStore.imageURL(layer, videoPath: videoPath), at: uv) {
+            if hitTester.isOpaque(
+                fileURL: SceneStore.imageURL(layer, videoPath: videoPath),
+                at: uv
+            ) {
                 return layer
             }
         }
@@ -734,7 +801,7 @@ final class ScenePreviewNSView: NSView {
             return
         }
         let aspect = Float(renderer.document.aspectRatio)
-        // Distances and angles in a space with the canvas's proportions.
+        /// Distances and angles in a space with the canvas's proportions.
         func shaped(_ v: SIMD2<Float>) -> SIMD2<Float> {
             SIMD2(v.x * aspect, v.y)
         }
@@ -743,8 +810,15 @@ final class ScenePreviewNSView: NSView {
             var transform = start
             transform.offsetX = start.offsetX + Double(canvas.x - from.x)
             transform.offsetY = start.offsetY + Double(canvas.y - from.y)
-            if let layer = renderer.document.layers.first(where: { $0.id == layerID }), !renderer.document.scripts.contains(where: \.canRun) {
-                transform = snapped(transform, layer: layer, renderer: renderer, enabled: !event.modifierFlags.contains(.command))
+            if let layer = renderer.document.layers.first(where: { $0.id == layerID }),
+               !renderer.document.scripts.contains(where: \.canRun)
+            {
+                transform = snapped(
+                    transform,
+                    layer: layer,
+                    renderer: renderer,
+                    enabled: !event.modifierFlags.contains(.command)
+                )
             }
             onTransformLayer?(layerID, transform)
         case let .scale(layerID, start, from, center):
@@ -755,7 +829,10 @@ final class ScenePreviewNSView: NSView {
             }
             var transform = start
             let range = SceneTransform.scaleRange
-            transform.scale = min(max(start.scale * Double(now / before), range.lowerBound), range.upperBound)
+            transform.scale = min(
+                max(start.scale * Double(now / before), range.lowerBound),
+                range.upperBound
+            )
             onTransformLayer?(layerID, transform)
         case let .rotate(layerID, start, from, center):
             let a = shaped(from - center)
@@ -785,24 +862,31 @@ final class ScenePreviewNSView: NSView {
         enabled: Bool
     ) -> SceneTransform {
         snapGuides = []
-        guard enabled, let viewport = sceneLayer?.viewport, bounds.width > 0, bounds.height > 0 else {
+        guard enabled, let viewport = sceneLayer?.viewport, bounds.width > 0,
+              bounds.height > 0
+        else {
             return transform
         }
         let corners = [SIMD2<Float>(0, 0), SIMD2(1, 0), SIMD2(1, 1), SIMD2(0, 1)].map { uv in
             renderer.canvasUV(layerUV: uv, layer: layer, transform: transform)
         }
         let threshold = SIMD2(
-            Float(Self.snapDistance / bounds.width) * viewport.z, Float(Self.snapDistance / bounds.height) * viewport.w
+            Float(Self.snapDistance / bounds.width) * viewport.z,
+            Float(Self.snapDistance / bounds.height) * viewport.w
         )
         var result = transform
         for axis in 0 ..< 2 {
             let values = corners.map { $0[axis] }
             let center = Float(axis == 0 ? transform.offsetX : transform.offsetY) + 0.5
             let candidates: [(value: Float, target: Float)] = [
-                (center, 0.5), (values.min()!, 0), (values.max()!, 1), (values.min()!, 0.5), (values.max()!, 0.5)
+                (center, 0.5), (values.min()!, 0), (values.max()!, 1), (values.min()!, 0.5), (
+                    values.max()!,
+                    0.5
+                )
             ]
-            guard let best = candidates.min(by: { abs($0.target - $0.value) < abs($1.target - $1.value) }),
-                  abs(best.target - best.value) <= threshold[axis]
+            guard let best = candidates
+                .min(by: { abs($0.target - $0.value) < abs($1.target - $1.value) }),
+                abs(best.target - best.value) <= threshold[axis]
             else {
                 continue
             }
@@ -853,7 +937,10 @@ final class ScenePreviewNSView: NSView {
             return
         }
         let point = layerPoint(of: event)
-        let parallax = CGPoint(x: point.x / bounds.width * 2 - 1, y: point.y / bounds.height * 2 - 1)
+        let parallax = CGPoint(
+            x: point.x / bounds.width * 2 - 1,
+            y: point.y / bounds.height * 2 - 1
+        )
         sceneLayer?.setCursor(point, parallax: parallax)
     }
 }

@@ -118,13 +118,19 @@ final class SceneRenderGraphRenderer {
         ))
     }
 
-    init(graph: SceneRenderGraph, device: MTLDevice, rigs: SceneSkeletonRegistry? = nil, pool: SceneTexturePool? = nil) throws {
+    init(
+        graph: SceneRenderGraph,
+        device: MTLDevice,
+        rigs: SceneSkeletonRegistry? = nil,
+        pool: SceneTexturePool? = nil
+    ) throws {
         self.graph = graph
-        self.usesLayerPlacement = graph.uses(.layerFromCanvas) || graph.uses(.canvasFromLayer) || graph.uses(.screenFromLayer)
+        usesLayerPlacement = graph.uses(.layerFromCanvas) || graph.uses(.canvasFromLayer) || graph
+            .uses(.screenFromLayer)
         self.device = device
         self.pool = pool
         let transient = pool == nil ? [] : graph.transientTargetNames()
-        self.transientTargets = graph.targets.filter { transient.contains($0.name) }
+        transientTargets = graph.targets.filter { transient.contains($0.name) }
         self.rigs = try rigs ?? SceneSkeletonRegistry()
         try validate()
         for (index, pass) in graph.passes.enumerated() {
@@ -149,7 +155,8 @@ final class SceneRenderGraphRenderer {
                 let source: MTLBlendFactor = weighted ? .sourceAlpha : .one
                 attachment.sourceRGBBlendFactor = source
                 attachment.sourceAlphaBlendFactor = source
-                let destination: MTLBlendFactor = blend == .sourceOver || blend == .alphaOver ? .oneMinusSourceAlpha : .one
+                let destination: MTLBlendFactor = blend == .sourceOver || blend == .alphaOver ?
+                    .oneMinusSourceAlpha : .one
                 attachment.destinationRGBBlendFactor = destination
                 attachment.destinationAlphaBlendFactor = destination
                 if blend == .maximum {
@@ -203,8 +210,13 @@ final class SceneRenderGraphRenderer {
                 let bytesPerQuad = SceneMeshFrame.floatsPerQuad * MemoryLayout<Float>.stride
                 let capacityInBytes = dynamic.capacity * bytesPerQuad
                 for _ in 0 ..< 3 {
-                    guard let buf = device.makeBuffer(length: capacityInBytes, options: .storageModeShared) else {
-                        throw GraphError(detail: "pass \(index) dynamic vertex buffer allocation failed")
+                    guard let buf = device.makeBuffer(
+                        length: capacityInBytes,
+                        options: .storageModeShared
+                    ) else {
+                        throw GraphError(
+                            detail: "pass \(index) dynamic vertex buffer allocation failed"
+                        )
                     }
                     dynamicBuffers.append(buf)
                 }
@@ -235,7 +247,10 @@ final class SceneRenderGraphRenderer {
         return try draw.skeleton.map(SceneSkeletonEvaluator.init)
     }
 
-    private func targetDescriptor(_ target: SceneRenderGraph.Target, input: MTLTexture) throws -> MTLTextureDescriptor {
+    private func targetDescriptor(
+        _ target: SceneRenderGraph.Target,
+        input: MTLTexture
+    ) throws -> MTLTextureDescriptor {
         var width = Double(target.width ?? input.width)
         var height = Double(target.height ?? input.height)
         if let fit = target.fit.map(Double.init) {
@@ -257,7 +272,8 @@ final class SceneRenderGraphRenderer {
             throw GraphError(detail: "invalid size for target \(target.name)")
         }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: pixelFormat(target.format), width: Int(width), height: Int(height), mipmapped: false
+            pixelFormat: pixelFormat(target.format), width: Int(width), height: Int(height),
+            mipmapped: false
         )
         descriptor.storageMode = .private
         descriptor.usage = [.renderTarget, .shaderRead]
@@ -286,7 +302,8 @@ final class SceneRenderGraphRenderer {
         frame = FrameValues(
             pointer: pointer, previousPointer: lastPointer ?? pointer,
             layerFromCanvas: clip, canvasFromLayer: clip.inverse,
-            screenFromLayer: simd_float4x4(diagonal: SIMD4(1, -1, 1, 1)) * clip.inverse, frameTime: Float(step),
+            screenFromLayer: simd_float4x4(diagonal: SIMD4(1, -1, 1, 1)) * clip.inverse,
+            frameTime: Float(step),
             pointerHeld: pointerHeld, parallax: (parallax + 1) / 2
         )
         lastPointer = pointer
@@ -294,7 +311,9 @@ final class SceneRenderGraphRenderer {
         let newSize = SIMD2(input.width, input.height)
         if newSize != size {
             targets.removeAll()
-            for target in graph.targets where !transientTargets.contains(where: { $0.name == target.name }) {
+            for target in graph.targets
+                where !transientTargets.contains(where: { $0.name == target.name })
+            {
                 let descriptor = try targetDescriptor(target, input: input)
                 guard let texture = device.makeTexture(descriptor: descriptor) else {
                     throw GraphError(detail: "target \(target.name) allocation failed")
@@ -305,7 +324,12 @@ final class SceneRenderGraphRenderer {
                 clear.colorAttachments[0].texture = texture
                 clear.colorAttachments[0].loadAction = .clear
                 let color = target.clearColor ?? [0, 0, 0, 0]
-                clear.colorAttachments[0].clearColor = MTLClearColorMake(color[0], color[1], color[2], color[3])
+                clear.colorAttachments[0].clearColor = MTLClearColorMake(
+                    color[0],
+                    color[1],
+                    color[2],
+                    color[3]
+                )
                 clear.colorAttachments[0].storeAction = .store
                 guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: clear) else {
                     throw GraphError(detail: "target \(target.name) clear failed")
@@ -327,7 +351,10 @@ final class SceneRenderGraphRenderer {
         }
         resources["input"] = input
         if graph.readsBackground {
-            guard let background else { throw GraphError(detail: "the graph reads the background but none was given") }
+            guard let background
+            else {
+                throw GraphError(detail: "the graph reads the background but none was given")
+            }
             resources[SceneRenderGraph.background] = background
         }
         for (name, file) in graph.images {
@@ -353,7 +380,9 @@ final class SceneRenderGraphRenderer {
                     guard source.width == target.width, source.height == target.height,
                           source.pixelFormat == target.pixelFormat
                     else {
-                        throw GraphError(detail: "copy pass \(index) requires matching size and format")
+                        throw GraphError(
+                            detail: "copy pass \(index) requires matching size and format"
+                        )
                     }
                     guard let encoder = commandBuffer.makeBlitCommandEncoder()
                     else { throw GraphError(detail: "copy encoder failed") }
@@ -375,7 +404,9 @@ final class SceneRenderGraphRenderer {
                     guard source.width == target.width, source.height == target.height,
                           source.pixelFormat == target.pixelFormat
                     else {
-                        throw GraphError(detail: "swap pass \(index) requires matching size and format")
+                        throw GraphError(
+                            detail: "swap pass \(index) requires matching size and format"
+                        )
                     }
                     resources[pass.source!] = target
                     resources[pass.target] = source
@@ -386,7 +417,11 @@ final class SceneRenderGraphRenderer {
                     // A pass that adds to its target and has nothing to add costs a full
                     // load and store of the target for no change.
                     if let dynamic = draw.dynamic, draw.clears == false,
-                       !meshes.contains(where: { $0.parent == dynamic.parent && dynamic.materials[$0.material] != nil }) {
+                       !meshes
+                       .contains(where: {
+                           $0.parent == dynamic.parent && dynamic.materials[$0.material] != nil
+                       })
+                    {
                         continue
                     }
                     let pose = compiled.skeleton?.evaluate(time: time)
@@ -401,16 +436,17 @@ final class SceneRenderGraphRenderer {
                         audio: audio
                     )
                     // A mesh pass fills its own fragment block per material.
-                    let fragment = try draw.dynamic != nil ? UniformBinding.buffer(nil) : uniformBinding(
-                        draw.fragment,
-                        cached: compiled.fragmentUniforms,
-                        resources: resources,
-                        time: time,
-                        cursor: cursor,
-                        pose: pose,
-                        effectValues: values,
-                        audio: audio
-                    )
+                    let fragment = try draw.dynamic != nil ? UniformBinding
+                        .buffer(nil) : uniformBinding(
+                            draw.fragment,
+                            cached: compiled.fragmentUniforms,
+                            resources: resources,
+                            time: time,
+                            cursor: cursor,
+                            pose: pose,
+                            effectValues: values,
+                            audio: audio
+                        )
                     let requiresNewEncoder = activeEncoder == nil
                         || activeTargetName != pass.target
                         || draw.clears != false
@@ -418,10 +454,12 @@ final class SceneRenderGraphRenderer {
                         endActiveEncoder()
                         let descriptor = MTLRenderPassDescriptor()
                         descriptor.colorAttachments[0].texture = target
-                        descriptor.colorAttachments[0].loadAction = draw.clears == false ? .load : .clear
+                        descriptor.colorAttachments[0].loadAction = draw
+                            .clears == false ? .load : .clear
                         descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
                         descriptor.colorAttachments[0].storeAction = .store
-                        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor)
+                        guard let encoder = commandBuffer
+                            .makeRenderCommandEncoder(descriptor: descriptor)
                         else {
                             throw GraphError(detail: "draw encoder failed")
                         }
@@ -444,8 +482,10 @@ final class SceneRenderGraphRenderer {
                     }
                     if let dynamic = draw.dynamic {
                         try drawMeshes(
-                            draw, dynamic: dynamic, compiled: compiled, meshes: meshes, resources: resources,
-                            time: time, cursor: cursor, effectValues: values, audio: audio, encoder: encoder
+                            draw, dynamic: dynamic, compiled: compiled, meshes: meshes,
+                            resources: resources,
+                            time: time, cursor: cursor, effectValues: values, audio: audio,
+                            encoder: encoder
                         )
                     } else {
                         drawGeometry(
@@ -479,18 +519,24 @@ final class SceneRenderGraphRenderer {
     /// Writes the meshes made for this pass's parent into one buffer, in the order
     /// they arrive, and draws each run of quads with its own material's textures.
     private func drawMeshes(
-        _ draw: SceneRenderGraph.Draw, dynamic: SceneRenderGraph.DynamicMesh, compiled: CompiledDraw,
-        meshes: [SceneMeshFrame], resources: [String: MTLTexture], time: Double, cursor: SIMD2<Float>?,
+        _ draw: SceneRenderGraph.Draw, dynamic: SceneRenderGraph.DynamicMesh,
+        compiled: CompiledDraw,
+        meshes: [SceneMeshFrame], resources: [String: MTLTexture], time: Double,
+        cursor: SIMD2<Float>?,
         effectValues: [String: Double], audio: SceneAudioSpectrum?, encoder: MTLRenderCommandEncoder
     ) throws {
         struct Run { var material: String; var firstQuad: Int; var quads: Int }
         var runs: [Run] = []
         var totalQuads = 0
-        for mesh in meshes where mesh.parent == dynamic.parent && dynamic.materials[mesh.material] != nil {
+        for mesh in meshes
+            where mesh.parent == dynamic.parent && dynamic.materials[mesh.material] != nil
+        {
             let count = mesh.vertices.count / SceneMeshFrame.floatsPerQuad
             guard count > 0 else { continue }
             guard totalQuads + count <= dynamic.capacity else {
-                throw GraphError(detail: "mesh quads exceed the pass capacity of \(dynamic.capacity)")
+                throw GraphError(
+                    detail: "mesh quads exceed the pass capacity of \(dynamic.capacity)"
+                )
             }
             totalQuads += count
         }
@@ -499,7 +545,8 @@ final class SceneRenderGraphRenderer {
         let buffer: MTLBuffer
         if !compiled.dynamicVertexBuffers.isEmpty {
             buffer = compiled.dynamicVertexBuffers[compiled.dynamicBufferIndex]
-            compiled.dynamicBufferIndex = (compiled.dynamicBufferIndex + 1) % compiled.dynamicVertexBuffers.count
+            compiled.dynamicBufferIndex = (compiled.dynamicBufferIndex + 1) % compiled
+                .dynamicVertexBuffers.count
         } else {
             let byteCount = totalQuads * SceneMeshFrame.floatsPerQuad * MemoryLayout<Float>.stride
             guard let buf = device.makeBuffer(length: byteCount, options: .storageModeShared) else {
@@ -511,7 +558,9 @@ final class SceneRenderGraphRenderer {
         let rawPointer = buffer.contents()
         var currentFloatOffset = 0
         var quads = 0
-        for mesh in meshes where mesh.parent == dynamic.parent && dynamic.materials[mesh.material] != nil {
+        for mesh in meshes
+            where mesh.parent == dynamic.parent && dynamic.materials[mesh.material] != nil
+        {
             let count = mesh.vertices.count / SceneMeshFrame.floatsPerQuad
             guard count > 0 else { continue }
             let floatCount = count * SceneMeshFrame.floatsPerQuad
@@ -537,8 +586,8 @@ final class SceneRenderGraphRenderer {
                 encoder.setVertexSamplerState(sampler, index: binding.index)
                 encoder.setFragmentSamplerState(sampler, index: binding.index)
             }
-            bindUniforms(
-                try uniformBinding(
+            try bindUniforms(
+                uniformBinding(
                     draw.fragment, cached: compiled.fragmentUniforms, resources: slots, time: time,
                     cursor: cursor, pose: nil, effectValues: effectValues, audio: audio
                 ),
@@ -684,7 +733,10 @@ final class SceneRenderGraphRenderer {
                 case .canvasFromLayer: frame.canvasFromLayer
                 default: frame.screenFromLayer
                 }
-                withUnsafeBytes(of: &matrix) { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
+                withUnsafeBytes(of: &matrix) { data.replaceSubrange(
+                    update.offset ..< update.offset + $0.count,
+                    with: $0
+                ) }
                 continue
             case .texelSize, .texelOffsets:
                 let texture = resources[update.texture!]!
@@ -722,7 +774,10 @@ final class SceneRenderGraphRenderer {
             case .audioSpectrum:
                 let count = update.components!
                 // Silence when nothing listens (a bake, sound reaction off).
-                let bands = audio?.bands(count, right: update.key == "right") ?? Array(repeating: 0, count: count)
+                let bands = audio?.bands(count, right: update.key == "right") ?? Array(
+                    repeating: 0,
+                    count: count
+                )
                 for (index, value) in bands.enumerated() {
                     var value = value
                     withUnsafeBytes(of: &value) { bytes in
@@ -738,37 +793,62 @@ final class SceneRenderGraphRenderer {
                 case .model: model.model
                 default: model.viewProjection
                 }
-                withUnsafeBytes(of: &matrix) { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
+                withUnsafeBytes(of: &matrix) { data.replaceSubrange(
+                    update.offset ..< update.offset + $0.count,
+                    with: $0
+                ) }
                 continue
             case .normalModel:
                 guard let model else { continue }
-                // Normals turn by the model's axes with the scale divided out, each column padded to 16 bytes. The
-                // inverse transpose would stretch the normals of a mesh squashed along one axis (a sphere scaled
-                // to 3 3 0.00001 shades like a sphere in the capture, not like a plane facing the camera).
+                // Normals turn by the model's axes with the scale divided out, each column padded
+                // to 16 bytes. The
+                // inverse transpose would stretch the normals of a mesh squashed along one axis (a
+                // sphere scaled
+                // to 3 3 0.00001 shades like a sphere in the capture, not like a plane facing the
+                // camera).
                 let linear = simd_float3x3(columns: (
-                    SIMD3(model.model.columns.0.x, model.model.columns.0.y, model.model.columns.0.z),
-                    SIMD3(model.model.columns.1.x, model.model.columns.1.y, model.model.columns.1.z),
+                    SIMD3(
+                        model.model.columns.0.x,
+                        model.model.columns.0.y,
+                        model.model.columns.0.z
+                    ),
+                    SIMD3(
+                        model.model.columns.1.x,
+                        model.model.columns.1.y,
+                        model.model.columns.1.z
+                    ),
                     SIMD3(model.model.columns.2.x, model.model.columns.2.y, model.model.columns.2.z)
                 ))
                 let normal = simd_float3x3(columns: (
-                    simd_normalize(linear.columns.0), simd_normalize(linear.columns.1), simd_normalize(linear.columns.2)
+                    simd_normalize(linear.columns.0), simd_normalize(linear.columns.1),
+                    simd_normalize(linear.columns.2)
                 ))
                 var padded = [Float](repeating: 0, count: 12)
-                for (column, vector) in [normal.columns.0, normal.columns.1, normal.columns.2].enumerated() {
+                for (column, vector) in [normal.columns.0, normal.columns.1, normal.columns.2]
+                    .enumerated()
+                {
                     padded[column * 4] = vector.x
                     padded[column * 4 + 1] = vector.y
                     padded[column * 4 + 2] = vector.z
                 }
-                padded.withUnsafeBytes { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
+                padded.withUnsafeBytes { data.replaceSubrange(
+                    update.offset ..< update.offset + $0.count,
+                    with: $0
+                ) }
                 continue
             case .shadowMatrix:
                 // Without a shadow map the matrix stays zero and the lookup falls outside it.
-                guard let model, let index = update.key.flatMap(Int.init), model.shadowMatrices.indices.contains(index) else { continue }
+                guard let model, let index = update.key.flatMap(Int.init),
+                      model.shadowMatrices.indices.contains(index) else { continue }
                 var matrix = model.shadowMatrices[index]
-                withUnsafeBytes(of: &matrix) { data.replaceSubrange(update.offset ..< update.offset + $0.count, with: $0) }
+                withUnsafeBytes(of: &matrix) { data.replaceSubrange(
+                    update.offset ..< update.offset + $0.count,
+                    with: $0
+                ) }
                 continue
             case .lightOrigin, .lightAxis, .lightColor:
-                guard let model, let index = update.key.flatMap(Int.init), model.lights.indices.contains(index) else { continue }
+                guard let model, let index = update.key.flatMap(Int.init),
+                      model.lights.indices.contains(index) else { continue }
                 let light = model.lights[index]
                 let value: SIMD3<Float> = switch update.value {
                 case .lightOrigin: light.origin
@@ -776,10 +856,18 @@ final class SceneRenderGraphRenderer {
                 default: light.color
                 }
                 values = [value.x, value.y, value.z]
-            case .screen: values = model.map { [$0.screen.x, $0.screen.y, $0.screen.z] } ?? [1, 1, 1]
+            case .screen: values = model.map { [$0.screen.x, $0.screen.y, $0.screen.z] } ?? [
+                    1,
+                    1,
+                    1
+                ]
             case .mipLevels: values = [Float(resources[update.texture!]!.mipmapLevelCount)]
             case .layerAlpha: values = [model?.alpha ?? 1]
-            case .layerColor: values = model.map { [$0.color.x, $0.color.y, $0.color.z] } ?? [1, 1, 1]
+            case .layerColor: values = model.map { [$0.color.x, $0.color.y, $0.color.z] } ?? [
+                    1,
+                    1,
+                    1
+                ]
             case .eyePosition, .ambientColor, .skylightColor:
                 let value: SIMD3<Float>? = switch update.value {
                 case .eyePosition: model?.eye
@@ -808,7 +896,10 @@ final class SceneRenderGraphRenderer {
         func require(_ condition: Bool, _ message: String) throws {
             if !condition { throw GraphError(detail: message) }
         }
-        let names = graph.targets.map(\.name) + Array(graph.images.keys) + ["input", SceneRenderGraph.background]
+        let names = graph.targets.map(\.name) + Array(graph.images.keys) + [
+            "input",
+            SceneRenderGraph.background
+        ]
         try require(Set(names).count == names.count, "resource names must be unique")
         let resources = Set(names), targets = Set(graph.targets.map(\.name))
         try require(resources.contains(graph.output), "unknown output \(graph.output)")
@@ -822,7 +913,8 @@ final class SceneRenderGraphRenderer {
         for target in graph.targets {
             try require(target.scale.isFinite && target.scale > 0, "invalid target scale")
             try require(
-                [target.width, target.height, target.fit].allSatisfy { $0.map { (1 ... 8192).contains($0) } ?? true },
+                [target.width, target.height, target.fit]
+                    .allSatisfy { $0.map { (1 ... 8192).contains($0) } ?? true },
                 "invalid target size"
             )
             try require(
@@ -845,7 +937,8 @@ final class SceneRenderGraphRenderer {
                 try require(pass.source != pass.target, "copy pass \(index) aliases its target")
             case .swap:
                 try require(
-                    pass.draw == nil && pass.source.map { targets.contains($0) && $0 != pass.target } == true,
+                    pass.draw == nil && pass.source
+                        .map { targets.contains($0) && $0 != pass.target } == true,
                     "swap pass \(index) needs two different targets"
                 )
                 try require(
@@ -869,10 +962,12 @@ final class SceneRenderGraphRenderer {
                     )
                     for textures in dynamic.materials.values {
                         try require(
-                            Set(textures.map(\.index)).count == textures.count && textures.allSatisfy {
-                                (0 ..< 16).contains($0.index) && resources.contains($0.source) &&
-                                    $0.source != pass.target
-                            },
+                            Set(textures.map(\.index)).count == textures.count && textures
+                                .allSatisfy {
+                                    (0 ..< 16).contains($0.index) && resources
+                                        .contains($0.source) &&
+                                        $0.source != pass.target
+                                },
                             "pass \(index) has an invalid material texture"
                         )
                     }
@@ -901,7 +996,10 @@ final class SceneRenderGraphRenderer {
                 let commandBindings =
                     Set((draw.textures + (draw.commands ?? []).flatMap { $0.textures ?? [] })
                             .map(\.index))
-                try require(draw.commands == nil || draw.indices != nil, "indexed commands require an index buffer")
+                try require(
+                    draw.commands == nil || draw.indices != nil,
+                    "indexed commands require an index buffer"
+                )
                 for command in draw.commands ?? [] {
                     let count = draw.indices?.count ?? 0
                     try require(
@@ -979,8 +1077,10 @@ final class SceneRenderGraphRenderer {
                 case .parallaxPosition, .texelSize: bytes = 8
                 case .texelOffsets: bytes = 16
                 case .textureSize: bytes = 16
-                case .modelViewProjection, .model, .normalModel, .viewProjection, .layerAlpha, .layerColor, .eyePosition,
-                     .ambientColor, .skylightColor, .shadowMatrix, .lightOrigin, .lightAxis, .lightColor, .mipLevels, .screen:
+                case .modelViewProjection, .model, .normalModel, .viewProjection, .layerAlpha,
+                     .layerColor, .eyePosition,
+                     .ambientColor, .skylightColor, .shadowMatrix, .lightOrigin, .lightAxis,
+                     .lightColor, .mipLevels, .screen:
                     throw GraphError(detail: "model layer values outside a model layer")
                 case .boneMatrices, .boneOpacity:
                     let count = (draw.skeleton ?? draw.skeletonID.flatMap { rigs.skeletons[$0] })?
@@ -1016,7 +1116,12 @@ final class SceneRenderGraphRenderer {
                 )
                 if [.textureSize, .texelSize, .texelOffsets].contains(update.value) {
                     try require(
-                        update.texture.map { resources.contains($0) || ($0.hasPrefix("slot:") && draw.dynamic != nil) } == true,
+                        update.texture
+                            .map {
+                                resources
+                                    .contains($0) || ($0.hasPrefix("slot:") && draw.dynamic != nil)
+                            } ==
+                            true,
                         "uniform references an unknown texture"
                     )
                 }
@@ -1054,7 +1159,6 @@ final class SceneRenderGraphRenderer {
     }
 }
 
-
 /// Render targets lent for the length of one graph encode. Metal tracks hazards between
 /// encoders, so a texture written by one graph can be handed to the next in command order.
 final class SceneTexturePool {
@@ -1069,7 +1173,11 @@ final class SceneTexturePool {
     private var peak: [Key: Int] = [:]
 
     func acquire(_ descriptor: MTLTextureDescriptor, device: MTLDevice) -> MTLTexture? {
-        let key = Key(width: descriptor.width, height: descriptor.height, format: descriptor.pixelFormat)
+        let key = Key(
+            width: descriptor.width,
+            height: descriptor.height,
+            format: descriptor.pixelFormat
+        )
         let count = (outstanding[key] ?? 0) + 1
         outstanding[key] = count
         peak[key] = max(peak[key] ?? 0, count)
@@ -1106,7 +1214,9 @@ extension SceneRenderGraph {
 
     /// Whether a frame starts from what earlier frames left in a target, so its picture is
     /// not a function of the time alone.
-    var carriesFrames: Bool { firstUseOverwrites().values.contains(false) }
+    var carriesFrames: Bool {
+        firstUseOverwrites().values.contains(false)
+    }
 
     /// For each target the frame uses, whether its first use overwrites it completely.
     private func firstUseOverwrites() -> [String: Bool] {

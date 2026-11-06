@@ -3,7 +3,6 @@ import SwiftUI
 extension SceneEditorView {
     private static let sceneTextFontFamilies = NSFontManager.shared.availableFontFamilies
 
-    @ViewBuilder
     func sceneTextControls(path: String, layer: SceneLayer, text: SceneText) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField(
@@ -11,7 +10,9 @@ extension SceneEditorView {
                 text: Binding(
                     get: { text.string },
                     set: { value in
-                        updateSceneText(path: path, layerID: layer.id) { $0.string = String(value.prefix(SceneText.maximumLength)) }
+                        updateSceneText(path: path, layerID: layer.id) {
+                            $0.string = String(value.prefix(SceneText.maximumLength))
+                        }
                     }
                 ),
                 axis: .vertical
@@ -25,18 +26,24 @@ extension SceneEditorView {
                     model.localizedString("フォント"),
                     selection: Binding<String?>(
                         get: { text.systemFont },
-                        set: { name in updateSceneText(path: path, layerID: layer.id) { $0.systemFont = name } }
+                        set: { name in
+                            updateSceneText(path: path, layerID: layer.id) { $0.systemFont = name }
+                        }
                     )
                 ) {
                     Text(model.localizedString("既定のフォント")).tag(String?.none)
-                    ForEach(Self.sceneTextFontFamilies, id: \.self) { Text($0).tag(String?.some($0)) }
+                    ForEach(Self.sceneTextFontFamilies, id: \.self) {
+                        Text($0).tag(String?.some($0))
+                    }
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
             }
             sceneTextSlider(
-                model.localizedString("大きさ"), value: text.pointSize, range: SceneText.pointSizeRange, format: "%.0f"
+                model.localizedString("大きさ"), value: text.pointSize,
+                range: SceneText.pointSizeRange,
+                format: "%.0f"
             ) { value in updateSceneText(path: path, layerID: layer.id) { $0.pointSize = value } }
             sceneTextRow(model.localizedString("色")) {
                 sceneTextColorPicker(text.color, title: model.localizedString("色")) { color in
@@ -48,7 +55,11 @@ extension SceneEditorView {
                     model.localizedString("寄せ"),
                     selection: Binding(
                         get: { text.horizontalAlignment },
-                        set: { value in updateSceneText(path: path, layerID: layer.id) { $0.horizontalAlignment = value } }
+                        set: { value in
+                            updateSceneText(path: path, layerID: layer.id) {
+                                $0.horizontalAlignment = value
+                            }
+                        }
                     )
                 ) {
                     Text(model.localizedString("左")).tag(SceneTextHorizontalAlignment.left)
@@ -60,17 +71,24 @@ extension SceneEditorView {
                 .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
             }
             sceneTextSlider(
-                model.localizedString("字間"), value: text.letterSpacing, range: -20 ... 100, format: "%.0f"
-            ) { value in updateSceneText(path: path, layerID: layer.id) { $0.letterSpacing = value } }
+                model.localizedString("字間"), value: text.letterSpacing, range: -20 ... 100,
+                format: "%.0f"
+            ) { value in updateSceneText(path: path, layerID: layer.id) { $0.letterSpacing = value
+            } }
             sceneTextSlider(
-                model.localizedString("行間"), value: text.lineSpacing, range: -50 ... 200, format: "%.0f"
+                model.localizedString("行間"), value: text.lineSpacing, range: -50 ... 200,
+                format: "%.0f"
             ) { value in updateSceneText(path: path, layerID: layer.id) { $0.lineSpacing = value } }
             sceneTextRow(model.localizedString("折り返し")) {
                 Toggle(
                     model.localizedString("折り返し"),
                     isOn: Binding(
                         get: { text.maxWidth != nil },
-                        set: { on in updateSceneText(path: path, layerID: layer.id) { $0.maxWidth = on ? 1000 : nil } }
+                        set: { on in
+                            updateSceneText(path: path, layerID: layer.id) {
+                                $0.maxWidth = on ? 1000 : nil
+                            }
+                        }
                     )
                 )
                 .labelsHidden()
@@ -78,14 +96,17 @@ extension SceneEditorView {
             }
             if let maxWidth = text.maxWidth {
                 sceneTextSlider(
-                    model.localizedString("折り返す幅"), value: maxWidth, range: 50 ... 4000, format: "%.0f"
-                ) { value in updateSceneText(path: path, layerID: layer.id) { $0.maxWidth = value } }
+                    model.localizedString("折り返す幅"), value: maxWidth, range: 50 ... 4000,
+                    format: "%.0f"
+                ) { value in updateSceneText(path: path, layerID: layer.id) { $0.maxWidth = value }
+                }
             }
 
             sceneTextOutline(path: path, layer: layer, text: text)
             sceneTextShadow(path: path, layer: layer, text: text)
             sceneTextSlider(
-                model.localizedString("文字のぼかし"), value: text.style?.blur ?? 0, range: 0 ... 20, format: "%.1f"
+                model.localizedString("文字のぼかし"), value: text.style?.blur ?? 0, range: 0 ... 20,
+                format: "%.1f"
             ) { value in
                 updateSceneText(path: path, layerID: layer.id) { text in
                     var style = text.style ?? SceneTextStyle()
@@ -106,7 +127,10 @@ extension SceneEditorView {
                     get: { outline != nil },
                     set: { on in
                         setSceneTextStyle(path: path, layerID: layer.id) {
-                            $0.outline = on ? .init(color: RGBAColor(red: 0, green: 0, blue: 0, alpha: 1), thickness: 2) : nil
+                            $0.outline = on ? .init(
+                                color: RGBAColor(red: 0, green: 0, blue: 0, alpha: 1),
+                                thickness: 2
+                            ) : nil
                         }
                     }
                 )
@@ -121,8 +145,11 @@ extension SceneEditorView {
                 }
             }
             sceneTextSlider(
-                model.localizedString("縁の太さ"), value: outline.thickness, range: 0.5 ... 20, format: "%.1f"
-            ) { value in setSceneTextStyle(path: path, layerID: layer.id) { $0.outline?.thickness = value } }
+                model.localizedString("縁の太さ"), value: outline.thickness, range: 0.5 ... 20,
+                format: "%.1f"
+            ) { value in setSceneTextStyle(path: path, layerID: layer.id) {
+                $0.outline?.thickness = value
+            } }
         }
     }
 
@@ -137,7 +164,13 @@ extension SceneEditorView {
                     set: { on in
                         setSceneTextStyle(path: path, layerID: layer.id) {
                             $0.shadow = on
-                                ? .init(color: RGBAColor(red: 0, green: 0, blue: 0, alpha: 1), size: 4, offsetX: 3, offsetY: 3, opacity: 0.6)
+                                ? .init(
+                                    color: RGBAColor(red: 0, green: 0, blue: 0, alpha: 1),
+                                    size: 4,
+                                    offsetX: 3,
+                                    offsetY: 3,
+                                    opacity: 0.6
+                                )
                                 : nil
                         }
                     }
@@ -154,16 +187,25 @@ extension SceneEditorView {
             }
             sceneTextSlider(
                 model.localizedString("影のぼかし"), value: shadow.size, range: 0 ... 30, format: "%.1f"
-            ) { value in setSceneTextStyle(path: path, layerID: layer.id) { $0.shadow?.size = value } }
+            ) { value in setSceneTextStyle(path: path, layerID: layer.id) { $0.shadow?.size = value
+            } }
             sceneTextSlider(
-                model.localizedString("影の横位置"), value: shadow.offsetX, range: -30 ... 30, format: "%.1f"
-            ) { value in setSceneTextStyle(path: path, layerID: layer.id) { $0.shadow?.offsetX = value } }
+                model.localizedString("影の横位置"), value: shadow.offsetX, range: -30 ... 30,
+                format: "%.1f"
+            ) { value in setSceneTextStyle(path: path, layerID: layer.id) {
+                $0.shadow?.offsetX = value
+            } }
             sceneTextSlider(
-                model.localizedString("影の縦位置"), value: shadow.offsetY, range: -30 ... 30, format: "%.1f"
-            ) { value in setSceneTextStyle(path: path, layerID: layer.id) { $0.shadow?.offsetY = value } }
+                model.localizedString("影の縦位置"), value: shadow.offsetY, range: -30 ... 30,
+                format: "%.1f"
+            ) { value in setSceneTextStyle(path: path, layerID: layer.id) {
+                $0.shadow?.offsetY = value
+            } }
             sceneTextSlider(
                 model.localizedString("影の濃さ"), value: shadow.opacity, range: 0 ... 1, format: "%.2f"
-            ) { value in setSceneTextStyle(path: path, layerID: layer.id) { $0.shadow?.opacity = value } }
+            ) { value in setSceneTextStyle(path: path, layerID: layer.id) {
+                $0.shadow?.opacity = value
+            } }
         }
     }
 
@@ -186,9 +228,15 @@ extension SceneEditorView {
             Text(title)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
-            Slider(value: Binding(get: { min(max(value, range.lowerBound), range.upperBound) }, set: set), in: range)
-                .accessibilityLabel(title)
-                .accessibilityValue(valueText)
+            Slider(
+                value: Binding(
+                    get: { min(max(value, range.lowerBound), range.upperBound) },
+                    set: set
+                ),
+                in: range
+            )
+            .accessibilityLabel(title)
+            .accessibilityValue(valueText)
             Text(valueText)
                 .font(.caption.monospacedDigit())
                 .foregroundColor(.secondary)
@@ -196,7 +244,11 @@ extension SceneEditorView {
         }
     }
 
-    private func sceneTextColorPicker(_ color: RGBAColor, title: String, set: @escaping (RGBAColor) -> Void) -> some View {
+    private func sceneTextColorPicker(
+        _ color: RGBAColor,
+        title: String,
+        set: @escaping (RGBAColor) -> Void
+    ) -> some View {
         ColorPicker(
             title,
             selection: Binding(
@@ -208,7 +260,11 @@ extension SceneEditorView {
         .labelsHidden()
     }
 
-    private func setSceneTextStyle(path: String, layerID: UUID, _ change: (inout SceneTextStyle) -> Void) {
+    private func setSceneTextStyle(
+        path: String,
+        layerID: UUID,
+        _ change: (inout SceneTextStyle) -> Void
+    ) {
         updateSceneText(path: path, layerID: layerID) { text in
             var style = text.style ?? SceneTextStyle()
             change(&style)
@@ -238,13 +294,21 @@ extension SceneEditorView {
             sceneSourceToggle(
                 title: model.localizedString("再生中の曲のジャケットを表示"),
                 isOn: layer.usesMediaArtwork,
-                note: model.localizedString("画像の透明な部分でジャケットの形を切り抜きます。曲が無いときは画像そのものを表示します。この設定のシーンは、書き出した動画ではなくリアルタイムで描画します。")
-            ) { on in updateSceneLayerSource(path: path, layerID: layer.id) { $0.usesMediaArtwork = on } }
+                note: model
+                    .localizedString(
+                        "画像の透明な部分でジャケットの形を切り抜きます。曲が無いときは画像そのものを表示します。この設定のシーンは、書き出した動画ではなくリアルタイムで描画します。"
+                    )
+            ) { on in updateSceneLayerSource(path: path, layerID: layer.id) {
+                $0.usesMediaArtwork = on
+            } }
             sceneSourceToggle(
                 title: model.localizedString("下のレイヤーを入力にする"),
                 isOn: layer.capturesCanvas,
-                note: model.localizedString("画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。")
-            ) { on in updateSceneLayerSource(path: path, layerID: layer.id) { $0.capturesCanvas = on } }
+                note: model
+                    .localizedString("画像の代わりに、このレイヤーより下の絵を入力にします。動きと組み合わせると、下の絵を揺らしたり歪めたりできます。")
+            ) { on in updateSceneLayerSource(path: path, layerID: layer.id) {
+                $0.capturesCanvas = on
+            } }
         }
     }
 
@@ -258,7 +322,11 @@ extension SceneEditorView {
         }
     }
 
-    private func updateSceneLayerSource(path: String, layerID: UUID, _ change: (inout SceneLayer) -> Void) {
+    private func updateSceneLayerSource(
+        path: String,
+        layerID: UUID,
+        _ change: (inout SceneLayer) -> Void
+    ) {
         guard var document = model.sceneDocumentsByPath[path],
               let index = document.layers.firstIndex(where: { $0.id == layerID }),
               !document.layers[index].isLocked

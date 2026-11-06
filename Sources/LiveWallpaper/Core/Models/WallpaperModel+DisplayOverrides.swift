@@ -81,7 +81,10 @@ extension WallpaperModel {
             }
         }
         let fileName = path.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "none"
-        AppLog.events.notice("screen \(screenID, privacy: .public) fixed video -> \(fileName, privacy: .public)")
+        AppLog.events
+            .notice(
+                "screen \(screenID, privacy: .public) fixed video -> \(fileName, privacy: .public)"
+            )
         persistVideoOverrides()
         if isWebWallpaperActive {
             // 共有が Web のときは、固定の付け外しでウィンドウの中身(動画/Web)が入れ替わる。

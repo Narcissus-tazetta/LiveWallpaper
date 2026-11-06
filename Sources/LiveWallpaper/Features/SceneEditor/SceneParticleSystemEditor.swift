@@ -86,7 +86,8 @@ struct SceneParticleSystemEditor: View {
             return Binding(
                 get: {
                     let children = parent.wrappedValue.children
-                    return children.indices.contains(index) ? children[index].system.value : fallback
+                    return children.indices.contains(index) ? children[index].system
+                        .value : fallback
                 },
                 set: { newValue in
                     guard parent.wrappedValue.children.indices.contains(index) else {
@@ -139,8 +140,15 @@ private struct ParticleSystemForm: View {
             DisclosureGroup(t("描き方")) {
                 rendererSection.padding(.top, 6).frame(maxWidth: .infinity, alignment: .leading)
             }
-            DisclosureGroup(String(format: t("制御点(%d)"), locale: locale, system.controlPoints.count)) {
-                controlPointsSection.padding(.top, 6).frame(maxWidth: .infinity, alignment: .leading)
+            DisclosureGroup(String(
+                format: t("制御点(%d)"),
+                locale: locale,
+                system.controlPoints.count
+            )) {
+                controlPointsSection.padding(.top, 6).frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
             }
             DisclosureGroup(String(format: t("子粒子(%d)"), locale: locale, system.children.count)) {
                 childrenSection.padding(.top, 6).frame(maxWidth: .infinity, alignment: .leading)
@@ -150,7 +158,6 @@ private struct ParticleSystemForm: View {
 
     // MARK: General
 
-    @ViewBuilder
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             ParticleRow(t("同時に出せる数の上限")) {
@@ -164,10 +171,19 @@ private struct ParticleSystemForm: View {
                     system.sheet = nil
                 }
             }
-            optionalGroup(t("コマ割り"), $system.sheet, make: PSystem.Sheet(columns: 1, rows: 1, frameCount: 1)) { sheet in
-                ParticleRow(t("列")) { IntField(title: t("列"), value: sheet.columns, locale: locale) }
+            optionalGroup(
+                t("コマ割り"),
+                $system.sheet,
+                make: PSystem.Sheet(columns: 1, rows: 1, frameCount: 1)
+            ) { sheet in
+                ParticleRow(t("列")) { IntField(title: t("列"), value: sheet.columns, locale: locale)
+                }
                 ParticleRow(t("行")) { IntField(title: t("行"), value: sheet.rows, locale: locale) }
-                ParticleRow(t("コマ数")) { IntField(title: t("コマ数"), value: sheet.frameCount, locale: locale) }
+                ParticleRow(t("コマ数")) { IntField(
+                    title: t("コマ数"),
+                    value: sheet.frameCount,
+                    locale: locale
+                ) }
                 ParticleRow(t("コマの選び方")) {
                     Picker(t("コマの選び方"), selection: sheet.mode) {
                         Text(t("生まれたときに1つ選ぶ")).tag(PSystem.Sheet.Mode.random)
@@ -175,7 +191,11 @@ private struct ParticleSystemForm: View {
                     }
                     .labelsHidden().fixedSize()
                 }
-                ParticleRow(t("一生で流す回数")) { NumberField(title: t("一生で流す回数"), value: sheet.speed, locale: locale) }
+                ParticleRow(t("一生で流す回数")) { NumberField(
+                    title: t("一生で流す回数"),
+                    value: sheet.speed,
+                    locale: locale
+                ) }
             }
             ParticleRow(t("合成")) {
                 Picker(t("合成"), selection: $system.blend) {
@@ -188,23 +208,42 @@ private struct ParticleSystemForm: View {
             ParticleRow(t("明るさ")) {
                 NumberField(title: t("明るさ"), value: $system.brightness, locale: locale)
             }
-            optionalGroup(t("背景を歪ませる"), $system.refraction, make: PSystem.Refraction()) { refraction in
+            optionalGroup(
+                t("背景を歪ませる"),
+                $system.refraction,
+                make: PSystem.Refraction()
+            ) { refraction in
                 ParticleRow(t("法線画像")) {
                     imagePicker(file: refraction.normalFile, emptyText: t("なし")) {}
                 }
-                ParticleRow(t("歪みの量")) { NumberField(title: t("歪みの量"), value: refraction.amount, locale: locale) }
+                ParticleRow(t("歪みの量")) { NumberField(
+                    title: t("歪みの量"),
+                    value: refraction.amount,
+                    locale: locale
+                ) }
             }
             optionalGroup(t("輪郭をくっきりさせる"), $system.cutout, make: PSystem.Cutout()) { cutout in
-                ParticleRow(t("透明度の下端")) { NumberField(title: t("透明度の下端"), value: cutout.start, locale: locale) }
-                ParticleRow(t("透明度の上端")) { NumberField(title: t("透明度の上端"), value: cutout.end, locale: locale) }
-                ParticleRow(t("不透明度")) { NumberField(title: t("不透明度"), value: cutout.opacity, locale: locale) }
+                ParticleRow(t("透明度の下端")) { NumberField(
+                    title: t("透明度の下端"),
+                    value: cutout.start,
+                    locale: locale
+                ) }
+                ParticleRow(t("透明度の上端")) { NumberField(
+                    title: t("透明度の上端"),
+                    value: cutout.end,
+                    locale: locale
+                ) }
+                ParticleRow(t("不透明度")) { NumberField(
+                    title: t("不透明度"),
+                    value: cutout.opacity,
+                    locale: locale
+                ) }
             }
         }
     }
 
     // MARK: Emitters
 
-    @ViewBuilder
     private var emittersSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(system.emitters.indices, id: \.self) { index in
@@ -221,10 +260,20 @@ private struct ParticleSystemForm: View {
             }
             Menu(t("発生源を追加")) {
                 Button(t("箱")) {
-                    system.emitters.append(PSystem.Emitter(shape: .box, distanceMax: [256, 256, 0], directions: [1, 1, 0], rate: 10))
+                    system.emitters.append(PSystem.Emitter(
+                        shape: .box,
+                        distanceMax: [256, 256, 0],
+                        directions: [1, 1, 0],
+                        rate: 10
+                    ))
                 }
                 Button(t("球")) {
-                    system.emitters.append(PSystem.Emitter(shape: .sphere, distanceMax: [256, 0, 0], directions: [1, 1, 0], rate: 10))
+                    system.emitters.append(PSystem.Emitter(
+                        shape: .sphere,
+                        distanceMax: [256, 0, 0],
+                        directions: [1, 1, 0],
+                        rate: 10
+                    ))
                 }
             }
             .fixedSize()
@@ -246,33 +295,58 @@ private struct ParticleSystemForm: View {
             vectorRow(t("中心からの距離(最大)"), emitter.distanceMax)
         } else {
             ParticleRow(t("内側の半径")) {
-                NumberField(title: t("内側の半径"), value: component(emitter.distanceMin, 0), locale: locale)
+                NumberField(
+                    title: t("内側の半径"),
+                    value: component(emitter.distanceMin, 0),
+                    locale: locale
+                )
             }
             ParticleRow(t("外側の半径")) {
-                NumberField(title: t("外側の半径"), value: component(emitter.distanceMax, 0), locale: locale)
+                NumberField(
+                    title: t("外側の半径"),
+                    value: component(emitter.distanceMax, 0),
+                    locale: locale
+                )
             }
         }
         vectorRow(t("軸ごとの伸ばし"), emitter.directions)
         vectorRow(t("向きの制限"), emitter.sign, help: t("0 は両側、正の値は正の側だけ、負の値は負の側だけに出します。"))
-        ParticleRow(t("1秒に出す数")) { NumberField(title: t("1秒に出す数"), value: emitter.rate, locale: locale) }
-        ParticleRow(t("始めに一度に出す数")) { IntField(title: t("始めに一度に出す数"), value: emitter.burst, locale: locale) }
+        ParticleRow(t("1秒に出す数")) { NumberField(
+            title: t("1秒に出す数"),
+            value: emitter.rate,
+            locale: locale
+        ) }
+        ParticleRow(t("始めに一度に出す数")) { IntField(
+            title: t("始めに一度に出す数"),
+            value: emitter.burst,
+            locale: locale
+        ) }
         rangeRow(t("中心から離れる速さ"), emitter.speed)
-        ParticleRow(t("始めるまでの秒数")) { NumberField(title: t("始めるまでの秒数"), value: emitter.delay, locale: locale) }
+        ParticleRow(t("始めるまでの秒数")) { NumberField(
+            title: t("始めるまでの秒数"),
+            value: emitter.delay,
+            locale: locale
+        ) }
         optionalGroup(t("決まった秒数で止める"), emitter.duration, make: 5) { duration in
-            ParticleRow(t("出し続ける秒数")) { NumberField(title: t("出し続ける秒数"), value: duration, locale: locale) }
+            ParticleRow(t("出し続ける秒数")) { NumberField(
+                title: t("出し続ける秒数"),
+                value: duration,
+                locale: locale
+            ) }
         }
         optionalGroup(t("休みを挟んで出す"), emitter.periodic, make: PSystem.Periodic()) { periodic in
             rangeRow(t("出す秒数"), periodic.duration)
             rangeRow(t("休む秒数"), periodic.pause)
             optionalGroup(t("1回に出す数を制限"), periodic.maxPerBurst, make: 10) { limit in
-                ParticleRow(t("1回に出す数")) { IntField(title: t("1回に出す数"), value: limit, locale: locale) }
+                ParticleRow(t("1回に出す数")) {
+                    IntField(title: t("1回に出す数"), value: limit, locale: locale)
+                }
             }
         }
     }
 
     // MARK: Initial values
 
-    @ViewBuilder
     private var initialSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             let initial = $system.initial
@@ -285,7 +359,10 @@ private struct ParticleSystemForm: View {
                     selection: Binding(
                         get: { !system.initial.colorChoices.isEmpty },
                         set: { usesChoices in
-                            system.initial.colorChoices = usesChoices ? [system.initial.colorMin, system.initial.colorMax] : []
+                            system.initial.colorChoices = usesChoices ? [
+                                system.initial.colorMin,
+                                system.initial.colorMax
+                            ] : []
                         }
                     )
                 ) {
@@ -303,11 +380,14 @@ private struct ParticleSystemForm: View {
             } else {
                 ParticleRow(t("色の候補")) {
                     ForEach(system.initial.colorChoices.indices, id: \.self) { index in
-                        ParticleColorWell(title: numbered("色 %d", index), rgb: element(initial.colorChoices, index))
-                            .contextMenu {
-                                Button(t("削除")) { remove(index, from: initial.colorChoices) }
-                                    .disabled(system.initial.colorChoices.count <= 1)
-                            }
+                        ParticleColorWell(
+                            title: numbered("色 %d", index),
+                            rgb: element(initial.colorChoices, index)
+                        )
+                        .contextMenu {
+                            Button(t("削除")) { remove(index, from: initial.colorChoices) }
+                                .disabled(system.initial.colorChoices.count <= 1)
+                        }
                     }
                     Button {
                         system.initial.colorChoices.append([1, 1, 1])
@@ -325,28 +405,61 @@ private struct ParticleSystemForm: View {
             vectorRangeRow(t("回転の速さ"), initial.angularVelocity)
             settingsNote(t("回転の速さは「回転の動き」があるときだけ効きます。"))
 
-            optionalGroup(t("揺らぎながら進む速さを足す"), initial.turbulentVelocity, make: PSystem.TurbulentVelocity()) { value in
+            optionalGroup(
+                t("揺らぎながら進む速さを足す"),
+                initial.turbulentVelocity,
+                make: PSystem.TurbulentVelocity()
+            ) { value in
                 rangeRow(t("速さ"), value.speed)
                 rangeRow(t("位相"), value.phase)
-                ParticleRow(t("変化の速さ")) { NumberField(title: t("変化の速さ"), value: value.timeScale, locale: locale) }
-                ParticleRow(t("向きの振れ幅")) { NumberField(title: t("向きの振れ幅"), value: value.scale, locale: locale) }
-                ParticleRow(t("向きのずらし")) { NumberField(title: t("向きのずらし"), value: value.offset, locale: locale) }
+                ParticleRow(t("変化の速さ")) { NumberField(
+                    title: t("変化の速さ"),
+                    value: value.timeScale,
+                    locale: locale
+                ) }
+                ParticleRow(t("向きの振れ幅")) { NumberField(
+                    title: t("向きの振れ幅"),
+                    value: value.scale,
+                    locale: locale
+                ) }
+                ParticleRow(t("向きのずらし")) { NumberField(
+                    title: t("向きのずらし"),
+                    value: value.offset,
+                    locale: locale
+                ) }
                 vectorRow(t("基準の向き"), value.forward)
                 vectorRow(t("回す軸"), value.axis)
             }
-            optionalGroup(t("生まれる位置を揺らぎでずらす"), initial.positionOffset, make: PSystem.PositionOffset()) { value in
-                ParticleRow(t("距離")) { NumberField(title: t("距離"), value: value.distance, locale: locale) }
+            optionalGroup(
+                t("生まれる位置を揺らぎでずらす"),
+                initial.positionOffset,
+                make: PSystem.PositionOffset()
+            ) { value in
+                ParticleRow(t("距離")) { NumberField(
+                    title: t("距離"),
+                    value: value.distance,
+                    locale: locale
+                ) }
                 ParticleRow(t("場所による変化の細かさ")) {
                     NumberField(title: t("場所による変化の細かさ"), value: value.scale, locale: locale)
                 }
-                ParticleRow(t("変化の速さ")) { NumberField(title: t("変化の速さ"), value: value.timeScale, locale: locale) }
+                ParticleRow(t("変化の速さ")) { NumberField(
+                    title: t("変化の速さ"),
+                    value: value.timeScale,
+                    locale: locale
+                ) }
                 vectorRow(t("軸ごとの伸ばし"), value.directions)
                 vectorRow(t("向きの制限"), value.sign, help: t("0 は両側、正の値は正の側だけ、負の値は負の側だけに出します。"))
             }
             optionalGroup(
                 t("制御点に沿って順に生まれる"),
                 initial.sequence,
-                make: PSystem.Sequence(path: .between(start: 0, end: 1, arc: 0.3, arcDirection: [0, 1, 0]))
+                make: PSystem.Sequence(path: .between(
+                    start: 0,
+                    end: 1,
+                    arc: 0.3,
+                    arcDirection: [0, 1, 0]
+                ))
             ) { value in
                 sequenceEditor(value)
             }
@@ -384,7 +497,12 @@ private struct ParticleSystemForm: View {
                     set: { kind in
                         sequence.wrappedValue.path = kind == 0
                             ? .between(start: 0, end: 1, arc: 0.3, arcDirection: [0, 1, 0])
-                            : .around(controlPoint: 0, axis: [0, 0, 1], speedMin: [0, 0, 0], speedMax: [0, 0, 0])
+                            : .around(
+                                controlPoint: 0,
+                                axis: [0, 0, 1],
+                                speedMin: [0, 0, 0],
+                                speedMax: [0, 0, 0]
+                            )
                     }
                 )
             ) {
@@ -398,7 +516,11 @@ private struct ParticleSystemForm: View {
         case .between: betweenEditor(pathBinding)
         case .around: aroundEditor(pathBinding)
         }
-        ParticleRow(t("一巡で生まれる数")) { NumberField(title: t("一巡で生まれる数"), value: sequence.count, locale: locale) }
+        ParticleRow(t("一巡で生まれる数")) { NumberField(
+            title: t("一巡で生まれる数"),
+            value: sequence.count,
+            locale: locale
+        ) }
         ParticleRow(t("使う区間")) {
             NumberField(title: t("使う区間"), value: sequence.boundsMin, locale: locale)
             Text("〜").foregroundColor(.secondary)
@@ -416,7 +538,12 @@ private struct ParticleSystemForm: View {
                 if case let .between(start, _, _, _) = $0 { return start }
                 return nil
             }, { path, value in
-                if case let .between(_, end, arc, direction) = path { return .between(start: value, end: end, arc: arc, arcDirection: direction) }
+                if case let .between(_, end, arc, direction) = path { return .between(
+                    start: value,
+                    end: end,
+                    arc: arc,
+                    arcDirection: direction
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -425,7 +552,12 @@ private struct ParticleSystemForm: View {
                 if case let .between(_, end, _, _) = $0 { return end }
                 return nil
             }, { path, value in
-                if case let .between(start, _, arc, direction) = path { return .between(start: start, end: value, arc: arc, arcDirection: direction) }
+                if case let .between(start, _, arc, direction) = path { return .between(
+                    start: start,
+                    end: value,
+                    arc: arc,
+                    arcDirection: direction
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -434,7 +566,12 @@ private struct ParticleSystemForm: View {
                 if case let .between(_, _, arc, _) = $0 { return arc }
                 return nil
             }, { path, value in
-                if case let .between(start, end, _, direction) = path { return .between(start: start, end: end, arc: value, arcDirection: direction) }
+                if case let .between(start, end, _, direction) = path { return .between(
+                    start: start,
+                    end: end,
+                    arc: value,
+                    arcDirection: direction
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -442,7 +579,12 @@ private struct ParticleSystemForm: View {
             if case let .between(_, _, _, direction) = $0 { return direction }
             return nil
         }, { path, value in
-            if case let .between(start, end, arc, _) = path { return .between(start: start, end: end, arc: arc, arcDirection: value) }
+            if case let .between(start, end, arc, _) = path { return .between(
+                start: start,
+                end: end,
+                arc: arc,
+                arcDirection: value
+            ) }
             return nil
         }))
     }
@@ -454,7 +596,12 @@ private struct ParticleSystemForm: View {
                 if case let .around(point, _, _, _) = $0 { return point }
                 return nil
             }, { path, value in
-                if case let .around(_, axis, low, high) = path { return .around(controlPoint: value, axis: axis, speedMin: low, speedMax: high) }
+                if case let .around(_, axis, low, high) = path { return .around(
+                    controlPoint: value,
+                    axis: axis,
+                    speedMin: low,
+                    speedMax: high
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -462,21 +609,36 @@ private struct ParticleSystemForm: View {
             if case let .around(_, axis, _, _) = $0 { return axis }
             return nil
         }, { path, value in
-            if case let .around(point, _, low, high) = path { return .around(controlPoint: point, axis: value, speedMin: low, speedMax: high) }
+            if case let .around(point, _, low, high) = path { return .around(
+                controlPoint: point,
+                axis: value,
+                speedMin: low,
+                speedMax: high
+            ) }
             return nil
         }))
         vectorRow(t("速さ(最小)"), part(pathBinding, {
             if case let .around(_, _, low, _) = $0 { return low }
             return nil
         }, { path, value in
-            if case let .around(point, axis, _, high) = path { return .around(controlPoint: point, axis: axis, speedMin: value, speedMax: high) }
+            if case let .around(point, axis, _, high) = path { return .around(
+                controlPoint: point,
+                axis: axis,
+                speedMin: value,
+                speedMax: high
+            ) }
             return nil
         }))
         vectorRow(t("速さ(最大)"), part(pathBinding, {
             if case let .around(_, _, _, high) = $0 { return high }
             return nil
         }, { path, value in
-            if case let .around(point, axis, low, _) = path { return .around(controlPoint: point, axis: axis, speedMin: low, speedMax: value) }
+            if case let .around(point, axis, low, _) = path { return .around(
+                controlPoint: point,
+                axis: axis,
+                speedMin: low,
+                speedMax: value
+            ) }
             return nil
         }))
     }
@@ -495,7 +657,11 @@ private struct ParticleSystemForm: View {
             .labelsHidden().fixedSize()
         }
         if remap.wrappedValue.input == .distanceToControlPoint {
-            ParticleRow(t("制御点")) { IntField(title: t("制御点"), value: remap.controlPoint, locale: locale) }
+            ParticleRow(t("制御点")) { IntField(
+                title: t("制御点"),
+                value: remap.controlPoint,
+                locale: locale
+            ) }
         }
         ParticleRow(t("元の値の範囲")) {
             NumberField(title: t("元の値の範囲"), value: remap.inputMin, locale: locale)
@@ -547,7 +713,6 @@ private struct ParticleSystemForm: View {
 
     // MARK: Behaviours
 
-    @ViewBuilder
     private var behaviorsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             settingsNote(t("上から順に毎フレーム適用します。"))
@@ -557,7 +722,10 @@ private struct ParticleSystemForm: View {
                     title: "\(index + 1). \(behaviorName(behavior.wrappedValue))",
                     model: model,
                     onMoveUp: index > 0 ? { system.behaviors.swapAt(index, index - 1) } : nil,
-                    onMoveDown: index < system.behaviors.count - 1 ? { system.behaviors.swapAt(index, index + 1) } : nil,
+                    onMoveDown: index < system.behaviors.count - 1 ? { system.behaviors.swapAt(
+                        index,
+                        index + 1
+                    ) } : nil,
                     onRemove: { remove(index, from: $system.behaviors) }
                 )
                 VStack(alignment: .leading, spacing: 6) {
@@ -584,9 +752,19 @@ private struct ParticleSystemForm: View {
         .sizeChange(PSystem.Change(startValue: 1, endValue: 0)),
         .alphaChange(PSystem.Change(startValue: 1, endValue: 0)),
         .colorChange(PSystem.ColorChange(startValue: [1, 1, 1], endValue: [0, 0, 0])),
-        .oscillatePosition(PSystem.Oscillation(frequency: PSystem.Range(1, 5), amplitude: PSystem.Range(0, 10), phase: PSystem.Range(0, 2 * .pi))),
-        .oscillateAlpha(PSystem.Oscillation(frequency: PSystem.Range(1, 10), amplitude: PSystem.Range(0, 1))),
-        .oscillateSize(PSystem.Oscillation(frequency: PSystem.Range(1, 10), amplitude: PSystem.Range(0.8, 1.2))),
+        .oscillatePosition(PSystem.Oscillation(
+            frequency: PSystem.Range(1, 5),
+            amplitude: PSystem.Range(0, 10),
+            phase: PSystem.Range(0, 2 * .pi)
+        )),
+        .oscillateAlpha(PSystem.Oscillation(
+            frequency: PSystem.Range(1, 10),
+            amplitude: PSystem.Range(0, 1)
+        )),
+        .oscillateSize(PSystem.Oscillation(
+            frequency: PSystem.Range(1, 10),
+            amplitude: PSystem.Range(0.8, 1.2)
+        )),
         .attract(controlPoint: 0, scale: 100, threshold: 300),
         .turbulence(PSystem.Turbulence()),
         .vortex(PSystem.Vortex()),
@@ -654,7 +832,8 @@ private struct ParticleSystemForm: View {
             if case let .movement(gravity, _) = $0 { return gravity }
             return nil
         }, { current, value in
-            if case let .movement(_, drag) = current { return .movement(gravity: value, drag: drag) }
+            if case let .movement(_, drag) = current { return .movement(gravity: value, drag: drag)
+            }
             return nil
         }))
         ParticleRow(t("抵抗")) {
@@ -662,7 +841,10 @@ private struct ParticleSystemForm: View {
                 if case let .movement(_, drag) = $0 { return drag }
                 return nil
             }, { current, value in
-                if case let .movement(gravity, _) = current { return .movement(gravity: gravity, drag: value) }
+                if case let .movement(gravity, _) = current { return .movement(
+                    gravity: gravity,
+                    drag: value
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -674,7 +856,10 @@ private struct ParticleSystemForm: View {
             if case let .angularMovement(force, _) = $0 { return force }
             return nil
         }, { current, value in
-            if case let .angularMovement(_, drag) = current { return .angularMovement(force: value, drag: drag) }
+            if case let .angularMovement(_, drag) = current { return .angularMovement(
+                force: value,
+                drag: drag
+            ) }
             return nil
         }))
         ParticleRow(t("抵抗")) {
@@ -682,7 +867,10 @@ private struct ParticleSystemForm: View {
                 if case let .angularMovement(_, drag) = $0 { return drag }
                 return nil
             }, { current, value in
-                if case let .angularMovement(force, _) = current { return .angularMovement(force: force, drag: value) }
+                if case let .angularMovement(force, _) = current { return .angularMovement(
+                    force: force,
+                    drag: value
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -695,7 +883,10 @@ private struct ParticleSystemForm: View {
                 if case let .alphaFade(fadeIn, _) = $0 { return fadeIn }
                 return nil
             }, { current, value in
-                if case let .alphaFade(_, fadeOut) = current { return .alphaFade(fadeIn: value, fadeOut: fadeOut) }
+                if case let .alphaFade(_, fadeOut) = current { return .alphaFade(
+                    fadeIn: value,
+                    fadeOut: fadeOut
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -704,14 +895,16 @@ private struct ParticleSystemForm: View {
                 if case let .alphaFade(_, fadeOut) = $0 { return fadeOut }
                 return nil
             }, { current, value in
-                if case let .alphaFade(fadeIn, _) = current { return .alphaFade(fadeIn: fadeIn, fadeOut: value) }
+                if case let .alphaFade(fadeIn, _) = current { return .alphaFade(
+                    fadeIn: fadeIn,
+                    fadeOut: value
+                ) }
                 return nil
             }), locale: locale)
         }
         settingsNote(t("寿命を 0〜1 とした割合です。"))
     }
 
-    @ViewBuilder
     private func sizeChangeEditor(_ behavior: Binding<PSystem.Behavior>) -> some View {
         changeEditor(part(behavior, {
             if case let .sizeChange(change) = $0 { return change }
@@ -719,7 +912,6 @@ private struct ParticleSystemForm: View {
         }, { _, value in .sizeChange(value) }))
     }
 
-    @ViewBuilder
     private func alphaChangeEditor(_ behavior: Binding<PSystem.Behavior>) -> some View {
         changeEditor(part(behavior, {
             if case let .alphaChange(change) = $0 { return change }
@@ -741,7 +933,6 @@ private struct ParticleSystemForm: View {
         }
     }
 
-    @ViewBuilder
     private func oscillatePositionEditor(_ behavior: Binding<PSystem.Behavior>) -> some View {
         oscillationEditor(part(behavior, {
             if case let .oscillatePosition(value) = $0 { return value }
@@ -749,7 +940,6 @@ private struct ParticleSystemForm: View {
         }, { _, value in .oscillatePosition(value) }), showsMask: true)
     }
 
-    @ViewBuilder
     private func oscillateAlphaEditor(_ behavior: Binding<PSystem.Behavior>) -> some View {
         oscillationEditor(part(behavior, {
             if case let .oscillateAlpha(value) = $0 { return value }
@@ -757,7 +947,6 @@ private struct ParticleSystemForm: View {
         }, { _, value in .oscillateAlpha(value) }), showsMask: false)
     }
 
-    @ViewBuilder
     private func oscillateSizeEditor(_ behavior: Binding<PSystem.Behavior>) -> some View {
         oscillationEditor(part(behavior, {
             if case let .oscillateSize(value) = $0 { return value }
@@ -772,7 +961,11 @@ private struct ParticleSystemForm: View {
                 if case let .attract(point, _, _) = $0 { return point }
                 return nil
             }, { current, value in
-                if case let .attract(_, scale, threshold) = current { return .attract(controlPoint: value, scale: scale, threshold: threshold) }
+                if case let .attract(_, scale, threshold) = current { return .attract(
+                    controlPoint: value,
+                    scale: scale,
+                    threshold: threshold
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -781,7 +974,11 @@ private struct ParticleSystemForm: View {
                 if case let .attract(_, scale, _) = $0 { return scale }
                 return nil
             }, { current, value in
-                if case let .attract(point, _, threshold) = current { return .attract(controlPoint: point, scale: value, threshold: threshold) }
+                if case let .attract(point, _, threshold) = current { return .attract(
+                    controlPoint: point,
+                    scale: value,
+                    threshold: threshold
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -790,7 +987,11 @@ private struct ParticleSystemForm: View {
                 if case let .attract(_, _, threshold) = $0 { return threshold }
                 return nil
             }, { current, value in
-                if case let .attract(point, scale, _) = current { return .attract(controlPoint: point, scale: scale, threshold: value) }
+                if case let .attract(point, scale, _) = current { return .attract(
+                    controlPoint: point,
+                    scale: scale,
+                    threshold: value
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -804,7 +1005,11 @@ private struct ParticleSystemForm: View {
             return nil
         }, { _, value in PSystem.Behavior.turbulence(value) })
         rangeRow(t("速さ"), value.speed)
-        ParticleRow(t("変化の速さ")) { NumberField(title: t("変化の速さ"), value: value.timeScale, locale: locale) }
+        ParticleRow(t("変化の速さ")) { NumberField(
+            title: t("変化の速さ"),
+            value: value.timeScale,
+            locale: locale
+        ) }
         ParticleRow(t("場所による変化の細かさ")) {
             NumberField(title: t("場所による変化の細かさ"), value: value.scale, locale: locale)
         }
@@ -819,7 +1024,9 @@ private struct ParticleSystemForm: View {
             if case let .vortex(value) = $0 { return value }
             return nil
         }, { _, value in PSystem.Behavior.vortex(value) })
-        ParticleRow(t("制御点")) { IntField(title: t("制御点"), value: value.controlPoint, locale: locale) }
+        ParticleRow(t("制御点")) {
+            IntField(title: t("制御点"), value: value.controlPoint, locale: locale)
+        }
         vectorRow(t("中心のずらし"), value.offset)
         vectorRow(t("回す軸"), value.axis)
         ParticleRow(t("内側の距離と速さ")) {
@@ -840,7 +1047,10 @@ private struct ParticleSystemForm: View {
                 if case let .capVelocity(speed, _) = $0 { return speed }
                 return nil
             }, { current, value in
-                if case let .capVelocity(_, ramp) = current { return .capVelocity(maxSpeed: value, ramp: ramp) }
+                if case let .capVelocity(_, ramp) = current { return .capVelocity(
+                    maxSpeed: value,
+                    ramp: ramp
+                ) }
                 return nil
             }), locale: locale)
         }
@@ -848,7 +1058,10 @@ private struct ParticleSystemForm: View {
             if case let .capVelocity(_, ramp) = $0 { return ramp }
             return nil
         }, { current, value in
-            if case let .capVelocity(speed, _) = current { return .capVelocity(maxSpeed: speed, ramp: value) }
+            if case let .capVelocity(speed, _) = current { return .capVelocity(
+                maxSpeed: speed,
+                ramp: value
+            ) }
             return nil
         }))
     }
@@ -859,7 +1072,9 @@ private struct ParticleSystemForm: View {
             if case let .reduceMovement(value) = $0 { return value }
             return nil
         }, { _, value in PSystem.Behavior.reduceMovement(value) })
-        ParticleRow(t("制御点")) { IntField(title: t("制御点"), value: value.controlPoint, locale: locale) }
+        ParticleRow(t("制御点")) {
+            IntField(title: t("制御点"), value: value.controlPoint, locale: locale)
+        }
         ParticleRow(t("内側の距離と減速")) {
             NumberField(title: t("内側の距離"), value: value.distanceInner, locale: locale)
             NumberField(title: t("内側の減速"), value: value.reductionInner, locale: locale)
@@ -882,15 +1097,26 @@ private struct ParticleSystemForm: View {
         ParticleRow(t("離れようとする距離")) {
             NumberField(title: t("離れようとする距離"), value: value.separationThreshold, locale: locale)
         }
-        ParticleRow(t("離れる強さ")) { NumberField(title: t("離れる強さ"), value: value.separationFactor, locale: locale) }
-        ParticleRow(t("集まる強さ")) { NumberField(title: t("集まる強さ"), value: value.cohesionFactor, locale: locale) }
-        ParticleRow(t("向きを揃える強さ")) { NumberField(title: t("向きを揃える強さ"), value: value.alignmentFactor, locale: locale) }
+        ParticleRow(t("離れる強さ")) { NumberField(
+            title: t("離れる強さ"),
+            value: value.separationFactor,
+            locale: locale
+        ) }
+        ParticleRow(t("集まる強さ")) { NumberField(
+            title: t("集まる強さ"),
+            value: value.cohesionFactor,
+            locale: locale
+        ) }
+        ParticleRow(t("向きを揃える強さ")) { NumberField(
+            title: t("向きを揃える強さ"),
+            value: value.alignmentFactor,
+            locale: locale
+        ) }
         optionalGroup(t("速さを制限"), value.maxSpeed, make: 100) { speed in
             ParticleRow(t("最大の速さ")) { NumberField(title: t("最大の速さ"), value: speed, locale: locale) }
         }
     }
 
-    @ViewBuilder
     private func remapBehaviorEditor(_ behavior: Binding<PSystem.Behavior>) -> some View {
         remapEditor(part(behavior, {
             if case let .remap(value) = $0 { return value }
@@ -917,7 +1143,10 @@ private struct ParticleSystemForm: View {
     }
 
     @ViewBuilder
-    private func oscillationEditor(_ oscillation: Binding<PSystem.Oscillation>, showsMask: Bool) -> some View {
+    private func oscillationEditor(
+        _ oscillation: Binding<PSystem.Oscillation>,
+        showsMask: Bool
+    ) -> some View {
         rangeRow(t("周波数(ラジアン/秒)"), oscillation.frequency)
         rangeRow(showsMask ? t("振れ幅") : t("倍率の範囲"), oscillation.amplitude)
         rangeRow(t("位相"), oscillation.phase)
@@ -928,7 +1157,11 @@ private struct ParticleSystemForm: View {
     }
 
     private func rampEditor(_ ramp: Binding<PSystem.Ramp?>) -> some View {
-        optionalGroup(t("寿命の途中で効き始め・効き終わる"), ramp, make: PSystem.Ramp(inStart: 0, inEnd: 0.1, outStart: 0.9, outEnd: 1)) { ramp in
+        optionalGroup(
+            t("寿命の途中で効き始め・効き終わる"),
+            ramp,
+            make: PSystem.Ramp(inStart: 0, inEnd: 0.1, outStart: 0.9, outEnd: 1)
+        ) { ramp in
             ParticleRow(t("効き始め")) {
                 NumberField(title: t("効き始め"), value: ramp.inStart, locale: locale)
                 Text("〜").foregroundColor(.secondary)
@@ -944,7 +1177,6 @@ private struct ParticleSystemForm: View {
 
     // MARK: Renderer
 
-    @ViewBuilder
     private var rendererSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             ParticleRow(t("形")) {
@@ -986,7 +1218,11 @@ private struct ParticleSystemForm: View {
                         if case let .trail(length, _, _) = $0 { return length }
                         return nil
                     }, { current, value in
-                        if case let .trail(_, low, high) = current { return .trail(length: value, minLength: low, maxLength: high) }
+                        if case let .trail(_, low, high) = current { return .trail(
+                            length: value,
+                            minLength: low,
+                            maxLength: high
+                        ) }
                         return nil
                     }), locale: locale)
                 }
@@ -995,7 +1231,11 @@ private struct ParticleSystemForm: View {
                         if case let .trail(_, low, _) = $0 { return low }
                         return nil
                     }, { current, value in
-                        if case let .trail(length, _, high) = current { return .trail(length: length, minLength: value, maxLength: high) }
+                        if case let .trail(length, _, high) = current { return .trail(
+                            length: length,
+                            minLength: value,
+                            maxLength: high
+                        ) }
                         return nil
                     }), locale: locale)
                     Text("〜").foregroundColor(.secondary)
@@ -1003,7 +1243,11 @@ private struct ParticleSystemForm: View {
                         if case let .trail(_, _, high) = $0 { return high }
                         return nil
                     }, { current, value in
-                        if case let .trail(length, low, _) = current { return .trail(length: length, minLength: low, maxLength: value) }
+                        if case let .trail(length, low, _) = current { return .trail(
+                            length: length,
+                            minLength: low,
+                            maxLength: value
+                        ) }
                         return nil
                     }), locale: locale)
                 }
@@ -1013,7 +1257,11 @@ private struct ParticleSystemForm: View {
                         if case let .ropeTrail(length, _, _) = $0 { return length }
                         return nil
                     }, { current, value in
-                        if case let .ropeTrail(_, segments, fades) = current { return .ropeTrail(length: value, segments: segments, fadesAlpha: fades) }
+                        if case let .ropeTrail(_, segments, fades) = current { return .ropeTrail(
+                            length: value,
+                            segments: segments,
+                            fadesAlpha: fades
+                        ) }
                         return nil
                     }), locale: locale)
                 }
@@ -1022,7 +1270,11 @@ private struct ParticleSystemForm: View {
                         if case let .ropeTrail(_, segments, _) = $0 { return segments }
                         return nil
                     }, { current, value in
-                        if case let .ropeTrail(length, _, fades) = current { return .ropeTrail(length: length, segments: value, fadesAlpha: fades) }
+                        if case let .ropeTrail(length, _, fades) = current { return .ropeTrail(
+                            length: length,
+                            segments: value,
+                            fadesAlpha: fades
+                        ) }
                         return nil
                     }), locale: locale)
                 }
@@ -1031,7 +1283,11 @@ private struct ParticleSystemForm: View {
                         if case let .ropeTrail(_, _, fades) = $0 { return fades }
                         return nil
                     }, { current, value in
-                        if case let .ropeTrail(length, segments, _) = current { return .ropeTrail(length: length, segments: segments, fadesAlpha: value) }
+                        if case let .ropeTrail(length, segments, _) = current { return .ropeTrail(
+                            length: length,
+                            segments: segments,
+                            fadesAlpha: value
+                        ) }
                         return nil
                     }))
                     .labelsHidden()
@@ -1042,7 +1298,6 @@ private struct ParticleSystemForm: View {
 
     // MARK: Control points
 
-    @ViewBuilder
     private var controlPointsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             settingsNote(t("引き寄せ・渦などの動きは、ここで置いた点を番号で指します。"))
@@ -1054,7 +1309,11 @@ private struct ParticleSystemForm: View {
                     onRemove: { remove(index, from: $system.controlPoints) }
                 )
                 VStack(alignment: .leading, spacing: 6) {
-                    ParticleRow(t("番号")) { IntField(title: t("番号"), value: point.index, locale: locale) }
+                    ParticleRow(t("番号")) { IntField(
+                        title: t("番号"),
+                        value: point.index,
+                        locale: locale
+                    ) }
                     ParticleRow(t("位置の基準")) {
                         Picker(t("位置の基準"), selection: point.anchor) {
                             Text(t("レイヤーの中心")).tag(PSystem.ControlPoint.Anchor.layer)
@@ -1079,7 +1338,6 @@ private struct ParticleSystemForm: View {
 
     // MARK: Children
 
-    @ViewBuilder
     private var childrenSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(system.children.indices, id: \.self) { index in
@@ -1101,7 +1359,11 @@ private struct ParticleSystemForm: View {
                     }
                     vectorRow(t("位置のずらし"), child.origin)
                     vectorRow(t("倍率(位置・大きさ・速さ)"), child.scale)
-                    ParticleRow(t("出す確率")) { NumberField(title: t("出す確率"), value: child.probability, locale: locale) }
+                    ParticleRow(t("出す確率")) { NumberField(
+                        title: t("出す確率"),
+                        value: child.probability,
+                        locale: locale
+                    ) }
                     Button(t("中身を編集…")) {
                         openChild(index)
                     }
@@ -1110,7 +1372,10 @@ private struct ParticleSystemForm: View {
                 .padding(.leading, 12)
             }
             Button(t("子粒子を追加")) {
-                system.children.append(PSystem.Child(trigger: .death, system: .init(Self.newChild(textureFile: system.textureFile))))
+                system.children.append(PSystem.Child(
+                    trigger: .death,
+                    system: .init(Self.newChild(textureFile: system.textureFile))
+                ))
             }
         }
     }
@@ -1120,10 +1385,19 @@ private struct ParticleSystemForm: View {
         var child = PSystem()
         child.maxCount = 200
         child.textureFile = textureFile
-        child.emitters = [PSystem.Emitter(shape: .sphere, distanceMax: [8, 0, 0], directions: [1, 1, 0], burst: 8, speed: PSystem.Range(20, 60))]
+        child.emitters = [PSystem.Emitter(
+            shape: .sphere,
+            distanceMax: [8, 0, 0],
+            directions: [1, 1, 0],
+            burst: 8,
+            speed: PSystem.Range(20, 60)
+        )]
         child.initial.lifetime = PSystem.Range(0.4, 0.8)
         child.initial.size = PSystem.Range(4, 10)
-        child.behaviors = [.movement(gravity: [0, 0, 0], drag: 1), .alphaFade(fadeIn: 0, fadeOut: 0.3)]
+        child.behaviors = [
+            .movement(gravity: [0, 0, 0], drag: 1),
+            .alphaFade(fadeIn: 0, fadeOut: 0.3)
+        ]
         return child
     }
 
@@ -1133,7 +1407,11 @@ private struct ParticleSystemForm: View {
         SceneHintText(text: text)
     }
 
-    private func vectorRow(_ title: String, _ values: Binding<[Double]>, help: String? = nil) -> some View {
+    private func vectorRow(
+        _ title: String,
+        _ values: Binding<[Double]>,
+        help: String? = nil
+    ) -> some View {
         ParticleRow(title) {
             VectorFields(title: title, values: values, locale: locale)
         }
@@ -1149,14 +1427,23 @@ private struct ParticleSystemForm: View {
         }
     }
 
-    private func vectorRangeRow(_ title: String, _ range: Binding<PSystem.VectorRange>) -> some View {
+    private func vectorRangeRow(
+        _ title: String,
+        _ range: Binding<PSystem.VectorRange>
+    ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             ParticleRow(title) {
-                Text(t("最小値")).foregroundColor(.secondary).lineLimit(1).frame(width: 64, alignment: .leading)
+                Text(t("最小値")).foregroundColor(.secondary).lineLimit(1).frame(
+                    width: 64,
+                    alignment: .leading
+                )
                 VectorFields(title: title, values: range.min, locale: locale)
             }
             ParticleRow("") {
-                Text(t("最大値")).foregroundColor(.secondary).lineLimit(1).frame(width: 64, alignment: .leading)
+                Text(t("最大値")).foregroundColor(.secondary).lineLimit(1).frame(
+                    width: 64,
+                    alignment: .leading
+                )
                 VectorFields(title: title, values: range.max, locale: locale)
                 exponentField(title: title, value: range.exponent)
             }
@@ -1171,7 +1458,11 @@ private struct ParticleSystemForm: View {
         .help(t("1 で均等。大きいほど最小の側に寄り、1 より小さいと最大の側に寄ります。"))
     }
 
-    private func imagePicker(file: Binding<String?>, emptyText: String, onReplace: @escaping () -> Void) -> some View {
+    private func imagePicker(
+        file: Binding<String?>,
+        emptyText: String,
+        onReplace: @escaping () -> Void
+    ) -> some View {
         HStack(spacing: 8) {
             Text(file.wrappedValue == nil ? emptyText : t("あり"))
                 .foregroundColor(.secondary)
@@ -1205,11 +1496,11 @@ private struct ParticleSystemForm: View {
     }
 
     /// A Toggle that adds or removes an optional part, and the part's fields while it is on.
-    private func optionalGroup<Value, Content: View>(
+    private func optionalGroup<Value>(
         _ title: String,
         _ value: Binding<Value?>,
         make: Value,
-        @ViewBuilder content: @escaping (Binding<Value>) -> Content
+        @ViewBuilder content: @escaping (Binding<Value>) -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             ParticleRow(title) {
@@ -1263,7 +1554,7 @@ private func element<Element>(_ array: Binding<[Element]>, _ index: Int) -> Bind
     )
 }
 
-private func remove<Element>(_ index: Int, from array: Binding<[Element]>) {
+private func remove(_ index: Int, from array: Binding<[some Any]>) {
     if array.wrappedValue.indices.contains(index) {
         array.wrappedValue.remove(at: index)
     }
@@ -1339,13 +1630,17 @@ private struct IntField: View {
     let locale: Locale
 
     var body: some View {
-        TextField(title, value: $value, format: IntegerFormatStyle<Int>.number.grouping(.never).locale(locale))
-            .labelsHidden()
-            .textFieldStyle(.roundedBorder)
-            .controlSize(.small)
-            .multilineTextAlignment(.trailing)
-            .font(.caption.monospacedDigit())
-            .frame(width: 72)
+        TextField(
+            title,
+            value: $value,
+            format: IntegerFormatStyle<Int>.number.grouping(.never).locale(locale)
+        )
+        .labelsHidden()
+        .textFieldStyle(.roundedBorder)
+        .controlSize(.small)
+        .multilineTextAlignment(.trailing)
+        .font(.caption.monospacedDigit())
+        .frame(width: 72)
     }
 }
 
@@ -1360,7 +1655,12 @@ private struct VectorFields: View {
             Text(name)
                 .font(.caption)
                 .foregroundColor(.secondary)
-            NumberField(title: "\(title) \(name)", value: component($values, axis), locale: locale, width: 64)
+            NumberField(
+                title: "\(title) \(name)",
+                value: component($values, axis),
+                locale: locale,
+                width: 64
+            )
         }
     }
 }
@@ -1382,7 +1682,11 @@ private struct ParticleColorWell: View {
                     guard let srgb = NSColor(color).usingColorSpace(.sRGB) else {
                         return
                     }
-                    rgb = [Double(srgb.redComponent), Double(srgb.greenComponent), Double(srgb.blueComponent)]
+                    rgb = [
+                        Double(srgb.redComponent),
+                        Double(srgb.greenComponent),
+                        Double(srgb.blueComponent)
+                    ]
                 }
             ),
             supportsOpacity: false

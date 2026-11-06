@@ -23,7 +23,10 @@ struct LocalWebSettingsSheet: View {
     }
 
     private var values: [String: WebPropertyValue] {
-        var values = Dictionary(context.properties.map { ($0.id, $0.value) }, uniquingKeysWith: { _, last in last })
+        var values = Dictionary(
+            context.properties.map { ($0.id, $0.value) },
+            uniquingKeysWith: { _, last in last }
+        )
         values.merge(settings.values) { _, new in new }
         return values
     }
@@ -61,7 +64,11 @@ struct LocalWebSettingsSheet: View {
                                 if settings.audioReactiveEnabled,
                                    let error = integration.audioError
                                 {
-                                    IntegrationFailureNote(model: model, message: error, privacy: "Privacy_ScreenCapture")
+                                    IntegrationFailureNote(
+                                        model: model,
+                                        message: error,
+                                        privacy: "Privacy_ScreenCapture"
+                                    )
                                 }
                             }
                             if context.supportsMedia {
@@ -69,7 +76,11 @@ struct LocalWebSettingsSheet: View {
                                 Text(localized("起動中のアプリから曲名・ジャケット・再生状態を取得します。初回はオートメーションの許可が必要です。"))
                                     .font(.caption).foregroundColor(.secondary)
                                 if settings.mediaEnabled, let error = integration.mediaError {
-                                    IntegrationFailureNote(model: model, message: error, privacy: "Privacy_Automation")
+                                    IntegrationFailureNote(
+                                        model: model,
+                                        message: error,
+                                        privacy: "Privacy_Automation"
+                                    )
                                 }
                             }
                         }.padding(4)
@@ -168,17 +179,17 @@ struct LocalWebSettingsSheet: View {
                 let minimum = property.minimum ?? 0
                 let maximum = property.maximum ?? 100
                 if maximum > minimum {
-                    // Huge stepped ranges stall native slider layout, so snap values without native stops.
+                    // Huge stepped ranges stall native slider layout, so snap values without native
+                    // stops.
                     Slider(
                         value: binding(
                             property,
                             read: { min(max($0.number, minimum), maximum) },
                             write: { value in
-                                let snapped: Double
-                                if let step = property.step, step > 0 {
-                                    snapped = minimum + ((value - minimum) / step).rounded() * step
+                                let snapped: Double = if let step = property.step, step > 0 {
+                                    minimum + ((value - minimum) / step).rounded() * step
                                 } else {
-                                    snapped = value
+                                    value
                                 }
                                 return .number(min(max(snapped, minimum), maximum))
                             }
@@ -227,7 +238,8 @@ struct LocalWebSettingsSheet: View {
                         settings.values[property.id] = property.value; save()
                     }
                 }
-                Button(localized("ファイルを選択")) { selectFile(property) }.disabled(importingFile || context.importFile == nil)
+                Button(localized("ファイルを選択")) { selectFile(property) }
+                    .disabled(importingFile || context.importFile == nil)
             }
         case "directory":
             let path = (values[property.id] ?? property.value).string

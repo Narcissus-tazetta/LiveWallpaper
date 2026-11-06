@@ -22,7 +22,8 @@ enum LocalWebUserDirectory {
     /// The original escapes the colon, spaces and `&` and leaves non-ASCII letters as they are.
     /// Which other ASCII characters it escapes is unmeasured; this escapes every reserved one.
     static func pageFile(path: String) -> String {
-        let unreserved = Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~/".utf8)
+        let unreserved = Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~/"
+            .utf8)
         var result = "Z%3A"
         for scalar in standardized(path).unicodeScalars {
             if scalar.isASCII, !unreserved.contains(UInt8(scalar.value)) {
@@ -38,7 +39,7 @@ enum LocalWebUserDirectory {
     // The rest of each set is assumed.
     private static let extensions: [String: Set<String>] = [
         "image": ["jpg", "jpeg", "png", "pnga", "gif", "webp", "bmp", "svg"],
-        "video": ["webm", "mp4", "m4v", "mov", "ogv", "ogg"],
+        "video": ["webm", "mp4", "m4v", "mov", "ogv", "ogg"]
     ]
 
     /// Files directly inside the folder, with their modification dates. Whether the original
@@ -130,16 +131,15 @@ final class LocalWebDirectoryWatcher {
         let selection = selection
         Task.detached(priority: .utility) {
             let files: [String: Date]
-            do { files = try LocalWebUserDirectory.listing(of: selection) }
-            catch {
+            do { files = try LocalWebUserDirectory.listing(of: selection) } catch {
                 AppLog.externalWallpapers.error(
                     "web folder listing failed: \(error.localizedDescription, privacy: .public)"
                 )
                 files = [:]
             }
             await MainActor.run { [weak self] in
-                guard let self, self.generation == current else { return }
-                self.onChange(files)
+                guard let self, generation == current else { return }
+                onChange(files)
             }
         }
     }

@@ -24,7 +24,8 @@ struct SolarLocation: Codable, Equatable {
             else {
                 continue
             }
-            let city = timeZone.identifier.split(separator: "/").last.map(String.init) ?? timeZone.identifier
+            let city = timeZone.identifier.split(separator: "/").last.map(String.init) ?? timeZone
+                .identifier
             return SolarLocation(
                 name: city.replacingOccurrences(of: "_", with: " "),
                 latitude: latitude,

@@ -25,7 +25,9 @@ extension WallpaperModel {
         return externalWallpapers.first { $0.id == id }
     }
 
-    var canShowExternalWallpaper: Bool { true }
+    var canShowExternalWallpaper: Bool {
+        true
+    }
 
     /// A scene can be shown or added once LiveWallpaper has baked it.
     func isExternalWallpaperReady(_ wallpaper: ExternalWallpaper) -> Bool {
@@ -45,7 +47,8 @@ extension WallpaperModel {
     /// The library copy of an external wallpaper, while the user keeps it.
     func libraryPath(forExternalWallpaperID id: String) -> String? {
         guard let path = importedExternalWallpaperPaths[id],
-              libraryVideoPaths.contains(path) || webWallpaperSources.contains(where: { $0.localFolderPath != nil && $0.url.path == path })
+              libraryVideoPaths.contains(path) || webWallpaperSources
+              .contains(where: { $0.localFolderPath != nil && $0.url.path == path })
         else {
             return nil
         }
@@ -80,11 +83,17 @@ extension WallpaperModel {
               libraryPath(forExternalWallpaperID: id) == nil,
               let wallpaper = externalWallpapers.first(where: { $0.id == id })
         else {
-            AppLog.externalWallpapers.warning("importExternalWallpaper skipped id=\(id, privacy: .public): busy or already imported")
+            AppLog.externalWallpapers
+                .warning(
+                    "importExternalWallpaper skipped id=\(id, privacy: .public): busy or already imported"
+                )
             return false
         }
         guard isExternalWallpaperReady(wallpaper) else {
-            AppLog.externalWallpapers.warning("importExternalWallpaper skipped id=\(id, privacy: .public): wallpaper not ready")
+            AppLog.externalWallpapers
+                .warning(
+                    "importExternalWallpaper skipped id=\(id, privacy: .public): wallpaper not ready"
+                )
             return false
         }
         importingExternalWallpaperID = id
@@ -93,8 +102,11 @@ extension WallpaperModel {
         if let source = wallpaper.webSource {
             return await importExternalWebWallpaper(source, externalID: id)
         }
-        guard let localURL = await importVideoToAppSupport(from: URL(fileURLWithPath: wallpaper.path)) else {
-            AppLog.externalWallpapers.error("could not add \(id, privacy: .public) to the library: video copy failed")
+        guard let localURL =
+            await importVideoToAppSupport(from: URL(fileURLWithPath: wallpaper.path))
+        else {
+            AppLog.externalWallpapers
+                .error("could not add \(id, privacy: .public) to the library: video copy failed")
             failedExternalWallpaperImportID = id
             return false
         }
@@ -106,32 +118,47 @@ extension WallpaperModel {
         // the library never holds the video without its scene.
         var scene: SceneDocument?
         if wallpaper.isScene {
-            let sourceFolder: URL
-            if SceneStore.hasScene(videoPath: wallpaper.path) {
-                sourceFolder = SceneStore.folderURL(forVideoPath: wallpaper.path)
+            let sourceFolder: URL = if SceneStore.hasScene(videoPath: wallpaper.path) {
+                SceneStore.folderURL(forVideoPath: wallpaper.path)
             } else if let originalFolder = wallpaper.sceneFolderPath,
-               FileManager.default.fileExists(atPath: URL(fileURLWithPath: originalFolder).appendingPathComponent("scene.json").path) {
-                sourceFolder = URL(fileURLWithPath: originalFolder, isDirectory: true)
+                      FileManager.default
+                      .fileExists(atPath: URL(fileURLWithPath: originalFolder)
+                          .appendingPathComponent("scene.json").path)
+            {
+                URL(fileURLWithPath: originalFolder, isDirectory: true)
             } else {
-                sourceFolder = SceneStore.folderURL(forVideoPath: wallpaper.path)
+                SceneStore.folderURL(forVideoPath: wallpaper.path)
             }
             do {
                 let videoIsOutOfDate = SceneStore.isNewerThanVideo(videoPath: wallpaper.path)
                 scene = try await Task.detached(priority: .userInitiated) {
-                    try SceneStore.importScene(from: sourceFolder, videoPath: localURL.path, videoIsOutOfDate: videoIsOutOfDate)
+                    try SceneStore.importScene(
+                        from: sourceFolder,
+                        videoPath: localURL.path,
+                        videoIsOutOfDate: videoIsOutOfDate
+                    )
                 }.value
             } catch {
                 AppLog.externalWallpapers.error(
                     "could not copy the scene of \(id, privacy: .public): \(error.localizedDescription, privacy: .public)"
                 )
-                removeLeftovers(of: [localURL, sidecarURL, SceneStore.folderURL(forVideoPath: localURL.path)])
+                removeLeftovers(of: [
+                    localURL,
+                    sidecarURL,
+                    SceneStore.folderURL(forVideoPath: localURL.path)
+                ])
                 failedExternalWallpaperImportID = id
                 return false
             }
         }
         guard addVideoPathToLibrary(localURL.path, preferredDisplayName: wallpaper.name) else {
-            AppLog.externalWallpapers.error("could not add \(id, privacy: .public) to the library: registration failed")
-            removeLeftovers(of: [localURL, sidecarURL, SceneStore.folderURL(forVideoPath: localURL.path)])
+            AppLog.externalWallpapers
+                .error("could not add \(id, privacy: .public) to the library: registration failed")
+            removeLeftovers(of: [
+                localURL,
+                sidecarURL,
+                SceneStore.folderURL(forVideoPath: localURL.path)
+            ])
             failedExternalWallpaperImportID = id
             return false
         }
@@ -202,7 +229,8 @@ extension WallpaperModel {
             // A video-to-web fade transfers the outgoing player to its overlay.
             // Once that overlay is gone, returning needs a new shared player.
             if changesWeb, !isWebWallpaperActive, sharedPlayer?.currentItem == nil,
-               let savedPath = currentVideoPath, FileManager.default.fileExists(atPath: savedPath) {
+               let savedPath = currentVideoPath, FileManager.default.fileExists(atPath: savedPath)
+            {
                 playRegisteredVideo(path: savedPath)
             }
             if changesWeb { scheduleWindowRebuild(delay: 0.05) }
@@ -217,31 +245,47 @@ extension WallpaperModel {
             stopExternalWallpaper()
         }
         let removedWebFolders = externalWallpapers.compactMap { old -> String? in
-            guard !wallpapers.contains(where: { $0.webSource?.localFolderPath == old.webSource?.localFolderPath }) else { return nil }
+            guard !wallpapers
+                .contains(where: { $0.webSource?.localFolderPath == old.webSource?.localFolderPath
+                }) else { return nil }
             return old.webSource?.localFolderPath
         }
-        for folder in removedWebFolders { localWebWallpaperServer.remove(folder: URL(fileURLWithPath: folder)) }
+        for folder in removedWebFolders {
+            localWebWallpaperServer.remove(folder: URL(fileURLWithPath: folder))
+        }
         externalWallpapers = wallpapers
         reconcileExternalScenes()
         reconcileImportedExternalWallpapersThumbnails()
     }
 
-    private func importExternalWebWallpaper(_ source: WebWallpaperSource, externalID: String) async -> Bool {
+    private func importExternalWebWallpaper(
+        _ source: WebWallpaperSource,
+        externalID: String
+    ) async -> Bool {
         let folder = URL(fileURLWithPath: source.localFolderPath!, isDirectory: true)
-        let destination = LocalWebWallpaperPackage.libraryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let destination = LocalWebWallpaperPackage.libraryDirectory.appendingPathComponent(
+            UUID().uuidString,
+            isDirectory: true
+        )
         do {
             try await Task.detached(priority: .userInitiated) {
                 try LocalWebWallpaperPackage.copy(from: folder, to: destination)
             }.value
             let package = try LocalWebWallpaperPackage.load(folder: destination)
-            let saved = WebWallpaperSource(url: destination.appendingPathComponent(package.entryPoint),
-                                           displayName: source.displayName, localFolderPath: destination.path,
-                                           warnings: package.warnings,
-                                           thumbnailPath: package.preview.map { destination.appendingPathComponent($0).path })
+            let saved = WebWallpaperSource(
+                url: destination.appendingPathComponent(package.entryPoint),
+                displayName: source.displayName,
+                localFolderPath: destination.path,
+                warnings: package.warnings,
+                thumbnailPath: package.preview.map { destination.appendingPathComponent($0).path }
+            )
             try LocalWebSettings.load(id: source.id).save(id: saved.id)
             webWallpaperSources.append(saved)
             importedExternalWallpaperPaths[externalID] = saved.url.path
-            UserDefaults.standard.set(importedExternalWallpaperPaths, forKey: PrefsKey.importedExternalWallpapers)
+            UserDefaults.standard.set(
+                importedExternalWallpaperPaths,
+                forKey: PrefsKey.importedExternalWallpapers
+            )
             setWebWallpaperFeatureEnabled(true)
             syncActivePlaylistPaths()
             stopExternalWallpaper()
@@ -252,7 +296,10 @@ extension WallpaperModel {
             removeLeftovers(of: [destination])
             failedExternalWallpaperImportID = externalID
             webWallpaperErrorMessage = error.localizedDescription
-            AppLog.externalWallpapers.error("could not import web package: \(error.localizedDescription, privacy: .public)")
+            AppLog.externalWallpapers
+                .error(
+                    "could not import web package: \(error.localizedDescription, privacy: .public)"
+                )
             return false
         }
     }
@@ -263,23 +310,28 @@ extension WallpaperModel {
     /// the bakes of scenes no longer offered as they are.
     private func reconcileExternalScenes() {
         let offered = Dictionary(
-            externalWallpapers.filter(\.isScene).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }
+            externalWallpapers.filter(\.isScene).map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
         )
-        let known = Set(readyExternalScenes.keys).union(externalScenePreparations.keys).union(failedExternalScenes.keys)
+        let known = Set(readyExternalScenes.keys).union(externalScenePreparations.keys)
+            .union(failedExternalScenes.keys)
         AppLog.externalWallpapers.info(
-            "reconcile scenes offered=\(offered.mapValues { $0.sceneRevision?.timeIntervalSince1970 ?? 0 }.description, privacy: .public) ready=\(self.readyExternalScenes.mapValues(\.timeIntervalSince1970).description, privacy: .public) preparing=\(self.externalScenePreparations.count) failed=\(self.failedExternalScenes.count)"
+            "reconcile scenes offered=\(offered.mapValues { $0.sceneRevision?.timeIntervalSince1970 ?? 0 }.description, privacy: .public) ready=\(readyExternalScenes.mapValues(\.timeIntervalSince1970).description, privacy: .public) preparing=\(externalScenePreparations.count) failed=\(failedExternalScenes.count)"
         )
         for id in known {
             let revision = offered[id]?.sceneRevision
-            let current = readyExternalScenes[id] ?? externalScenePreparations[id]?.revision ?? failedExternalScenes[id]
+            let current = readyExternalScenes[id] ?? externalScenePreparations[id]?
+                .revision ?? failedExternalScenes[id]
             let path = offered[id]?.path
-            let missingBakedVideo = readyExternalScenes[id] != nil && (path == nil || !FileManager.default.fileExists(atPath: path!))
+            let missingBakedVideo = readyExternalScenes[id] != nil &&
+                (path == nil || !FileManager.default.fileExists(atPath: path!))
             if revision == nil || (current != nil && current != revision) || missingBakedVideo {
                 discardExternalScene(id: id)
             }
         }
         for wallpaper in offered.values
-            where readyExternalScenes[wallpaper.id] == nil && externalScenePreparations[wallpaper.id] == nil
+            where readyExternalScenes[wallpaper.id] == nil &&
+            externalScenePreparations[wallpaper.id] == nil
             && failedExternalScenes[wallpaper.id] == nil
         {
             if canReuseBakedScene(wallpaper) {
@@ -299,11 +351,15 @@ extension WallpaperModel {
         }
         let metaURL = ExternalWallpaperProviderMonitor.bakedSceneMetaURL(forID: wallpaper.id)
         guard let data = try? Data(contentsOf: metaURL),
-              let meta = try? JSONDecoder().decode(ExternalWallpaperProviderMonitor.BakedSceneMeta.self, from: data)
+              let meta = try? JSONDecoder().decode(
+                  ExternalWallpaperProviderMonitor.BakedSceneMeta.self,
+                  from: data
+              )
         else {
             return false
         }
-        return meta.sceneRevision == revision && meta.appSignature == ExternalWallpaperProviderMonitor.currentAppSignature
+        return meta.sceneRevision == revision && meta
+            .appSignature == ExternalWallpaperProviderMonitor.currentAppSignature
     }
 
     private func reuseBakedScene(_ wallpaper: ExternalWallpaper) {
@@ -315,7 +371,8 @@ extension WallpaperModel {
         }
         registerImportedScene(document, path: wallpaper.path)
         readyExternalScenes[wallpaper.id] = revision
-        AppLog.externalWallpapers.info("reused cached baked scene \(wallpaper.id, privacy: .public)")
+        AppLog.externalWallpapers
+            .info("reused cached baked scene \(wallpaper.id, privacy: .public)")
         objectWillChange.send()
         if pendingShowExternalWallpaperID == wallpaper.id {
             showExternalWallpaper(id: wallpaper.id)
@@ -338,39 +395,64 @@ extension WallpaperModel {
                     var previous: SceneDocument?
                     if FileManager.default.fileExists(atPath: bakeFolder.path) {
                         do {
-                            previous = try SceneStore.load(videoPath: videoPath).map { SceneScriptPermissions.restored($0, path: videoPath) }
+                            previous = try SceneStore.load(videoPath: videoPath)
+                                .map { SceneScriptPermissions.restored(
+                                    $0,
+                                    path: videoPath
+                                ) }
                         } catch {
-                            AppLog.externalWallpapers.error("previous scene of \(id, privacy: .public) not read: \(error.localizedDescription, privacy: .public)")
+                            AppLog.externalWallpapers
+                                .error(
+                                    "previous scene of \(id, privacy: .public) not read: \(error.localizedDescription, privacy: .public)"
+                                )
                         }
                         try FileManager.default.removeItem(at: bakeFolder)
                     }
-                    try FileManager.default.createDirectory(at: bakeFolder, withIntermediateDirectories: true)
-                    let document = try SceneStore.importScene(from: URL(fileURLWithPath: folder, isDirectory: true), videoPath: videoPath)
+                    try FileManager.default.createDirectory(
+                        at: bakeFolder,
+                        withIntermediateDirectories: true
+                    )
+                    let document = try SceneStore.importScene(
+                        from: URL(fileURLWithPath: folder, isDirectory: true),
+                        videoPath: videoPath
+                    )
                     return (document, previous)
                 }.value
                 var document = imported
                 try Task.checkCancellation()
                 guard let self else { return }
-                SceneScriptPermissions.carry(document, replacing: previous ?? self.sceneDocumentsByPath[videoPath], path: videoPath)
+                SceneScriptPermissions.carry(
+                    document,
+                    replacing: previous ?? sceneDocumentsByPath[videoPath],
+                    path: videoPath
+                )
                 let settings = try LocalWebSettings.load(key: "authorSettings.external." + id)
                 if !settings.values.isEmpty {
                     let sourceDirectory = document.authorSourceDirectory
-                    let itemID = id.hasPrefix("we-import.json/") ? String(id.dropFirst("we-import.json/".count)) : nil
-                    try await SceneAuthorSettingsConversion.apply(sourceDirectory: sourceDirectory, itemID: itemID, values: settings.values) { source in
+                    let itemID = id
+                        .hasPrefix("we-import.json/") ?
+                        String(id.dropFirst("we-import.json/".count)) : nil
+                    try await SceneAuthorSettingsConversion.apply(
+                        sourceDirectory: sourceDirectory,
+                        itemID: itemID,
+                        values: settings.values
+                    ) { source in
                         document = try await Task.detached(priority: .utility) {
                             try SceneStore.importScene(from: source, videoPath: videoPath)
                         }.value
                     }
-                    try settings.save(key: "authorSettings.scene." + URL(fileURLWithPath: videoPath).standardizedFileURL.path)
+                    try settings
+                        .save(key: "authorSettings.scene." + URL(fileURLWithPath: videoPath)
+                            .standardizedFileURL.path)
                 }
                 // A still stands in for the video: the desktop draws the scene live, and
                 // a full loop is baked only once it goes on the lock screen or screen saver.
-                try await self.bakeSceneOutsideLibrary(document, videoPath: videoPath, stillOnly: true)
+                try await bakeSceneOutsideLibrary(document, videoPath: videoPath, stillOnly: true)
                 if document.isAnimated {
                     try SceneStore.markVideoOutOfDate(videoPath: videoPath)
                 }
                 try Task.checkCancellation()
-                self.registerImportedScene(document, path: videoPath)
+                registerImportedScene(document, path: videoPath)
                 let meta = ExternalWallpaperProviderMonitor.BakedSceneMeta(
                     sceneRevision: revision,
                     appSignature: ExternalWallpaperProviderMonitor.currentAppSignature
@@ -381,10 +463,10 @@ extension WallpaperModel {
                         options: .atomic
                     )
                 }
-                self.readyExternalScenes[id] = revision
+                readyExternalScenes[id] = revision
                 AppLog.externalWallpapers.info("scene ready \(id, privacy: .public)")
-                if self.pendingShowExternalWallpaperID == id {
-                    self.showExternalWallpaper(id: id)
+                if pendingShowExternalWallpaperID == id {
+                    showExternalWallpaper(id: id)
                 }
             } catch is CancellationError {
                 // discardExternalScene cancelled it and cleans up.
@@ -461,7 +543,11 @@ extension WallpaperModel {
         if !activated {
             let appURL = URL(fileURLWithPath: "/Applications/we-import.app")
             if FileManager.default.fileExists(atPath: appURL.path) {
-                NSWorkspace.shared.openApplication(at: appURL, configuration: .init(), completionHandler: nil)
+                NSWorkspace.shared.openApplication(
+                    at: appURL,
+                    configuration: .init(),
+                    completionHandler: nil
+                )
             }
         }
     }
@@ -483,7 +569,10 @@ extension WallpaperModel {
         externalWallpapers: [ExternalWallpaper]
     ) {
         let fileManager = FileManager.default
-        let externalMap = Dictionary(externalWallpapers.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let externalMap = Dictionary(
+            externalWallpapers.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
 
         for (externalID, importedVideoPath) in imported {
             guard fileManager.fileExists(atPath: importedVideoPath) else {
@@ -503,7 +592,8 @@ extension WallpaperModel {
 
             if VideoThumbnailGenerator.saveNormalizedPreview(from: previewSource, to: sidecarURL) {
                 if let dataURL = DiskThumbnailCache.dataDirectoryURL() {
-                    let cacheFile = dataURL.appendingPathComponent("\(CacheKeyHashing.hashed(importedVideoPath)).jpg")
+                    let cacheFile = dataURL
+                        .appendingPathComponent("\(CacheKeyHashing.hashed(importedVideoPath)).jpg")
                     try? fileManager.removeItem(at: cacheFile)
                 }
             }
@@ -524,7 +614,8 @@ extension WallpaperModel {
                 candidateDirs.append(URL(fileURLWithPath: sceneFolder, isDirectory: true))
             }
             if !wallpaper.path.isEmpty {
-                candidateDirs.append(URL(fileURLWithPath: wallpaper.path).deletingLastPathComponent())
+                candidateDirs
+                    .append(URL(fileURLWithPath: wallpaper.path).deletingLastPathComponent())
             }
             let previewNames = ["preview.jpg", "preview.gif", "preview.png", "preview.jpeg"]
             for dir in candidateDirs {
@@ -537,10 +628,16 @@ extension WallpaperModel {
             }
         }
 
-        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+        guard let appSupport = fileManager.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
             return nil
         }
-        let weWallpapers = appSupport.appendingPathComponent("we-import/Wallpapers", isDirectory: true)
+        let weWallpapers = appSupport.appendingPathComponent(
+            "we-import/Wallpapers",
+            isDirectory: true
+        )
         let itemID = externalID.components(separatedBy: "/").last ?? externalID
         var candidateDirs: [URL] = [
             weWallpapers.appendingPathComponent("we-\(itemID)", isDirectory: true),

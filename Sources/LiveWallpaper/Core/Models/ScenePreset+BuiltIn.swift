@@ -3,7 +3,11 @@ import Foundation
 extension ScenePreset {
     /// `localize` turns the Japanese source strings into the app's language.
     static func builtIn(_ kind: BuiltIn, localize: (String) -> String) -> ScenePreset {
-        func particles(_ preset: SceneParticlePreset, name: String, _ change: (inout SceneLayer) -> Void = { _ in }) -> SceneLayer {
+        func particles(
+            _ preset: SceneParticlePreset,
+            name: String,
+            _ change: (inout SceneLayer) -> Void = { _ in }
+        ) -> SceneLayer {
             var particles = SceneParticles(preset: preset)
             // A fixed pattern, so trying the preset again shows the same picture.
             particles.seed = 4217
@@ -38,17 +42,27 @@ extension ScenePreset {
             var flow = SceneEffect(kind: .waterFlow)
             flow.strength = 0.5
             // Only where a direction is drawn moves, so drawing is the area too.
-            return ScenePreset(name: localize("水面の流れ"), builtIn: kind, effects: [ScenePresetEffect(flow, wantsMask: false)])
+            return ScenePreset(
+                name: localize("水面の流れ"),
+                builtIn: kind,
+                effects: [ScenePresetEffect(flow, wantsMask: false)]
+            )
 
         case .driftingClouds:
             var clouds = SceneEffect(kind: .drift)
             clouds.strength = 0.5
             clouds.direction = 0
-            return ScenePreset(name: localize("流れる雲"), builtIn: kind, effects: [ScenePresetEffect(clouds, wantsMask: true)])
+            return ScenePreset(
+                name: localize("流れる雲"),
+                builtIn: kind,
+                effects: [ScenePresetEffect(clouds, wantsMask: true)]
+            )
 
         case .cherryBlossoms:
             var preset = ScenePreset(name: localize("桜吹雪"), builtIn: kind, effects: [])
-            preset.particleLayers = [particles(.petals, name: "花びら") { $0.particles?.cursorMode = .repel }]
+            preset
+                .particleLayers =
+                [particles(.petals, name: "花びら") { $0.particles?.cursorMode = .repel }]
             return preset
 
         case .fallingSnow:

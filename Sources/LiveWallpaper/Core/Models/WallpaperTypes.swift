@@ -46,12 +46,14 @@ enum QualityPreset: String {
     case quality
 }
 
-enum BakeQuality: String, CaseIterable, Identifiable, Sendable {
+enum BakeQuality: String, CaseIterable, Identifiable {
     case standard
     case high
     case maximum
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var compressionQuality: Double {
         switch self {

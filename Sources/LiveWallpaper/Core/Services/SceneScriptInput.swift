@@ -12,13 +12,20 @@ struct SceneScriptInput {
         var errorDescription: String?
     }
 
-    mutating func null() { bytes.append(0) }
+    mutating func null() {
+        bytes.append(0)
+    }
 
-    mutating func bool(_ value: Bool) { bytes.append(value ? 2 : 1) }
+    mutating func bool(_ value: Bool) {
+        bytes.append(value ? 2 : 1)
+    }
 
     /// JSON has no NaN or infinity, and scripts were never given one.
     mutating func number(_ value: Double) throws {
-        guard value.isFinite else { throw InvalidValue(errorDescription: "Invalid number value (\(value)) in script input") }
+        guard value.isFinite
+        else {
+            throw InvalidValue(errorDescription: "Invalid number value (\(value)) in script input")
+        }
         bytes.append(3)
         withUnsafeBytes(of: value.bitPattern.littleEndian) { bytes.append(contentsOf: $0) }
     }
@@ -34,17 +41,28 @@ struct SceneScriptInput {
     }
 
     /// Returns where the count goes, for `end(_:count:)`.
-    mutating func beginArray() -> Int { begin(5) }
-
-    mutating func beginObject() -> Int { begin(6) }
-
-    mutating func key(_ name: String) { appendText(name) }
-
-    mutating func end(_ position: Int, count: Int) {
-        withUnsafeBytes(of: UInt32(count).littleEndian) { bytes.replaceSubrange(position ..< position + 4, with: $0) }
+    mutating func beginArray() -> Int {
+        begin(5)
     }
 
-    mutating func append(_ other: SceneScriptInput) { bytes.append(contentsOf: other.bytes) }
+    mutating func beginObject() -> Int {
+        begin(6)
+    }
+
+    mutating func key(_ name: String) {
+        appendText(name)
+    }
+
+    mutating func end(_ position: Int, count: Int) {
+        withUnsafeBytes(of: UInt32(count).littleEndian) { bytes.replaceSubrange(
+            position ..< position + 4,
+            with: $0
+        ) }
+    }
+
+    mutating func append(_ other: SceneScriptInput) {
+        bytes.append(contentsOf: other.bytes)
+    }
 
     /// Any value JSONSerialization would write.
     mutating func value(_ value: Any) throws {
@@ -56,7 +74,9 @@ struct SceneScriptInput {
         case let number as NSNumber:
             if CFGetTypeID(number) == CFBooleanGetTypeID() {
                 bool(number.boolValue)
-            } else if CFNumberGetType(number) == .float32Type || CFNumberGetType(number) == .floatType {
+            } else if CFNumberGetType(number) == .float32Type || CFNumberGetType(number) ==
+                .floatType
+            {
                 try self.number(number.floatValue)
             } else {
                 try self.number(number.doubleValue)
@@ -70,7 +90,9 @@ struct SceneScriptInput {
             end(position, count: object.count)
         case let array as [Any]:
             let position = beginArray()
-            for item in array { try self.value(item) }
+            for item in array {
+                try self.value(item)
+            }
             end(position, count: array.count)
         default:
             throw InvalidValue(errorDescription: "Invalid type in script input: \(type(of: value))")
@@ -123,7 +145,9 @@ enum SceneScriptOutputReader {
             let count = Int(UInt32(littleEndian: load(bytes, &offset)))
             var array: [Any] = []
             array.reserveCapacity(count)
-            for _ in 0 ..< count { array.append(value(bytes, &offset)) }
+            for _ in 0 ..< count {
+                array.append(value(bytes, &offset))
+            }
             return array
         default:
             let count = Int(UInt32(littleEndian: load(bytes, &offset)))
@@ -136,7 +160,10 @@ enum SceneScriptOutputReader {
         }
     }
 
-    private static func load<T: FixedWidthInteger>(_ bytes: UnsafeRawBufferPointer, _ offset: inout Int) -> T {
+    private static func load<T: FixedWidthInteger>(
+        _ bytes: UnsafeRawBufferPointer,
+        _ offset: inout Int
+    ) -> T {
         defer { offset += MemoryLayout<T>.size }
         return bytes.loadUnaligned(fromByteOffset: offset, as: T.self)
     }
@@ -144,7 +171,10 @@ enum SceneScriptOutputReader {
     private static func text(_ bytes: UnsafeRawBufferPointer, _ offset: inout Int) -> String {
         let length = Int(UInt32(littleEndian: load(bytes, &offset)))
         defer { offset += length }
-        return String(decoding: UnsafeRawBufferPointer(rebasing: bytes[offset ..< offset + length]), as: UTF8.self)
+        return String(
+            decoding: UnsafeRawBufferPointer(rebasing: bytes[offset ..< offset + length]),
+            as: UTF8.self
+        )
     }
 }
 
@@ -155,47 +185,96 @@ enum SceneScriptOutputReader {
 struct SceneScriptValueDecoder: Decoder {
     let value: Any
     var codingPath: [CodingKey] = []
-    var userInfo: [CodingUserInfoKey: Any] { [:] }
+    var userInfo: [CodingUserInfoKey: Any] {
+        [:]
+    }
 
-    static func decode<T: Decodable>(_ type: T.Type, from value: Any) throws -> T {
+    static func decode<T: Decodable>(_: T.Type, from value: Any) throws -> T {
         try T(from: SceneScriptValueDecoder(value: value))
     }
 
     func container<Key: CodingKey>(keyedBy _: Key.Type) throws -> KeyedDecodingContainer<Key> {
-        guard let object = value as? [String: Any] else { throw mismatch([String: Any].self, codingPath) }
+        guard let object = value as? [String: Any] else { throw mismatch(
+            [String: Any].self,
+            codingPath
+        ) }
         return KeyedDecodingContainer(Keyed<Key>(object: object, codingPath: codingPath))
     }
 
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
-        throw DecodingError.typeMismatch([Any].self, .init(codingPath: codingPath, debugDescription: "Arrays are not decoded from script values"))
+        throw DecodingError.typeMismatch(
+            [Any].self,
+            .init(
+                codingPath: codingPath,
+                debugDescription: "Arrays are not decoded from script values"
+            )
+        )
     }
 
-    func singleValueContainer() throws -> SingleValueDecodingContainer { Single(value: value, codingPath: codingPath) }
+    func singleValueContainer() throws -> SingleValueDecodingContainer {
+        Single(
+            value: value,
+            codingPath: codingPath
+        )
+    }
 
-    fileprivate static func number(_ value: Any, _ type: Any.Type, _ path: [CodingKey]) throws -> NSNumber {
-        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { throw mismatch(type, path) }
+    fileprivate static func number(
+        _ value: Any,
+        _ type: Any.Type,
+        _ path: [CodingKey]
+    ) throws -> NSNumber {
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID()
+        else { throw mismatch(
+            type,
+            path
+        ) }
         return number
     }
 
-    fileprivate static func decodeValue<T: Decodable>(_ type: T.Type, _ value: Any, _ path: [CodingKey]) throws -> T {
+    /// The caller has matched `type` already; this only spells the conversion without `as!`.
+    private static func typed<T>(_ value: Any, _ type: T.Type, _ path: [CodingKey]) throws -> T {
+        guard let typed = value as? T else {
+            throw mismatch(type, path)
+        }
+        return typed
+    }
+
+    fileprivate static func decodeValue<T: Decodable>(
+        _ type: T.Type,
+        _ value: Any,
+        _ path: [CodingKey]
+    ) throws -> T {
         switch type {
         case is Bool.Type:
-            guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { throw mismatch(type, path) }
-            return number.boolValue as! T
+            guard let number = value as? NSNumber,
+                  CFGetTypeID(number) == CFBooleanGetTypeID()
+            else { throw mismatch(
+                type,
+                path
+            ) }
+            return try typed(number.boolValue, type, path)
         case is Double.Type:
-            return try number(value, type, path).doubleValue as! T
+            return try typed(number(value, type, path).doubleValue, type, path)
         case is Int.Type:
             let number = try number(value, type, path)
-            let integer = CFNumberIsFloatType(number) ? Int(exactly: number.doubleValue) : Int(exactly: number.int64Value)
+            let integer = CFNumberIsFloatType(number) ? Int(exactly: number.doubleValue) :
+                Int(exactly: number.int64Value)
             guard let integer else {
-                throw DecodingError.dataCorrupted(.init(codingPath: path, debugDescription: "Number \(number) does not fit in Int."))
+                throw DecodingError.dataCorrupted(.init(
+                    codingPath: path,
+                    debugDescription: "Number \(number) does not fit in Int."
+                ))
             }
-            return integer as! T
+            return try typed(integer, type, path)
         case is String.Type:
             guard let text = value as? String else { throw mismatch(type, path) }
-            return text as! T
+            return try typed(text, type, path)
         case is Float.Type:
-            throw DecodingError.typeMismatch(type, .init(codingPath: path, debugDescription: "Float is decoded from JSON text"))
+            throw DecodingError.typeMismatch(
+                type,
+                .init(codingPath: path, debugDescription: "Float is decoded from JSON text")
+            )
         default:
             return try T(from: SceneScriptValueDecoder(value: value, codingPath: path))
         }
@@ -204,15 +283,27 @@ struct SceneScriptValueDecoder: Decoder {
     private struct Keyed<Key: CodingKey>: KeyedDecodingContainerProtocol {
         let object: [String: Any]
         let codingPath: [CodingKey]
-        var allKeys: [Key] { object.keys.compactMap(Key.init(stringValue:)) }
+        var allKeys: [Key] {
+            object.keys.compactMap(Key.init(stringValue:))
+        }
 
-        func contains(_ key: Key) -> Bool { object[key.stringValue] != nil }
+        func contains(_ key: Key) -> Bool {
+            object[key.stringValue] != nil
+        }
 
-        func decodeNil(forKey key: Key) throws -> Bool { object[key.stringValue] is NSNull }
+        func decodeNil(forKey key: Key) throws -> Bool {
+            object[key.stringValue] is NSNull
+        }
 
         func decode<T: Decodable>(_ type: T.Type, forKey key: Key) throws -> T {
             guard let value = object[key.stringValue] else {
-                throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: "No value for \(key.stringValue)."))
+                throw DecodingError.keyNotFound(
+                    key,
+                    .init(
+                        codingPath: codingPath,
+                        debugDescription: "No value for \(key.stringValue)."
+                    )
+                )
             }
             return try decodeValue(type, value, codingPath + [key])
         }
@@ -222,18 +313,35 @@ struct SceneScriptValueDecoder: Decoder {
             return try decodeValue(type, value, codingPath + [key])
         }
 
-        func nestedContainer<NestedKey: CodingKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
-            try SceneScriptValueDecoder(value: object[key.stringValue] as Any, codingPath: codingPath + [key]).container(keyedBy: type)
+        func nestedContainer<NestedKey: CodingKey>(
+            keyedBy type: NestedKey.Type,
+            forKey key: Key
+        ) throws -> KeyedDecodingContainer<NestedKey> {
+            try SceneScriptValueDecoder(
+                value: object[key.stringValue] as Any,
+                codingPath: codingPath + [key]
+            ).container(keyedBy: type)
         }
 
         func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
-            try SceneScriptValueDecoder(value: object[key.stringValue] as Any, codingPath: codingPath + [key]).unkeyedContainer()
+            try SceneScriptValueDecoder(
+                value: object[key.stringValue] as Any,
+                codingPath: codingPath + [key]
+            ).unkeyedContainer()
         }
 
-        func superDecoder() throws -> Decoder { SceneScriptValueDecoder(value: object, codingPath: codingPath) }
+        func superDecoder() throws -> Decoder {
+            SceneScriptValueDecoder(
+                value: object,
+                codingPath: codingPath
+            )
+        }
 
         func superDecoder(forKey key: Key) throws -> Decoder {
-            SceneScriptValueDecoder(value: object[key.stringValue] ?? NSNull(), codingPath: codingPath + [key])
+            SceneScriptValueDecoder(
+                value: object[key.stringValue] ?? NSNull(),
+                codingPath: codingPath + [key]
+            )
         }
     }
 
@@ -241,12 +349,26 @@ struct SceneScriptValueDecoder: Decoder {
         let value: Any
         let codingPath: [CodingKey]
 
-        func decodeNil() -> Bool { value is NSNull }
+        func decodeNil() -> Bool {
+            value is NSNull
+        }
 
-        func decode<T: Decodable>(_ type: T.Type) throws -> T { try decodeValue(type, value, codingPath) }
+        func decode<T: Decodable>(_ type: T.Type) throws -> T {
+            try decodeValue(
+                type,
+                value,
+                codingPath
+            )
+        }
     }
 }
 
 private func mismatch(_ type: Any.Type, _ path: [CodingKey]) -> DecodingError {
-    DecodingError.typeMismatch(type, .init(codingPath: path, debugDescription: "Expected to decode \(type) but found another value."))
+    DecodingError.typeMismatch(
+        type,
+        .init(
+            codingPath: path,
+            debugDescription: "Expected to decode \(type) but found another value."
+        )
+    )
 }

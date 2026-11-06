@@ -11,7 +11,11 @@ extension SceneEditorView {
                 ForEach(ScenePreset.BuiltIn.allCases, id: \.self) { kind in
                     Button(ScenePreset.builtIn(kind, localize: model.localizedString).name) {
                         if let target {
-                            tryScenePreset(ScenePreset.builtIn(kind, localize: model.localizedString), layer: target, path: path)
+                            tryScenePreset(
+                                ScenePreset.builtIn(kind, localize: model.localizedString),
+                                layer: target,
+                                path: path
+                            )
                         }
                     }
                 }
@@ -76,7 +80,8 @@ extension SceneEditorView {
 
     /// Shown under the preview while a preset is on show.
     func scenePresetTrialBar(_ trial: ScenePresetTrial) -> some View {
-        let layerName = model.sceneDocumentsByPath[trial.path]?.layers.first { $0.id == trial.layerID }?.name ?? ""
+        let layerName = model.sceneDocumentsByPath[trial.path]?.layers
+            .first { $0.id == trial.layerID }?.name ?? ""
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Image(systemName: "wand.and.stars")
@@ -99,12 +104,16 @@ extension SceneEditorView {
                 settingsFootnote(model.localizedString(ScenePreset.summary(of: kind)))
             }
             settingsFootnote(String(
-                format: model.localizedString("レイヤー「%@」の動き・奥行き・カーソルの設定を置き換え、粒子のレイヤーがあれば上に追加します。適用したあと ⌘Z で 1 回で元に戻せます。"),
+                format: model
+                    .localizedString(
+                        "レイヤー「%@」の動き・奥行き・カーソルの設定を置き換え、粒子のレイヤーがあれば上に追加します。適用したあと ⌘Z で 1 回で元に戻せます。"
+                    ),
                 layerName
             ))
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.05)))
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(Color.primary.opacity(0.05)))
     }
 
     // MARK: - Guide
@@ -151,7 +160,8 @@ extension SceneEditorView {
                 ))
             }
             .padding(10)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.05)))
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.05)))
         }
     }
 
@@ -171,7 +181,11 @@ extension SceneEditorView {
     }
 
     @ViewBuilder
-    private func scenePresetStepButton(_ step: ScenePresetStep, path: String, layer: SceneLayer) -> some View {
+    private func scenePresetStepButton(
+        _ step: ScenePresetStep,
+        path: String,
+        layer: SceneLayer
+    ) -> some View {
         switch step {
         case let .paintMask(effectID, _), let .drawFlow(effectID):
             let kind: ScenePaintOverride.Target = if case .drawFlow = step { .flow } else { .mask }
@@ -220,7 +234,10 @@ extension SceneEditorView {
                 .help(SceneAI.isDepthModelInstalled
                     ? ""
                     : String(
-                        format: model.localizedString("初回だけ、Apple が公開しているモデル(約 %d MB)を Hugging Face からダウンロードします。"),
+                        format: model
+                            .localizedString(
+                                "初回だけ、Apple が公開しているモデル(約 %d MB)を Hugging Face からダウンロードします。"
+                            ),
                         locale: model.appLocale, SceneAI.modelDownloadMegabytes
                     ))
             }
@@ -238,9 +255,13 @@ extension SceneEditorView {
                 .textFieldStyle(.roundedBorder)
                 .frame(minWidth: 320)
             Toggle(model.localizedString("塗った範囲とピンの位置も含める"), isOn: $scenePresetIncludesPaint)
-            settingsFootnote(model.localizedString("含めると、別の画像にも同じ割合の位置で当てはめます。構図の似た写真に使うときに便利です。含めない場合は、適用したあとに塗る操作を案内します。"))
+            settingsFootnote(model
+                .localizedString(
+                    "含めると、別の画像にも同じ割合の位置で当てはめます。構図の似た写真に使うときに便利です。含めない場合は、適用したあとに塗る操作を案内します。"
+                ))
             Toggle(model.localizedString("粒子のレイヤーも含める"), isOn: $scenePresetIncludesParticles)
-            settingsFootnote(model.localizedString("選んだレイヤーの動き・奥行き・カーソルの設定を保存します。配置とキーフレーム、奥行きの推定結果は含めません。"))
+            settingsFootnote(model
+                .localizedString("選んだレイヤーの動き・奥行き・カーソルの設定を保存します。配置とキーフレーム、奥行きの推定結果は含めません。"))
             HStack {
                 Spacer(minLength: 0)
                 Button(model.localizedString("キャンセル")) {
@@ -253,7 +274,8 @@ extension SceneEditorView {
                     }
                     if model.saveUserScenePreset(
                         name: name, layerID: layerID, path: path,
-                        includingPaint: scenePresetIncludesPaint, includingParticles: scenePresetIncludesParticles
+                        includingPaint: scenePresetIncludesPaint,
+                        includingParticles: scenePresetIncludesParticles
                     ) {
                         isSavingScenePreset = false
                     }

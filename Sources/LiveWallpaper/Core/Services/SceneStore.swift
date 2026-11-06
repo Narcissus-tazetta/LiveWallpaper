@@ -55,22 +55,32 @@ enum SceneStore {
         try read(folder: folder).document
     }
 
-    private static func read(folder: URL, format: StoredFormat = .scene) throws -> (document: SceneDocument, prepared: StoredFormat.Prepared) {
+    private static func read(
+        folder: URL,
+        format: StoredFormat = .scene
+    ) throws
+        -> (document: SceneDocument, prepared: StoredFormat.Prepared)
+    {
         let sceneFile = folder.appendingPathComponent(documentFileName)
-        let sceneSize = (try? FileManager.default.attributesOfItem(atPath: sceneFile.path)[.size] as? Int64) ?? 0
+        // A missing file throws the same no-such-file error the read below would.
+        let sceneSize = try Int64(sceneFile.regularFileSize())
         guard sceneSize <= maximumSceneJSONBytes else {
             throw ImportError.sceneDefinitionTooLarge(sceneSize, max: maximumSceneJSONBytes)
         }
         let prepared = try format.prepare(Data(contentsOf: sceneFile))
         let decoder = JSONDecoder()
         decoder.userInfo[.sceneFolder] = folder
-        return (try decoder.decode(SceneDocument.self, from: prepared.data), prepared)
+        return try (decoder.decode(SceneDocument.self, from: prepared.data), prepared)
     }
 
     /// A dot name, so pruning (which skips those) leaves it alone. Kept once per version:
     /// the first copy is the file as the older app wrote it.
-    private static func keepCopyBeforeUpgrade(of documentURL: URL, fromVersion version: Int) throws {
-        let copy = documentURL.deletingLastPathComponent().appendingPathComponent(".\(documentFileName).v\(version).bak")
+    private static func keepCopyBeforeUpgrade(
+        of documentURL: URL,
+        fromVersion version: Int
+    ) throws {
+        let copy = documentURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(documentFileName).v\(version).bak")
         guard !FileManager.default.fileExists(atPath: copy.path) else {
             return
         }
@@ -80,16 +90,23 @@ enum SceneStore {
     /// Moves model geometry that scene.json still holds inline into its own files and
     /// reads the scene back mapped. scene.json keeps its date, so the video is out of
     /// date exactly when it was before.
-    static func movingGeometryToFiles(_ document: SceneDocument, videoPath: String) throws -> SceneDocument {
+    static func movingGeometryToFiles(
+        _ document: SceneDocument,
+        videoPath: String
+    ) throws -> SceneDocument {
         guard document.hasInlineModelGeometry else {
             return document
         }
         let folder = folderURL(forVideoPath: videoPath)
         let documentURL = folder.appendingPathComponent(documentFileName)
-        let date = try FileManager.default.attributesOfItem(atPath: documentURL.path)[.modificationDate]
+        let date = try FileManager.default
+            .attributesOfItem(atPath: documentURL.path)[.modificationDate]
         try write(encode(document, folder: folder), videoPath: videoPath)
         if let date {
-            try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: documentURL.path)
+            try FileManager.default.setAttributes(
+                [.modificationDate: date],
+                ofItemAtPath: documentURL.path
+            )
         }
         return try decode(folder: folder)
     }
@@ -98,18 +115,22 @@ enum SceneStore {
     /// Dates scene.json after the video, so the video counts as out of date
     /// (isNewerThanVideo) until a real bake, across launches and library imports.
     static func markVideoOutOfDate(videoPath: String) throws {
-        let videoDate = try FileManager.default.attributesOfItem(atPath: videoPath)[.modificationDate] as? Date ?? Date()
+        let videoDate = try FileManager.default
+            .attributesOfItem(atPath: videoPath)[.modificationDate] as? Date ?? Date()
         try FileManager.default.setAttributes(
             [.modificationDate: videoDate.addingTimeInterval(1)],
-            ofItemAtPath: folderURL(forVideoPath: videoPath).appendingPathComponent(documentFileName).path
+            ofItemAtPath: folderURL(forVideoPath: videoPath)
+                .appendingPathComponent(documentFileName).path
         )
     }
 
     static func isNewerThanVideo(videoPath: String) -> Bool {
         let scene = folderURL(forVideoPath: videoPath).appendingPathComponent(documentFileName)
         do {
-            let sceneDate = try FileManager.default.attributesOfItem(atPath: scene.path)[.modificationDate] as? Date
-            let videoDate = try FileManager.default.attributesOfItem(atPath: videoPath)[.modificationDate] as? Date
+            let sceneDate = try FileManager.default
+                .attributesOfItem(atPath: scene.path)[.modificationDate] as? Date
+            let videoDate = try FileManager.default
+                .attributesOfItem(atPath: videoPath)[.modificationDate] as? Date
             guard let sceneDate, let videoDate else {
                 return false
             }
@@ -117,13 +138,17 @@ enum SceneStore {
             // just after the date copied; a real edit comes far later than that.
             return sceneDate.timeIntervalSince(videoDate) > 0.001
         } catch {
-            AppLog.windowRefresh.error("scene date check failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error("scene date check failed: \(error.localizedDescription, privacy: .public)")
             return false
         }
     }
 
     static func save(_ document: SceneDocument, videoPath: String) throws {
-        try write(encode(document, folder: folderURL(forVideoPath: videoPath)), videoPath: videoPath)
+        try write(
+            encode(document, folder: folderURL(forVideoPath: videoPath)),
+            videoPath: videoPath
+        )
     }
 
     /// With a folder, writes the files of large models there first and names them in
@@ -179,7 +204,11 @@ enum SceneStore {
         // Renderers never use more than maxTextureEdge, and every renderer decodes the
         // file again: a 16000 px PNG took ~1.8 s per renderer, 4096 px a fraction.
         if max(size.width, size.height) > CGFloat(SceneRenderer.maxTextureEdge) {
-            let (fileName, storedSize) = try writeDownscaled(sourceURL, maxEdge: SceneRenderer.maxTextureEdge, folder: folder)
+            let (fileName, storedSize) = try writeDownscaled(
+                sourceURL,
+                maxEdge: SceneRenderer.maxTextureEdge,
+                folder: folder
+            )
             return (SceneLayer(name: name, imageFile: fileName), storedSize)
         }
         let ext = sourceURL.pathExtension.isEmpty ? "png" : sourceURL.pathExtension.lowercased()
@@ -198,7 +227,10 @@ enum SceneStore {
         }
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: SceneRenderer.maxTextureEdge, height: SceneRenderer.maxTextureEdge)
+        generator.maximumSize = CGSize(
+            width: SceneRenderer.maxTextureEdge,
+            height: SceneRenderer.maxTextureEdge
+        )
         let frame = try await generator.image(at: .zero).image
         let imageFile = try writeImage(frame, prefix: "layer", videoPath: videoPath)
         let ext = sourceURL.pathExtension.isEmpty ? "mp4" : sourceURL.pathExtension.lowercased()
@@ -206,14 +238,21 @@ enum SceneStore {
         try FileManager.default.copyItem(
             at: sourceURL, to: folderURL(forVideoPath: videoPath).appendingPathComponent(videoFile)
         )
-        var layer = SceneLayer(name: sourceURL.deletingPathExtension().lastPathComponent, imageFile: imageFile)
+        var layer = SceneLayer(
+            name: sourceURL.deletingPathExtension().lastPathComponent,
+            imageFile: imageFile
+        )
         layer.videoFile = videoFile
         return layer
     }
 
     /// Writes the image at most `maxEdge` on its long side, EXIF orientation applied.
     /// Images with transparency stay PNG; opaque ones become JPEG, which decodes fastest.
-    private static func writeDownscaled(_ url: URL, maxEdge: Int, folder: URL) throws -> (String, CGSize) {
+    private static func writeDownscaled(
+        _ url: URL,
+        maxEdge: Int,
+        folder: URL
+    ) throws -> (String, CGSize) {
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
@@ -257,13 +296,20 @@ enum SceneStore {
         let bytesPerPixel = isMask ? 1 : 4
         guard let provider = CGDataProvider(data: Data(bytes) as CFData),
               let image = CGImage(
-                  width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 8 * bytesPerPixel,
+                  width: width, height: height, bitsPerComponent: 8,
+                  bitsPerPixel: 8 * bytesPerPixel,
                   bytesPerRow: width * bytesPerPixel,
                   space: CGColorSpace(name: isMask ? CGColorSpace.linearGray : CGColorSpace.sRGB)!,
-                  bitmapInfo: CGBitmapInfo(rawValue: (isMask ? CGImageAlphaInfo.none : .noneSkipLast).rawValue),
+                  bitmapInfo: CGBitmapInfo(rawValue: (isMask ? CGImageAlphaInfo
+                          .none : .noneSkipLast).rawValue),
                   provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
               ),
-              let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil)
+              let destination = CGImageDestinationCreateWithURL(
+                  url as CFURL,
+                  "public.png" as CFString,
+                  1,
+                  nil
+              )
         else {
             throw StoreError.unreadableImage(fileName)
         }
@@ -335,15 +381,24 @@ enum SceneStore {
 
     private static func assetFiles(of document: SceneDocument) -> Set<String> {
         var files = Set<String>()
-        for sound in document.sounds { files.formUnion(sound.files) }
+        for sound in document.sounds {
+            files.formUnion(sound.files)
+        }
         for material in (document.meshMaterials ?? []).compactMap({ $0 }) {
-            files.formUnion(material.images.values.filter { SceneModelRenderer.layerObjectID($0) == nil })
+            files
+                .formUnion(material.images.values
+                    .filter { SceneModelRenderer.layerObjectID($0) == nil })
         }
         for layer in document.layers {
             if layer.kind == .image {
                 files.insert(layer.imageFile)
             }
-            files.formUnion([layer.particles?.maskFile, layer.depthFile, layer.text?.fontFile, layer.videoFile].compactMap { $0 })
+            files.formUnion([
+                layer.particles?.maskFile,
+                layer.depthFile,
+                layer.text?.fontFile,
+                layer.videoFile
+            ].compactMap { $0 })
             for part in [layer.model].compactMap({ $0 }) + (layer.modelParts ?? []) {
                 files.formUnion(part.surface?.images ?? [])
             }
@@ -351,7 +406,12 @@ enum SceneStore {
             files.formUnion(layer.particleSystem?.textureFiles ?? [])
             for effect in layer.effects {
                 if let graph = effect.renderGraph { files.formUnion(graph.images.values) }
-                files.formUnion([effect.maskFile, effect.flowFile, effect.timeOffsetFile, effect.patternFile].compactMap { $0 })
+                files.formUnion([
+                    effect.maskFile,
+                    effect.flowFile,
+                    effect.timeOffsetFile,
+                    effect.patternFile
+                ].compactMap { $0 })
             }
         }
         return files
@@ -366,15 +426,20 @@ enum SceneStore {
         }
         let folder = folderURL(forVideoPath: videoPath)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        try encode(document, folder: nil).write(to: destination.appendingPathComponent(documentFileName))
+        try encode(document, folder: nil)
+            .write(to: destination.appendingPathComponent(documentFileName))
         for name in assetFiles(of: document) {
             try FileManager.default.copyItem(
-                at: folder.appendingPathComponent(name), to: destination.appendingPathComponent(name)
+                at: folder.appendingPathComponent(name),
+                to: destination.appendingPathComponent(name)
             )
         }
         let propURL = folder.appendingPathComponent("properties.json")
         if FileManager.default.fileExists(atPath: propURL.path) {
-            try FileManager.default.copyItem(at: propURL, to: destination.appendingPathComponent("properties.json"))
+            try FileManager.default.copyItem(
+                at: propURL,
+                to: destination.appendingPathComponent("properties.json")
+            )
         }
     }
 
@@ -385,7 +450,10 @@ enum SceneStore {
         var errorDescription: String? {
             switch self {
             case let .unsafeFile(name):
-                return String(format: NSLocalizedString("パッケージに不正なファイル参照が含まれています: %@", comment: ""), name)
+                return String(
+                    format: NSLocalizedString("パッケージに不正なファイル参照が含まれています: %@", comment: ""),
+                    name
+                )
             case let .sceneDefinitionTooLarge(size, max):
                 let formatter = ByteCountFormatter()
                 formatter.countStyle = .file
@@ -402,20 +470,28 @@ enum SceneStore {
     /// Installs a scene from an unpacked package next to the imported video. The
     /// package comes from anyone: only plain files that scene.json names, with plain
     /// names, are copied.
-    static func importScene(from source: URL, videoPath: String, videoIsOutOfDate: Bool = false) throws -> SceneDocument {
+    static func importScene(
+        from source: URL,
+        videoPath: String,
+        videoIsOutOfDate: Bool = false
+    ) throws -> SceneDocument {
         let sceneFile = source.appendingPathComponent(documentFileName)
-        let sceneSize = (try? FileManager.default.attributesOfItem(atPath: sceneFile.path)[.size] as? Int64) ?? 0
+        // A missing file throws the same no-such-file error the read below would.
+        let sceneSize = try Int64(sceneFile.regularFileSize())
         guard sceneSize <= maximumSceneJSONBytes else {
             throw ImportError.sceneDefinitionTooLarge(sceneSize, max: maximumSceneJSONBytes)
         }
         var document = try decode(folder: source)
         let root = source.resolvingSymlinksInPath().standardizedFileURL.path
         var names = referencedFiles(of: document).union([documentFileName])
-        if FileManager.default.fileExists(atPath: source.appendingPathComponent("properties.json").path) {
+        if FileManager.default
+            .fileExists(atPath: source.appendingPathComponent("properties.json").path)
+        {
             names.insert("properties.json")
         }
         for name in names {
-            guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\\"),
+            guard !name.isEmpty, name != ".", name != "..", !name.contains("/"),
+                  !name.contains("\\"),
                   !name.contains("\0")
             else {
                 throw ImportError.unsafeFile(name)
@@ -437,11 +513,13 @@ enum SceneStore {
             try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
             for name in names {
                 try FileManager.default.copyItem(
-                    at: source.appendingPathComponent(name), to: staging.appendingPathComponent(name)
+                    at: source.appendingPathComponent(name),
+                    to: staging.appendingPathComponent(name)
                 )
             }
             if document.hasInlineModelGeometry {
-                try encode(document, folder: staging).write(to: staging.appendingPathComponent(documentFileName))
+                try encode(document, folder: staging)
+                    .write(to: staging.appendingPathComponent(documentFileName))
                 // Mapped from the staging folder; the mapping outlives moving the folder below.
                 document = try decode(folder: staging)
             }
@@ -449,11 +527,13 @@ enum SceneStore {
             // scene.json only becomes newer than the video (isNewerThanVideo) once edited.
             // A scene installed before its first bake has no video yet.
             if FileManager.default.fileExists(atPath: videoPath),
-               let videoDate = try FileManager.default.attributesOfItem(atPath: videoPath)[.modificationDate] as? Date
+               let videoDate = try FileManager.default
+               .attributesOfItem(atPath: videoPath)[.modificationDate] as? Date
             {
                 // A video that is only a stand-in (videoIsOutOfDate) stays out of date.
                 try FileManager.default.setAttributes(
-                    [.modificationDate: videoIsOutOfDate ? videoDate.addingTimeInterval(1) : videoDate],
+                    [.modificationDate: videoIsOutOfDate ? videoDate
+                        .addingTimeInterval(1) : videoDate],
                     ofItemAtPath: staging.appendingPathComponent(documentFileName).path
                 )
             }
@@ -502,7 +582,11 @@ enum SceneStore {
 
     static func pixelSize(of url: URL) throws -> CGSize {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let properties = CGImageSourceCopyPropertiesAtIndex(
+                  source,
+                  0,
+                  nil
+              ) as? [CFString: Any],
               let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
               let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue,
               width > 0, height > 0
@@ -511,6 +595,9 @@ enum SceneStore {
         }
         // Orientations 5–8 are rotated by 90°.
         let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
-        return orientation >= 5 ? CGSize(width: height, height: width) : CGSize(width: width, height: height)
+        return orientation >= 5 ? CGSize(width: height, height: width) : CGSize(
+            width: width,
+            height: height
+        )
     }
 }

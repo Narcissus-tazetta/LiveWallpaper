@@ -1,5 +1,5 @@
-import AVFoundation
 import AppKit
+import AVFoundation
 
 @MainActor
 final class LightweightProxyCache {
@@ -160,17 +160,16 @@ final class LightweightProxyCache {
         activeGeneration = active
         active.task = Task { [weak self] in
             guard let self else { return }
-            let result: GenerationResult
-            if active.isCancelled {
-                result = .cancelled
+            let result: GenerationResult = if active.isCancelled {
+                .cancelled
             } else if let cached = cachedProxyURL(for: active.path) {
-                result = .ready(cached)
+                .ready(cached)
             } else if let entry = metadata.entries[active.path], entry.isPassthrough,
                       SourceValidityCheck.isValid(path: active.path, entry: entry)
             {
-                result = .passthrough
+                .passthrough
             } else {
-                result = await performGeneration(path: active.path, activeGeneration: active)
+                await performGeneration(path: active.path, activeGeneration: active)
             }
             let completions = active.completions
             activeGeneration = nil

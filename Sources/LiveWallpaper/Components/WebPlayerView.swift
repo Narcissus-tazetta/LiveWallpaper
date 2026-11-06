@@ -113,7 +113,8 @@ final class WebPlayerView: NSView {
     /// `point` is in page coordinates (top-left origin). `onDeclined` runs when the page
     /// had no element there, so the rest of that press is not forwarded.
     func forwardPointer(
-        _ phase: PointerPhase, at point: CGPoint, scroll: CGVector = .zero, onDeclined: (() -> Void)? = nil
+        _ phase: PointerPhase, at point: CGPoint, scroll: CGVector = .zero,
+        onDeclined: (() -> Void)? = nil
     ) {
         // The page is drawn mirrored when flipped, so a press lands on what is shown there.
         let flipped = displayAdjustment.flipsHorizontally
@@ -123,7 +124,9 @@ final class WebPlayerView: NSView {
         webView.evaluateJavaScript(call) { result, error in
             if let error {
                 AppLog.externalWallpapers
-                    .error("pointer forward failed: \(error.localizedDescription, privacy: .public)")
+                    .error(
+                        "pointer forward failed: \(error.localizedDescription, privacy: .public)"
+                    )
             } else if (result as? Bool) != true {
                 onDeclined?()
             }
@@ -203,7 +206,10 @@ final class WebPlayerView: NSView {
     private var lastMediaArtwork: String?
     private var spectrumInFlight = false
     private var assetProperties: [String] = []
-    private var directoryWatchers: [String: (LocalWebUserDirectory.Selection, LocalWebDirectoryWatcher)] = [:]
+    private var directoryWatchers: [String: (
+        LocalWebUserDirectory.Selection,
+        LocalWebDirectoryWatcher
+    )] = [:]
     private var directoryListings: [String: [String: Date]] = [:]
 
     func setLocalConfiguration(
@@ -237,7 +243,9 @@ final class WebPlayerView: NSView {
     }
 
     private func updateDirectories(_ directories: [String: LocalWebUserDirectory.Selection]) {
-        for (property, (selection, watcher)) in directoryWatchers where directories[property] != selection {
+        for (property, (selection, watcher)) in directoryWatchers
+            where directories[property] != selection
+        {
             watcher.stop()
             directoryWatchers[property] = nil
             directoryListings[property] = [:]
@@ -255,14 +263,16 @@ final class WebPlayerView: NSView {
     private func sendDirectory(_ property: String) {
         guard currentRequest?.isLocalPackage == true else { return }
         let entries = (directoryListings[property] ?? [:]).map { [
-            WebPropertyValue.string($0.key), .number($0.value.timeIntervalSince1970),
+            WebPropertyValue.string($0.key), .number($0.value.timeIntervalSince1970)
         ] }
         webView.evaluateJavaScript(
             "window.__liveWallpaperSetDirectory && window.__liveWallpaperSetDirectory(\(LocalWebHostScript.json(property)), \(LocalWebHostScript.json(entries)));"
         ) { _, error in
             if let error {
                 AppLog.externalWallpapers
-                    .error("web folder listing failed: \(error.localizedDescription, privacy: .public)")
+                    .error(
+                        "web folder listing failed: \(error.localizedDescription, privacy: .public)"
+                    )
             }
         }
     }
@@ -775,7 +785,12 @@ final class WebPlayerView: NSView {
     private func applyFlip() {
         // AppKit owns the layer's own transform, so the mirror goes on its sublayers.
         pageView.layer?.sublayerTransform = displayAdjustment.flipsHorizontally
-            ? CATransform3DScale(CATransform3DMakeTranslation(pageView.bounds.width, 0, 0), -1, 1, 1)
+            ? CATransform3DScale(
+                CATransform3DMakeTranslation(pageView.bounds.width, 0, 0),
+                -1,
+                1,
+                1
+            )
             : CATransform3DIdentity
     }
 
@@ -820,8 +835,58 @@ final class WebPlayerView: NSView {
         )
     }
 
+    /// The package's server origin, while a local package is loaded.
+    private var localPackageOrigin: WebOrigin? {
+        guard let currentRequest, currentRequest.isLocalPackage,
+              case let .url(url) = currentRequest.loadContent
+        else {
+            return nil
+        }
+        return WebOrigin(url: url)
+    }
+
+    /// The host bridge hands a local package the audio spectrum, now-playing media and the
+    /// listings of folders the user chose. Only the package's own page may ask for them.
+    fileprivate func acceptsHostMessage(from frame: WKFrameInfo) -> Bool {
+        guard frame.isMainFrame, let origin = localPackageOrigin else {
+            return false
+        }
+        return WebOrigin(frame.securityOrigin) == origin
+    }
+
+    /// A local package page that navigates elsewhere would keep receiving what the host
+    /// pushes into the page (properties, spectrum, folder listings), so its main frame stays
+    /// on the package's own origin. `about:` covers the blank page of a deep unload.
+    fileprivate func allowsMainFrameNavigation(to url: URL) -> Bool {
+        guard let origin = localPackageOrigin, url.scheme != "about" else {
+            return true
+        }
+        return WebOrigin(url: url) == origin
+    }
+
     private final class NavigationDelegate: NSObject, WKNavigationDelegate {
         weak var owner: WebPlayerView?
+
+        func webView(
+            _: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
+        ) {
+            guard let owner, navigationAction.targetFrame?.isMainFrame == true,
+                  let url = navigationAction.request.url
+            else {
+                decisionHandler(.allow)
+                return
+            }
+            if owner.allowsMainFrameNavigation(to: url) {
+                decisionHandler(.allow)
+            } else {
+                AppLog.externalWallpapers.error(
+                    "blocked local web page leaving its package for \(url.scheme ?? "", privacy: .public)://\(url.host ?? "", privacy: .public)"
+                )
+                decisionHandler(.cancel)
+            }
+        }
 
         func webView(_: WKWebView, didFinish _: WKNavigation!) {
             owner?.handleNavigationFinished()
@@ -862,20 +927,19 @@ final class WebPlayerView: NSView {
             }
             switch body {
             case "spectrum":
-                guard message.frameInfo.isMainFrame,
-                      owner?.currentRequest?.isLocalPackage == true else { return }
+                guard owner?.acceptsHostMessage(from: message.frameInfo) == true else { return }
                 owner?.wantsSpectrum = true
                 owner?.refreshIntegration()
             case "media":
-                guard message.frameInfo.isMainFrame,
-                      owner?.currentRequest?.isLocalPackage == true else { return }
+                guard owner?.acceptsHostMessage(from: message.frameInfo) == true else { return }
                 owner?.wantsMedia = true
                 owner?.refreshIntegration()
             case "directories":
                 // A new page starts with no listings; it asks for them as its document starts.
-                guard message.frameInfo.isMainFrame, let owner,
-                      owner.currentRequest?.isLocalPackage == true else { return }
-                for property in owner.directoryListings.keys { owner.sendDirectory(property) }
+                guard let owner, owner.acceptsHostMessage(from: message.frameInfo) else { return }
+                for property in owner.directoryListings.keys {
+                    owner.sendDirectory(property)
+                }
             case "ready":
                 owner?.handleEmbedPlayerReady()
             case "error":
@@ -892,4 +956,34 @@ enum WebWallpaperLoadState: Equatable {
     case loading
     case loaded
     case failed
+}
+
+/// Scheme, host and port: what the web security model treats as one site.
+struct WebOrigin: Equatable {
+    let scheme: String
+    let host: String
+    let port: Int
+
+    init?(url: URL) {
+        guard let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased() else {
+            return nil
+        }
+        self.scheme = scheme
+        self.host = host
+        port = url.port ?? Self.defaultPort(scheme: scheme)
+    }
+
+    init(_ origin: WKSecurityOrigin) {
+        scheme = origin.protocol.lowercased()
+        host = origin.host.lowercased()
+        port = origin.port == 0 ? Self.defaultPort(scheme: scheme) : origin.port
+    }
+
+    private static func defaultPort(scheme: String) -> Int {
+        switch scheme {
+        case "http": 80
+        case "https": 443
+        default: 0
+        }
+    }
 }

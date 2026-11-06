@@ -63,9 +63,17 @@ struct SceneCursorMask: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = SceneCursorMask()
-        mode = (try? container.decode(SceneCursorMaskMode.self, forKey: .mode)) ?? defaults.mode
-        radius = (try? container.decode(Double.self, forKey: .radius)) ?? defaults.radius
-        softness = (try? container.decode(Double.self, forKey: .softness)) ?? defaults.softness
+        mode = container.decodeLenient(
+            SceneCursorMaskMode.self,
+            forKey: .mode,
+            default: defaults.mode
+        )
+        radius = container.decodeLenient(Double.self, forKey: .radius, default: defaults.radius)
+        softness = container.decodeLenient(
+            Double.self,
+            forKey: .softness,
+            default: defaults.softness
+        )
     }
 }
 
@@ -118,8 +126,19 @@ enum SceneEffectKind: String, Codable, CaseIterable {
     /// Runs on seconds rather than whole repeats per loop: drawn live it keeps its
     /// own speed, and only a baked video rounds the speed to fit the loop.
     var runsOnRealTime: Bool {
-        [.travelingWaves, .flowShake, .flowMap, .normalRipples, .noiseDrift, .noiseSway, .pulseBlend, .uvScroll, .axisSwing, .shader]
-            .contains(self)
+        [
+            .travelingWaves,
+            .flowShake,
+            .flowMap,
+            .normalRipples,
+            .noiseDrift,
+            .noiseSway,
+            .pulseBlend,
+            .uvScroll,
+            .axisSwing,
+            .shader
+        ]
+        .contains(self)
     }
 
     /// Uses `centerX`/`centerY` (picked on the preview).
@@ -177,7 +196,12 @@ struct SceneAreaBounds: Codable, Equatable {
 
     /// The box around the pixels at or above `threshold` in a one-byte-per-pixel
     /// image; nil when there are none.
-    static func of(_ bytes: [UInt8], width: Int, height: Int, threshold: UInt8 = 8) -> SceneAreaBounds? {
+    static func of(
+        _ bytes: [UInt8],
+        width: Int,
+        height: Int,
+        threshold: UInt8 = 8
+    ) -> SceneAreaBounds? {
         var minX = width, minY = height, maxX = -1, maxY = -1
         for y in 0 ..< height {
             for x in 0 ..< width where bytes[y * width + x] >= threshold {
@@ -222,13 +246,13 @@ struct ScenePin: Codable, Equatable, Identifiable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = (try? container.decode(UUID.self, forKey: .id)) ?? UUID()
-        x = (try? container.decode(Double.self, forKey: .x)) ?? 0.5
-        y = (try? container.decode(Double.self, forKey: .y)) ?? 0.5
-        isAnchor = (try? container.decode(Bool.self, forKey: .isAnchor)) ?? true
-        amount = (try? container.decode(Double.self, forKey: .amount)) ?? 0.5
-        direction = (try? container.decode(Double.self, forKey: .direction)) ?? 0
-        phase = (try? container.decode(Double.self, forKey: .phase)) ?? 0
+        id = container.decodeLenient(UUID.self, forKey: .id, default: UUID())
+        x = container.decodeLenient(Double.self, forKey: .x, default: 0.5)
+        y = container.decodeLenient(Double.self, forKey: .y, default: 0.5)
+        isAnchor = container.decodeLenient(Bool.self, forKey: .isAnchor, default: true)
+        amount = container.decodeLenient(Double.self, forKey: .amount, default: 0.5)
+        direction = container.decodeLenient(Double.self, forKey: .direction, default: 0)
+        phase = container.decodeLenient(Double.self, forKey: .phase, default: 0)
     }
 }
 
@@ -292,24 +316,36 @@ struct SceneEffect: Codable, Equatable, Identifiable {
         id = try container.decode(UUID.self, forKey: .id)
         kind = try container.decode(SceneEffectKind.self, forKey: .kind)
         renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
-        builtIn = try? container.decodeIfPresent(String.self, forKey: .builtIn)
+        builtIn = container.decodeLenientIfPresent(String.self, forKey: .builtIn)
         let defaults = SceneEffect(kind: kind)
-        isEnabled = (try? container.decode(Bool.self, forKey: .isEnabled)) ?? defaults.isEnabled
-        cycles = (try? container.decode(Int.self, forKey: .cycles)) ?? defaults.cycles
-        strength = (try? container.decode(Double.self, forKey: .strength)) ?? defaults.strength
-        scale = (try? container.decode(Double.self, forKey: .scale)) ?? defaults.scale
-        direction = (try? container.decode(Double.self, forKey: .direction)) ?? defaults.direction
-        centerX = (try? container.decode(Double.self, forKey: .centerX)) ?? defaults.centerX
-        centerY = (try? container.decode(Double.self, forKey: .centerY)) ?? defaults.centerY
-        reversed = (try? container.decode(Bool.self, forKey: .reversed)) ?? defaults.reversed
-        maskFile = try? container.decodeIfPresent(String.self, forKey: .maskFile)
-        flowFile = try? container.decodeIfPresent(String.self, forKey: .flowFile)
-        pins = (try? container.decode([ScenePin].self, forKey: .pins)) ?? []
-        values = (try? container.decode([String: Double].self, forKey: .values)) ?? [:]
-        timeOffsetFile = try? container.decodeIfPresent(String.self, forKey: .timeOffsetFile)
-        patternFile = try? container.decodeIfPresent(String.self, forKey: .patternFile)
-        fixedEdge = (try? container.decode(SceneFixedEdge.self, forKey: .fixedEdge)) ?? .none
-        areaBounds = try? container.decodeIfPresent(SceneAreaBounds.self, forKey: .areaBounds)
+        isEnabled = container.decodeLenient(
+            Bool.self,
+            forKey: .isEnabled,
+            default: defaults.isEnabled
+        )
+        cycles = container.decodeLenient(Int.self, forKey: .cycles, default: defaults.cycles)
+        strength = container.decodeLenient(
+            Double.self,
+            forKey: .strength,
+            default: defaults.strength
+        )
+        scale = container.decodeLenient(Double.self, forKey: .scale, default: defaults.scale)
+        direction = container.decodeLenient(
+            Double.self,
+            forKey: .direction,
+            default: defaults.direction
+        )
+        centerX = container.decodeLenient(Double.self, forKey: .centerX, default: defaults.centerX)
+        centerY = container.decodeLenient(Double.self, forKey: .centerY, default: defaults.centerY)
+        reversed = container.decodeLenient(Bool.self, forKey: .reversed, default: defaults.reversed)
+        maskFile = container.decodeLenientIfPresent(String.self, forKey: .maskFile)
+        flowFile = container.decodeLenientIfPresent(String.self, forKey: .flowFile)
+        pins = container.decodeLenient([ScenePin].self, forKey: .pins, default: [])
+        values = container.decodeLenient([String: Double].self, forKey: .values, default: [:])
+        timeOffsetFile = container.decodeLenientIfPresent(String.self, forKey: .timeOffsetFile)
+        patternFile = container.decodeLenientIfPresent(String.self, forKey: .patternFile)
+        fixedEdge = container.decodeLenient(SceneFixedEdge.self, forKey: .fixedEdge, default: .none)
+        areaBounds = container.decodeLenientIfPresent(SceneAreaBounds.self, forKey: .areaBounds)
     }
 }
 
@@ -488,13 +524,15 @@ extension SceneEffect {
         case .travelingWaves:
             typealias Key = WaveKey
             return [
-                Key.speed: 5, Key.scale: 200, Key.amplitude: 0.1, Key.exponent: 1, Key.angle: 0, Key.dual: 0,
+                Key.speed: 5, Key.scale: 200, Key.amplitude: 0.1, Key.exponent: 1, Key.angle: 0,
+                Key.dual: 0,
                 Key.speed2: 3, Key.scale2: 66, Key.offset2: 0, Key.exponent2: 1, Key.angle2: 0
             ]
         case .flowShake:
             typealias Key = FlowShakeKey
             return [
-                Key.speed: 1, Key.amplitude: 0.1, Key.frictionX: 1, Key.frictionY: 1, Key.boundsMin: 0, Key.boundsMax: 1,
+                Key.speed: 1, Key.amplitude: 0.1, Key.frictionX: 1, Key.frictionY: 1,
+                Key.boundsMin: 0, Key.boundsMax: 1,
                 Key.side: 0, Key.irregular: 0
             ]
         case .flowMap:
@@ -503,22 +541,41 @@ extension SceneEffect {
         case .normalRipples:
             typealias Key = RipplesKey
             return [
-                Key.animationSpeed: 0.15, Key.scale: 1, Key.scrollSpeed: 0, Key.scrollAngle: 0, Key.ratio: 1, Key.strength: 0.1,
-                Key.specular: 0, Key.specularPower: 1, Key.specularStrength: 1, Key.specularRed: 1, Key.specularGreen: 1,
+                Key.animationSpeed: 0.15, Key.scale: 1, Key.scrollSpeed: 0, Key.scrollAngle: 0,
+                Key.ratio: 1, Key.strength: 0.1,
+                Key.specular: 0, Key.specularPower: 1, Key.specularStrength: 1, Key.specularRed: 1,
+                Key.specularGreen: 1,
                 Key.specularBlue: 1
             ]
         case .noiseDrift:
             typealias Key = NoiseDriftKey
-            return [Key.speed: 0.02, Key.scale: 2, Key.scaleX: 0.5, Key.amount: 0.1, Key.angle: .pi / 2]
+            return [
+                Key.speed: 0.02,
+                Key.scale: 2,
+                Key.scaleX: 0.5,
+                Key.amount: 0.1,
+                Key.angle: .pi / 2
+            ]
         case .noiseSway:
             typealias Key = NoiseSwayKey
-            return [Key.speed: 5, Key.strength: 0.4, Key.phase: 0.5, Key.power: 1, Key.noiseScale: 0.05, Key.ratio: 0.3, Key.angle: 0]
+            return [
+                Key.speed: 5,
+                Key.strength: 0.4,
+                Key.phase: 0.5,
+                Key.power: 1,
+                Key.noiseScale: 0.05,
+                Key.ratio: 0.3,
+                Key.angle: 0
+            ]
         case .pulseBlend:
             typealias Key = PulseKey
             return [
-                Key.speed: 3, Key.phase: 0, Key.amount: 1, Key.boundsMin: 0, Key.boundsMax: 1, Key.noiseSpeed: 0.5,
-                Key.noiseAmount: 0, Key.power: 1, Key.lowRed: 1, Key.lowGreen: 1, Key.lowBlue: 1, Key.highRed: 1,
-                Key.highGreen: 1, Key.highBlue: 1, Key.blendMode: 9, Key.pulsesColor: 1, Key.pulsesOpacity: 0
+                Key.speed: 3, Key.phase: 0, Key.amount: 1, Key.boundsMin: 0, Key.boundsMax: 1,
+                Key.noiseSpeed: 0.5,
+                Key.noiseAmount: 0, Key.power: 1, Key.lowRed: 1, Key.lowGreen: 1, Key.lowBlue: 1,
+                Key.highRed: 1,
+                Key.highGreen: 1, Key.highBlue: 1, Key.blendMode: 9, Key.pulsesColor: 1,
+                Key.pulsesOpacity: 0
             ]
         case .uvScroll:
             typealias Key = ScrollKey
@@ -528,8 +585,11 @@ extension SceneEffect {
         case .axisSwing:
             typealias Key = AxisSwingKey
             return [
-                Key.speed: 2, Key.phase: 0, Key.amount: 0.2, Key.x0: 0.25, Key.y0: 0.5, Key.x1: 0.75, Key.y1: 0.5,
-                Key.size: 0.4, Key.center: 0.5, Key.feather: 0.01, Key.doubleSided: 0, Key.noise: 0, Key.noiseSpeed: 0.15,
+                Key.speed: 2, Key.phase: 0, Key.amount: 0.2, Key.x0: 0.25, Key.y0: 0.5,
+                Key.x1: 0.75,
+                Key.y1: 0.5,
+                Key.size: 0.4, Key.center: 0.5, Key.feather: 0.01, Key.doubleSided: 0, Key.noise: 0,
+                Key.noiseSpeed: 0.15,
                 Key.noiseAmount: 0.2
             ]
         default:
@@ -556,11 +616,11 @@ struct SceneTransform: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        offsetX = (try? container.decode(Double.self, forKey: .offsetX)) ?? 0
-        offsetY = (try? container.decode(Double.self, forKey: .offsetY)) ?? 0
-        scale = (try? container.decode(Double.self, forKey: .scale)) ?? 1
-        scaleY = try? container.decodeIfPresent(Double.self, forKey: .scaleY)
-        rotation = (try? container.decode(Double.self, forKey: .rotation)) ?? 0
+        offsetX = container.decodeLenient(Double.self, forKey: .offsetX, default: 0)
+        offsetY = container.decodeLenient(Double.self, forKey: .offsetY, default: 0)
+        scale = container.decodeLenient(Double.self, forKey: .scale, default: 1)
+        scaleY = container.decodeLenientIfPresent(Double.self, forKey: .scaleY)
+        rotation = container.decodeLenient(Double.self, forKey: .rotation, default: 0)
     }
 
     func interpolated(to other: SceneTransform, _ t: Double) -> SceneTransform {
@@ -568,10 +628,14 @@ struct SceneTransform: Codable, Equatable {
         result.offsetX = offsetX + (other.offsetX - offsetX) * t
         result.offsetY = offsetY + (other.offsetY - offsetY) * t
         // Scale is interpolated in log space so a zoom feels even.
-        result.scale = exp(log(max(scale, 0.01)) + (log(max(other.scale, 0.01)) - log(max(scale, 0.01))) * t)
+        result.scale = exp(log(max(scale, 0.01)) + (log(max(other.scale, 0.01)) - log(max(
+            scale,
+            0.01
+        ))) * t)
         if scaleY != nil || other.scaleY != nil {
             let sy0 = scaleY ?? scale, sy1 = other.scaleY ?? other.scale
-            result.scaleY = exp(log(max(sy0, 0.01)) + (log(max(sy1, 0.01)) - log(max(sy0, 0.01))) * t)
+            result
+                .scaleY = exp(log(max(sy0, 0.01)) + (log(max(sy1, 0.01)) - log(max(sy0, 0.01))) * t)
         }
         result.rotation = rotation + (other.rotation - rotation) * t
         return result
@@ -596,10 +660,14 @@ struct SceneKeyframe: Codable, Equatable, Identifiable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = (try? container.decode(UUID.self, forKey: .id)) ?? UUID()
-        time = (try? container.decode(Double.self, forKey: .time)) ?? 0
-        transform = (try? container.decode(SceneTransform.self, forKey: .transform)) ?? .identity
-        opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
+        id = container.decodeLenient(UUID.self, forKey: .id, default: UUID())
+        time = container.decodeLenient(Double.self, forKey: .time, default: 0)
+        transform = container.decodeLenient(
+            SceneTransform.self,
+            forKey: .transform,
+            default: .identity
+        )
+        opacity = container.decodeLenient(Double.self, forKey: .opacity, default: 1)
     }
 }
 
@@ -623,8 +691,12 @@ struct SceneMotion: Codable, Equatable {
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             time = try container.decode(Double.self, forKey: .time)
-            transform = (try? container.decode(SceneTransform.self, forKey: .transform)) ?? .identity
-            opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
+            transform = container.decodeLenient(
+                SceneTransform.self,
+                forKey: .transform,
+                default: .identity
+            )
+            opacity = container.decodeLenient(Double.self, forKey: .opacity, default: 1)
         }
     }
 
@@ -663,13 +735,18 @@ struct SceneMotion: Codable, Equatable {
         let a = samples[low], b = samples[low + 1]
         let span = b.time - a.time
         let f = span > 1e-12 ? (t - a.time) / span : 1
-        func mix(_ x: Double, _ y: Double) -> Double { x + (y - x) * f }
+        func mix(_ x: Double, _ y: Double) -> Double {
+            x + (y - x) * f
+        }
         var transform = SceneTransform()
         transform.offsetX = mix(a.transform.offsetX, b.transform.offsetX)
         transform.offsetY = mix(a.transform.offsetY, b.transform.offsetY)
         transform.scale = mix(a.transform.scale, b.transform.scale)
         if a.transform.scaleY != nil || b.transform.scaleY != nil {
-            transform.scaleY = mix(a.transform.scaleY ?? a.transform.scale, b.transform.scaleY ?? b.transform.scale)
+            transform.scaleY = mix(
+                a.transform.scaleY ?? a.transform.scale,
+                b.transform.scaleY ?? b.transform.scale
+            )
         }
         transform.rotation = mix(a.transform.rotation, b.transform.rotation)
         return (transform, mix(a.opacity, b.opacity))
@@ -724,7 +801,10 @@ extension SceneDocument {
     /// The geometry files that exist in the scene folder for this document: read from
     /// there, or written by a save.
     var storedGeometryFiles: Set<String> {
-        Set(models.filter { !$0.hasInlineGeometry }.compactMap(\.geometryFiles).flatMap { [$0.vertices, $0.indices] })
+        Set(models.filter { !$0.hasInlineGeometry }.compactMap(\.geometryFiles).flatMap { [
+            $0.vertices,
+            $0.indices
+        ] })
     }
 }
 
@@ -746,7 +826,10 @@ struct SceneStaticModel: Codable, Equatable {
     /// Where `vertices` and `indices` are, or will be once saved, in the scene folder;
     /// nil while they belong inline.
     var geometryFiles: SceneModelGeometryFiles? {
-        vertices.count + indices.count >= SceneModelGeometryFiles.minimumBytes ? files.names(vertices, indices) : nil
+        vertices.count + indices.count >= SceneModelGeometryFiles.minimumBytes ? files.names(
+            vertices,
+            indices
+        ) : nil
     }
 
     /// The geometry was read from scene.json itself, so a save moves it into files.
@@ -754,7 +837,14 @@ struct SceneStaticModel: Codable, Equatable {
         vertices.count + indices.count >= SceneModelGeometryFiles.minimumBytes && !files.isStored
     }
 
-    init(material: Int, components: UInt32, vertices: Data, indices: Data, skeleton: UUID? = nil, surface: SceneModelSurface? = nil) {
+    init(
+        material: Int,
+        components: UInt32,
+        vertices: Data,
+        indices: Data,
+        skeleton: UUID? = nil,
+        surface: SceneModelSurface? = nil
+    ) {
         self.material = material
         self.components = components
         self.vertices = vertices
@@ -805,7 +895,10 @@ struct SceneStaticModel: Codable, Equatable {
         components = try container.decode(UInt32.self, forKey: .components)
         skeleton = try container.decodeIfPresent(UUID.self, forKey: .skeleton)
         surface = try container.decodeIfPresent(SceneModelSurface.self, forKey: .surface)
-        guard let names = try container.decodeIfPresent(SceneModelGeometryFiles.self, forKey: .geometryFiles) else {
+        guard let names = try container.decodeIfPresent(
+            SceneModelGeometryFiles.self,
+            forKey: .geometryFiles
+        ) else {
             vertices = try container.decode(Data.self, forKey: .vertices)
             indices = try container.decode(Data.self, forKey: .indices)
             files = FileNames(stored: nil)
@@ -817,11 +910,23 @@ struct SceneStaticModel: Codable, Equatable {
                 debugDescription: "model geometry lives in files beside scene.json; decode the scene with SceneStore"
             )
         }
-        for name in [names.vertices, names.indices] where !SceneModelGeometryFiles.isFileName(name) {
-            throw DecodingError.dataCorruptedError(forKey: .geometryFiles, in: container, debugDescription: "bad geometry file name \(name)")
+        for name in [names.vertices, names.indices]
+            where !SceneModelGeometryFiles.isFileName(name)
+        {
+            throw DecodingError.dataCorruptedError(
+                forKey: .geometryFiles,
+                in: container,
+                debugDescription: "bad geometry file name \(name)"
+            )
         }
-        vertices = try Data(contentsOf: folder.appendingPathComponent(names.vertices), options: .alwaysMapped)
-        indices = try Data(contentsOf: folder.appendingPathComponent(names.indices), options: .alwaysMapped)
+        vertices = try Data(
+            contentsOf: folder.appendingPathComponent(names.vertices),
+            options: .alwaysMapped
+        )
+        indices = try Data(
+            contentsOf: folder.appendingPathComponent(names.indices),
+            options: .alwaysMapped
+        )
         files = FileNames(stored: names)
     }
 
@@ -855,15 +960,23 @@ struct SceneStaticModel: Codable, Equatable {
             do {
                 try FileManager.default.removeItem(at: partial)
             } catch let cleanupError {
-                AppLog.persistence.error("mesh write cleanup failed: \(cleanupError.localizedDescription, privacy: .public)")
+                AppLog.persistence
+                    .error(
+                        "mesh write cleanup failed: \(cleanupError.localizedDescription, privacy: .public)"
+                    )
             }
-            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path, NSUnderlyingErrorKey: error])
+            throw CocoaError(
+                .fileWriteUnknown,
+                userInfo: [NSFilePathErrorKey: url.path, NSUnderlyingErrorKey: error]
+            )
         }
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.material == rhs.material && lhs.components == rhs.components && lhs.skeleton == rhs.skeleton
-            && lhs.surface == rhs.surface && lhs.vertices == rhs.vertices && lhs.indices == rhs.indices
+        lhs.material == rhs.material && lhs.components == rhs.components && lhs.skeleton == rhs
+            .skeleton
+            && lhs.surface == rhs.surface && lhs.vertices == rhs.vertices && lhs.indices == rhs
+            .indices
     }
 
     private var floatsPerVertex: Int {
@@ -873,10 +986,14 @@ struct SceneStaticModel: Codable, Equatable {
 
     var isValid: Bool {
         let stride = floatsPerVertex
-        guard stride > 0, vertices.count % (stride * 4) == 0, indices.count % 12 == 0, surface?.isValid ?? true else { return false }
+        guard stride > 0, vertices.count % (stride * 4) == 0, indices.count % 12 == 0,
+              surface?.isValid ?? true else { return false }
         let count = UInt32(vertices.count / (stride * 4))
         return indices.withUnsafeBytes { bytes in
-            (0 ..< indices.count / 4).allSatisfy { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian < count }
+            (0 ..< indices.count / 4).allSatisfy { bytes.loadUnaligned(
+                fromByteOffset: $0 * 4,
+                as: UInt32.self
+            ).littleEndian < count }
         }
     }
 
@@ -891,23 +1008,38 @@ struct SceneStaticModel: Codable, Equatable {
         return vertices.withUnsafeBytes { bytes in
             (0 ..< vertices.count / (stride * 4)).reduce(-1) { highest, vertex in
                 (0 ..< 4).reduce(highest) { highest, slot in
-                    let word = bytes.loadUnaligned(fromByteOffset: (vertex * stride + before + slot) * 4, as: UInt32.self).littleEndian
+                    let word = bytes.loadUnaligned(
+                        fromByteOffset: (vertex * stride + before + slot) * 4,
+                        as: UInt32.self
+                    ).littleEndian
                     return max(highest, Int(min(word, UInt32(Int32.max))))
                 }
             }
         }
     }
 
-    private static let jointsBit = UInt32(1) << UInt32(SceneRenderGraph.Attribute.Semantic.allCases.firstIndex(of: .joints)!)
+    private static let jointsBit = UInt32(1) <<
+        UInt32(SceneRenderGraph.Attribute.Semantic.allCases.firstIndex(of: .joints)!)
 
     var shape: SceneModelLayerFrame.Shape {
         let floats = vertices.withUnsafeBytes { bytes in
-            (0 ..< vertices.count / 4).map { Float(bitPattern: bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian) }
+            (0 ..< vertices.count / 4).map { Float(bitPattern: bytes.loadUnaligned(
+                fromByteOffset: $0 * 4,
+                as: UInt32.self
+            ).littleEndian) }
         }
         let triangles = indices.withUnsafeBytes { bytes in
-            (0 ..< indices.count / 4).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: UInt32.self).littleEndian }
+            (0 ..< indices.count / 4).map { bytes.loadUnaligned(
+                fromByteOffset: $0 * 4,
+                as: UInt32.self
+            ).littleEndian }
         }
-        return SceneModelLayerFrame.Shape(material: material, components: components, vertices: floats, indices: triangles)
+        return SceneModelLayerFrame.Shape(
+            material: material,
+            components: components,
+            vertices: floats,
+            indices: triangles
+        )
     }
 }
 
@@ -995,23 +1127,35 @@ struct SceneParticles: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let preset = (try? container.decode(SceneParticlePreset.self, forKey: .preset)) ?? .snow
+        let preset = container.decodeLenient(
+            SceneParticlePreset.self,
+            forKey: .preset,
+            default: .snow
+        )
         let defaults = SceneParticles(preset: preset)
         self.preset = preset
-        count = (try? container.decode(Int.self, forKey: .count)) ?? defaults.count
-        size = (try? container.decode(Double.self, forKey: .size)) ?? defaults.size
-        cycles = (try? container.decode(Int.self, forKey: .cycles)) ?? defaults.cycles
-        direction = (try? container.decode(Double.self, forKey: .direction)) ?? defaults.direction
-        sway = (try? container.decode(Double.self, forKey: .sway)) ?? defaults.sway
-        color = (try? container.decode(RGBAColor.self, forKey: .color)) ?? defaults.color
-        opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? defaults.opacity
-        cursorMode = (try? container.decode(SceneParticleCursorMode.self, forKey: .cursorMode)) ?? .none
-        maskFile = try? container.decodeIfPresent(String.self, forKey: .maskFile)
-        seed = (try? container.decode(Int.self, forKey: .seed)) ?? 0
+        count = container.decodeLenient(Int.self, forKey: .count, default: defaults.count)
+        size = container.decodeLenient(Double.self, forKey: .size, default: defaults.size)
+        cycles = container.decodeLenient(Int.self, forKey: .cycles, default: defaults.cycles)
+        direction = container.decodeLenient(
+            Double.self,
+            forKey: .direction,
+            default: defaults.direction
+        )
+        sway = container.decodeLenient(Double.self, forKey: .sway, default: defaults.sway)
+        color = container.decodeLenient(RGBAColor.self, forKey: .color, default: defaults.color)
+        opacity = container.decodeLenient(Double.self, forKey: .opacity, default: defaults.opacity)
+        cursorMode = container.decodeLenient(
+            SceneParticleCursorMode.self,
+            forKey: .cursorMode,
+            default: .none
+        )
+        maskFile = container.decodeLenientIfPresent(String.self, forKey: .maskFile)
+        seed = container.decodeLenient(Int.self, forKey: .seed, default: 0)
     }
 }
 
-struct SceneLayer: Codable, Equatable, Identifiable, Sendable {
+struct SceneLayer: Codable, Equatable, Identifiable {
     var id = UUID()
     var name: String
     var kind: SceneLayerKind = .image
@@ -1104,54 +1248,97 @@ struct SceneLayer: Codable, Equatable, Identifiable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
-        kind = (try? container.decode(SceneLayerKind.self, forKey: .kind)) ?? .image
-        imageFile = (try? container.decode(String.self, forKey: .imageFile)) ?? ""
+        kind = container.decodeLenient(SceneLayerKind.self, forKey: .kind, default: .image)
+        imageFile = container.decodeLenient(String.self, forKey: .imageFile, default: "")
         videoFile = try container.decodeIfPresent(String.self, forKey: .videoFile)
-        usesMediaArtwork = try container.decodeIfPresent(Bool.self, forKey: .usesMediaArtwork) ?? false
-        capturesCanvas = (try? container.decode(Bool.self, forKey: .capturesCanvas)) ?? false
+        usesMediaArtwork = try container
+            .decodeIfPresent(Bool.self, forKey: .usesMediaArtwork) ?? false
+        capturesCanvas = container.decodeLenient(Bool.self, forKey: .capturesCanvas, default: false)
         objectID = try container.decodeIfPresent(Int.self, forKey: .objectID)
-        particles = try? container.decodeIfPresent(SceneParticles.self, forKey: .particles)
-        particleSystem = try container.decodeIfPresent(SceneParticleSystem.self, forKey: .particleSystem)
+        particles = container.decodeLenientIfPresent(SceneParticles.self, forKey: .particles)
+        particleSystem = try container.decodeIfPresent(
+            SceneParticleSystem.self,
+            forKey: .particleSystem
+        )
         space = try container.decodeIfPresent(SceneSpace.self, forKey: .space)
-        guard space.map({ $0.isValid }) ?? true else {
-            throw DecodingError.dataCorruptedError(forKey: .space, in: container, debugDescription: "Invalid placement in space")
+        guard space.map(\.isValid) ?? true else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .space,
+                in: container,
+                debugDescription: "Invalid placement in space"
+            )
         }
         model = try container.decodeIfPresent(SceneStaticModel.self, forKey: .model)
         castsShadow = try container.decodeIfPresent(Bool.self, forKey: .castsShadow)
         modelValues = try container.decodeIfPresent([String: Double].self, forKey: .modelValues)
-        guard model.map({ $0.isValid }) ?? true else {
-            throw DecodingError.dataCorruptedError(forKey: .model, in: container, debugDescription: "Invalid model")
+        guard model.map(\.isValid) ?? true else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .model,
+                in: container,
+                debugDescription: "Invalid model"
+            )
         }
         modelParts = try container.decodeIfPresent([SceneStaticModel].self, forKey: .modelParts)
         guard (modelParts ?? []).allSatisfy({ $0.isValid && $0.skeleton == model?.skeleton }) else {
-            throw DecodingError.dataCorruptedError(forKey: .modelParts, in: container, debugDescription: "Invalid model part")
+            throw DecodingError.dataCorruptedError(
+                forKey: .modelParts,
+                in: container,
+                debugDescription: "Invalid model part"
+            )
         }
-        modelPlacement = try container.decodeIfPresent(SceneModelPlacement.self, forKey: .modelPlacement)
+        modelPlacement = try container.decodeIfPresent(
+            SceneModelPlacement.self,
+            forKey: .modelPlacement
+        )
         guard modelPlacement.map({ $0.isValid && model != nil }) ?? true else {
-            throw DecodingError.dataCorruptedError(forKey: .modelPlacement, in: container, debugDescription: "Invalid model placement")
+            throw DecodingError.dataCorruptedError(
+                forKey: .modelPlacement,
+                in: container,
+                debugDescription: "Invalid model placement"
+            )
         }
         text = try container.decodeIfPresent(SceneText.self, forKey: .text)
         renderGraph = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .renderGraph)
         placement = try container.decodeIfPresent(SceneLayerPlacement.self, forKey: .placement)
-        depthFile = try? container.decodeIfPresent(String.self, forKey: .depthFile)
-        depthStrength = (try? container.decode(Double.self, forKey: .depthStrength)) ?? 0.5
-        depthFollowsCursor = (try? container.decode(Bool.self, forKey: .depthFollowsCursor)) ?? true
-        depthAutoMotion = (try? container.decode(Double.self, forKey: .depthAutoMotion)) ?? 0
-        depthAutoCycles = (try? container.decode(Int.self, forKey: .depthAutoCycles)) ?? 1
-        transform = (try? container.decode(SceneTransform.self, forKey: .transform)) ?? .identity
-        keyframes = (try? container.decode([SceneKeyframe].self, forKey: .keyframes)) ?? []
-        motion = try? container.decodeIfPresent(SceneMotion.self, forKey: .motion)
-        isVisible = (try? container.decode(Bool.self, forKey: .isVisible)) ?? true
-        isLocked = (try? container.decode(Bool.self, forKey: .isLocked)) ?? false
-        opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
-        tint = (try? container.decode(RGBAColor.self, forKey: .tint)) ?? RGBAColor(red: 1, green: 1, blue: 1, alpha: 1)
-        blendMode = (try? container.decode(SceneBlendMode.self, forKey: .blendMode)) ?? .normal
-        parallaxDepth = (try? container.decode(Double.self, forKey: .parallaxDepth)) ?? 0
-        parallaxDepthY = try? container.decodeIfPresent(Double.self, forKey: .parallaxDepthY)
-        cursorMask = try? container.decodeIfPresent(SceneCursorMask.self, forKey: .cursorMask)
+        depthFile = container.decodeLenientIfPresent(String.self, forKey: .depthFile)
+        depthStrength = container.decodeLenient(Double.self, forKey: .depthStrength, default: 0.5)
+        depthFollowsCursor = container.decodeLenient(
+            Bool.self,
+            forKey: .depthFollowsCursor,
+            default: true
+        )
+        depthAutoMotion = container.decodeLenient(Double.self, forKey: .depthAutoMotion, default: 0)
+        depthAutoCycles = container.decodeLenient(Int.self, forKey: .depthAutoCycles, default: 1)
+        transform = container.decodeLenient(
+            SceneTransform.self,
+            forKey: .transform,
+            default: .identity
+        )
+        keyframes = container.decodeLenient([SceneKeyframe].self, forKey: .keyframes, default: [])
+        motion = container.decodeLenientIfPresent(SceneMotion.self, forKey: .motion)
+        isVisible = container.decodeLenient(Bool.self, forKey: .isVisible, default: true)
+        isLocked = container.decodeLenient(Bool.self, forKey: .isLocked, default: false)
+        opacity = container.decodeLenient(Double.self, forKey: .opacity, default: 1)
+        tint = container.decodeLenient(
+            RGBAColor.self,
+            forKey: .tint,
+            default: RGBAColor(red: 1, green: 1, blue: 1, alpha: 1)
+        )
+        blendMode = container.decodeLenient(
+            SceneBlendMode.self,
+            forKey: .blendMode,
+            default: .normal
+        )
+        parallaxDepth = container.decodeLenient(Double.self, forKey: .parallaxDepth, default: 0)
+        parallaxDepthY = container.decodeLenientIfPresent(Double.self, forKey: .parallaxDepthY)
+        cursorMask = container.decodeLenientIfPresent(SceneCursorMask.self, forKey: .cursorMask)
         // An effect this version does not know is dropped rather than failing the scene.
-        effects = ((try? container.decode([FailableDecodable<SceneEffect>].self, forKey: .effects)) ?? [])
-            .compactMap(\.value)
+        effects = container.decodeLenient(
+            [FailableDecodable<SceneEffect>].self,
+            forKey: .effects,
+            default: []
+        )
+        .compactMap(\.value)
     }
 
     var activeEffects: [SceneEffect] {
@@ -1242,17 +1429,20 @@ struct SceneLayer: Codable, Equatable, Identifiable, Sendable {
     }
 
     var usesCursor: Bool {
-        isVisible && (parallaxDepth > 0 || cursorMask != nil || (particles.map { $0.cursorMode != .none } ?? false)
-            || particleSystem?.usesPointer == true
-            || (hasDepth && depthFollowsCursor) || renderGraph?.usesPointer == true
-            || activeEffects.contains { $0.renderGraph?.usesPointer == true })
+        isVisible &&
+            (parallaxDepth > 0 || cursorMask != nil ||
+                (particles.map { $0.cursorMode != .none } ?? false)
+                || particleSystem?.usesPointer == true
+                || (hasDepth && depthFollowsCursor) || renderGraph?.usesPointer == true
+                || activeEffects.contains { $0.renderGraph?.usesPointer == true })
     }
 
     /// Particles move on their own; an image layer through its effects or the
     /// depth's own drift.
     var isAnimated: Bool {
         !activeEffects.isEmpty || (isVisible && hasParticles)
-            || (isVisible && hasDepth && depthAutoMotion > 0) || (isVisible && (isKeyframed || motion != nil))
+            || (isVisible && hasDepth && depthAutoMotion > 0) ||
+            (isVisible && (isKeyframed || motion != nil))
             || (isVisible && (renderGraph != nil || placement != nil || videoFile != nil))
     }
 }
@@ -1273,13 +1463,23 @@ struct SceneSpace: Codable, Equatable {
     var cull: SceneRenderGraph.Draw.Cull?
 
     var isValid: Bool {
-        world.count == 16 && world.allSatisfy(\.isFinite) && [width, height, offsetX, offsetY].allSatisfy(\.isFinite)
+        world.count == 16 && world.allSatisfy(\.isFinite) && [width, height, offsetX, offsetY]
+            .allSatisfy(\.isFinite)
     }
 
     var matrix: simd_float4x4 {
         let m = world.map(Float.init)
-        return simd_float4x4(columns: (SIMD4(m[0], m[1], m[2], m[3]), SIMD4(m[4], m[5], m[6], m[7]),
-                                       SIMD4(m[8], m[9], m[10], m[11]), SIMD4(m[12], m[13], m[14], m[15])))
+        return simd_float4x4(columns: (
+            SIMD4(m[0], m[1], m[2], m[3]),
+            SIMD4(m[4], m[5], m[6], m[7]),
+            SIMD4(m[8], m[9], m[10], m[11]),
+            SIMD4(
+                m[12],
+                m[13],
+                m[14],
+                m[15]
+            )
+        ))
     }
 }
 
@@ -1310,9 +1510,11 @@ struct SceneCamera: Codable, Equatable {
     var fog: SceneFog?
 
     var isValid: Bool {
-        [eye, center, up, ambientColor, skylightColor].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
+        [eye, center, up, ambientColor, skylightColor]
+            .allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
             && [fov, nearZ, farZ].allSatisfy(\.isFinite)
-            && (shadowLights ?? []).allSatisfy(\.isValid) && (dynamicLights ?? []).allSatisfy(\.isValid)
+            && (shadowLights ?? []).allSatisfy(\.isValid) && (dynamicLights ?? [])
+            .allSatisfy(\.isValid)
             && (fog?.isValid ?? true)
             && (path?.isValid ?? true)
     }
@@ -1330,7 +1532,8 @@ struct SceneFog: Codable, Equatable {
         var color: [Double]
 
         var isValid: Bool {
-            color.count == 3 && ([start, end, startDensity, endDensity] + color).allSatisfy(\.isFinite) && start != end
+            color.count == 3 && ([start, end, startDensity, endDensity] + color)
+                .allSatisfy(\.isFinite) && start != end
         }
     }
 
@@ -1353,7 +1556,9 @@ struct SceneCameraPath: Codable, Equatable {
         /// Magnification about the middle of the view; flat scenes only.
         var zoom: Double
 
-        var zoomAxis: [Double] { [zoom, 0, 0] }
+        var zoomAxis: [Double] {
+            [zoom, 0, 0]
+        }
     }
 
     var duration: Double
@@ -1363,7 +1568,11 @@ struct SceneCameraPath: Codable, Equatable {
     var isValid: Bool {
         duration.isFinite && !transforms.isEmpty
             && transforms.allSatisfy {
-                $0.timestamp.isFinite && $0.timestamp >= 0 && $0.zoom.isFinite && $0.zoom > 0 && [$0.eye, $0.center, $0.up].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
+                $0.timestamp.isFinite && $0.timestamp >= 0 && $0.zoom.isFinite && $0.zoom > 0 && [
+                    $0.eye,
+                    $0.center,
+                    $0.up
+                ].allSatisfy { $0.count == 3 && $0.allSatisfy(\.isFinite) }
             }
             && zip(transforms, transforms.dropFirst()).allSatisfy { $0.timestamp <= $1.timestamp }
             && period > 0
@@ -1378,13 +1587,25 @@ struct SceneCameraPath: Codable, Equatable {
     /// Each segment is its own cubic: P + ΔP·(½u + 3⁄2u² − u³), a Hermite curve whose slope
     /// at both ends is half the segment's own change. Reference three-point paths
     /// fit this within about 1 px; a slope taken from the neighbouring key points does not.
-    func transform(at time: Double) -> (eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>, zoom: Float) {
+    struct Pose: Equatable {
+        var eye: SIMD3<Float>
+        var center: SIMD3<Float>
+        var up: SIMD3<Float>
+        var zoom: Float
+    }
+
+    func transform(at time: Double) -> Pose {
         let t = time.truncatingRemainder(dividingBy: period)
         let next = transforms.firstIndex { $0.timestamp > t } ?? transforms.count
-        func vector(_ values: [Double]) -> SIMD3<Float> { SIMD3(values.map(Float.init)) }
+        func vector(_ values: [Double]) -> SIMD3<Float> {
+            SIMD3(values.map(Float.init))
+        }
         guard next > 0, next < transforms.count else {
             let held = transforms[next == 0 ? 0 : transforms.count - 1]
-            return (vector(held.eye), vector(held.center), vector(held.up), Float(held.zoom))
+            return Pose(
+                eye: vector(held.eye), center: vector(held.center), up: vector(held.up),
+                zoom: Float(held.zoom)
+            )
         }
         let a = transforms[next - 1], b = transforms[next]
         let u = Float((t - a.timestamp) / (b.timestamp - a.timestamp))
@@ -1393,8 +1614,14 @@ struct SceneCameraPath: Codable, Equatable {
             let start = vector(a[keyPath: key])
             return start + (vector(b[keyPath: key]) - start) * ease
         }
-        return (point(\.eye), point(\.center), point(\.up), point(\.zoomAxis).x)
-    }}
+        return Pose(
+            eye: point(\.eye),
+            center: point(\.center),
+            up: point(\.up),
+            zoom: point(\.zoomAxis).x
+        )
+    }
+}
 
 /// A light a script moves, as the scene file gives it.
 struct SceneDynamicLight: Codable, Equatable {
@@ -1421,11 +1648,13 @@ struct SceneShadowLight: Codable, Equatable {
     var outerCone: Double
     /// How far from the camera a directional light's shadow reaches.
     var cascadeDistance: Double
-    /// The index in `SceneCamera.dynamicLights` of the light that moves this one; nil when it stays.
+    /// The index in `SceneCamera.dynamicLights` of the light that moves this one; nil when it
+    /// stays.
     var dynamicLight: Int?
 
     var isValid: Bool {
-        origin.count == 3 && axis.count == 3 && (origin + axis + [outerCone, cascadeDistance]).allSatisfy(\.isFinite)
+        origin.count == 3 && axis.count == 3 && (origin + axis + [outerCone, cascadeDistance])
+            .allSatisfy(\.isFinite)
             && axis.contains { $0 != 0 } && (0 ..< 90).contains(outerCone)
     }
 }
@@ -1433,7 +1662,7 @@ struct SceneShadowLight: Codable, Equatable {
 /// A still-image wallpaper built from layers. Lives in a folder next to the video it
 /// is baked into (SceneStore); the desktop draws it live, everything else that only
 /// plays videos (lock screen, screen saver, thumbnails) uses the baked video.
-struct SceneDocument: Codable, Equatable, Sendable {
+struct SceneDocument: Codable, Equatable {
     static let loopSecondsChoices = [10, 20, 30, 60]
 
     var canvasWidth: Int
@@ -1471,7 +1700,8 @@ struct SceneDocument: Codable, Equatable, Sendable {
     var meshMaterials: [SceneMeshMaterial?]?
     /// Where model layers scripts make are seen from; scripts can move it.
     var camera: SceneCamera?
-    /// How models the editor imported are seen and lit; in place of `camera` for all model layers when set.
+    /// How models the editor imported are seen and lit; in place of `camera` for all model layers
+    /// when set.
     var modelStage: SceneModelStage?
     var properties: [LocalWebProperty]?
     var authorSourceDirectory: String?
@@ -1479,7 +1709,12 @@ struct SceneDocument: Codable, Equatable, Sendable {
     var scriptOrigin: String?
     var sounds: [SceneSound] = []
 
-    init(canvasWidth: Int, canvasHeight: Int, layers: [SceneLayer], properties: [LocalWebProperty]? = nil) {
+    init(
+        canvasWidth: Int,
+        canvasHeight: Int,
+        layers: [SceneLayer],
+        properties: [LocalWebProperty]? = nil
+    ) {
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
         self.layers = layers
@@ -1493,58 +1728,100 @@ struct SceneDocument: Codable, Equatable, Sendable {
         layers = try container.decode([SceneLayer].self, forKey: .layers)
         rigs = try container.decodeIfPresent([UUID: SceneSkeleton].self, forKey: .rigs) ?? [:]
         // Packages come from anyone, and the baker writes loopSeconds × 60 frames.
-        let decodedLoop = (try? container.decode(Int.self, forKey: .loopSeconds)) ?? 20
+        let decodedLoop = container.decodeLenient(Int.self, forKey: .loopSeconds, default: 20)
         loopSeconds = min(max(decodedLoop, 1), Self.loopSecondsChoices.max()!)
-        let bands = (try? container.decode([SceneTimeBand].self, forKey: .timeBands)) ?? []
+        let bands = container.decodeLenient([SceneTimeBand].self, forKey: .timeBands, default: [])
         // One of each part, within a day; anything else falls back as a whole.
-        if Set(bands.map(\.timeOfDay)) == Set(SceneTimeOfDay.allCases), bands.count == SceneTimeOfDay.allCases.count,
+        if Set(bands.map(\.timeOfDay)) == Set(SceneTimeOfDay.allCases),
+           bands.count == SceneTimeOfDay.allCases.count,
            bands.allSatisfy({ (0 ..< 24 * 60).contains($0.startMinute) })
         {
             timeBands = bands
         }
-        links = ((try? container.decode([FailableDecodable<SceneLink>].self, forKey: .links)) ?? []).compactMap(\.value)
-        runsInRealTime = (try? container.decode(Bool.self, forKey: .runsInRealTime)) ?? false
+        links = container.decodeLenient(
+            [FailableDecodable<SceneLink>].self,
+            forKey: .links,
+            default: []
+        ).compactMap(\.value)
+        runsInRealTime = container.decodeLenient(Bool.self, forKey: .runsInRealTime, default: false)
         backgroundColor = try container.decodeIfPresent([Double].self, forKey: .backgroundColor)
         guard backgroundColor.map({ $0.count == 3 && $0.allSatisfy(\.isFinite) }) ?? true else {
-            throw DecodingError.dataCorruptedError(forKey: .backgroundColor, in: container, debugDescription: "Background needs three finite components")
+            throw DecodingError.dataCorruptedError(
+                forKey: .backgroundColor,
+                in: container,
+                debugDescription: "Background needs three finite components"
+            )
         }
-        highDynamicRange = try container.decodeIfPresent(Bool.self, forKey: .highDynamicRange) ?? false
+        highDynamicRange = try container
+            .decodeIfPresent(Bool.self, forKey: .highDynamicRange) ?? false
         finishing = try container.decodeIfPresent(SceneRenderGraph.self, forKey: .finishing)
         bloom = try container.decodeIfPresent(SceneBloom.self, forKey: .bloom)
         parallaxTravel = try container.decodeIfPresent(Double.self, forKey: .parallaxTravel)
         parallaxResponse = try container.decodeIfPresent(Double.self, forKey: .parallaxResponse)
         cameraShake = try container.decodeIfPresent(SceneCameraShake.self, forKey: .cameraShake)
-        meshMaterials = try container.decodeIfPresent([SceneMeshMaterial?].self, forKey: .meshMaterials)
+        meshMaterials = try container.decodeIfPresent(
+            [SceneMeshMaterial?].self,
+            forKey: .meshMaterials
+        )
         camera = try container.decodeIfPresent(SceneCamera.self, forKey: .camera)
-        guard camera.map({ $0.isValid }) ?? true else {
-            throw DecodingError.dataCorruptedError(forKey: .camera, in: container, debugDescription: "Invalid camera")
+        guard camera.map(\.isValid) ?? true else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .camera,
+                in: container,
+                debugDescription: "Invalid camera"
+            )
         }
         modelStage = try container.decodeIfPresent(SceneModelStage.self, forKey: .modelStage)
-        guard modelStage.map({ $0.isValid }) ?? true else {
-            throw DecodingError.dataCorruptedError(forKey: .modelStage, in: container, debugDescription: "Invalid model stage")
+        guard modelStage.map(\.isValid) ?? true else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .modelStage,
+                in: container,
+                debugDescription: "Invalid model stage"
+            )
         }
         guard [parallaxTravel, parallaxResponse].allSatisfy({ $0?.isFinite ?? true }) else {
-            throw DecodingError.dataCorruptedError(forKey: .parallaxTravel, in: container, debugDescription: "Parallax values must be finite")
+            throw DecodingError.dataCorruptedError(
+                forKey: .parallaxTravel,
+                in: container,
+                debugDescription: "Parallax values must be finite"
+            )
         }
         scripts = try container.decodeIfPresent([SceneScript].self, forKey: .scripts) ?? []
-        guard scripts.count <= SceneScript.maximumCount, Set(scripts.map(\.id)).count == scripts.count else {
-            throw DecodingError.dataCorruptedError(forKey: .scripts, in: container, debugDescription: "Too many scripts or duplicate script IDs")
+        guard scripts.count <= SceneScript.maximumCount,
+              Set(scripts.map(\.id)).count == scripts.count
+        else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .scripts,
+                in: container,
+                debugDescription: "Too many scripts or duplicate script IDs"
+            )
         }
         properties = try container.decodeIfPresent([LocalWebProperty].self, forKey: .properties)
-        authorSourceDirectory = try container.decodeIfPresent(String.self, forKey: .authorSourceDirectory)
+        authorSourceDirectory = try container.decodeIfPresent(
+            String.self,
+            forKey: .authorSourceDirectory
+        )
         scriptOrigin = try container.decodeIfPresent(String.self, forKey: .scriptOrigin)
         sounds = try container.decodeIfPresent([SceneSound].self, forKey: .sounds) ?? []
-        guard sounds.count <= SceneSound.maximumCount, Set(sounds.map(\.id)).count == sounds.count else {
-            throw DecodingError.dataCorruptedError(forKey: .sounds, in: container, debugDescription: "Too many sounds or duplicate sound IDs")
+        guard sounds.count <= SceneSound.maximumCount,
+              Set(sounds.map(\.id)).count == sounds.count
+        else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .sounds,
+                in: container,
+                debugDescription: "Too many sounds or duplicate sound IDs"
+            )
         }
         scriptOrigin = try container.decodeIfPresent(String.self, forKey: .scriptOrigin)
     }
 
     var isAnimated: Bool {
-        layers.contains(where: \.isAnimated) || scripts.contains { $0.canRun && $0.usesTime } || cameraShake != nil
+        layers.contains(where: \.isAnimated) || scripts
+            .contains { $0.canRun && $0.usesTime } || cameraShake != nil
             || layers.contains { layer in
                 layer.isVisible && layer.modelPlacement != nil
-                    && layer.model?.skeleton.flatMap { rigs[$0] }.map { !$0.playback.isEmpty } == true
+                    && layer.model?.skeleton.flatMap { rigs[$0] }
+                    .map { !$0.playback.isEmpty } == true
             }
     }
 
@@ -1553,7 +1830,8 @@ struct SceneDocument: Codable, Equatable, Sendable {
     }
 
     var usesCursor: Bool {
-        layers.contains(where: \.usesCursor) || links.contains { $0.input.usesCursor && $0.hasEffect }
+        layers.contains(where: \.usesCursor) || links
+            .contains { $0.input.usesCursor && $0.hasEffect }
             || scripts.contains { $0.canRun && $0.usesCursor }
     }
 
@@ -1576,13 +1854,19 @@ struct SceneDocument: Codable, Equatable, Sendable {
 
     var requiresRealTimePlayback: Bool {
         runsInRealTime || layers.contains { layer in
-            layer.activeEffects.contains { $0.kind.runsOnRealTime } || (layer.isVisible && (layer.renderGraph != nil || layer.placement != nil || layer.usesMediaArtwork))
+            layer.activeEffects
+                .contains { $0.kind.runsOnRealTime } ||
+                (layer
+                    .isVisible &&
+                    (layer.renderGraph != nil || layer.placement != nil || layer.usesMediaArtwork))
                 // A recorded motion keeps its own period, not the loop's.
                 || (layer.isVisible && layer.motion != nil)
         }
     }
 
-    var hasUnapprovedScripts: Bool { scripts.contains { $0.isEnabled && !$0.canRun } }
+    var hasUnapprovedScripts: Bool {
+        scripts.contains { $0.isEnabled && !$0.canRun }
+    }
 }
 
 /// The whole canvas drifts on a smooth path, as a handheld camera would.
@@ -1595,7 +1879,9 @@ struct SceneCameraShake: Codable, Equatable {
     var roughness: Double
 
     /// Radians per second of the path's two sines (x, y).
-    var angularSpeeds: [Double] { [speed * speed, 1.333 * speed * speed] }
+    var angularSpeeds: [Double] {
+        [speed * speed, 1.333 * speed * speed]
+    }
 
     /// How far the view moves, in canvas heights (+y down), once its sines reach
     /// `angles`: `angularSpeeds` × time, or a baked loop's bent version of that.
@@ -1613,11 +1899,4 @@ struct SceneCameraShake: Codable, Equatable {
     }
 }
 
-/// Decodes to nil instead of failing the whole array.
-struct FailableDecodable<Value: Decodable>: Decodable {
-    let value: Value?
-
-    init(from decoder: Decoder) throws {
-        value = try? Value(from: decoder)
-    }
-}
+// Decodes to nil instead of failing the whole array.

@@ -17,7 +17,10 @@ extension WallpaperModel {
 
     func recordPersistenceFailure(key: String, error: Error) {
         persistenceFailureCount += 1
-        AppLog.persistence.error("failed key=\(key, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+        AppLog.persistence
+            .error(
+                "failed key=\(key, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
         guard persistenceFailureCount >= persistenceFailureThreshold else {
             return
         }
@@ -48,7 +51,10 @@ extension WallpaperModel {
             UserDefaults.standard.set(libraryVideoPaths, forKey: PrefsKey.libraryVideoPaths)
             // 旧バージョンへ戻した場合の移行元として、旧キーにもライブラリ全体を書いておく
             UserDefaults.standard.set(libraryVideoPaths, forKey: PrefsKey.registeredVideoPaths)
-            UserDefaults.standard.set(selectedPlaylistID?.uuidString, forKey: PrefsKey.selectedPlaylistID)
+            UserDefaults.standard.set(
+                selectedPlaylistID?.uuidString,
+                forKey: PrefsKey.selectedPlaylistID
+            )
             let presentationData = try JSONEncoder().encode(wallpaperPresentationByPath)
             UserDefaults.standard.set(presentationData, forKey: wallpaperPresentationStorageKey)
             let editData = try JSONEncoder().encode(wallpaperEditByPath)
@@ -61,7 +67,10 @@ extension WallpaperModel {
                 focusFilterIntegrationEnabled, forKey: PrefsKey.focusFilterIntegrationEnabled
             )
             let focusAssignmentsData = try JSONEncoder().encode(focusModeAssignments)
-            UserDefaults.standard.set(focusAssignmentsData, forKey: PrefsKey.focusModeAssignmentsData)
+            UserDefaults.standard.set(
+                focusAssignmentsData,
+                forKey: PrefsKey.focusModeAssignmentsData
+            )
             UserDefaults.standard.set(wallpaperKind.rawValue, forKey: PrefsKey.wallpaperKind)
             if let webID = currentWebWallpaperID {
                 UserDefaults.standard.set(webID.uuidString, forKey: PrefsKey.currentWebWallpaperID)

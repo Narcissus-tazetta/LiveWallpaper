@@ -18,7 +18,9 @@ final class LocalWebIntegration: ObservableObject {
         var receiveSceneSpectrum: ([Float]) -> Void = { _ in }
         var receiveMedia: (WebNowPlaying, Bool) -> Void
 
-        var needsAudio: Bool { spectrum || sceneSpectrum }
+        var needsAudio: Bool {
+            spectrum || sceneSpectrum
+        }
 
         func receiveSilence() {
             if spectrum { receiveSpectrum([Float](repeating: 0, count: 128)) }
@@ -168,7 +170,9 @@ final class LocalWebIntegration: ObservableObject {
                        Date().timeIntervalSince(lastSpectrumAt) > 0.2
                     {
                         sentSilence = true
-                        for item in subscriptions.values { item.receiveSilence() }
+                        for item in subscriptions.values {
+                            item.receiveSilence()
+                        }
                     }
                 }
             } catch is CancellationError {
@@ -189,7 +193,9 @@ final class LocalWebIntegration: ObservableObject {
         silenceTask = nil
         AppLog.externalWallpapers
             .error("system audio capture failed: \(error.localizedDescription, privacy: .public)")
-        for item in subscriptions.values { item.receiveSilence() }
+        for item in subscriptions.values {
+            item.receiveSilence()
+        }
         if let capture {
             self.capture = nil
             Task {

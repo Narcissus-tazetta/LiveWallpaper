@@ -11,7 +11,13 @@ enum SceneLoopTiming {
     /// that `keepsDirection` (a scroll, a travelling wave, an animation clip) eases onto
     /// at least one cycle its own way rather than winding back; a swing eases onto the
     /// nearest count, which may be none.
-    static func phase(rate: Double, cycle: Double, keepsDirection: Bool, time: Double, loop: Double?) -> Double {
+    static func phase(
+        rate: Double,
+        cycle: Double,
+        keepsDirection: Bool,
+        time: Double,
+        loop: Double?
+    ) -> Double {
         guard let loop else {
             return (rate * time).truncatingRemainder(dividingBy: cycle)
         }
@@ -21,7 +27,8 @@ enum SceneLoopTiming {
         let cycles = rate * loop / cycle
         var whole = cycles.rounded()
         if keepsDirection, rate != 0, abs(whole) < 1 { whole = rate < 0 ? -1 : 1 }
-        return (rate * time - ease * (cycles - whole) * cycle).truncatingRemainder(dividingBy: cycle)
+        return (rate * time - ease * (cycles - whole) * cycle)
+            .truncatingRemainder(dividingBy: cycle)
     }
 
     static func timeInLoop(_ time: Double, loop: Double) -> Double {

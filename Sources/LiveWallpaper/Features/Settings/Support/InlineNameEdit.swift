@@ -56,8 +56,8 @@ extension SettingsView {
     /// TextField に渡す `Binding<String>`。編集中でなければ空文字を返す
     /// (カード側は `state?.id == 対象` を見てからしかこのBindingを使わないため、
     /// 実際に空文字が表示されることはない)。
-    func inlineNameEditInputBinding<ID: Hashable>(
-        _ state: Binding<InlineNameEdit<ID>?>
+    func inlineNameEditInputBinding(
+        _ state: Binding<InlineNameEdit<some Hashable>?>
     ) -> Binding<String> {
         Binding<String>(
             get: { state.wrappedValue?.input ?? "" },
@@ -114,7 +114,7 @@ extension SettingsView {
         )
     }
 
-    func commitWallpaperNameEdit(path: String) {
+    func commitWallpaperNameEdit(path _: String) {
         commitInlineNameEdit(state: $wallpaperNameEdit, focus: $focusedWallpaperPath) { id, name in
             model.setRegisteredVideoDisplayName(name, for: id)
         }
@@ -135,7 +135,7 @@ extension SettingsView {
         )
     }
 
-    func commitPlaylistNameEdit(playlistID: UUID) {
+    func commitPlaylistNameEdit(playlistID _: UUID) {
         commitInlineNameEdit(state: $playlistNameEdit, focus: $focusedPlaylistID) { id, name in
             model.setPlaylistName(name, for: id)
         }
@@ -159,8 +159,11 @@ extension SettingsView {
         )
     }
 
-    func commitWebWallpaperNameEdit(sourceID: UUID) {
-        commitInlineNameEdit(state: $webWallpaperNameEdit, focus: $focusedWebWallpaperID) { id, name in
+    func commitWebWallpaperNameEdit(sourceID _: UUID) {
+        commitInlineNameEdit(
+            state: $webWallpaperNameEdit,
+            focus: $focusedWebWallpaperID
+        ) { id, name in
             model.setWebWallpaperDisplayName(name, for: id)
         }
     }

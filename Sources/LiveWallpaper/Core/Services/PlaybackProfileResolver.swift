@@ -151,7 +151,10 @@ enum PlaybackProfileResolver {
         }
     }
 
-    private static func qualityAdjustedBuffer(_ base: TimeInterval, preset: QualityPreset) -> TimeInterval {
+    private static func qualityAdjustedBuffer(
+        _ base: TimeInterval,
+        preset: QualityPreset
+    ) -> TimeInterval {
         switch preset {
         case .auto:
             return base
@@ -175,7 +178,9 @@ enum AutoFrameRatePolicy {
     }
 
     /// - Returns: nil なら factor=1.0/adjustment=0(通常状態)からの変化なし。
-    static func resolve(_ inputs: Inputs) -> (bitRateFactor: Double, bufferAdjustment: TimeInterval) {
+    static func resolve(_ inputs: Inputs)
+        -> (bitRateFactor: Double, bufferAdjustment: TimeInterval)
+    {
         var nextBitRateFactor = 1.0
         var nextBufferAdjustment: TimeInterval = 0
 

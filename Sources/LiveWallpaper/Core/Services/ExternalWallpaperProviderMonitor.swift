@@ -3,7 +3,7 @@ import Foundation
 
 /// A wallpaper another running app offers. It exists only while that app runs and is
 /// never saved.
-struct ExternalWallpaper: Identifiable, Equatable, Sendable {
+struct ExternalWallpaper: Identifiable, Equatable {
     /// Unique across providers: "<manifest file name>/<item id>".
     let id: String
     let providerName: String
@@ -19,8 +19,8 @@ struct ExternalWallpaper: Identifiable, Equatable, Sendable {
     /// When the provider last wrote scene.json, so a rewritten scene is baked again.
     var sceneRevision: Date?
     var webSource: WebWallpaperSource?
-    var providerPID: pid_t? = nil
-    var properties: [LocalWebProperty]? = nil
+    var providerPID: pid_t?
+    var properties: [LocalWebProperty]?
 
     var isScene: Bool {
         sceneFolderPath != nil
@@ -144,9 +144,12 @@ final class ExternalWallpaperProviderMonitor {
             for item in manifest.wallpapers {
                 let id = "\(file.lastPathComponent)/\(item.id)"
                 let thumbnail = item.thumbnail.flatMap { Self.isRegularFile($0) ? $0 : nil }
-                if let path = item.path, item.scene == nil, item.web == nil, Self.isRegularFile(path) {
+                if let path = item.path, item.scene == nil, item.web == nil,
+                   Self.isRegularFile(path)
+                {
                     wallpapers.append(ExternalWallpaper(
-                        id: id, providerName: manifest.name, name: item.name, path: path, thumbnailPath: thumbnail,
+                        id: id, providerName: manifest.name, name: item.name, path: path,
+                        thumbnailPath: thumbnail,
                         providerPID: pid
                     ))
                 } else if let scene = item.scene, item.path == nil, item.web == nil,
@@ -163,12 +166,16 @@ final class ExternalWallpaperProviderMonitor {
                     do {
                         let folder = URL(fileURLWithPath: web, isDirectory: true)
                         let package = try LocalWebWallpaperPackage.load(folder: folder)
-                        let hash = SHA256.hash(data: Data(id.utf8)).map { String(format: "%02x", $0) }.joined()
+                        let hash = SHA256.hash(data: Data(id.utf8))
+                            .map { String(format: "%02x", $0) }.joined()
                         let text = "\(hash.prefix(8))-\(hash.dropFirst(8).prefix(4))-\(hash.dropFirst(12).prefix(4))-\(hash.dropFirst(16).prefix(4))-\(hash.dropFirst(20).prefix(12))"
                         var source = WebWallpaperSource(
-                            id: UUID(uuidString: text)!, url: folder.appendingPathComponent(package.entryPoint),
-                            displayName: item.name, localFolderPath: folder.path, warnings: package.warnings,
-                            thumbnailPath: package.preview.map { folder.appendingPathComponent($0).path }
+                            id: UUID(uuidString: text)!,
+                            url: folder.appendingPathComponent(package.entryPoint),
+                            displayName: item.name, localFolderPath: folder.path,
+                            warnings: package.warnings,
+                            thumbnailPath: package.preview
+                                .map { folder.appendingPathComponent($0).path }
                         )
                         source.addedAt = Date(timeIntervalSince1970: 0)
                         wallpapers.append(ExternalWallpaper(
@@ -177,7 +184,10 @@ final class ExternalWallpaperProviderMonitor {
                             providerPID: pid, properties: package.properties
                         ))
                     } catch {
-                        AppLog.externalWallpapers.error("invalid web package of \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                        AppLog.externalWallpapers
+                            .error(
+                                "invalid web package of \(id, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                            )
                     }
                 } else {
                     AppLog.externalWallpapers.error(
@@ -230,21 +240,25 @@ final class ExternalWallpaperProviderMonitor {
 
     /// One folder per item, named by a hash: item IDs are the provider's strings.
     nonisolated static func bakedScenePath(forID id: String) -> String {
-        let digest = SHA256.hash(data: Data(id.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
+        let digest = SHA256.hash(data: Data(id.utf8)).prefix(12).map { String(format: "%02x", $0) }
+            .joined()
         return bakedScenesDirectoryURL.appendingPathComponent(digest, isDirectory: true)
             .appendingPathComponent("wallpaper.mp4").path
     }
 
     nonisolated static func bakedSceneMetaURL(forID id: String) -> URL {
-        URL(fileURLWithPath: bakedScenePath(forID: id)).deletingLastPathComponent().appendingPathComponent("bake_meta.json")
+        URL(fileURLWithPath: bakedScenePath(forID: id)).deletingLastPathComponent()
+            .appendingPathComponent("bake_meta.json")
     }
 
     private static func sceneRevision(folder: String) -> Date? {
         guard folder.hasPrefix("/") else {
             return nil
         }
-        let document = URL(fileURLWithPath: folder, isDirectory: true).appendingPathComponent("scene.json")
-        return try? FileManager.default.attributesOfItem(atPath: document.path)[.modificationDate] as? Date
+        let document = URL(fileURLWithPath: folder, isDirectory: true)
+            .appendingPathComponent("scene.json")
+        return try? FileManager.default
+            .attributesOfItem(atPath: document.path)[.modificationDate] as? Date
     }
 
     private static func loadSceneProperties(folder: String) -> [LocalWebProperty]? {
@@ -253,7 +267,8 @@ final class ExternalWallpaperProviderMonitor {
         guard FileManager.default.fileExists(atPath: propURL.path),
               let data = try? Data(contentsOf: propURL),
               let properties = try? JSONDecoder().decode([LocalWebProperty].self, from: data),
-              !properties.isEmpty else {
+              !properties.isEmpty
+        else {
             return nil
         }
         return properties

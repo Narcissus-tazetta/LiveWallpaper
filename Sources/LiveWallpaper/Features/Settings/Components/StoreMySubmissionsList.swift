@@ -102,7 +102,7 @@ extension SettingsView {
     private func storeMySubmissionEffectiveStatus(_ submission: StoreMySubmission) -> String {
         guard submission.lastKnownStatus == "requested",
               let createdAt = Self.submissionDateFormatter.date(from: submission.createdAt)
-                ?? Self.submissionDateFormatterNoFraction.date(from: submission.createdAt)
+              ?? Self.submissionDateFormatterNoFraction.date(from: submission.createdAt)
         else {
             return submission.lastKnownStatus
         }

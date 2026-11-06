@@ -86,7 +86,8 @@ struct LocalWebSettings: Codable, Equatable {
         if UserDefaults.standard.object(forKey: key) != nil {
             return try load(key: key)
         }
-        return try load(key: "authorSettings.scene." + URL(fileURLWithPath: videoPath).lastPathComponent)
+        return try load(key: "authorSettings.scene." + URL(fileURLWithPath: videoPath)
+            .lastPathComponent)
     }
 
     func save(id: UUID) throws {

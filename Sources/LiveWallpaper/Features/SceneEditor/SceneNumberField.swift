@@ -56,7 +56,10 @@ struct SceneNumberField: View {
     }
 
     private func commit() {
-        let normalized = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        let normalized = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(
+            of: ",",
+            with: "."
+        )
         guard let shown = Double(normalized), shown.isFinite else {
             text = formatted(value)
             return

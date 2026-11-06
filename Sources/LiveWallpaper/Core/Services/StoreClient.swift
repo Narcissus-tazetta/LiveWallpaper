@@ -47,7 +47,8 @@ enum StoreClientError: LocalizedError {
     }
 
     private static func localized(_ key: String) -> String {
-        let raw = UserDefaults.standard.string(forKey: PrefsKey.appLanguage) ?? AppLanguage.automatic.rawValue
+        let raw = UserDefaults.standard.string(forKey: PrefsKey.appLanguage) ?? AppLanguage
+            .automatic.rawValue
         let language = AppLanguage(rawValue: raw) ?? .automatic
         return AppLocalization.localizedString(key, languageCode: language.effectiveLanguageCode)
     }
@@ -55,19 +56,19 @@ enum StoreClientError: LocalizedError {
     private static func friendlyStatusMessage(_ status: Int) -> String {
         switch status {
         case 400:
-            return Self.localized("入力内容に問題があります。タイトルや作者名を確認してください")
+            return localized("入力内容に問題があります。タイトルや作者名を確認してください")
         case 404:
-            return Self.localized("アップロードした動画がStore上で見つかりませんでした。もう一度お試しください")
+            return localized("アップロードした動画がStore上で見つかりませんでした。もう一度お試しください")
         case 409:
-            return Self.localized("アップロード中にデータの不整合が起きました。もう一度お試しください")
+            return localized("アップロード中にデータの不整合が起きました。もう一度お試しください")
         case 411:
-            return Self.localized("アップロードデータの送信に失敗しました。もう一度お試しください")
+            return localized("アップロードデータの送信に失敗しました。もう一度お試しください")
         case 429:
-            return Self.localized("アクセスが集中しています。しばらく待ってから再度お試しください")
-        case 500..<600:
-            return Self.localized("Storeサーバーで問題が発生しています。しばらくしてから再度お試しください")
+            return localized("アクセスが集中しています。しばらく待ってから再度お試しください")
+        case 500 ..< 600:
+            return localized("Storeサーバーで問題が発生しています。しばらくしてから再度お試しください")
         default:
-            return Self.localized("Storeへのリクエストに失敗しました")
+            return localized("Storeへのリクエストに失敗しました")
         }
     }
 }
@@ -113,11 +114,7 @@ final class StoreClient {
 
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        defer {
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                try? FileManager.default.removeItem(at: tempDir)
-            }
-        }
+        defer { BlockingWork.removeInBackground(tempDir) }
 
         let baseFileName = ExportFileNameSanitizer.sanitizedExportFileName(title)
         let packageURL = try await packageExporter.exportSingleWallpaperPackage(
@@ -317,6 +314,7 @@ final class StoreClient {
             let createdAt: String
             let status: String
         }
+
         let ok: Bool
         let entry: Entry
         let withdrawToken: String
@@ -371,7 +369,7 @@ final class StoreClient {
         guard let http = response as? HTTPURLResponse else {
             throw StoreClientError.invalidResponse
         }
-        guard (200..<300).contains(http.statusCode) else {
+        guard (200 ..< 300).contains(http.statusCode) else {
             let message = (try? JSONDecoder().decode([String: String].self, from: data))?["error"]
             throw StoreClientError.serverError(status: http.statusCode, message: message)
         }

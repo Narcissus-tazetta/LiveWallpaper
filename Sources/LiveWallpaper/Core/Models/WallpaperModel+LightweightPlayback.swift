@@ -9,7 +9,9 @@ extension WallpaperModel {
     /// generation itself — see `ensureLightweightProxyIfNeeded(for:)` for that.
     func resolvedPlaybackURL(for path: String) -> URL {
         let originalURL = URL(fileURLWithPath: path)
-        guard effectiveLightweightMode, let proxyURL = lightweightProxyCache.cachedProxyURL(for: path) else {
+        guard effectiveLightweightMode,
+              let proxyURL = lightweightProxyCache.cachedProxyURL(for: path)
+        else {
             return originalURL
         }
         return proxyURL
@@ -39,30 +41,30 @@ extension WallpaperModel {
         lightweightProxyStatesByPath[path] = .generating
         refreshLightweightProxyState()
         lightweightProxyCache.generateProxyIfNeeded(for: path) { [weak self] result in
-            guard let self, self.lightweightProxyRequests[path] == requestID else { return }
-            self.lightweightProxyRequests[path] = nil
-            guard self.effectiveLightweightMode else { return }
+            guard let self, lightweightProxyRequests[path] == requestID else { return }
+            lightweightProxyRequests[path] = nil
+            guard effectiveLightweightMode else { return }
             switch result {
-            case .ready(let proxyURL):
-                self.lightweightProxyStatesByPath[path] = .ready
-                if self.currentVideoPath == path, !self.isDeepSuspended {
-                    let resumeTime = self.sharedPlayer?.currentTime() ?? .zero
-                    self.reinstallPlayerItemContinuingPlayback(url: proxyURL, attach: true)
-                    self.restorePlaybackPositionAfterProxySwap(resumeTime)
+            case let .ready(proxyURL):
+                lightweightProxyStatesByPath[path] = .ready
+                if currentVideoPath == path, !isDeepSuspended {
+                    let resumeTime = sharedPlayer?.currentTime() ?? .zero
+                    reinstallPlayerItemContinuingPlayback(url: proxyURL, attach: true)
+                    restorePlaybackPositionAfterProxySwap(resumeTime)
                 }
-                for (screenID, activePath) in self.activeDedicatedPathByScreenID
+                for (screenID, activePath) in activeDedicatedPathByScreenID
                     where activePath == path
                 {
                     self.replaceDedicatedPlaybackURL(proxyURL, screenID: screenID, path: path)
                 }
             case .passthrough:
-                self.lightweightProxyStatesByPath[path] = .ready
+                lightweightProxyStatesByPath[path] = .ready
             case .cancelled:
-                self.lightweightProxyStatesByPath[path] = .idle
+                lightweightProxyStatesByPath[path] = .idle
             case .failed:
-                self.lightweightProxyStatesByPath[path] = .failed
+                lightweightProxyStatesByPath[path] = .failed
             }
-            self.refreshLightweightProxyState()
+            refreshLightweightProxyState()
         }
     }
 

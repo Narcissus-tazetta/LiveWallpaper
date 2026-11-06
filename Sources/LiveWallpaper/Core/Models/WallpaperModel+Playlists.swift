@@ -79,7 +79,8 @@ extension WallpaperModel {
         guard let playlistIndex = playlists.firstIndex(where: { $0.id == playlistID }) else {
             return false
         }
-        guard let valueIndex = playlists[playlistIndex][keyPath: keyPath].firstIndex(of: value) else {
+        guard let valueIndex = playlists[playlistIndex][keyPath: keyPath].firstIndex(of: value)
+        else {
             return false
         }
         playlists[playlistIndex][keyPath: keyPath].remove(at: valueIndex)
@@ -119,7 +120,11 @@ extension WallpaperModel {
     @discardableResult
     func removeVideo(path: String, fromPlaylist playlistID: UUID) -> Bool {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        let removed = removeFromPlaylistArray(trimmed, fromPlaylist: playlistID, keyPath: \.videoPaths)
+        let removed = removeFromPlaylistArray(
+            trimmed,
+            fromPlaylist: playlistID,
+            keyPath: \.videoPaths
+        )
         if removed, selectedPlaylistID == playlistID {
             syncActivePlaylistPaths()
             refreshCurrentVideoIndex()
@@ -147,7 +152,11 @@ extension WallpaperModel {
     /// プレイリストからWeb壁紙の参照だけを外す。webWallpaperSources には影響しない。
     @discardableResult
     func removeWebWallpaper(sourceID: UUID, fromPlaylist playlistID: UUID) -> Bool {
-        let removed = removeFromPlaylistArray(sourceID, fromPlaylist: playlistID, keyPath: \.webWallpaperIDs)
+        let removed = removeFromPlaylistArray(
+            sourceID,
+            fromPlaylist: playlistID,
+            keyPath: \.webWallpaperIDs
+        )
         if removed, selectedPlaylistID == playlistID {
             syncActivePlaylistPaths()
         }
@@ -264,7 +273,7 @@ extension WallpaperModel {
         syncActivePlaylistPaths()
 
         if let current = currentPlaybackEntry, registeredPlaybackEntries.contains(current) {
-            if case .video(let path) = current {
+            if case let .video(path) = current {
                 currentVideoIndex = registeredVideoPaths.firstIndex(of: path)
             }
             persistPlaylistState()
@@ -348,9 +357,9 @@ extension WallpaperModel {
 
     func selectPlaybackEntry(_ entry: WallpaperPlaybackEntry, clearsPin: Bool) {
         switch entry {
-        case .video(let path):
+        case let .video(path):
             selectRegisteredVideo(path: path, clearsPin: clearsPin)
-        case .web(let id):
+        case let .web(id):
             selectWebWallpaper(id: id, clearsPin: clearsPin)
         }
     }
@@ -491,7 +500,10 @@ extension WallpaperModel {
             removeRegisteredVideo(path: trimmed)
             return
         }
-        AppLog.events.notice("shared wallpaper -> \(URL(fileURLWithPath: trimmed).lastPathComponent, privacy: .public)")
+        AppLog.events
+            .notice(
+                "shared wallpaper -> \(URL(fileURLWithPath: trimmed).lastPathComponent, privacy: .public)"
+            )
         performSharedWallpaperTransition(to: .video(trimmed)) {
             applyRegisteredVideoSelection(path: trimmed, clearsPin: clearsPin)
         }
@@ -624,10 +636,12 @@ extension WallpaperModel {
            let index = playlists.firstIndex(where: { $0.id == selectedPlaylistID })
         {
             registeredVideoPaths = playlists[index].videoPaths
-            registeredWebWallpaperIDs = webWallpaperFeatureEnabled ? playlists[index].webWallpaperIDs : []
+            registeredWebWallpaperIDs = webWallpaperFeatureEnabled ? playlists[index]
+                .webWallpaperIDs : []
         } else {
             registeredVideoPaths = libraryVideoPaths
-            registeredWebWallpaperIDs = webWallpaperFeatureEnabled ? webWallpaperSources.map(\.id) : []
+            registeredWebWallpaperIDs = webWallpaperFeatureEnabled ? webWallpaperSources
+                .map(\.id) : []
         }
         pruneWallpaperPresentationsForExistingPaths()
         pruneWallpaperEditsForExistingPaths()

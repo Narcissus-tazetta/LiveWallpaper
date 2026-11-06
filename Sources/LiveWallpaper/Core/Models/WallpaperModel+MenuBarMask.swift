@@ -26,12 +26,12 @@ extension WallpaperModel {
         UserDefaults.standard.bool(forKey: PrefsKey.hideMenuBarGlobal)
     }
 
-    // Bakes the "opaque menu bar" strip into the existing wallpaper windows' own content
-    // instead of layering a separate NSWindow on top: a standalone window would have to
-    // compete with the real menu bar's own status-item windows for the same window level
-    // (and can end up drawn in front of the clock/icons), and closing/recreating such a
-    // window turned out to be a use-after-free hazard. Painting inside the wallpaper's own
-    // desktop-level window sidesteps both problems since it never changes window ordering.
+    /// Bakes the "opaque menu bar" strip into the existing wallpaper windows' own content
+    /// instead of layering a separate NSWindow on top: a standalone window would have to
+    /// compete with the real menu bar's own status-item windows for the same window level
+    /// (and can end up drawn in front of the clock/icons), and closing/recreating such a
+    /// window turned out to be a use-after-free hazard. Painting inside the wallpaper's own
+    /// desktop-level window sidesteps both problems since it never changes window ordering.
     func applyMenuBarMaskState() {
         menuBarAutoHideDetected = isMenuBarAutoHideEnabled()
         let maskEnabled = menuBarOpaqueEnabled && !menuBarAutoHideDetected
@@ -39,7 +39,10 @@ extension WallpaperModel {
 
         for index in playerViews.indices {
             let screen = index < screens.count ? screens[index] : nil
-            playerViews[index].menuBarMaskHeight = menuBarMaskHeight(for: screen, enabled: maskEnabled)
+            playerViews[index].menuBarMaskHeight = menuBarMaskHeight(
+                for: screen,
+                enabled: maskEnabled
+            )
         }
         for (index, window) in windows.enumerated() {
             guard let view = window.contentView as? WebPlayerView else {

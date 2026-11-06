@@ -85,7 +85,8 @@ struct ScreenSaverInstaller {
         guard fileManager.fileExists(atPath: installedSaverURL.path) else {
             return .notInstalled
         }
-        return Self.buildID(of: installedSaverURL) == Self.buildID(of: bundled) ? .installed : .updateAvailable
+        return Self.buildID(of: installedSaverURL) == Self
+            .buildID(of: bundled) ? .installed : .updateAvailable
     }
 
     func install() throws {

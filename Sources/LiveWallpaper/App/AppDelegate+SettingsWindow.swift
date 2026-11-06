@@ -3,7 +3,7 @@ import ServiceManagement
 import SwiftUI
 
 extension AppDelegate {
-    // 既定幅を 880→780 に変更した際に旧フレームを引き継がないよう名前を更新済み。
+    /// 既定幅を 880→780 に変更した際に旧フレームを引き継がないよう名前を更新済み。
     private static let settingsWindowFrameAutosaveName = "SettingsWindow780"
 
     func setupSettingsWindow() {

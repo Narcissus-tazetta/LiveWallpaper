@@ -80,10 +80,14 @@ final class StoreMySubmissionsController: ObservableObject {
         var anySucceeded = false
         for index in submissions.indices {
             do {
-                submissions[index].lastKnownStatus = try await fetchStatus(id: submissions[index].id)
+                submissions[index]
+                    .lastKnownStatus = try await fetchStatus(id: submissions[index].id)
                 anySucceeded = true
             } catch {
-                AppLog.store.error("status refresh failed error=\(error.localizedDescription, privacy: .public)")
+                AppLog.store
+                    .error(
+                        "status refresh failed error=\(error.localizedDescription, privacy: .public)"
+                    )
             }
         }
         if !anySucceeded {
@@ -95,7 +99,9 @@ final class StoreMySubmissionsController: ObservableObject {
     private func fetchStatus(id: String) async throws -> String {
         let url = StoreClient.baseURL.appendingPathComponent("entries/\(id)/status")
         let (data, response) = try await session.data(from: url)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+        guard let http = response as? HTTPURLResponse,
+              (200 ..< 300).contains(http.statusCode)
+        else {
             throw StoreClientError.invalidResponse
         }
         return try JSONDecoder().decode(StoreEntryStatusResponse.self, from: data).status
@@ -105,12 +111,15 @@ final class StoreMySubmissionsController: ObservableObject {
         struct WithdrawRequestBody: Encodable {
             let token: String
         }
-        var request = URLRequest(url: StoreClient.baseURL.appendingPathComponent("entries/\(id)/withdraw"))
+        var request = URLRequest(url: StoreClient.baseURL
+            .appendingPathComponent("entries/\(id)/withdraw"))
         request.httpMethod = "DELETE"
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = try JSONEncoder().encode(WithdrawRequestBody(token: token))
         let (_, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+        guard let http = response as? HTTPURLResponse,
+              (200 ..< 300).contains(http.statusCode)
+        else {
             throw StoreClientError.invalidResponse
         }
     }
@@ -119,19 +128,24 @@ final class StoreMySubmissionsController: ObservableObject {
         do {
             try defaults.set(JSONEncoder().encode(submissions), forKey: Self.storageKey)
         } catch {
-            AppLog.store.error("saving submissions failed error=\(error.localizedDescription, privacy: .public)")
+            AppLog.store
+                .error(
+                    "saving submissions failed error=\(error.localizedDescription, privacy: .public)"
+                )
         }
     }
 
     private static func load(from defaults: UserDefaults) -> [StoreMySubmission] {
-        guard let decoded = defaults.decodedJSON([StoreMySubmission].self, forKey: storageKey) else {
+        guard let decoded = defaults.decodedJSON([StoreMySubmission].self, forKey: storageKey)
+        else {
             return []
         }
         return decoded
     }
 
     private static func localized(_ key: String) -> String {
-        let raw = UserDefaults.standard.string(forKey: PrefsKey.appLanguage) ?? AppLanguage.automatic.rawValue
+        let raw = UserDefaults.standard.string(forKey: PrefsKey.appLanguage) ?? AppLanguage
+            .automatic.rawValue
         let language = AppLanguage(rawValue: raw) ?? .automatic
         return AppLocalization.localizedString(key, languageCode: language.effectiveLanguageCode)
     }

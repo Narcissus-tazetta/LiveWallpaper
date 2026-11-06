@@ -63,7 +63,12 @@ final class SceneVideoFrames: @unchecked Sendable {
         return published
     }
 
-    private init(asset: AVURLAsset, track: AVAssetTrack, duration: Double, textureCache: CVMetalTextureCache) {
+    private init(
+        asset: AVURLAsset,
+        track: AVAssetTrack,
+        duration: Double,
+        textureCache: CVMetalTextureCache
+    ) {
         self.asset = asset
         self.track = track
         self.duration = duration
@@ -119,7 +124,10 @@ final class SceneVideoFrames: @unchecked Sendable {
                     // The last frame stays; the error repeats every frame, so it is logged once.
                     if !hasReportedFailure {
                         hasReportedFailure = true
-                        AppLog.windowRefresh.error("scene video decode failed: \(error.localizedDescription, privacy: .public)")
+                        AppLog.windowRefresh
+                            .error(
+                                "scene video decode failed: \(error.localizedDescription, privacy: .public)"
+                            )
                     }
                 }
             }
@@ -135,7 +143,9 @@ final class SceneVideoFrames: @unchecked Sendable {
            local - (current.shownTime ?? current.start) <= Self.maximumForwardDecode
         {
             // Keep reading in order.
-        } else if let prepared = nextLoop, local < (read?.shownTime ?? .infinity), local <= Self.maximumForwardDecode {
+        } else if let prepared = nextLoop, local < (read?.shownTime ?? .infinity),
+                  local <= Self.maximumForwardDecode
+        {
             read?.reader.cancelReading()
             read = prepared
             nextLoop = nil
@@ -166,7 +176,8 @@ final class SceneVideoFrames: @unchecked Sendable {
 
     /// Near the end of a read, opens the next loop's read at 0 and decodes its first frame.
     private func prepareNextLoop() throws {
-        guard nextLoop == nil, let current = read, current.isFinished || (current.shownTime ?? 0) > duration - 0.5 else { return }
+        guard nextLoop == nil, let current = read,
+              current.isFinished || (current.shownTime ?? 0) > duration - 0.5 else { return }
         var next = try startReading(at: 0)
         next.pending = try nextSample(&next)
         nextLoop = next
@@ -185,9 +196,15 @@ final class SceneVideoFrames: @unchecked Sendable {
         ])
         output.alwaysCopiesSampleData = false
         reader.add(output)
-        reader.timeRange = CMTimeRange(start: CMTime(seconds: time, preferredTimescale: 600), end: .positiveInfinity)
+        reader.timeRange = CMTimeRange(
+            start: CMTime(seconds: time, preferredTimescale: 600),
+            end: .positiveInfinity
+        )
         guard reader.startReading() else {
-            throw FramesError.readFailed(asset.url.lastPathComponent, reader.error?.localizedDescription ?? "cannot start")
+            throw FramesError.readFailed(
+                asset.url.lastPathComponent,
+                reader.error?.localizedDescription ?? "cannot start"
+            )
         }
         return Read(reader: reader, output: output, start: time)
     }
@@ -202,7 +219,10 @@ final class SceneVideoFrames: @unchecked Sendable {
             return sample
         }
         if read.reader.status == .failed {
-            throw FramesError.readFailed(asset.url.lastPathComponent, read.reader.error?.localizedDescription ?? "decode failed")
+            throw FramesError.readFailed(
+                asset.url.lastPathComponent,
+                read.reader.error?.localizedDescription ?? "decode failed"
+            )
         }
         // The end of the file: the last frame stays until the loop wraps.
         read.isFinished = true
@@ -218,7 +238,9 @@ final class SceneVideoFrames: @unchecked Sendable {
             nil, textureCache, buffer, nil, .bgra8Unorm,
             CVPixelBufferGetWidth(buffer), CVPixelBufferGetHeight(buffer), 0, &backing
         )
-        guard status == kCVReturnSuccess, let backing, let texture = CVMetalTextureGetTexture(backing) else {
+        guard status == kCVReturnSuccess, let backing,
+              let texture = CVMetalTextureGetTexture(backing)
+        else {
             throw FramesError.readFailed(asset.url.lastPathComponent, "frame texture \(status)")
         }
         lock.lock()

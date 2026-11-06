@@ -112,14 +112,23 @@ final class SceneSkeletonEvaluator {
             if playback.loops, clip.frameCount > 0 {
                 let period = Double(clip.frameCount) * (playback.mirrors == true ? 2 : 1)
                 // A clip runs one way, so a baked loop speeds it on rather than winding it back.
-                let played = SceneLoopTiming.phase(rate: perSecond, cycle: period, keepsDirection: true, time: time, loop: loop)
+                let played = SceneLoopTiming.phase(
+                    rate: perSecond,
+                    cycle: period,
+                    keepsDirection: true,
+                    time: time,
+                    loop: loop
+                )
                 frame = (playback.startFrame + played).truncatingRemainder(dividingBy: period)
                 if frame < 0 { frame += period }
                 if frame > Double(clip.frameCount) { frame = period - frame }
             } else {
                 // A clip played once ends where it ends; a baked loop starts it again.
                 let elapsed = loop.map { SceneLoopTiming.timeInLoop(time, loop: $0) } ?? time
-                frame = min(Double(clip.frameCount), max(0, playback.startFrame + elapsed * perSecond))
+                frame = min(
+                    Double(clip.frameCount),
+                    max(0, playback.startFrame + elapsed * perSecond)
+                )
             }
             let first = Int(frame), next = min(first + 1, clip.frameCount)
             let fraction = Float(frame - Double(first))
@@ -132,7 +141,12 @@ final class SceneSkeletonEvaluator {
                         weight: playback.weight
                     )
                 } else {
-                    transforms[bone] = Self.mix(transforms[bone], sampled, playback.weight, normalizedLerp: true)
+                    transforms[bone] = Self.mix(
+                        transforms[bone],
+                        sampled,
+                        playback.weight,
+                        normalizedLerp: true
+                    )
                 }
                 if let values = track.opacity {
                     let value = values[first] + (values[next] - values[first]) * fraction
@@ -318,12 +332,16 @@ final class SceneSkeletonRegistry {
     }
 
     func setPlaybackOverrides(_ overrides: [UUID: [SceneSkeleton.Playback]]) {
-        for (id, evaluator) in evaluators { evaluator.setPlaybackOverride(overrides[id]) }
+        for (id, evaluator) in evaluators {
+            evaluator.setPlaybackOverride(overrides[id])
+        }
     }
 
     /// The baked loop every clip must close in, nil on real time.
     func setLoop(_ seconds: Double?) {
-        for evaluator in evaluators.values { evaluator.setLoop(seconds) }
+        for evaluator in evaluators.values {
+            evaluator.setLoop(seconds)
+        }
     }
 
     func evaluator(_ id: UUID) throws -> SceneSkeletonEvaluator {

@@ -15,6 +15,7 @@ struct SceneEvaluatedFrame {
         /// Where in its video a video layer is, once a script controls it.
         var videoTime: Double?
     }
+
     var input: SceneFrameInput
     var layers: [UUID: Layer]
     var issues: [SceneScriptIssue]
@@ -47,11 +48,21 @@ final class SceneFrameEvaluator {
         /// that runs out of time throws the half-loaded bundle away and compiles it again
         /// (the largest converted bundles took 0.39 s on an M5). The limit keeps a start
         /// that never ends from holding a core for longer at each retry.
-        static let live = Budget(perScript: 0.008, perFrame: 0.016, moduleStart: 1, moduleStartLimit: 2)
+        static let live = Budget(
+            perScript: 0.008,
+            perFrame: 0.016,
+            moduleStart: 1,
+            moduleStartLimit: 2
+        )
         /// A bake has no deadline, and a frame that ran out of time fails the whole
         /// video, so this only has to stop code that never ends. A converted bundle that
         /// takes about 31 ms a frame still failed a 60 s bake at 0.25 s a script, minutes in.
-        static let offline = Budget(perScript: 5, perFrame: 10, moduleStart: 10, moduleStartLimit: 10)
+        static let offline = Budget(
+            perScript: 5,
+            perFrame: 10,
+            moduleStart: 10,
+            moduleStartLimit: 10
+        )
     }
 
     private let budget: Budget
@@ -83,6 +94,7 @@ final class SceneFrameEvaluator {
         var invalid: Error?
         var layerOpacity: Double
     }
+
     private var cachedLayers: [SceneLayer] = []
     private var cachedRigs: [UUID: SceneSkeleton] = [:]
     private var cachedTemplates: [UUID: LayerTemplate] = [:]
@@ -91,25 +103,35 @@ final class SceneFrameEvaluator {
     /// Where scripts' localStorage goes; by default nowhere that outlives this evaluator.
     var storage: SceneScriptStorage.Session
 
-    init(budget: Budget = .live, temporaryStopSeconds: TimeInterval = 2, storage: SceneScriptStorage.Session = .scratch()) {
+    init(
+        budget: Budget = .live,
+        temporaryStopSeconds: TimeInterval = 2,
+        storage: SceneScriptStorage.Session = .scratch()
+    ) {
         self.budget = budget
         self.temporaryStopSeconds = temporaryStopSeconds
         self.storage = storage
     }
 
-    private static func apply(_ adjustment: SceneScriptAdjustment, to layer: inout SceneEvaluatedFrame.Layer) {
+    private static func apply(
+        _ adjustment: SceneScriptAdjustment,
+        to layer: inout SceneEvaluatedFrame.Layer
+    ) {
         layer.transform.offsetX += adjustment.values.offsetX
         layer.transform.offsetY += adjustment.values.offsetY
         layer.transform.rotation += adjustment.values.rotation
         if layer.transform.scaleY != nil || adjustment.values.scaleY != nil {
-            layer.transform.scaleY = (layer.transform.scaleY ?? layer.transform.scale) * (adjustment.values.scaleY ?? adjustment.values.scale)
+            layer.transform
+                .scaleY = (layer.transform.scaleY ?? layer.transform.scale) *
+                (adjustment.values.scaleY ?? adjustment.values.scale)
         }
         layer.transform.scale *= adjustment.values.scale
         layer.opacity *= adjustment.values.opacity
         layer.color = layer.color.combined(with: adjustment.values)
         adjustment.appearance?.apply(to: &layer.layer)
         for index in layer.layer.effects.indices {
-            adjustment.effects[layer.layer.effects[index].id]?.apply(to: &layer.layer.effects[index])
+            adjustment.effects[layer.layer.effects[index].id]?
+                .apply(to: &layer.layer.effects[index])
         }
         if let text = adjustment.text { text.apply(to: &layer.layer.text!) }
         if let world = adjustment.world { layer.world = world }
@@ -117,7 +139,12 @@ final class SceneFrameEvaluator {
         if let modelValues = adjustment.modelValues { layer.layer.modelValues = modelValues }
     }
 
-    func evaluate(_ document: SceneDocument, input: SceneFrameInput, timeOfDay: SceneTimeOfDay, failOnError: Bool = true) throws -> SceneEvaluatedFrame {
+    func evaluate(
+        _ document: SceneDocument,
+        input: SceneFrameInput,
+        timeOfDay: SceneTimeOfDay,
+        failOnError: Bool = true
+    ) throws -> SceneEvaluatedFrame {
         if previousScripts != document.scripts {
             stopped = [:]
             resumeTimes = [:]
@@ -141,24 +168,37 @@ final class SceneFrameEvaluator {
                 if failOnError { throw issue }
             }
         }
-        let allowance = document.scripts.reduce(0) { $0 + budget.perScript * (timeScales[$1.id] ?? 1) }
+        let allowance = document.scripts
+            .reduce(0) { $0 + budget.perScript * (timeScales[$1.id] ?? 1) }
         let deadline = ProcessInfo.processInfo.systemUptime + max(budget.perFrame, allowance)
         let phase = (input.time / Double(document.loopSeconds)).truncatingRemainder(dividingBy: 1)
         let normalizedPhase = phase < 0 ? phase + 1 : phase
         var base: [UUID: SceneEvaluatedFrame.Layer] = [:]
         for layer in document.layers {
             let pose = layer.pose(at: normalizedPhase, time: input.time)
-            let link = document.linkValues(layerID: layer.id, timeOfDay: timeOfDay,
-                                           cursor: SIMD2(Double(input.parallax.x), Double(input.parallax.y)))
+            let link = document.linkValues(
+                layerID: layer.id,
+                timeOfDay: timeOfDay,
+                cursor: SIMD2(
+                    Double(input.parallax.x),
+                    Double(input.parallax.y)
+                )
+            )
             var transform = pose.transform
             transform.offsetX += link.offsetX
             transform.offsetY += link.offsetY
             transform.rotation += link.rotation
             if transform.scaleY != nil || link.scaleY != nil {
-                transform.scaleY = (transform.scaleY ?? transform.scale) * (link.scaleY ?? link.scale)
+                transform
+                    .scaleY = (transform.scaleY ?? transform.scale) * (link.scaleY ?? link.scale)
             }
             transform.scale *= link.scale
-            base[layer.id] = .init(layer: layer, transform: transform, opacity: pose.opacity * link.opacity, color: link)
+            base[layer.id] = .init(
+                layer: layer,
+                transform: transform,
+                opacity: pose.opacity * link.opacity,
+                color: link
+            )
         }
         var rigPlayback: [UUID: [SceneSkeleton.Playback]] = [:]
         var order: [UUID: Int] = [:]
@@ -175,7 +215,8 @@ final class SceneFrameEvaluator {
         // A converted bundle runs even with no layer of its own to drive: it may draw
         // what it makes.
         for script in document.scripts where script.canRun
-            && (script.modules != nil || !script.targetLayerIDs(in: document.layers).isEmpty) {
+            && (script.modules != nil || !script.targetLayerIDs(in: document.layers).isEmpty)
+        {
             if let issue = stopped[script.id] {
                 if failOnError { throw issue }
                 continue
@@ -262,7 +303,8 @@ final class SceneFrameEvaluator {
                     member("cursorActive")
                     context.bool(input.cursor != nil)
                     member("pointer")
-                    if let cursor = input.cursor { try Self.pointInput(cursor, into: &context) } else { context.null() }
+                    if let cursor = input.cursor { try Self.pointInput(cursor, into: &context) }
+                    else { context.null() }
                     member("pointerPresses")
                     let pressesPosition = context.beginArray()
                     for press in input.pointerPresses {
@@ -288,7 +330,9 @@ final class SceneFrameEvaluator {
                         for (name, values) in [("left", audio.left), ("right", audio.right)] {
                             context.key(name)
                             let array = context.beginArray()
-                            for value in values { try context.number(value) }
+                            for value in values {
+                                try context.number(value)
+                            }
                             context.end(array, count: values.count)
                         }
                         context.end(position, count: 2)
@@ -312,25 +356,35 @@ final class SceneFrameEvaluator {
                 try context.value(missing)
                 context.end(contextPosition, count: contextCount)
                 let output: SceneScriptOutput
-                // A held frame repeats the last output, whose particle requests were already carried out.
+                // A held frame repeats the last output, whose particle requests were already
+                // carried out.
                 var heldOutput = false
                 let scale = timeScales[script.id] ?? 1
                 let started = ProcessInfo.processInfo.systemUptime
                 do {
                     output = try runtime.evaluate(
-                        script, input: context, elapsedTime: input.time, layers: document.layers, rigs: document.rigs, storage: storage,
+                        script, input: context, elapsedTime: input.time, layers: document.layers,
+                        rigs: document.rigs, storage: storage,
                         perScript: budget.perScript * scale, deadline: deadline,
                         moduleStart: budget.moduleStart, moduleStartLimit: budget.moduleStartLimit
                     )
-                    if scale > 1, ProcessInfo.processInfo.systemUptime - started < budget.perScript * scale / 4 {
+                    if scale > 1,
+                       ProcessInfo.processInfo.systemUptime - started < budget
+                       .perScript * scale / 4
+                    {
                         timeScales[script.id] = max(scale / 2, 1)
                     }
                     consecutiveTimeouts[script.id] = nil
                     lastOutputs[script.id] = output
-                } catch let issue as SceneScriptIssue where !failOnError && issue.isTemporary && runtime.isLoaded(script.id) {
+                } catch let issue as SceneScriptIssue
+                    where !failOnError && issue.isTemporary && runtime.isLoaded(script.id)
+                {
                     // A slow frame (other work took the CPU) is skipped: the script keeps its
                     // state, so its animations carry on instead of restarting.
-                    if script.modules != nil { timeScales[script.id] = min(scale * 2, Self.maximumTimeScale) }
+                    if script.modules != nil { timeScales[script.id] = min(
+                        scale * 2,
+                        Self.maximumTimeScale
+                    ) }
                     let count = (consecutiveTimeouts[script.id] ?? 0) + 1
                     guard count <= Self.maximumHeldFrames else { throw issue }
                     consecutiveTimeouts[script.id] = count
@@ -339,29 +393,43 @@ final class SceneFrameEvaluator {
                     heldOutput = true
                 }
                 warnings += output.warnings.map {
-                    SceneScriptIssue(scriptID: script.id, name: script.name, message: $0, isPartial: true)
+                    SceneScriptIssue(
+                        scriptID: script.id,
+                        name: script.name,
+                        message: $0,
+                        isPartial: true
+                    )
                 }
                 meshes += output.meshes
                 models += output.models
                 sounds.merge(output.sounds) { _, new in new }
                 camera = output.camera ?? camera
-                for light in output.lights { lights[light.objectID] = light }
+                for light in output.lights {
+                    lights[light.objectID] = light
+                }
                 for (id, adjustment) in output.adjustments {
                     if let position = adjustment.order { order[id] = position }
                     for (rigID, changes) in adjustment.rigPlayback {
                         var playback = rigPlayback[rigID] ?? document.rigs[rigID]!.playback
-                        for (index, change) in changes { change.apply(to: &playback[index]) }
+                        for (index, change) in changes {
+                            change.apply(to: &playback[index])
+                        }
                         rigPlayback[rigID] = playback
                     }
                     var layer = result[id]!
                     Self.apply(adjustment, to: &layer)
-                    if let particles = adjustment.particles { particles.apply(to: &layer.layer.particles!) }
-                    if let control = adjustment.particleControl, !heldOutput { particleControls[id, default: .init()].append(control) }
+                    if let particles = adjustment
+                        .particles { particles.apply(to: &layer.layer.particles!) }
+                    if let control = adjustment.particleControl, !heldOutput { particleControls[
+                        id,
+                        default: .init()
+                    ].append(control) }
                     result[id] = layer
                 }
                 // A copy starts from its template as the scene places it, before scripts.
                 for instance in output.instances {
-                    guard var layer = base[instance.template], layer.layer.particleSystem == nil else { continue }
+                    guard var layer = base[instance.template],
+                          layer.layer.particleSystem == nil else { continue }
                     layer.layer.id = instance.id
                     // An effect with a render graph keeps state under its own ID, which a
                     // copy would advance a second time each frame.
@@ -376,18 +444,38 @@ final class SceneFrameEvaluator {
                 if failOnError { throw issue }
             }
         }
-        return SceneEvaluatedFrame(instances: instances, input: input, layers: result, issues: document.scripts.compactMap { stopped[$0.id] } + warnings, logs: runtime.logs, rigPlayback: rigPlayback, order: order, meshes: meshes, models: models, sounds: sounds, camera: camera, particleControls: particleControls, lights: lights)
+        return SceneEvaluatedFrame(
+            instances: instances,
+            input: input,
+            layers: result,
+            issues: document.scripts.compactMap { stopped[$0.id] } + warnings,
+            logs: runtime.logs,
+            rigPlayback: rigPlayback,
+            order: order,
+            meshes: meshes,
+            models: models,
+            sounds: sounds,
+            camera: camera,
+            particleControls: particleControls,
+            lights: lights
+        )
     }
 
     /// A hand-made scene reads its properties' defaults until the viewer changes one; an
     /// imported scene gets only what was set, as its scripts expect.
-    private static func userProperties(_ document: SceneDocument, input: SceneFrameInput) -> [String: WebPropertyValue]? {
+    private static func userProperties(
+        _ document: SceneDocument,
+        input: SceneFrameInput
+    ) -> [String: WebPropertyValue]? {
         guard document.authorSourceDirectory == nil, document.scriptOrigin == nil,
               let properties = document.properties, !properties.isEmpty
         else {
             return input.userProperties
         }
-        var merged = Dictionary(properties.map { ($0.id, $0.value) }, uniquingKeysWith: { _, last in last })
+        var merged = Dictionary(
+            properties.map { ($0.id, $0.value) },
+            uniquingKeysWith: { _, last in last }
+        )
         merged.merge(input.userProperties ?? [:]) { _, set in set }
         return merged
     }
@@ -404,12 +492,13 @@ final class SceneFrameEvaluator {
     private func stop(_ issue: SceneScriptIssue) {
         stopped[issue.scriptID] = issue
         if issue.isTemporary {
-            resumeTimes[issue.scriptID] = ProcessInfo.processInfo.systemUptime + temporaryStopSeconds
+            resumeTimes[issue.scriptID] = ProcessInfo.processInfo
+                .systemUptime + temporaryStopSeconds
         }
     }
 
     private func updateCacheIfNeeded(document: SceneDocument) {
-        if document.layers == cachedLayers && document.rigs == cachedRigs { return }
+        if document.layers == cachedLayers, document.rigs == cachedRigs { return }
         cachedLayers = document.layers
         cachedRigs = document.rigs
         cachedTemplates.removeAll(keepingCapacity: true)
@@ -417,24 +506,48 @@ final class SceneFrameEvaluator {
 
         for layer in document.layers {
             let effects: [[String: Any]] = layer.effects.map { effect in
-                ["id": effect.id.uuidString, "kind": effect.kind.rawValue, "isEnabled": effect.isEnabled,
-                 "strength": effect.strength, "scale": effect.scale, "direction": effect.direction, "cycles": effect.cycles,
-                 "centerX": effect.centerX, "centerY": effect.centerY, "reversed": effect.reversed,
-                 "fixedEdge": effect.fixedEdge.rawValue, "values": effect.values]
+                [
+                    "id": effect.id.uuidString,
+                    "kind": effect.kind.rawValue,
+                    "isEnabled": effect.isEnabled,
+                    "strength": effect.strength,
+                    "scale": effect.scale,
+                    "direction": effect.direction,
+                    "cycles": effect.cycles,
+                    "centerX": effect.centerX,
+                    "centerY": effect.centerY,
+                    "reversed": effect.reversed,
+                    "fixedEdge": effect.fixedEdge.rawValue,
+                    "values": effect.values
+                ]
             }
             let particles: Any = layer.particles.map(Self.particleInput) ?? NSNull()
             let text: Any = layer.text.map {
-                ["string": $0.string, "color": ["red": $0.color.red, "green": $0.color.green, "blue": $0.color.blue]] as [String: Any]
+                [
+                    "string": $0.string,
+                    "color": ["red": $0.color.red, "green": $0.color.green, "blue": $0.color.blue]
+                ] as [String: Any]
             } ?? NSNull()
-            let rigs: [[String: Any]] = layer.scriptRigIDs.sorted { $0.uuidString < $1.uuidString }.compactMap { id -> [String: Any]? in
-                guard let rig = document.rigs[id] else { return nil }
-                return ["id": id.uuidString, "playback": rig.playback.enumerated().map { index, playback in
-                    let clip = rig.clips[playback.clip]
-                    return ["index": index, "name": clip.name, "frameCount": clip.frameCount,
-                            "framesPerSecond": clip.framesPerSecond, "startFrame": playback.startFrame,
-                            "rate": playback.rate, "weight": playback.weight, "loops": playback.loops] as [String: Any]
-                }]
-            }
+            let rigs: [[String: Any]] = layer.scriptRigIDs.sorted { $0.uuidString < $1.uuidString }
+                .compactMap { id -> [String: Any]? in
+                    guard let rig = document.rigs[id] else { return nil }
+                    return [
+                        "id": id.uuidString,
+                        "playback": rig.playback.enumerated().map { index, playback in
+                            let clip = rig.clips[playback.clip]
+                            return [
+                                "index": index,
+                                "name": clip.name,
+                                "frameCount": clip.frameCount,
+                                "framesPerSecond": clip.framesPerSecond,
+                                "startFrame": playback.startFrame,
+                                "rate": playback.rate,
+                                "weight": playback.weight,
+                                "loops": playback.loops
+                            ] as [String: Any]
+                        }
+                    ]
+                }
             let appearance: [String: Any] = [
                 "isVisible": layer.isVisible,
                 "tint": Self.colorInput(layer.tint),
@@ -468,22 +581,38 @@ final class SceneFrameEvaluator {
             } catch {
                 invalid = error
             }
-            cachedTemplates[layer.id] = LayerTemplate(base: base, baseCount: fields.count, invalid: invalid, layerOpacity: layer.opacity)
+            cachedTemplates[layer.id] = LayerTemplate(
+                base: base,
+                baseCount: fields.count,
+                invalid: invalid,
+                layerOpacity: layer.opacity
+            )
         }
     }
 
-    private func targetLayers(for script: SceneScript, in layers: [SceneLayer]) throws -> [SceneLayer] {
+    private func targetLayers(
+        for script: SceneScript,
+        in layers: [SceneLayer]
+    ) throws -> [SceneLayer] {
         if let cached = cachedScriptTargets[script.id] { return cached }
         let targetIDs = Set(script.targetLayerIDs(in: layers))
         guard targetIDs.count <= 512 else {
-            throw SceneScriptIssue(scriptID: script.id, name: script.name, message: "At most 512 target layers are supported")
+            throw SceneScriptIssue(
+                scriptID: script.id,
+                name: script.name,
+                message: "At most 512 target layers are supported"
+            )
         }
         let result = layers.filter { targetIDs.contains($0.id) }
         cachedScriptTargets[script.id] = result
         return result
     }
 
-    private static func numbers(_ members: KeyValuePairs<String, Double>, optional: (String, Double?), into input: inout SceneScriptInput) throws {
+    private static func numbers(
+        _ members: KeyValuePairs<String, Double>,
+        optional: (String, Double?),
+        into input: inout SceneScriptInput
+    ) throws {
         let position = input.beginObject()
         for (name, value) in members {
             input.key(name)
@@ -496,19 +625,46 @@ final class SceneFrameEvaluator {
         input.end(position, count: members.count + (optional.1 == nil ? 0 : 1))
     }
 
-    private static func transformInput(_ transform: SceneTransform, into input: inout SceneScriptInput) throws {
-        try numbers(["offsetX": transform.offsetX, "offsetY": transform.offsetY, "scale": transform.scale,
-                     "rotation": transform.rotation], optional: ("scaleY", transform.scaleY), into: &input)
+    private static func transformInput(
+        _ transform: SceneTransform,
+        into input: inout SceneScriptInput
+    ) throws {
+        try numbers(
+            [
+                "offsetX": transform.offsetX,
+                "offsetY": transform.offsetY,
+                "scale": transform.scale,
+                "rotation": transform.rotation
+            ],
+            optional: ("scaleY", transform.scaleY),
+            into: &input
+        )
     }
 
-    private static func linkValuesInput(_ values: SceneLinkValues, into input: inout SceneScriptInput) throws {
-        try numbers(["offsetX": values.offsetX, "offsetY": values.offsetY, "rotation": values.rotation,
-                     "scale": values.scale, "opacity": values.opacity, "brightness": values.brightness,
-                     "saturation": values.saturation, "warmth": values.warmth],
-                    optional: ("scaleY", values.scaleY), into: &input)
+    private static func linkValuesInput(
+        _ values: SceneLinkValues,
+        into input: inout SceneScriptInput
+    ) throws {
+        try numbers(
+            [
+                "offsetX": values.offsetX,
+                "offsetY": values.offsetY,
+                "rotation": values.rotation,
+                "scale": values.scale,
+                "opacity": values.opacity,
+                "brightness": values.brightness,
+                "saturation": values.saturation,
+                "warmth": values.warmth
+            ],
+            optional: ("scaleY", values.scaleY),
+            into: &input
+        )
     }
 
-    private static func pointInput(_ point: SIMD2<Float>, into input: inout SceneScriptInput) throws {
+    private static func pointInput(
+        _ point: SIMD2<Float>,
+        into input: inout SceneScriptInput
+    ) throws {
         let position = input.beginObject()
         input.key("x")
         try input.number(point.x)
@@ -528,22 +684,36 @@ final class SceneFrameEvaluator {
     private static func mediaInput(_ media: SceneMediaState?) -> [String: Any] {
         guard let media, media.isAvailable else { return ["isAvailable": false] }
         var value: [String: Any] = [
-            "isAvailable": true, "playback": media.playback.rawValue, "title": media.title, "artist": media.artist,
-            "album": media.album, "position": media.position, "duration": media.duration, "artworkID": media.artworkID
+            "isAvailable": true, "playback": media.playback.rawValue, "title": media.title,
+            "artist": media.artist,
+            "album": media.album, "position": media.position, "duration": media.duration,
+            "artworkID": media.artworkID
         ]
         if let palette = media.palette {
             let rgb = { (color: SIMD3<Double>) in [color.x, color.y, color.z] }
-            value["palette"] = ["primary": rgb(palette.primary), "secondary": rgb(palette.secondary),
-                                "tertiary": rgb(palette.tertiary), "text": rgb(palette.text),
-                                "highContrast": rgb(palette.highContrast)]
+            value["palette"] = [
+                "primary": rgb(palette.primary),
+                "secondary": rgb(palette.secondary),
+                "tertiary": rgb(palette.tertiary),
+                "text": rgb(palette.text),
+                "highContrast": rgb(palette.highContrast)
+            ]
         }
         return value
     }
 
     private static func particleInput(_ particles: SceneParticles) -> [String: Any] {
-        ["preset": particles.preset.rawValue, "cursorMode": particles.cursorMode.rawValue, "seed": particles.seed,
-         "count": particles.count, "size": particles.size, "cycles": particles.cycles,
-         "direction": particles.direction, "sway": particles.sway, "opacity": particles.opacity,
-         "color": colorInput(particles.color)]
+        [
+            "preset": particles.preset.rawValue,
+            "cursorMode": particles.cursorMode.rawValue,
+            "seed": particles.seed,
+            "count": particles.count,
+            "size": particles.size,
+            "cycles": particles.cycles,
+            "direction": particles.direction,
+            "sway": particles.sway,
+            "opacity": particles.opacity,
+            "color": colorInput(particles.color)
+        ]
     }
 }

@@ -167,10 +167,10 @@ extension FitEditorController {
             )
             let contentX =
                 (Double(anchor.x) - Double(before.translation.width))
-                / max(Double(before.renderedSize.width), 1)
+                    / max(Double(before.renderedSize.width), 1)
             let contentY =
                 (Double(anchor.y) - Double(before.translation.height))
-                / max(Double(before.renderedSize.height), 1)
+                    / max(Double(before.renderedSize.height), 1)
             let translationX = Double(anchor.x) - contentX * Double(after.renderedSize.width)
             let translationY = Double(anchor.y) - contentY * Double(after.renderedSize.height)
             draft.offsetX = normalizedOffset(

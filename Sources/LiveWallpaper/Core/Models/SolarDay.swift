@@ -19,11 +19,16 @@ enum SolarDay: Equatable {
         let day = calendar.dateComponents([.year, .month, .day], from: date)
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = TimeZone(identifier: "UTC")!
-        let utcMidnight = utc.date(from: DateComponents(year: day.year, month: day.month, day: day.day))!
+        let utcMidnight = utc.date(from: DateComponents(
+            year: day.year,
+            month: day.month,
+            day: day.day
+        ))!
 
         // Evaluate the orbit at local solar noon of that day; the sun moves too little
         // between noon and sunrise/sunset to matter at minute resolution.
-        let julianDay = utcMidnight.timeIntervalSince1970 / 86400 + 2_440_587.5 + (0.5 - longitude / 360)
+        let julianDay = utcMidnight
+            .timeIntervalSince1970 / 86400 + 2_440_587.5 + (0.5 - longitude / 360)
         let t = (julianDay - 2_451_545) / 36525
 
         let meanLongitude = (280.46646 + t * (36000.76983 + t * 0.0003032))
@@ -36,7 +41,10 @@ enum SolarDay: Equatable {
             + sin(3 * m) * 0.000289
         let omega = radians(125.04 - 1934.136 * t)
         let apparentLongitude = meanLongitude + equationOfCenter - 0.00569 - 0.00478 * sin(omega)
-        let meanObliquity = 23 + (26 + (21.448 - t * (46.815 + t * (0.00059 - t * 0.001813))) / 60) / 60
+        let meanObliquity = 23 + (
+            26 + (21.448 - t * (46.815 + t * (0.00059 - t * 0.001813))) / 60
+        ) /
+            60
         let obliquity = radians(meanObliquity + 0.00256 * cos(omega))
         let declination = asin(sin(obliquity) * sin(radians(apparentLongitude)))
 
@@ -53,7 +61,8 @@ enum SolarDay: Equatable {
         // 90.833° = refraction (34′) + the sun's apparent radius (16′), the same
         // "upper limb touches the horizon" definition almanacs use.
         let lat = radians(latitude)
-        let cosHourAngle = cos(radians(90.833)) / (cos(lat) * cos(declination)) - tan(lat) * tan(declination)
+        let cosHourAngle = cos(radians(90.833)) / (cos(lat) * cos(declination)) - tan(lat) *
+            tan(declination)
         if cosHourAngle < -1 {
             return .polarDay
         }

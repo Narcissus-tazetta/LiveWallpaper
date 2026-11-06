@@ -1,6 +1,6 @@
 import Foundation
 
-struct WebWallpaperSource: Codable, Identifiable, Equatable, Sendable {
+struct WebWallpaperSource: Codable, Identifiable, Equatable {
     let id: UUID
     var url: URL
     var displayName: String
@@ -11,11 +11,18 @@ struct WebWallpaperSource: Codable, Identifiable, Equatable, Sendable {
     var warnings: [String]?
     var thumbnailPath: String?
 
-    init(id: UUID = UUID(), url: URL, displayName: String? = nil, localFolderPath: String? = nil, warnings: [String]? = nil, thumbnailPath: String? = nil) {
+    init(
+        id: UUID = UUID(),
+        url: URL,
+        displayName: String? = nil,
+        localFolderPath: String? = nil,
+        warnings: [String]? = nil,
+        thumbnailPath: String? = nil
+    ) {
         self.id = id
         self.url = url
         self.displayName = displayName ?? url.host ?? url.absoluteString
-        self.addedAt = Date()
+        addedAt = Date()
         self.localFolderPath = localFolderPath
         self.warnings = warnings
         self.thumbnailPath = thumbnailPath

@@ -157,7 +157,9 @@ enum SettingsTransfer {
         if let value = snapshot.batteryAwareQualityEnabled {
             model.setBatteryAwareQualityEnabled(value)
         }
-        if let value = snapshot.batteryPlaybackPolicy.flatMap(BatteryPlaybackPolicy.init(rawValue:)) {
+        if let value = snapshot.batteryPlaybackPolicy
+            .flatMap(BatteryPlaybackPolicy.init(rawValue:))
+        {
             model.setBatteryPlaybackPolicy(value)
         }
         if let value = snapshot.hdrDisplayEnabled {
@@ -168,7 +170,9 @@ enum SettingsTransfer {
         {
             model.setWallpaperTransitionDuration(value)
         }
-        if let value = snapshot.wallpaperTransitionStyle.flatMap(WallpaperTransitionStyle.init(rawValue:)) {
+        if let value = snapshot.wallpaperTransitionStyle
+            .flatMap(WallpaperTransitionStyle.init(rawValue:))
+        {
             model.setWallpaperTransitionStyle(value)
         }
     }

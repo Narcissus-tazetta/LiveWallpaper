@@ -6,7 +6,7 @@ import ImageIO
 /// アニメ画像(GIF / APNG / アニメWebP)をループ再生用のmp4動画へ変換するサービス。
 /// WallpaperModel非依存。変換後は既存の動画パイプラインがそのまま扱える。
 enum AnimatedImageTranscoder {
-    struct Options: Sendable {
+    struct Options {
         /// エンコーダ保護のための長辺キャップ(超える場合はアスペクト維持で縮小)
         var maxLongEdge: CGFloat = 3840
         /// AVPlayerLooperがサブ秒アイテムを高速回転しないよう、短いアニメは繰り返してこの長さ以上にする
@@ -112,7 +112,7 @@ enum AnimatedImageTranscoder {
         }
 
         let canvas = canvasSize(for: firstFrame, maxLongEdge: options.maxLongEdge)
-        let delays = (0..<frameCount).map { frameDelay(source: source, index: $0) }
+        let delays = (0 ..< frameCount).map { frameDelay(source: source, index: $0) }
         let (appends, sessionEnd) = buildSchedule(
             frameCount: frameCount,
             delays: delays,
@@ -146,8 +146,8 @@ enum AnimatedImageTranscoder {
             AVVideoColorPropertiesKey: [
                 AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
                 AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
-            ],
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
+            ]
         ]
 
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
@@ -159,7 +159,7 @@ enum AnimatedImageTranscoder {
                 kCVPixelBufferWidthKey as String: width,
                 kCVPixelBufferHeightKey as String: height,
                 kCVPixelBufferCGImageCompatibilityKey as String: true,
-                kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+                kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
             ]
         )
 
@@ -257,7 +257,10 @@ enum AnimatedImageTranscoder {
             canvas: canvas
         )
         try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<
+                Void,
+                Error
+            >) in
                 let queue = DispatchQueue(label: "com.sakana.livewallpaper.animated-transcode")
                 input.requestMediaDataWhenReady(on: queue) {
                     drainFrames(
@@ -309,8 +312,11 @@ enum AnimatedImageTranscoder {
                     appendError = .frameDecodeFailed(index: step.frameIndex)
                     return
                 }
-                guard let buffer = makePixelBuffer(adaptor: context.adaptor, canvas: context.canvas),
-                      draw(image, into: buffer, canvas: context.canvas)
+                guard let buffer = makePixelBuffer(
+                    adaptor: context.adaptor,
+                    canvas: context.canvas
+                ),
+                    draw(image, into: buffer, canvas: context.canvas)
                 else {
                     appendError = .writerFailed(underlying: context.writer.error)
                     return
@@ -343,15 +349,21 @@ enum AnimatedImageTranscoder {
             return normalizedDelay(nil)
         }
         let candidates: [(dictionary: CFString, unclamped: CFString, clamped: CFString)] = [
-            (kCGImagePropertyGIFDictionary,
-             kCGImagePropertyGIFUnclampedDelayTime,
-             kCGImagePropertyGIFDelayTime),
-            (kCGImagePropertyPNGDictionary,
-             kCGImagePropertyAPNGUnclampedDelayTime,
-             kCGImagePropertyAPNGDelayTime),
-            (kCGImagePropertyWebPDictionary,
-             kCGImagePropertyWebPUnclampedDelayTime,
-             kCGImagePropertyWebPDelayTime),
+            (
+                kCGImagePropertyGIFDictionary,
+                kCGImagePropertyGIFUnclampedDelayTime,
+                kCGImagePropertyGIFDelayTime
+            ),
+            (
+                kCGImagePropertyPNGDictionary,
+                kCGImagePropertyAPNGUnclampedDelayTime,
+                kCGImagePropertyAPNGDelayTime
+            ),
+            (
+                kCGImagePropertyWebPDictionary,
+                kCGImagePropertyWebPUnclampedDelayTime,
+                kCGImagePropertyWebPDelayTime
+            )
         ]
         for candidate in candidates {
             guard let dictionary = properties[candidate.dictionary] as? [CFString: Any] else {
@@ -382,7 +394,7 @@ enum AnimatedImageTranscoder {
             return (
                 [
                     FrameAppend(frameIndex: 0, time: 0),
-                    FrameAppend(frameIndex: 0, time: options.singleFrameHoldDuration / 2),
+                    FrameAppend(frameIndex: 0, time: options.singleFrameHoldDuration / 2)
                 ],
                 options.singleFrameHoldDuration
             )
@@ -395,8 +407,8 @@ enum AnimatedImageTranscoder {
         var appends: [FrameAppend] = []
         appends.reserveCapacity(frameCount * passes)
         var time = 0.0
-        for _ in 0..<passes {
-            for index in 0..<frameCount {
+        for _ in 0 ..< passes {
+            for index in 0 ..< frameCount {
                 appends.append(FrameAppend(frameIndex: index, time: time))
                 time += delays[index]
             }
@@ -439,7 +451,7 @@ enum AnimatedImageTranscoder {
                 kCVPixelFormatType_32BGRA,
                 [
                     kCVPixelBufferCGImageCompatibilityKey: true,
-                    kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+                    kCVPixelBufferCGBitmapContextCompatibilityKey: true
                 ] as CFDictionary,
                 &buffer
             )
@@ -449,7 +461,11 @@ enum AnimatedImageTranscoder {
 
     /// フレームを不透明黒の上に合成してキャンバス全面へ描画する
     /// (透過GIF対策。奇数寸法パディング分の≤1pxストレッチは不可視)。
-    private static func draw(_ image: CGImage, into pixelBuffer: CVPixelBuffer, canvas: CGSize) -> Bool {
+    private static func draw(
+        _ image: CGImage,
+        into pixelBuffer: CVPixelBuffer,
+        canvas: CGSize
+    ) -> Bool {
         CVPixelBufferLockBaseAddress(pixelBuffer, [])
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
         guard let context = CGContext(

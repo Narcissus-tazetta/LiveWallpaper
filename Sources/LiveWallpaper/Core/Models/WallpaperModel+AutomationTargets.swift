@@ -5,7 +5,9 @@ import Foundation
 extension WallpaperModel {
     /// Searches the whole library (web wallpapers only while that feature is on),
     /// not just the play queue, so wallpapers outside the selected playlist can be named.
-    func automationWallpaperMatch(named name: String) -> AutomationNameMatch<WallpaperPlaybackEntry> {
+    func automationWallpaperMatch(named name: String)
+        -> AutomationNameMatch<WallpaperPlaybackEntry>
+    {
         var candidates: [(id: WallpaperPlaybackEntry, name: String)] = libraryVideoPaths.map {
             (id: .video($0), name: registeredVideoDisplayName(for: $0))
         }

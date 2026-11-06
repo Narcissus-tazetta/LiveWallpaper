@@ -18,65 +18,65 @@ extension FitEditorController {
 
         keyEventMonitor =
             NSEvent
-            .addLocalMonitorForEvents(
-                matching: [.keyDown, .keyUp, .leftMouseDown, .leftMouseUp]
-            ) { [weak self] event in
-                guard let self, isActive, isSubModeActive else {
-                    return event
-                }
-                // A press or release marks the edges of one gesture; edits between
-                // them (a slider drag, a held arrow key) become a single undo step.
-                if event.type != .keyDown || !event.isARepeat {
-                    breakDraftHistoryCoalescing()
-                }
-                guard event.type == .keyDown else {
-                    return event
-                }
-                // A text field (name edit, search, ...) is being edited: let the
-                // arrow keys move the caret/selection instead of panning the
-                // preview. The field editor backing any focused NSTextField or
-                // SwiftUI TextField is an NSTextView, a subclass of NSText.
-                if (event.window ?? NSApp.keyWindow)?.firstResponder is NSText {
-                    return event
-                }
-                guard let path = resolvedVideoPath(), !path.isEmpty else {
-                    return event
-                }
-
-                let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                let screenID = resolvedScreenID()
-                if event.keyCode == FitKeyCode.letterZ {
-                    guard flags == [.command] || flags == [.command, .shift] else {
+                .addLocalMonitorForEvents(
+                    matching: [.keyDown, .keyUp, .leftMouseDown, .leftMouseUp]
+                ) { [weak self] event in
+                    guard let self, isActive, isSubModeActive else {
                         return event
                     }
-                    if flags.contains(.shift) {
-                        redoDraft(path: path, screenID: screenID)
-                    } else {
-                        undoDraft(path: path, screenID: screenID)
+                    // A press or release marks the edges of one gesture; edits between
+                    // them (a slider drag, a held arrow key) become a single undo step.
+                    if event.type != .keyDown || !event.isARepeat {
+                        breakDraftHistoryCoalescing()
                     }
-                    return nil
-                }
+                    guard event.type == .keyDown else {
+                        return event
+                    }
+                    // A text field (name edit, search, ...) is being edited: let the
+                    // arrow keys move the caret/selection instead of panning the
+                    // preview. The field editor backing any focused NSTextField or
+                    // SwiftUI TextField is an NSTextView, a subclass of NSText.
+                    if (event.window ?? NSApp.keyWindow)?.firstResponder is NSText {
+                        return event
+                    }
+                    guard let path = resolvedVideoPath(), !path.isEmpty else {
+                        return event
+                    }
 
-                let step = flags.contains(.shift) ? 0.01 : 0.002
+                    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                    let screenID = resolvedScreenID()
+                    if event.keyCode == FitKeyCode.letterZ {
+                        guard flags == [.command] || flags == [.command, .shift] else {
+                            return event
+                        }
+                        if flags.contains(.shift) {
+                            redoDraft(path: path, screenID: screenID)
+                        } else {
+                            undoDraft(path: path, screenID: screenID)
+                        }
+                        return nil
+                    }
 
-                switch event.keyCode {
-                case FitKeyCode.left:
-                    moveDraftOffset(dx: -step, dy: 0, path: path, screenID: screenID)
-                    return nil
-                case FitKeyCode.right:
-                    moveDraftOffset(dx: step, dy: 0, path: path, screenID: screenID)
-                    return nil
-                // Offsets point up, as on the desktop.
-                case FitKeyCode.down:
-                    moveDraftOffset(dx: 0, dy: -step, path: path, screenID: screenID)
-                    return nil
-                case FitKeyCode.up:
-                    moveDraftOffset(dx: 0, dy: step, path: path, screenID: screenID)
-                    return nil
-                default:
-                    return event
+                    let step = flags.contains(.shift) ? 0.01 : 0.002
+
+                    switch event.keyCode {
+                    case FitKeyCode.left:
+                        moveDraftOffset(dx: -step, dy: 0, path: path, screenID: screenID)
+                        return nil
+                    case FitKeyCode.right:
+                        moveDraftOffset(dx: step, dy: 0, path: path, screenID: screenID)
+                        return nil
+                    // Offsets point up, as on the desktop.
+                    case FitKeyCode.down:
+                        moveDraftOffset(dx: 0, dy: -step, path: path, screenID: screenID)
+                        return nil
+                    case FitKeyCode.up:
+                        moveDraftOffset(dx: 0, dy: step, path: path, screenID: screenID)
+                        return nil
+                    default:
+                        return event
+                    }
                 }
-            }
     }
 
     func removeKeyMonitor() {

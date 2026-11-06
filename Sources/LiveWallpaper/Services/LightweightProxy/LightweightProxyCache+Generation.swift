@@ -1,5 +1,5 @@
-import AVFoundation
 import AppKit
+import AVFoundation
 
 extension LightweightProxyCache {
     private enum TranscodeEligibility {
@@ -15,7 +15,10 @@ extension LightweightProxyCache {
         }
     }
 
-    func performGeneration(path: String, activeGeneration: ActiveGeneration) async -> GenerationResult {
+    func performGeneration(
+        path: String,
+        activeGeneration: ActiveGeneration
+    ) async -> GenerationResult {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
               let fileSizeNumber = attributes[.size] as? NSNumber,
               let modifiedDate = attributes[.modificationDate] as? Date
@@ -55,7 +58,10 @@ extension LightweightProxyCache {
         do {
             try FileManager.default.createDirectory(at: dataURL, withIntermediateDirectories: true)
         } catch {
-            AppLog.proxyCache.error("creating cache directory failed error=\(error.localizedDescription, privacy: .public)")
+            AppLog.proxyCache
+                .error(
+                    "creating cache directory failed error=\(error.localizedDescription, privacy: .public)"
+                )
             return .failed
         }
 
@@ -66,7 +72,8 @@ extension LightweightProxyCache {
             return .failed
         }
 
-        let outputFileType: AVFileType = exportSession.supportedFileTypes.contains(.mp4) ? .mp4 : .mov
+        let outputFileType: AVFileType = exportSession.supportedFileTypes
+            .contains(.mp4) ? .mp4 : .mov
         let fileExtension = outputFileType == .mp4 ? "mp4" : "mov"
         let fileName = "\(CacheKeyHashing.hashed(path)).\(fileExtension)"
         let finalURL = dataURL.appendingPathComponent(fileName)
@@ -147,7 +154,8 @@ extension LightweightProxyCache {
             return .passthrough
         }
 
-        let composition = try await AVMutableVideoComposition.videoComposition(withPropertiesOf: asset)
+        let composition = try await AVMutableVideoComposition
+            .videoComposition(withPropertiesOf: asset)
         let scale = min(1.0, longEdge > 0 ? targetLongEdge / longEdge : 1.0)
         let newWidth = max((width * scale).rounded(), 2)
         let newHeight = max((height * scale).rounded(), 2)
@@ -162,11 +170,13 @@ extension LightweightProxyCache {
         // same factor as renderSize so the whole frame shrinks uniformly.
         let scaleTransform = CGAffineTransform(scaleX: scale, y: scale)
         for instruction in composition.instructions {
-            guard let mutableInstruction = instruction as? AVMutableVideoCompositionInstruction else {
+            guard let mutableInstruction = instruction as? AVMutableVideoCompositionInstruction
+            else {
                 continue
             }
             for layerInstruction in mutableInstruction.layerInstructions {
-                guard let mutableLayerInstruction = layerInstruction as? AVMutableVideoCompositionLayerInstruction
+                guard let mutableLayerInstruction =
+                    layerInstruction as? AVMutableVideoCompositionLayerInstruction
                 else {
                     continue
                 }

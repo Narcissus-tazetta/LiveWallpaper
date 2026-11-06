@@ -52,7 +52,9 @@ final class SceneAudioAnalyzer {
         // the DFT into a convolution with the kernel.
         let count = transformLength
         var log2 = 0
-        while 1 << log2 < 2 * count - 1 { log2 += 1 }
+        while 1 << log2 < 2 * count - 1 {
+            log2 += 1
+        }
         paddedLength = 1 << log2
         let log2Length = vDSP_Length(log2)
         log2PaddedLength = log2Length
@@ -133,7 +135,10 @@ final class SceneAudioAnalyzer {
                 sinceLastOutput = 0
                 let raw = bands(left) + bands(right)
                 result = Output(
-                    scene: loudness.process(raw.map { $0 * Self.sceneScale }, elapsed: Float(Double(period) / sampleRate)),
+                    scene: loudness.process(
+                        raw.map { $0 * Self.sceneScale },
+                        elapsed: Float(Double(period) / sampleRate)
+                    ),
                     web: raw.map { $0 * Self.webScale }
                 )
             }
@@ -155,7 +160,13 @@ final class SceneAudioAnalyzer {
         workReal.withUnsafeMutableBufferPointer { real in
             workImaginary.withUnsafeMutableBufferPointer { imaginary in
                 var split = DSPSplitComplex(realp: real.baseAddress!, imagp: imaginary.baseAddress!)
-                vDSP_fft_zip(setup, &split, 1, log2PaddedLength, FFTDirection(kFFTDirection_Forward))
+                vDSP_fft_zip(
+                    setup,
+                    &split,
+                    1,
+                    log2PaddedLength,
+                    FFTDirection(kFFTDirection_Forward)
+                )
                 kernelReal.withUnsafeBufferPointer { kernelReal in
                     kernelImaginary.withUnsafeBufferPointer { kernelImaginary in
                         var kernel = DSPSplitComplex(
@@ -165,7 +176,13 @@ final class SceneAudioAnalyzer {
                         vDSP_zvmul(&split, 1, &kernel, 1, &split, 1, vDSP_Length(paddedLength), 1)
                     }
                 }
-                vDSP_fft_zip(setup, &split, 1, log2PaddedLength, FFTDirection(kFFTDirection_Inverse))
+                vDSP_fft_zip(
+                    setup,
+                    &split,
+                    1,
+                    log2PaddedLength,
+                    FFTDirection(kFFTDirection_Inverse)
+                )
             }
         }
         // The output chirp has magnitude 1, so the energy needs only the inverse FFT's scale.
@@ -199,10 +216,13 @@ struct SceneSpectrumLoudness {
     /// `raw` is 64 left bands then 64 right bands; `elapsed` is the time since the last call.
     mutating func process(_ raw: [Float], elapsed: Float) -> [Float] {
         let dt = min(elapsed, 1)
-        var groupMax = (0 ..< 16).map { raw[$0 * Self.groupSize ..< ($0 + 1) * Self.groupSize].max()! }
+        var groupMax = (0 ..< 16)
+            .map { raw[$0 * Self.groupSize ..< ($0 + 1) * Self.groupSize].max()! }
         let loudest = groupMax.max()!
         let isSilent = loudest < Self.silence
-        for group in 0 ..< 16 { groupMax[group] = max(groupMax[group], loudest * 0.333) }
+        for group in 0 ..< 16 {
+            groupMax[group] = max(groupMax[group], loudest * 0.333)
+        }
 
         if peaks[0] <= Self.silence, !isSilent {
             peaks = [Float](repeating: 1, count: 16)
