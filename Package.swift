@@ -20,7 +20,9 @@ func activeMacOSSDKVersion() -> String? {
     if let developerDir = environment["DEVELOPER_DIR"] {
         developerDirs.append(developerDir)
     }
-    if let selected = try? FileManager.default.destinationOfSymbolicLink(atPath: "/var/db/xcode_select_link") {
+    if let selected = try? FileManager.default
+        .destinationOfSymbolicLink(atPath: "/var/db/xcode_select_link")
+    {
         developerDirs.append(selected)
     }
     for developerDir in developerDirs {
@@ -41,12 +43,20 @@ func activeMacOSSDKVersion() -> String? {
     return nil
 }
 
-// The swiftbuild build system copies Sparkle.framework next to the executable but, unlike the
-// native one, adds no rpath to find it.
+/// The swiftbuild build system copies Sparkle.framework next to the executable but, unlike the
+/// native one, adds no rpath to find it.
 var linkerFlags = ["-Xlinker", "-rpath", "-Xlinker", "@executable_path"]
 if let sdkVersion = activeMacOSSDKVersion() {
-    linkerFlags += ["-Xlinker", "-platform_version", "-Xlinker", "macos",
-                    "-Xlinker", minimumMacOSVersion, "-Xlinker", sdkVersion]
+    linkerFlags += [
+        "-Xlinker",
+        "-platform_version",
+        "-Xlinker",
+        "macos",
+        "-Xlinker",
+        minimumMacOSVersion,
+        "-Xlinker",
+        sdkVersion
+    ]
 }
 
 let package = Package(
@@ -63,7 +73,13 @@ let package = Package(
             name: "QuickJS",
             path: "Sources/QuickJS",
             exclude: ["vendor/LICENSE", "NOTICE.md"],
-            sources: ["Bridge.c", "vendor/quickjs.c", "vendor/dtoa.c", "vendor/libregexp.c", "vendor/libunicode.c"],
+            sources: [
+                "Bridge.c",
+                "vendor/quickjs.c",
+                "vendor/dtoa.c",
+                "vendor/libregexp.c",
+                "vendor/libunicode.c"
+            ],
             publicHeadersPath: "include",
             cSettings: [
                 .headerSearchPath("vendor"),

@@ -8,16 +8,21 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "bun test/integration/run.mjs",
-    "typecheck:tests": "tsc --noEmit --project test/tsconfig.json"
+    "typecheck:tests": "tsc --noEmit --project test/tsconfig.json",
+    "lint": "oxlint --deny-warnings src test",
+    "format": "oxfmt src test",
+    "format:check": "oxfmt --check src test"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.0",
     "@cloudflare/workers-types": "^4.20260701.0",
+    "esbuild": "0.27.3",
+    "miniflare": "4.20260714.0",
+    "oxfmt": "^0.76.0",
+    "oxlint": "1.91.0",
     "typescript": "^5.5.4",
     "vitest": "^3.2.0",
-    "wrangler": "^4.64.0",
-    "miniflare": "4.20260714.0",
-    "esbuild": "0.27.3"
+    "wrangler": "^4.64.0"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20",

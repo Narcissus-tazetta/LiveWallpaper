@@ -42,7 +42,7 @@ final class LiveWallpaperSaverView: ScreenSaverView {
         }
     }
 
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         nil
     }
 
@@ -77,7 +77,7 @@ final class LiveWallpaperSaverView: ScreenSaverView {
                 "de": "Öffne LiveWallpaper und wähle ein Hintergrundbild aus, um es hier anzuzeigen.",
                 "pt-BR": "Abra o LiveWallpaper e escolha uma imagem de fundo para exibi-la aqui.",
                 "vi": "Mở LiveWallpaper và chọn một hình nền để hiển thị tại đây.",
-                "tr": "Burada göstermek için LiveWallpaper’ı açın ve bir duvar kâğıdı seçin.",
+                "tr": "Burada göstermek için LiveWallpaper’ı açın ve bir duvar kâğıdı seçin."
             ]))
             return
         }
@@ -95,7 +95,7 @@ final class LiveWallpaperSaverView: ScreenSaverView {
                 "de": "Für diesen Bildschirm gibt es kein Video-Hintergrundbild.",
                 "pt-BR": "Não há nenhuma imagem de fundo em vídeo para esta tela.",
                 "vi": "Không có hình nền video nào cho màn hình này.",
-                "tr": "Bu ekran için video duvar kâğıdı yok.",
+                "tr": "Bu ekran için video duvar kâğıdı yok."
             ]))
             return
         }
@@ -192,7 +192,8 @@ final class LiveWallpaperSaverView: ScreenSaverView {
 
     private func displayID() -> String? {
         let screen = window?.screen ?? NSScreen.main
-        guard let number = screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        guard let number = screen?
+            .deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
         else {
             return nil
         }
@@ -206,9 +207,10 @@ final class LiveWallpaperSaverView: ScreenSaverView {
     }
 
     private static func loadConfig() -> ScreenSaverConfig? {
-        guard let data = try? Data(contentsOf: ScreenSaverConfig.fileURL(home: realHomeDirectory())),
-              let config = try? JSONDecoder().decode(ScreenSaverConfig.self, from: data),
-              config.formatVersion <= ScreenSaverConfig.currentFormatVersion
+        guard let data = try? Data(contentsOf: ScreenSaverConfig
+            .fileURL(home: realHomeDirectory())),
+            let config = try? JSONDecoder().decode(ScreenSaverConfig.self, from: data),
+            config.formatVersion <= ScreenSaverConfig.currentFormatVersion
         else {
             return nil
         }

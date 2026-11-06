@@ -36,6 +36,35 @@ jobs:
             - name: Test
               run: swift test
 
+    swift-lint:
+        runs-on: macos-26
+        env:
+            # Pinned: a newer release reformats code or adds rules, which would fail
+            # unrelated changes. Update together with .swiftlint-baseline.json.
+            SWIFTFORMAT_VERSION: "0.60.1"
+            SWIFTLINT_VERSION: "0.63.2"
+        steps:
+            - uses: actions/checkout@v4.4.0
+
+            - name: Install pinned SwiftFormat and SwiftLint
+              run: |
+                  mkdir -p "$RUNNER_TEMP/bin"
+                  curl -fsSL -o "$RUNNER_TEMP/swiftformat.zip" \
+                      "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip"
+                  unzip -q -o "$RUNNER_TEMP/swiftformat.zip" -d "$RUNNER_TEMP/bin"
+                  curl -fsSL -o "$RUNNER_TEMP/swiftlint.zip" \
+                      "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip"
+                  unzip -q -o "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/bin"
+                  chmod +x "$RUNNER_TEMP/bin/swiftformat" "$RUNNER_TEMP/bin/swiftlint"
+                  echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+            - name: Check formatting
+              run: swiftformat --lint .
+
+            # The baseline holds the violations that predate the linter; only new ones fail.
+            - name: Lint
+              run: swiftlint lint --strict --baseline .swiftlint-baseline.json
+
     store-worker:
         runs-on: ubuntu-latest
         defaults:
@@ -51,6 +80,15 @@ jobs:
 
             - name: Typecheck
               run: bun run typecheck
+
+            - name: Typecheck tests
+              run: bun run typecheck:tests
+
+            - name: Lint
+              run: bun run lint
+
+            - name: Check formatting
+              run: bun run format:check
 
             - name: Test
               run: bun run test

@@ -10,3 +10,5 @@
 --header ignore
 --disable redundantReturn
 --disable trailingClosures
+--swiftversion 5.10
+--exclude .build,.claude,dist,site,store-worker,homebrew-tap,we-cli,Sources/QuickJS/vendor
