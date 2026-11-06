@@ -128,15 +128,21 @@ final class PackageImporter: @unchecked Sendable {
 
     private let fileManager: FileManager
     private let videosDirectory: URL?
+    private let webWallpapersDirectory: URL
+    private let scenePresetStore: ScenePresetStore?
     private let limits: Limits
 
     init(
         fileManager: FileManager = .default,
         videosDirectory: URL? = nil,
+        webWallpapersDirectory: URL = LocalWebWallpaperPackage.libraryDirectory,
+        scenePresetStore: ScenePresetStore? = .standard,
         limits: Limits = .local
     ) {
         self.fileManager = fileManager
         self.videosDirectory = videosDirectory
+        self.webWallpapersDirectory = webWallpapersDirectory
+        self.scenePresetStore = scenePresetStore
         self.limits = limits
     }
 
@@ -228,18 +234,14 @@ final class PackageImporter: @unchecked Sendable {
             model.registerImportedScene(scene.document, path: scene.videoPath, asksAgain: true)
         }
 
-        var importedPlaylistIDs: [UUID] = []
-        for playlist in manifest.playlists {
-            let videoPaths = playlist.videoIds.compactMap { importedVideoPaths[$0] }
-            if !videoPaths.isEmpty {
-                if let playlistID = model.createPlaylist(named: playlist.name) {
-                    for videoPath in videoPaths {
-                        model.addRegisteredVideo(path: videoPath, to: playlistID)
-                    }
-                    importedPlaylistIDs.append(playlistID)
-                }
-            }
-        }
+        let webIDs = addWebWallpapers(of: manifest, staged: staged, to: model)
+        model.addImportedScenePresets(staged.scenePresets)
+        let importedPlaylistIDs = addPlaylists(
+            of: manifest,
+            importedVideoPaths: importedVideoPaths,
+            webIDs: webIDs,
+            to: model
+        )
 
         if let firstPlaylistID = importedPlaylistIDs.first {
             model.selectPlaylist(firstPlaylistID)
@@ -255,7 +257,59 @@ final class PackageImporter: @unchecked Sendable {
            let videoPath = importedVideoPaths[firstVideoId]
         {
             model.selectRegisteredVideo(path: videoPath)
+        } else if let firstWeb = manifest.webWallpapers?.first, let id = webIDs[firstWeb.id] {
+            model.selectWebWallpaper(id: id)
         }
+    }
+
+    /// - Returns: package web wallpaper id → id in the receiver's library.
+    @MainActor
+    private func addWebWallpapers(
+        of manifest: PackageManifest,
+        staged: StagedImport,
+        to model: WallpaperModel
+    ) -> [String: UUID] {
+        var webIDs: [String: UUID] = [:]
+        for web in manifest.webWallpapers ?? [] {
+            guard let item = staged.webSources[web.id] else { continue }
+            let id = model.addImportedWebWallpaper(item.source)
+            webIDs[web.id] = id
+            // A page already in the library keeps the receiver's own settings.
+            guard let settings = item.settings, id == item.source.id else { continue }
+            do {
+                try settings.save(id: id)
+            } catch {
+                AppLog.persistence.error(
+                    "imported web settings not saved: \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+        return webIDs
+    }
+
+    @MainActor
+    private func addPlaylists(
+        of manifest: PackageManifest,
+        importedVideoPaths: [String: String],
+        webIDs: [String: UUID],
+        to model: WallpaperModel
+    ) -> [UUID] {
+        var importedPlaylistIDs: [UUID] = []
+        for playlist in manifest.playlists {
+            let videoPaths = playlist.videoIds.compactMap { importedVideoPaths[$0] }
+            let webWallpaperIDs = (playlist.webWallpaperIds ?? []).compactMap { webIDs[$0] }
+            guard !videoPaths.isEmpty || !webWallpaperIDs.isEmpty,
+                  let playlistID = model.createPlaylist(named: playlist.name)
+            else { continue }
+            for videoPath in videoPaths {
+                model.addRegisteredVideo(path: videoPath, to: playlistID)
+            }
+            for webID in webWallpaperIDs {
+                _ = model.addWebWallpaper(sourceID: webID, to: playlistID)
+            }
+            importedPlaylistIDs.append(playlistID)
+        }
+        return importedPlaylistIDs
     }
 
     private static let stagingQueue = DispatchQueue(
@@ -268,6 +322,14 @@ final class PackageImporter: @unchecked Sendable {
         let packageRoot: URL
         /// Package video id → library path the video now lives at.
         let importedVideoPaths: [String: String]
+        /// Package web wallpaper id → the source to add, already copied into the library.
+        let webSources: [String: StagedWebWallpaper]
+        let scenePresets: [ScenePreset]
+    }
+
+    struct StagedWebWallpaper {
+        let source: WebWallpaperSource
+        let settings: LocalWebSettings?
     }
 
     /// Unpacks, validates and copies the videos into the library. Only touches files, so it
@@ -328,6 +390,8 @@ final class PackageImporter: @unchecked Sendable {
         let rollbackDirectory = tempDir.appendingPathComponent("rollback", isDirectory: true)
         try fileManager.createDirectory(at: rollbackDirectory, withIntermediateDirectories: true)
         var replacementBackups: [String: URL] = [:]
+        var webSources: [String: StagedWebWallpaper] = [:]
+        var scenePresets: [ScenePreset] = []
 
         do {
             for video in manifest.videos {
@@ -351,7 +415,18 @@ final class PackageImporter: @unchecked Sendable {
                     importedVideoPaths[video.id] = videoPath
                 }
             }
+            try stageWebWallpapers(
+                manifest.webWallpapers ?? [],
+                from: packageRootDir,
+                into: &webSources
+            )
+            try stageScenePresets(
+                manifest.scenePresets ?? [],
+                from: packageRootDir,
+                into: &scenePresets
+            )
         } catch {
+            removeStaged(webSources: webSources.values, scenePresets: scenePresets)
             for path in importedVideoPaths.values where !existingFilesBeforeImport.contains(path) {
                 do {
                     try fileManager.removeItem(atPath: path)
@@ -378,7 +453,8 @@ final class PackageImporter: @unchecked Sendable {
             throw error
         }
         return StagedImport(
-            manifest: manifest, packageRoot: packageRootDir, importedVideoPaths: importedVideoPaths
+            manifest: manifest, packageRoot: packageRootDir, importedVideoPaths: importedVideoPaths,
+            webSources: webSources, scenePresets: scenePresets
         )
     }
 
@@ -594,7 +670,7 @@ final class PackageImporter: @unchecked Sendable {
         }
     }
 
-    static let supportedVersions: Set<String> = ["1.0", "1.1"]
+    static let supportedVersions: Set<String> = ["1.0", "1.1", "1.2"]
 
     func validateManifest(_ manifest: PackageManifest) throws {
         guard Self.supportedVersions.contains(manifest.version) else {
@@ -713,10 +789,182 @@ final class PackageImporter: @unchecked Sendable {
             if case .abort = duplicateResolution,
                try findExistingVideoPath(for: video, libraryDigests: &libraryDigests) != nil
             {
-                throw ImportError.duplicateVideo(video.source.fileName)
+                throw ImportError.duplicateVideo(video.displayName)
             }
         }
     }
+
+    // MARK: - Web wallpapers and presets
+
+    private func stageWebWallpapers(
+        _ webWallpapers: [PackageManifest.PackageWebWallpaper],
+        from packageRoot: URL,
+        into staged: inout [String: StagedWebWallpaper]
+    ) throws {
+        for web in webWallpapers {
+            guard Self.isSafePathComponent(web.id), staged[web.id] == nil else {
+                throw ImportError.invalidPackageFormat
+            }
+            if let folder = web.folder {
+                let source = try validatedPackageFolder(folder, kind: "web", in: packageRoot)
+                let destination = webWallpapersDirectory
+                    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                try LocalWebWallpaperPackage.copy(from: source, to: destination)
+                let package = try LocalWebWallpaperPackage.load(folder: destination)
+                let settings = web.settings.map { $0.portable(for: package) }
+                staged[web.id] = StagedWebWallpaper(
+                    source: WebWallpaperSource(
+                        url: destination.appendingPathComponent(package.entryPoint),
+                        displayName: web.displayName,
+                        localFolderPath: destination.path,
+                        warnings: package.warnings,
+                        thumbnailPath: package.preview
+                            .map { destination.appendingPathComponent($0).path }
+                    ),
+                    settings: settings
+                )
+            } else if let urlString = web.url {
+                let url = try WebWallpaperURLResolver.normalizeURLString(urlString)
+                guard url.scheme == "https" || url.scheme == "http" else {
+                    throw ImportError.unsafeFileReference(urlString)
+                }
+                staged[web.id] = StagedWebWallpaper(
+                    source: WebWallpaperSource(url: url, displayName: web.displayName),
+                    settings: nil
+                )
+            } else {
+                throw ImportError.invalidPackageFormat
+            }
+        }
+    }
+
+    private func stageScenePresets(
+        _ presets: [PackageManifest.PackageScenePreset],
+        from packageRoot: URL,
+        into staged: inout [ScenePreset]
+    ) throws {
+        guard !presets.isEmpty else { return }
+        guard let scenePresetStore else { throw ImportError.extractionFailed }
+        for item in presets {
+            let folder = try validatedPackageFolder(item.folder, kind: "presets", in: packageRoot)
+            let documentURL = folder.appendingPathComponent("preset.json")
+            let prepared = try StoredFormat.scenePreset.prepare(Data(contentsOf: documentURL))
+            var preset = try JSONDecoder().decode(ScenePreset.self, from: prepared.data)
+            for name in preset.referencedFiles where !Self.isSafePathComponent(name) {
+                throw ImportError.unsafeFileReference(name)
+            }
+            // A fresh id: the receiver may already hold this preset, and ids name folders.
+            preset.id = UUID()
+            preset.builtIn = nil
+            try scenePresetStore.save(preset, filesFrom: folder)
+            staged.append(preset)
+        }
+    }
+
+    /// `folder` comes from the package author, so it must be exactly `<kind>/<one name>`
+    /// and resolve inside the package.
+    private func validatedPackageFolder(
+        _ folder: String,
+        kind: String,
+        in packageRoot: URL
+    ) throws -> URL {
+        let parts = folder.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 2, parts[0] == kind, Self.isSafePathComponent(String(parts[1]))
+        else {
+            throw ImportError.unsafeFileReference(folder)
+        }
+        let url = packageRoot.appendingPathComponent(kind, isDirectory: true)
+            .appendingPathComponent(String(parts[1]), isDirectory: true)
+        let resolvedRoot = packageRoot.resolvingSymlinksInPath().standardizedFileURL.path
+        let resolved = url.resolvingSymlinksInPath().standardizedFileURL.path
+        var isDirectory: ObjCBool = false
+        guard resolved.hasPrefix(resolvedRoot + "/"),
+              fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory),
+              isDirectory.boolValue
+        else {
+            throw ImportError.unsafeFileReference(folder)
+        }
+        return url
+    }
+
+    private func removeStaged(
+        webSources: some Sequence<StagedWebWallpaper>,
+        scenePresets: [ScenePreset]
+    ) {
+        for web in webSources {
+            guard let folder = web.source.localFolderPath else { continue }
+            do {
+                try fileManager.removeItem(atPath: folder)
+            } catch {
+                AppLog.persistence.error(
+                    "import rollback could not remove \(folder, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+        for preset in scenePresets {
+            do {
+                try scenePresetStore?.delete(preset.id)
+            } catch {
+                AppLog.persistence.error(
+                    "import rollback could not remove preset \(preset.id, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+    }
+
+    // MARK: - Preview
+
+    struct Preview {
+        let manifest: PackageManifest
+        let thumbnail: NSImage?
+        let packageBytes: Int64
+    }
+
+    /// Reads only the manifest and thumbnails, so the user can decide before the whole
+    /// package (possibly gigabytes) is unpacked.
+    func preview(of packageURL: URL) async throws -> Preview {
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { BlockingWork.removeInBackground(tempDir) }
+        return try await BlockingWork.run(on: Self.stagingQueue) { [self] in
+            try Self.inspectZipArchive(at: packageURL, limits: limits)
+            do {
+                try ProcessRunner.runSynchronously("/usr/bin/unzip", arguments: [
+                    "-q", packageURL.path,
+                    "metadata.json", "content/metadata.json", "previews/*", "content/previews/*",
+                    "-d", tempDir.path
+                ])
+            } catch let failure as ProcessRunner.Failure
+                where failure.status == Self.unzipSomeNamesMissing
+            {
+                // Expected: a package holds only one of the two layouts.
+            } catch let failure as ProcessRunner.Failure {
+                AppLog.persistence.error(
+                    "package preview extraction failed: \(failure.localizedDescription, privacy: .public)"
+                )
+                throw ImportError.extractionFailed
+            }
+            let (manifest, root) = try loadManifest(from: tempDir)
+            try validateManifest(manifest)
+            let candidates = manifest.videos.compactMap(\.thumbnail)
+                + (manifest.webWallpapers ?? []).compactMap(\.thumbnail)
+            let thumbnail = candidates.lazy.compactMap { path -> NSImage? in
+                let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+                guard parts.count == 2, parts[0] == "previews",
+                      Self.isSafePathComponent(String(parts[1]))
+                else { return nil }
+                return NSImage(contentsOf: root.appendingPathComponent(path))
+            }.first
+            return try Preview(
+                manifest: manifest,
+                thumbnail: thumbnail,
+                packageBytes: Int64(packageURL.regularFileSize())
+            )
+        }
+    }
+
+    /// unzip's exit status when some of the names it was given matched no entry.
+    private static let unzipSomeNamesMissing: Int32 = 11
 
     private func importVideo(
         _ video: PackageManifest.PackageVideo,
@@ -763,7 +1011,7 @@ final class PackageImporter: @unchecked Sendable {
         ) {
             switch duplicateResolution {
             case .abort:
-                throw ImportError.duplicateVideo(sourceFileName)
+                throw ImportError.duplicateVideo(video.displayName)
             case .replace:
                 let existingURL = URL(fileURLWithPath: existingPath)
                 let stagedURL = existingURL.deletingLastPathComponent()

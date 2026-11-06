@@ -87,8 +87,19 @@ PY
 }
 
 sign_app_bundle() {
+  local appex="$APP_DIR/Contents/PlugIns/LiveWallpaperQuickLook.appex"
+  # --deep signs nested code without entitlements, which strips the Quick Look extension's
+  # sandbox entitlement (Quick Look refuses unsandboxed extensions). So sign everything deep
+  # first, re-sign the extension with its entitlements, then re-seal only the outer app.
   codesign --force --deep --sign "$CODESIGN_IDENTITY" "$APP_DIR"
-  codesign --verify --deep --verbose=2 "$APP_DIR"
+  codesign --force --sign "$CODESIGN_IDENTITY" \
+    --entitlements "$ROOT_DIR/QuickLook/QuickLookThumbnail.entitlements" "$appex"
+  codesign --force --sign "$CODESIGN_IDENTITY" "$APP_DIR"
+  codesign --verify --deep --strict --verbose=2 "$APP_DIR"
+  if ! codesign -d --entitlements - "$appex" 2>/dev/null | grep -q "com.apple.security.app-sandbox"; then
+    echo "Quick Look extension lost its sandbox entitlement: $appex" >&2
+    exit 1
+  fi
 }
 
 create_polished_dmg() {
@@ -189,6 +200,9 @@ if [[ -d "$ROOT_DIR/Sources/LiveWallpaper/Resources" ]]; then
 fi
 cp -R "$SPARKLE_FRAMEWORK_PATH" "$APP_DIR/Contents/MacOS/Sparkle.framework"
 "$ROOT_DIR/scripts/build_screensaver.sh" "$VERSION" "$APP_DIR/Contents/Resources" >/dev/null
+mkdir -p "$APP_DIR/Contents/PlugIns"
+CODESIGN_IDENTITY="$CODESIGN_IDENTITY" \
+  "$ROOT_DIR/scripts/build_quicklook.sh" "$VERSION" "$APP_DIR/Contents/PlugIns" >/dev/null
 
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

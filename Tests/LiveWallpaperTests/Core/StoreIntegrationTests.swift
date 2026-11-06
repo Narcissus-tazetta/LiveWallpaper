@@ -167,6 +167,14 @@ final class StoreIntegrationTests: XCTestCase {
             SHA256.hash(data: package).map { String(format: "%02x", $0) }.joined(),
             entry.sha256
         )
+        await catalog.openLinkedEntry(id: entry.id)
+        XCTAssertEqual(catalog.linkedEntry?.id, entry.id)
+        XCTAssertEqual(catalog.linkedEntry?.sha256, entry.sha256)
+        let (page, pageResponse) = try await session
+            .data(from: endpoint.appendingPathComponent("w/\(entry.id)"))
+        XCTAssertEqual((pageResponse as? HTTPURLResponse)?.statusCode, 200)
+        XCTAssertTrue(String(decoding: page, as: UTF8.self)
+            .contains("livewallpaper://store?id=\(entry.id)"))
         await catalog.download(entry: entry, into: recipient)
         XCTAssertEqual(catalog.downloadResultMessage, recipient.localizedString("追加しました"))
         let importedPath = try XCTUnwrap(recipient.libraryVideoPaths.first)

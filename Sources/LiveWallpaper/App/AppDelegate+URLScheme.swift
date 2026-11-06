@@ -115,6 +115,13 @@ extension AppDelegate {
             openSettings()
         case "open-wallpaper", "wallpaper":
             openWallpaperTab()
+        case "store":
+            guard let id = stringParam("id"), StoreLinkRouter.isValidEntryID(id) else {
+                reportAutomationFailure("store: missing or invalid id parameter")
+                return
+            }
+            openSettings()
+            StoreLinkRouter.shared.requestedEntryID = id
         default:
             reportAutomationFailure("unknown command \(command)")
         }

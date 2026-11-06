@@ -35,4 +35,12 @@ enum AppLocalization {
         }
         return bundle.localizedString(forKey: key, value: key, table: "Localizable")
     }
+
+    /// For code without a model at hand; follows the language chosen in the app's settings.
+    static func localizedString(_ key: String) -> String {
+        let raw = UserDefaults.standard.string(forKey: PrefsKey.appLanguage)
+            ?? AppLanguage.automatic.rawValue
+        let language = AppLanguage(rawValue: raw) ?? .automatic
+        return localizedString(key, languageCode: language.effectiveLanguageCode)
+    }
 }

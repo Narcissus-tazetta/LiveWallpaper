@@ -233,6 +233,9 @@ extension SettingsView {
             addToNewPlaylist: { addWebWallpaperToNewPlaylist(sourceID: source.id) }
         )
         Divider()
+        Button(model.localizedString("共有…")) {
+            sharePackage(.webWallpaper(source))
+        }
         if source.localFolderPath != nil {
             Button(model.localizedString("作品の設定")) {
                 if let context = model.authorSettingsContext(for: source) {

@@ -47,6 +47,16 @@ extension SceneEditorView {
                 isSavingScenePreset = true
             }
             if let presets = model.userScenePresets, !presets.isEmpty {
+                Menu(model.localizedString("自分のプリセットを共有")) {
+                    ForEach(presets) { preset in
+                        Button(preset.name) {
+                            ShareExportController.shared.sharePackage(
+                                .scenePreset(preset),
+                                model: model
+                            )
+                        }
+                    }
+                }
                 Menu(model.localizedString("自分のプリセットを削除")) {
                     ForEach(presets) { preset in
                         Button(preset.name) {

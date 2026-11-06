@@ -110,11 +110,11 @@ extension AppDelegate {
         }
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
 
-        guard panel.runModal() == .OK, let url = panel.urls.first else { return }
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
 
-        PackageImportFlow.run(urls: [url], model: wallpaperModel)
+        PackageImportFlow.run(urls: panel.urls, model: wallpaperModel)
     }
 
     @objc func openReleasePage() {

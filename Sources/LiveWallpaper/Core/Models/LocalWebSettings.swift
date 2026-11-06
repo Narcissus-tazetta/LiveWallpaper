@@ -102,6 +102,17 @@ struct LocalWebSettings: Codable, Equatable {
     private static func key(_ id: UUID) -> String {
         "localWebSettings.\(id.uuidString)"
     }
+
+    /// For sharing: values naming files or folders point at the sender's disk, and values
+    /// for properties the page no longer declares may be such leftovers too.
+    func portable(for package: LocalWebWallpaperPackage) -> Self {
+        let portableIDs = Set((package.properties ?? [])
+            .filter { $0.kind != "directory" && $0.kind != "file" }
+            .map(\.id))
+        var portable = self
+        portable.values = values.filter { portableIDs.contains($0.key) }
+        return portable
+    }
 }
 
 /// Conditions are data, not executable JavaScript from an external package.

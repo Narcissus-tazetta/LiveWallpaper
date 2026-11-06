@@ -1,10 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// 壁紙を macOS の共有シート経由でエクスポート/共有する機能。
-/// 一時フォルダの用意・古い共有フォルダの掃除・NSSharingServicePicker の
-/// 提示までを担う。汎用の SwiftUI ヘルパー(Support/Helpers.swift)とは
-/// 別関心事のため独立したファイルに分けている。
+/// The picker sheet for sharing one wallpaper, and the share entry points of the
+/// settings window. The export itself runs in ShareExportController.
 extension SettingsView {
     func beginShareWallpaperSelection(path: String) {
         isWallpaperShareSheetPresented = false
@@ -25,6 +23,19 @@ extension SettingsView {
                 }
 
                 Spacer(minLength: 0)
+
+                Button(model.localizedString("ライブラリ全体を書き出す…")) {
+                    isWallpaperShareSheetPresented = false
+                    let selection = PackageSelection.library(of: model)
+                    DispatchQueue.main.async {
+                        ShareExportController.shared.savePackage(
+                            selection: selection,
+                            model: model
+                        )
+                    }
+                }
+                .buttonStyle(.bordered)
+                .help(model.localizedString("すべての壁紙・Web壁紙・プレイリスト・自分のプリセットを1つの .lwpkg にまとめます"))
 
                 Button(model.localizedString("閉じる")) {
                     isWallpaperShareSheetPresented = false
@@ -112,21 +123,22 @@ extension SettingsView {
     }
 
     func shareWallpaper(path: String) {
-        Task { @MainActor in
-            do {
-                let shareFolderURL = try prepareWallpaperShareFolder()
-                let exporter = PackageExporter()
-                let shareURLs = try await exporter.exportSingleWallpaper(
-                    model: model,
-                    videoPath: path,
-                    outputFolderURL: shareFolderURL,
-                    includePackage: model.advancedSharingEnabled
-                )
-                presentWallpaperSharePicker(for: shareURLs)
-            } catch {
-                showShareFailureAlert(message: error.localizedDescription)
-            }
+        ShareExportController.shared.share(
+            title: model.registeredVideoDisplayName(for: path),
+            model: model
+        ) { folder, progress in
+            try await PackageExporter().exportSingleWallpaper(
+                model: model,
+                videoPath: path,
+                outputFolderURL: folder,
+                includePackage: model.advancedSharingEnabled,
+                progress: progress
+            )
         }
+    }
+
+    func sharePackage(_ selection: PackageSelection) {
+        ShareExportController.shared.sharePackage(selection, model: model)
     }
 
     func shareWallpaperPickerDescriptionText() -> String {
@@ -134,75 +146,5 @@ extension SettingsView {
             return model.localizedString("選ぶと macOS の共有シートを開き、動画ファイルと .lwpkg を共有できます")
         }
         return model.localizedString("選ぶと macOS の共有シートを開き、動画ファイルを共有できます")
-    }
-
-    func prepareWallpaperShareFolder() throws -> URL {
-        let rootURL = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "LiveWallpaperShares",
-            isDirectory: true
-        )
-        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
-        cleanupOldWallpaperShareFolders(in: rootURL)
-
-        let shareFolderURL = rootURL.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: shareFolderURL,
-            withIntermediateDirectories: true
-        )
-        return shareFolderURL
-    }
-
-    func cleanupOldWallpaperShareFolders(in rootURL: URL) {
-        guard let folderURLs = try? FileManager.default.contentsOfDirectory(
-            at: rootURL,
-            includingPropertiesForKeys: [.creationDateKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return
-        }
-
-        let expirationDate = Date().addingTimeInterval(-24 * 60 * 60)
-        for folderURL in folderURLs {
-            let values = try? folderURL.resourceValues(forKeys: [.creationDateKey])
-            if values?.creationDate ?? .distantPast < expirationDate {
-                try? FileManager.default.removeItem(at: folderURL)
-            }
-        }
-    }
-
-    func presentWallpaperSharePicker(for urls: [URL]) {
-        guard let window = NSApp.keyWindow ?? NSApp.mainWindow,
-              let view = window.contentView
-        else {
-            let alert = NSAlert()
-            alert.messageText = model.localizedString("共有に失敗しました")
-            alert.informativeText = model.localizedString("共有シートを開けませんでした")
-            alert.alertStyle = .warning
-            alert.runModal()
-            return
-        }
-
-        let picker = NSSharingServicePicker(items: urls)
-        picker.show(
-            relativeTo: sharePickerAnchorRect(in: view, window: window),
-            of: view,
-            preferredEdge: .maxY
-        )
-    }
-
-    func sharePickerAnchorRect(in view: NSView, window: NSWindow) -> NSRect {
-        let windowPoint = window.convertPoint(fromScreen: NSEvent.mouseLocation)
-        let viewPoint = view.convert(windowPoint, from: nil)
-        let fallbackPoint = NSPoint(x: view.bounds.midX, y: view.bounds.midY)
-        let anchorPoint = view.bounds.contains(viewPoint) ? viewPoint : fallbackPoint
-        return NSRect(x: anchorPoint.x, y: anchorPoint.y, width: 1, height: 1)
-    }
-
-    func showShareFailureAlert(message: String) {
-        let alert = NSAlert()
-        alert.messageText = model.localizedString("共有に失敗しました")
-        alert.informativeText = message
-        alert.alertStyle = .warning
-        alert.runModal()
     }
 }

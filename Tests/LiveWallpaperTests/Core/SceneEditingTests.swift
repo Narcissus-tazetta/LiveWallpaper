@@ -228,6 +228,8 @@ final class SceneEditingTests: XCTestCase {
         model.libraryVideoPaths = []
         model.playlists = []
         model.selectedPlaylistID = nil
+        model.webWallpaperSources = []
+        model.scenePresetStore = nil
         XCTAssertTrue(model.addVideoPathToLibrary(source.path))
         for bulk in [false, true] {
             try original.write(to: source)
@@ -236,7 +238,7 @@ final class SceneEditingTests: XCTestCase {
                 packageURL = directory.appendingPathComponent("bulk.lwpkg")
                 try await exporter.exportPackage(
                     model: model,
-                    includeVideos: true,
+                    selection: .library(of: model),
                     outputURL: packageURL
                 )
             } else {
@@ -262,6 +264,51 @@ final class SceneEditingTests: XCTestCase {
             XCTAssertEqual(manifest.packaging.packageSizeBytes, UInt64(packed.count))
             XCTAssertNotEqual(try Data(contentsOf: source), packed)
         }
+    }
+
+    func testSharingAnEditedSceneBakesOnceForThePackageAndTheLooseVideo() async throws {
+        let video = directory.appendingPathComponent("shared.mp4")
+        var scene = try makeScene(videoURL: video)
+        scene.loopSeconds = 1
+        try SceneStore.save(scene, videoPath: video.path)
+        try Data("old baked video".utf8).write(to: video)
+        let model = WallpaperModel()
+        model.registerImportedScene(scene, path: video.path)
+        scene.layers[0].opacity = 0.4
+        model.updateScene(scene, path: video.path)
+        defer {
+            model.cancelSceneBake(path: video.path)
+            model.discardSceneSave(path: video.path)
+        }
+        let output = directory.appendingPathComponent("share", isDirectory: true)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        final class Recorder: @unchecked Sendable {
+            let lock = NSLock()
+            var values: [Double] = []
+        }
+        let recorder = Recorder()
+        let urls = try await PackageExporter().exportSingleWallpaper(
+            model: model,
+            videoPath: video.path,
+            outputFolderURL: output,
+            includePackage: true
+        ) { value in recorder.lock.withLock { recorder.values.append(value) } }
+
+        XCTAssertEqual(urls.map(\.pathExtension), ["mp4", "lwpkg"])
+        let extracted = try extract(urls[1])
+        let manifest = try JSONDecoder().decode(
+            PackageManifest.self,
+            from: Data(contentsOf: extracted.appendingPathComponent("metadata.json"))
+        )
+        let entry = try XCTUnwrap(manifest.videos.first)
+        let packed = try Data(contentsOf: extracted
+            .appendingPathComponent("videos/\(entry.id).mp4"))
+        XCTAssertEqual(try Data(contentsOf: urls[0]), packed)
+        XCTAssertNotEqual(packed, Data("old baked video".utf8))
+        // A second bake for the loose copy would start its progress over from zero.
+        let values = recorder.lock.withLock { recorder.values }
+        XCTAssertEqual(values.last, 1)
+        XCTAssertEqual(values, values.sorted())
     }
 
     func testExportBakesPendingSceneFromCapturedAssets() async throws {
