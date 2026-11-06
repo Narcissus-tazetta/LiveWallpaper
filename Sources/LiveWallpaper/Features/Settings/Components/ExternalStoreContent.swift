@@ -44,7 +44,10 @@ extension SettingsView {
                         Button {
                             model.openExternalWallpaperProvider()
                         } label: {
-                            Label(model.localizedString("他のアプリで壁紙を探す"), systemImage: "arrow.up.forward.app")
+                            Label(
+                                model.localizedString("他のアプリで壁紙を探す"),
+                                systemImage: "arrow.up.forward.app"
+                            )
                         }
                         .buttonStyle(.bordered)
                     }
@@ -109,7 +112,9 @@ extension SettingsView {
             HStack(alignment: .top, spacing: 6) {
                 if model.hasAuthorSettings(forExternalWallpaper: wallpaper) {
                     Button(model.localizedString("作品の設定")) {
-                        if let context = model.authorSettingsContext(forExternalWallpaper: wallpaper) {
+                        if let context = model
+                            .authorSettingsContext(forExternalWallpaper: wallpaper)
+                        {
                             authorSettingsContext = context
                         }
                     }
@@ -126,7 +131,8 @@ extension SettingsView {
                     ProgressView().controlSize(.small)
                 } else {
                     Button(model.localizedString("追加")) {
-                        AppLog.externalWallpapers.info("add button clicked for \(wallpaper.id, privacy: .public)")
+                        AppLog.externalWallpapers
+                            .info("add button clicked for \(wallpaper.id, privacy: .public)")
                         Task {
                             await model.importExternalWallpaper(id: wallpaper.id)
                         }
@@ -207,10 +213,15 @@ struct ExternalWallpaperThumbnail: View {
         }
         let image: CGImage?
         if let path = wallpaper.thumbnailPath,
-           let generated = VideoThumbnailGenerator.previewImage(from: URL(fileURLWithPath: path), maxPixelSize: maxPixelSize)
+           let generated = VideoThumbnailGenerator.previewImage(
+               from: URL(fileURLWithPath: path),
+               maxPixelSize: maxPixelSize
+           )
         {
             image = generated
-        } else if wallpaper.webSource != nil || wallpaper.path.isEmpty || !FileManager.default.fileExists(atPath: wallpaper.path) {
+        } else if wallpaper.webSource != nil || wallpaper.path.isEmpty || !FileManager.default
+            .fileExists(atPath: wallpaper.path)
+        {
             return nil
         } else {
             let generator =
@@ -218,7 +229,8 @@ struct ExternalWallpaperThumbnail: View {
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
             do {
-                image = try await generator.image(at: CMTime(seconds: 1, preferredTimescale: 600)).image
+                image = try await generator.image(at: CMTime(seconds: 1, preferredTimescale: 600))
+                    .image
             } catch {
                 AppLog.externalWallpapers.error(
                     "no thumbnail for \(wallpaper.id, privacy: .public): \(error.localizedDescription, privacy: .public)"

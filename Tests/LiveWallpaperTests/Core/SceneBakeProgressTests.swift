@@ -1,7 +1,6 @@
 import Combine
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class SceneBakeProgressTests: XCTestCase {
@@ -12,7 +11,8 @@ final class SceneBakeProgressTests: XCTestCase {
         var modelChanges = 0
         var progressChanges = 0
         let modelSubscription = model.objectWillChange.sink { modelChanges += 1 }
-        let progressSubscription = model.sceneBakeProgressStore.objectWillChange.sink { progressChanges += 1 }
+        let progressSubscription = model.sceneBakeProgressStore.objectWillChange
+            .sink { progressChanges += 1 }
 
         model.sceneBakeProgress["scene.mp4"] = 0.5
 

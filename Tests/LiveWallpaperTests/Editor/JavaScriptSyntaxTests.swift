@@ -1,5 +1,5 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class JavaScriptSyntaxTests: XCTestCase {
     func testCommentsStringsNumbersAndCallsRemainSeparate() {
@@ -15,15 +15,21 @@ final class JavaScriptSyntaxTests: XCTestCase {
         XCTAssertTrue(contains("'/* not a comment */'", .string))
         XCTAssertTrue(contains("wave", .function))
         XCTAssertTrue(contains("/[a-z/]+/gi", .regex))
-        XCTAssertFalse(tokens.contains { $0.kind == .comment && text.substring(with: $0.range).hasPrefix("/*") })
+        XCTAssertFalse(tokens
+            .contains { $0.kind == .comment && text.substring(with: $0.range).hasPrefix("/*") })
     }
 
     func testIncompleteDraftAndLargeInputHaveBoundedRanges() {
-        for source in ["/* unfinished", "`template\n${value}`", "const s = 'unfinished\nreturn 1;", String(repeating: "const x = 1;\n", count: 20000)] {
+        for source in [
+            "/* unfinished",
+            "`template\n${value}`",
+            "const s = 'unfinished\nreturn 1;",
+            String(repeating: "const x = 1;\n", count: 20000)
+        ] {
             let length = (source as NSString).length
             for token in JavaScriptSyntax.tokens(in: source) {
                 XCTAssertGreaterThan(token.range.length, 0)
-                XCTAssertLessThanOrEqual(NSMaxRange(token.range), min(length, 131072))
+                XCTAssertLessThanOrEqual(NSMaxRange(token.range), min(length, 131_072))
             }
         }
     }

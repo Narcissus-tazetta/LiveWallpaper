@@ -38,8 +38,11 @@ extension SettingsView {
                     Text(model.localizedString("外部アプリの壁紙:"))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    Text(String.localizedStringWithFormat(model.localizedString("%d件"), model.externalWallpapers.count))
-                        .font(.subheadline.weight(.medium))
+                    Text(String.localizedStringWithFormat(
+                        model.localizedString("%d件"),
+                        model.externalWallpapers.count
+                    ))
+                    .font(.subheadline.weight(.medium))
                     if !providerNames.isEmpty {
                         Text("(\(providerNames))")
                             .font(.caption)
@@ -82,7 +85,11 @@ extension SettingsView {
                 .foregroundColor(.red)
         } else if !model.isExternalWallpaperReady(wallpaper) {
             VStack(alignment: .leading, spacing: 4) {
-                ExternalScenePreparationProgress(model: model, progress: model.sceneBakeProgressStore, path: wallpaper.path)
+                ExternalScenePreparationProgress(
+                    model: model,
+                    progress: model.sceneBakeProgressStore,
+                    path: wallpaper.path
+                )
                 Text(model.localizedString("バックグラウンドで準備しています。完了すると追加できます。"))
                     .fixedSize(horizontal: false, vertical: true)
             }

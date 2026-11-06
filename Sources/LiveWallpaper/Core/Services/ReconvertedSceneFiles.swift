@@ -3,28 +3,42 @@ import Foundation
 import ImageIO
 
 enum ReconvertedSceneFiles {
-    static func replace(source: URL, videoPath: String, backup: URL, userProperties: [String: WebPropertyValue]? = nil) async throws -> SceneDocument {
+    static func replace(
+        source: URL,
+        videoPath: String,
+        backup: URL,
+        userProperties: [String: WebPropertyValue]? = nil
+    ) async throws -> SceneDocument {
         let fm = FileManager.default
         let video = URL(fileURLWithPath: videoPath)
-        let staging = video.deletingLastPathComponent().appendingPathComponent(".reconversion-\(UUID().uuidString)")
+        let staging = video.deletingLastPathComponent()
+            .appendingPathComponent(".reconversion-\(UUID().uuidString)")
         try fm.createDirectory(at: staging, withIntermediateDirectories: true)
         defer {
-            do { try fm.removeItem(at: staging) }
-            catch { AppLog.persistence.error("reconversion cleanup failed: \(error.localizedDescription, privacy: .public)") }
+            do { try fm.removeItem(at: staging) } catch {
+                AppLog.persistence
+                    .error(
+                        "reconversion cleanup failed: \(error.localizedDescription, privacy: .public)"
+                    )
+            }
         }
         let preparedVideo = staging.appendingPathComponent("wallpaper.mp4")
         let document = try SceneStore.importScene(from: source, videoPath: preparedVideo.path)
         let permitted = SceneScriptPermissions.restored(document, path: videoPath)
         try await SceneVideoBaker.bake(
             document: permitted, videoPath: preparedVideo.path,
-            userProperties: userProperties, stillOnly: true, quality: BakeQuality.maximum.compressionQuality, to: preparedVideo
+            userProperties: userProperties, stillOnly: true,
+            quality: BakeQuality.maximum.compressionQuality, to: preparedVideo
         ) { _ in }
         let preparedPreview = VideoThumbnailGenerator.expectedSidecarURL(for: preparedVideo.path)
         try writePreview(video: preparedVideo, destination: preparedPreview)
         let scene = SceneStore.folderURL(forVideoPath: videoPath)
         let preview = VideoThumbnailGenerator.expectedSidecarURL(for: videoPath)
-        let files = [(scene, SceneStore.folderURL(forVideoPath: preparedVideo.path)),
-                     (video, preparedVideo), (preview, preparedPreview)]
+        let files = [
+            (scene, SceneStore.folderURL(forVideoPath: preparedVideo.path)),
+            (video, preparedVideo),
+            (preview, preparedPreview)
+        ]
         try fm.createDirectory(at: backup, withIntermediateDirectories: true)
         for (destination, _) in files where fm.fileExists(atPath: destination.path) {
             let saved = backup.appendingPathComponent(destination.lastPathComponent)
@@ -64,10 +78,19 @@ enum ReconvertedSceneFiles {
         generator.maximumSize = CGSize(width: 480, height: 270)
         let image = try generator.copyCGImage(at: .zero, actualTime: nil)
         let data = NSMutableData()
-        guard let encoder = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else {
+        guard let encoder = CGImageDestinationCreateWithData(
+            data,
+            "public.jpeg" as CFString,
+            1,
+            nil
+        ) else {
             throw SceneStore.StoreError.unreadableImage(destination.lastPathComponent)
         }
-        CGImageDestinationAddImage(encoder, image, [kCGImageDestinationLossyCompressionQuality: 0.82] as CFDictionary)
+        CGImageDestinationAddImage(
+            encoder,
+            image,
+            [kCGImageDestinationLossyCompressionQuality: 0.82] as CFDictionary
+        )
         guard CGImageDestinationFinalize(encoder) else {
             throw SceneStore.StoreError.unreadableImage(destination.lastPathComponent)
         }

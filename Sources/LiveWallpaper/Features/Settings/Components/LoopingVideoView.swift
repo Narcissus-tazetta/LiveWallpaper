@@ -80,8 +80,8 @@ final class LoopingVideoNSView: NSView {
         loadedPath = nil
     }
 
-    // The settings window is hidden, not released, when closed, so SwiftUI keeps this view
-    // alive. Follow the window's visibility or it would keep decoding in the background.
+    /// The settings window is hidden, not released, when closed, so SwiftUI keeps this view
+    /// alive. Follow the window's visibility or it would keep decoding in the background.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if let occlusionObserver {

@@ -31,8 +31,10 @@ final class LocalWebUserDirectoryTests: XCTestCase {
 
     private func png() throws -> Data {
         let bitmap = try XCTUnwrap(NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 3, bitsPerSample: 8, samplesPerPixel: 4,
-            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+            bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 3, bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0,
+            bitsPerPixel: 0
         ))
         return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
     }
@@ -41,7 +43,8 @@ final class LocalWebUserDirectoryTests: XCTestCase {
         XCTAssertEqual(LocalWebUserDirectory.pageValue(path: ""), "")
         XCTAssertEqual(LocalWebUserDirectory.pageValue(path: "/Users/me/a b/"), "Z:/Users/me/a b")
         XCTAssertEqual(
-            LocalWebUserDirectory.pageFile(path: "/Users/me/directory test 日本語 & space/red space.png"),
+            LocalWebUserDirectory
+                .pageFile(path: "/Users/me/directory test 日本語 & space/red space.png"),
             "Z%3A/Users/me/directory%20test%20日本語%20%26%20space/red%20space.png"
         )
     }
@@ -54,7 +57,10 @@ final class LocalWebUserDirectoryTests: XCTestCase {
             at: chosen.appendingPathComponent("sub.png"), withIntermediateDirectories: true
         )
         func names(_ fileType: String?) throws -> Set<String> {
-            let files = try LocalWebUserDirectory.listing(of: .init(path: chosen.path, fileType: fileType))
+            let files = try LocalWebUserDirectory.listing(of: .init(
+                path: chosen.path,
+                fileType: fileType
+            ))
             return Set(files.keys.map { String($0.split(separator: "/").last!) })
         }
         XCTAssertEqual(try names("image"), ["red%20space.png", "anim.gif"])
@@ -69,10 +75,10 @@ final class LocalWebUserDirectoryTests: XCTestCase {
         let page = try await server.url(folder: package)
         let token = page.pathComponents[1]
         func status(_ path: String) async throws -> Int {
-            let url = URL(string: "http://127.0.0.1:\(page.port!)/\(token)/_userdir")!
-                .appendingPathComponent(path)
+            let url = try XCTUnwrap(URL(string: "http://127.0.0.1:\(page.port!)/\(token)/_userdir")?
+                .appendingPathComponent(path))
             let (_, response) = try await URLSession.shared.data(from: url)
-            return (response as! HTTPURLResponse).statusCode
+            return try XCTUnwrap((response as? HTTPURLResponse)?.statusCode)
         }
         let file = chosen.appendingPathComponent("red space.png").path
         let before = try await status(file)
@@ -87,7 +93,9 @@ final class LocalWebUserDirectoryTests: XCTestCase {
 
     private final class Navigation: NSObject, WKNavigationDelegate {
         var onFinish: (() -> Void)?
-        func webView(_: WKWebView, didFinish _: WKNavigation!) { onFinish?() }
+        func webView(_: WKWebView, didFinish _: WKNavigation!) {
+            onFinish?()
+        }
     }
 
     func testPageLoadsListedFilesAndHearsListingChanges() async throws {
@@ -103,7 +111,10 @@ final class LocalWebUserDirectoryTests: XCTestCase {
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
-        let webView = WKWebView(frame: .init(x: 0, y: 0, width: 100, height: 100), configuration: configuration)
+        let webView = WKWebView(
+            frame: .init(x: 0, y: 0, width: 100, height: 100),
+            configuration: configuration
+        )
         let navigation = Navigation()
         webView.navigationDelegate = navigation
         let loaded = expectation(description: "page loaded")
@@ -111,7 +122,8 @@ final class LocalWebUserDirectoryTests: XCTestCase {
         webView.load(URLRequest(url: page))
         await fulfillment(of: [loaded], timeout: 15)
 
-        let file = LocalWebUserDirectory.pageFile(path: chosen.appendingPathComponent("red space.png").path)
+        let file = LocalWebUserDirectory
+            .pageFile(path: chosen.appendingPathComponent("red space.png").path)
         let result = try await webView.callAsyncJavaScript("""
         const events = [];
         window.addEventListener('livewallpaper:directory', event => events.push(event.detail));

@@ -1,5 +1,5 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class DesktopIconsServiceTests: XCTestCase {
     func testMissingKeyDefaultsToVisible() {

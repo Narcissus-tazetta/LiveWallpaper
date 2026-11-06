@@ -13,12 +13,14 @@ final class ScenePresetTests: XCTestCase {
             .appendingPathComponent("ScenePresetTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         video = directory.appendingPathComponent("scene.mp4")
-        let scene = SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: [
-            SceneLayer(name: "photo", imageFile: try writeImage(videoPath: video.path))
+        let scene = try SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: [
+            SceneLayer(name: "photo", imageFile: writeImage(videoPath: video.path))
         ])
         try SceneStore.save(scene, videoPath: video.path)
         model = WallpaperModel()
-        model.scenePresetStore = ScenePresetStore(directory: directory.appendingPathComponent("Presets"))
+        model
+            .scenePresetStore = ScenePresetStore(directory: directory
+                .appendingPathComponent("Presets"))
         model.registerImportedScene(scene, path: video.path)
     }
 
@@ -34,7 +36,8 @@ final class ScenePresetTests: XCTestCase {
             width: 8, height: 8, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 32,
             space: CGColorSpace(name: CGColorSpace.sRGB)!,
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-            provider: CGDataProvider(data: Data(repeating: 200, count: 8 * 8 * 4) as CFData)!, decode: nil,
+            provider: CGDataProvider(data: Data(repeating: 200, count: 8 * 8 * 4) as CFData)!,
+            decode: nil,
             shouldInterpolate: false, intent: .defaultIntent
         )!
         return try SceneStore.writeImage(image, prefix: "layer", videoPath: videoPath)
@@ -56,7 +59,8 @@ final class ScenePresetTests: XCTestCase {
         var sway = SceneEffect(kind: .sway)
         sway.strength = 0.8
         sway.maskFile = try SceneStore.writePaintImage(
-            [UInt8](repeating: 255, count: 64), width: 8, height: 8, target: .mask, videoPath: video.path
+            [UInt8](repeating: 255, count: 64), width: 8, height: 8, target: .mask,
+            videoPath: video.path
         )
         var puppet = SceneEffect(kind: .puppet)
         puppet.pins = [ScenePin(x: 0.25, y: 0.75, isAnchor: true)]
@@ -76,14 +80,20 @@ final class ScenePresetTests: XCTestCase {
             let result = try XCTUnwrap(preset.applied(to: scene, layerID: layerID), "\(kind)")
             XCTAssertEqual(result.document.layers[0].imageFile, scene.layers[0].imageFile)
             XCTAssertEqual(result.document.layers.count, 1 + preset.particleLayers.count)
-            XCTAssertTrue(result.document.isAnimated || result.document.usesCursor || preset.wantsDepth, "\(kind) does something")
+            XCTAssertTrue(
+                result.document.isAnimated || result.document.usesCursor || preset.wantsDepth,
+                "\(kind) does something"
+            )
         }
     }
 
     func testBuiltInsThatNeedPaintOrAIListThoseSteps() throws {
         let layerID = scene.layers[0].id
         func steps(_ kind: ScenePreset.BuiltIn) throws -> [ScenePresetStep] {
-            try XCTUnwrap(ScenePreset.builtIn(kind, localize: { $0 }).applied(to: scene, layerID: layerID)).guide.steps
+            try XCTUnwrap(ScenePreset.builtIn(kind, localize: { $0 }).applied(
+                to: scene,
+                layerID: layerID
+            )).guide.steps
         }
         XCTAssertEqual(try steps(.depthFireflies), [.estimateDepth])
         XCTAssertEqual(try steps(.cherryBlossoms), [])
@@ -92,7 +102,8 @@ final class ScenePresetTests: XCTestCase {
         XCTAssertTrue(water.contains { if case .drawFlow = $0 { true } else { false } })
         let hair = try steps(.hairSway)
         XCTAssertTrue(hair.first.map { if case .paintMask = $0 { true } else { false } } ?? false)
-        XCTAssertTrue(hair.last.map { if case .moveToOwnLayer = $0 { true } else { false } } ?? false)
+        XCTAssertTrue(hair.last
+            .map { if case .moveToOwnLayer = $0 { true } else { false } } ?? false)
     }
 
     func testParticlesGoRightAboveTheLayerAndKeepItsPlacement() throws {
@@ -102,7 +113,8 @@ final class ScenePresetTests: XCTestCase {
         document.layers.append(SceneLayer(name: "top", imageFile: document.layers[0].imageFile))
         let preset = ScenePreset.builtIn(.fallingSnow, localize: { $0 })
 
-        let applied = try XCTUnwrap(preset.applied(to: document, layerID: document.layers[0].id)).document
+        let applied = try XCTUnwrap(preset.applied(to: document, layerID: document.layers[0].id))
+            .document
         XCTAssertEqual(applied.layers.map(\.name), ["photo", "雪(遠く)", "雪(近く)", "top"])
         XCTAssertEqual(applied.layers[0].transform.scale, 1.5)
         XCTAssertEqual(applied.layers[0].opacity, 0.4)
@@ -119,14 +131,22 @@ final class ScenePresetTests: XCTestCase {
     func testParticleLayersCannotTakeAPreset() {
         var document = scene
         document.layers.append(SceneLayer(name: "snow", particles: SceneParticles(preset: .snow)))
-        XCTAssertNil(ScenePreset.builtIn(.hairSway, localize: { $0 }).applied(to: document, layerID: document.layers[1].id))
+        XCTAssertNil(ScenePreset.builtIn(.hairSway, localize: { $0 }).applied(
+            to: document,
+            layerID: document.layers[1].id
+        ))
     }
 
     // MARK: - Capturing
 
     func testWithoutPaintTheAreasBecomeSteps() throws {
         let layer = try paintedPhoto()
-        let preset = ScenePreset.capture(name: "mine", layer: layer, particleLayers: [], includingPaint: false)
+        let preset = ScenePreset.capture(
+            name: "mine",
+            layer: layer,
+            particleLayers: [],
+            includingPaint: false
+        )
         XCTAssertTrue(preset.referencedFiles.isEmpty)
 
         let result = try XCTUnwrap(preset.applied(to: scene, layerID: layer.id))
@@ -137,10 +157,14 @@ final class ScenePresetTests: XCTestCase {
 
     // MARK: - Trial and the model
 
-    func testTrialLeavesTheSceneAndApplyIsOneUndoStep() throws {
+    func testTrialLeavesTheSceneAndApplyIsOneUndoStep() {
         let before = scene
         let layerID = scene.layers[0].id
-        model.beginScenePresetTrial(ScenePreset.builtIn(.depthFireflies, localize: { $0 }), layerID: layerID, path: video.path)
+        model.beginScenePresetTrial(
+            ScenePreset.builtIn(.depthFireflies, localize: { $0 }),
+            layerID: layerID,
+            path: video.path
+        )
         XCTAssertEqual(scene, before)
         XCTAssertEqual(model.scenePresetTrial?.document.layers.count, 2)
 
@@ -153,9 +177,13 @@ final class ScenePresetTests: XCTestCase {
         XCTAssertEqual(scene, before)
     }
 
-    func testTrialFollowsEditsMadeMeanwhile() throws {
+    func testTrialFollowsEditsMadeMeanwhile() {
         let layerID = scene.layers[0].id
-        model.beginScenePresetTrial(ScenePreset.builtIn(.hairSway, localize: { $0 }), layerID: layerID, path: video.path)
+        model.beginScenePresetTrial(
+            ScenePreset.builtIn(.hairSway, localize: { $0 }),
+            layerID: layerID,
+            path: video.path
+        )
         var document = scene
         document.loopSeconds = 10
         model.updateScene(document, path: video.path)
@@ -165,7 +193,8 @@ final class ScenePresetTests: XCTestCase {
     func testSavedPresetWithPaintLandsOnAnotherPictureAndSurvivesPruning() throws {
         let layer = try paintedPhoto()
         XCTAssertTrue(model.saveUserScenePreset(
-            name: "mine", layerID: layer.id, path: video.path, includingPaint: true, includingParticles: false
+            name: "mine", layerID: layer.id, path: video.path, includingPaint: true,
+            includingParticles: false
         ))
         model.userScenePresets = nil
         model.loadUserScenePresetsIfNeeded()
@@ -175,13 +204,14 @@ final class ScenePresetTests: XCTestCase {
         XCTAssertEqual(preset.effects[1].effect.pins.map(\.x), [0.25])
 
         // Another, wider picture in the same scene.
-        let wide = SceneLayer(name: "wide", imageFile: try writeImage(videoPath: video.path))
+        let wide = try SceneLayer(name: "wide", imageFile: writeImage(videoPath: video.path))
         var document = scene
         document.layers.append(wide)
         model.updateScene(document, path: video.path, coalescing: false)
 
         model.beginScenePresetTrial(preset, layerID: wide.id, path: video.path)
-        let trialMask = try XCTUnwrap(model.scenePresetTrial?.document.layers.last?.effects[0].maskFile)
+        let trialMask = try XCTUnwrap(model.scenePresetTrial?.document.layers.last?.effects[0]
+            .maskFile)
         XCTAssertNotEqual(trialMask, layer.effects[0].maskFile)
         // Saving an edit meanwhile prunes files the scene does not name.
         document = scene
@@ -203,7 +233,8 @@ final class ScenePresetTests: XCTestCase {
     func testEndingATrialRemovesItsCopies() throws {
         let layer = try paintedPhoto()
         XCTAssertTrue(model.saveUserScenePreset(
-            name: "mine", layerID: layer.id, path: video.path, includingPaint: true, includingParticles: false
+            name: "mine", layerID: layer.id, path: video.path, includingPaint: true,
+            includingParticles: false
         ))
         let preset = try XCTUnwrap(model.userScenePresets?.first)
         model.beginScenePresetTrial(preset, layerID: layer.id, path: video.path)
@@ -212,13 +243,17 @@ final class ScenePresetTests: XCTestCase {
 
         model.endScenePresetTrial()
         XCTAssertFalse(fileExists(copy))
-        XCTAssertTrue(fileExists(try XCTUnwrap(layer.effects[0].maskFile)), "the scene's own mask stays")
+        XCTAssertTrue(
+            try fileExists(XCTUnwrap(layer.effects[0].maskFile)),
+            "the scene's own mask stays"
+        )
     }
 
     func testDeletingAPresetRemovesItsFolder() throws {
         let layer = try paintedPhoto()
         XCTAssertTrue(model.saveUserScenePreset(
-            name: "mine", layerID: layer.id, path: video.path, includingPaint: true, includingParticles: false
+            name: "mine", layerID: layer.id, path: video.path, includingPaint: true,
+            includingParticles: false
         ))
         let preset = try XCTUnwrap(model.userScenePresets?.first)
         let folder = try XCTUnwrap(model.scenePresetStore).folderURL(of: preset.id)
@@ -231,7 +266,11 @@ final class ScenePresetTests: XCTestCase {
 
     func testUndoingThePresetRetiresItsGuide() throws {
         let layerID = scene.layers[0].id
-        model.beginScenePresetTrial(ScenePreset.builtIn(.depthFireflies, localize: { $0 }), layerID: layerID, path: video.path)
+        model.beginScenePresetTrial(
+            ScenePreset.builtIn(.depthFireflies, localize: { $0 }),
+            layerID: layerID,
+            path: video.path
+        )
         model.applyScenePresetTrial()
         let guide = try XCTUnwrap(model.scenePresetGuides[video.path])
         XCTAssertTrue(guide.isActive(in: scene))
@@ -244,21 +283,40 @@ final class ScenePresetTests: XCTestCase {
 
     func testHairMovesToItsOwnLayerAsOneStepAndTheGuideFollows() async throws {
         let layerID = scene.layers[0].id
-        model.beginScenePresetTrial(ScenePreset.builtIn(.hairSway, localize: { $0 }), layerID: layerID, path: video.path)
+        model.beginScenePresetTrial(
+            ScenePreset.builtIn(.hairSway, localize: { $0 }),
+            layerID: layerID,
+            path: video.path
+        )
         model.applyScenePresetTrial()
         let guide = try XCTUnwrap(model.scenePresetGuides[video.path])
         XCTAssertEqual(guide.steps.count, 2)
         let effectID = scene.layers[0].effects[0].id
-        let unpainted = await model.moveScenePaintedAreaToOwnLayer(effectID: effectID, layerID: layerID, path: video.path)
+        let unpainted = await model.moveScenePaintedAreaToOwnLayer(
+            effectID: effectID,
+            layerID: layerID,
+            path: video.path
+        )
         XCTAssertNil(unpainted, "nothing painted yet")
 
         // Paint the lower half.
         let mask = try SceneStore.writePaintImage(
-            (0 ..< 64).map { $0 >= 32 ? 255 : 0 }, width: 8, height: 8, target: .mask, videoPath: video.path
+            (0 ..< 64).map { $0 >= 32 ? 255 : 0 }, width: 8, height: 8, target: .mask,
+            videoPath: video.path
         )
-        model.setScenePaintFile(mask, kind: .mask, effectID: effectID, layerID: layerID, path: video.path)
+        model.setScenePaintFile(
+            mask,
+            kind: .mask,
+            effectID: effectID,
+            layerID: layerID,
+            path: video.path
+        )
         let painted = scene
-        let moved = await model.moveScenePaintedAreaToOwnLayer(effectID: effectID, layerID: layerID, path: video.path)
+        let moved = await model.moveScenePaintedAreaToOwnLayer(
+            effectID: effectID,
+            layerID: layerID,
+            path: video.path
+        )
         let areaID = try XCTUnwrap(moved)
 
         XCTAssertEqual(scene.layers.map(\.id), [layerID, areaID])
@@ -268,8 +326,17 @@ final class ScenePresetTests: XCTestCase {
         XCTAssertEqual(area.effects.map(\.id), [effectID])
         XCTAssertNil(area.effects[0].maskFile, "the area's outline is the cut-out itself")
         XCTAssertEqual(area.effects[0].fixedEdge, .top)
-        XCTAssertEqual(area.effects[0].areaBounds?.minY ?? 0, 0.5, accuracy: 0.07, "within a pixel of the 8 px mask")
-        XCTAssertNotEqual(rest.imageFile, painted.layers[0].imageFile, "the area's place is filled in")
+        XCTAssertEqual(
+            area.effects[0].areaBounds?.minY ?? 0,
+            0.5,
+            accuracy: 0.07,
+            "within a pixel of the 8 px mask"
+        )
+        XCTAssertNotEqual(
+            rest.imageFile,
+            painted.layers[0].imageFile,
+            "the area's place is filled in"
+        )
         XCTAssertTrue(guide.steps.allSatisfy { guide.isDone($0, in: scene) == true })
         XCTAssertTrue(guide.isActive(in: scene))
 
@@ -292,29 +359,41 @@ final class ScenePresetTests: XCTestCase {
             pixels[index * 4 + 1] = isRight ? 255 : 0
             pixels[index * 4 + 2] = 0
         }
-        let image = CGImage(
-            width: width, height: width, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
-            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+        let image = try CGImage(
+            width: width, height: width, bitsPerComponent: 8, bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB)),
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
             provider: CGDataProvider(data: Data(pixels) as CFData)!, decode: nil,
             shouldInterpolate: false, intent: .defaultIntent
         )!
         let file = try SceneStore.writeImage(image, prefix: "layer", videoPath: video.path)
         let mask = try SceneStore.writePaintImage(
-            (0 ..< width * width).map { $0 % width >= width / 2 ? 255 : 0 }, width: width, height: width,
+            (0 ..< width * width).map { $0 % width >= width / 2 ? 255 : 0 }, width: width,
+            height: width,
             target: .mask, videoPath: video.path
         )
         let folder = SceneStore.folderURL(forVideoPath: video.path)
         let separation = try SceneAI.separateArea(
-            imageURL: folder.appendingPathComponent(file), maskURL: folder.appendingPathComponent(mask)
+            imageURL: folder.appendingPathComponent(file),
+            maskURL: folder.appendingPathComponent(mask)
         )
         func rgba(_ image: CGImage, x: Int, y: Int) -> [UInt8] {
             var bytes = [UInt8](repeating: 0, count: 4)
             let context = CGContext(
                 data: &bytes, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
-                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
             )!
-            context.draw(image, in: CGRect(x: -x, y: -(image.height - 1 - y), width: image.width, height: image.height))
+            context.draw(
+                image,
+                in: CGRect(
+                    x: -x,
+                    y: -(image.height - 1 - y),
+                    width: image.width,
+                    height: image.height
+                )
+            )
             return bytes
         }
         XCTAssertEqual(rgba(separation.foreground, x: 2, y: 16)[3], 0, "outside the area is clear")
@@ -327,7 +406,11 @@ final class ScenePresetTests: XCTestCase {
 
     func testGuideTicksOffAPaintedArea() throws {
         let layerID = scene.layers[0].id
-        model.beginScenePresetTrial(ScenePreset.builtIn(.hairSway, localize: { $0 }), layerID: layerID, path: video.path)
+        model.beginScenePresetTrial(
+            ScenePreset.builtIn(.hairSway, localize: { $0 }),
+            layerID: layerID,
+            path: video.path
+        )
         model.applyScenePresetTrial()
         let guide = try XCTUnwrap(model.scenePresetGuides[video.path])
         let step = try XCTUnwrap(guide.steps.first)
@@ -335,9 +418,16 @@ final class ScenePresetTests: XCTestCase {
 
         let effectID = scene.layers[0].effects[0].id
         let mask = try SceneStore.writePaintImage(
-            [UInt8](repeating: 255, count: 64), width: 8, height: 8, target: .mask, videoPath: video.path
+            [UInt8](repeating: 255, count: 64), width: 8, height: 8, target: .mask,
+            videoPath: video.path
         )
-        model.setScenePaintFile(mask, kind: .mask, effectID: effectID, layerID: layerID, path: video.path)
+        model.setScenePaintFile(
+            mask,
+            kind: .mask,
+            effectID: effectID,
+            layerID: layerID,
+            path: video.path
+        )
         XCTAssertEqual(guide.isDone(step, in: scene), true)
     }
 }

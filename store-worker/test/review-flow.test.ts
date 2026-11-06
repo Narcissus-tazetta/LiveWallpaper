@@ -1,9 +1,4 @@
-import {
-	createExecutionContext,
-	env,
-	fetchMock,
-	waitOnExecutionContext,
-} from "cloudflare:test";
+import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from "cloudflare:test";
 import { zipSync } from "fflate";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import worker from "../src/index";
@@ -125,9 +120,7 @@ async function submitEntryForWithdraw(): Promise<{
 /// /admin/review/:token/video のテスト用に、動画バイト列を含む本物のZIP(.lwpkg相当)
 /// を組み立ててsubmitする。PackageExporter/PackageArchiveWriter が実際に作る
 /// content/videos/<id>.mp4 という配置(--keepParentでcontent/を持つZIP)を再現する。
-async function submitEntryWithVideo(
-	videoBytes: Uint8Array,
-): Promise<{ res: Response; id: string }> {
+async function submitEntryWithVideo(videoBytes: Uint8Array): Promise<{ res: Response; id: string }> {
 	const id = crypto.randomUUID();
 	const objectKey = `packages/${id}.lwpkg`;
 	const zipBytes = zipSync({
@@ -170,13 +163,15 @@ async function entryStatus(id: string): Promise<string | undefined> {
 
 describe("store submission review flow", () => {
 	it("binds the upload size into the presigned request", async () => {
-		const response = await callWorker(new Request("https://store.example.com/upload-url", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ contentType: "application/octet-stream", sizeBytes: 1024 }),
-		}));
+		const response = await callWorker(
+			new Request("https://store.example.com/upload-url", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ contentType: "application/octet-stream", sizeBytes: 1024 }),
+			}),
+		);
 		expect(response.status).toBe(200);
-		const slot = await response.json() as { uploadURL: string };
+		const slot = (await response.json()) as { uploadURL: string };
 		expect(new URL(slot.uploadURL).searchParams.get("X-Amz-SignedHeaders")?.split(";")).toContain("content-length");
 	});
 	it("submit creates a 'requested' entry with a one-time review token", async () => {
@@ -226,23 +221,17 @@ describe("store submission review flow", () => {
 		const catalogJson = (await catalogRes.json()) as { entries: { id: string }[] };
 		expect(catalogJson.entries.find((e) => e.id === id)).toBeUndefined();
 
-		const downloadRes = await callWorker(
-			new Request(`https://store.example.com/download/${id}`),
-		);
+		const downloadRes = await callWorker(new Request(`https://store.example.com/download/${id}`));
 		expect(downloadRes.status).toBe(404);
 
-		const thumbnailRes = await callWorker(
-			new Request(`https://store.example.com/thumbnail/${id}`),
-		);
+		const thumbnailRes = await callWorker(new Request(`https://store.example.com/thumbnail/${id}`));
 		expect(thumbnailRes.status).toBe(404);
 	});
 
 	it("/entries/:id/status lets the submitter poll status without ADMIN_KEY, unlike /catalog", async () => {
 		const { id } = await submitEntry();
 
-		const requested = await callWorker(
-			new Request(`https://store.example.com/entries/${id}/status`),
-		);
+		const requested = await callWorker(new Request(`https://store.example.com/entries/${id}/status`));
 		expect(requested.status).toBe(200);
 		expect((await requested.json()) as { status: string }).toMatchObject({
 			id,
@@ -255,14 +244,10 @@ describe("store submission review flow", () => {
 				headers: { "x-admin-key": ADMIN_KEY },
 			}),
 		);
-		const published = await callWorker(
-			new Request(`https://store.example.com/entries/${id}/status`),
-		);
+		const published = await callWorker(new Request(`https://store.example.com/entries/${id}/status`));
 		expect((await published.json()) as { status: string }).toMatchObject({ status: "published" });
 
-		const missing = await callWorker(
-			new Request(`https://store.example.com/entries/${crypto.randomUUID()}/status`),
-		);
+		const missing = await callWorker(new Request(`https://store.example.com/entries/${crypto.randomUUID()}/status`));
 		expect(missing.status).toBe(404);
 	});
 
@@ -307,9 +292,7 @@ describe("store submission review flow", () => {
 		await (await callWorker(new Request(`https://store.example.com/download/${highId}`))).arrayBuffer();
 		await (await callWorker(new Request(`https://store.example.com/download/${lowId}`))).arrayBuffer();
 
-		const page1 = await callWorker(
-			new Request("https://store.example.com/catalog?sort=popular&limit=1"),
-		);
+		const page1 = await callWorker(new Request("https://store.example.com/catalog?sort=popular&limit=1"));
 		const page1Json = (await page1.json()) as {
 			entries: { id: string }[];
 			nextCursor: string | null;
@@ -414,9 +397,7 @@ describe("store submission review flow", () => {
 		const { id } = await submitEntry();
 		const token = mock.getToken();
 
-		await env.STORE_DB.prepare(
-			"UPDATE store_review_tokens SET expires_at = ? WHERE entry_id = ?",
-		)
+		await env.STORE_DB.prepare("UPDATE store_review_tokens SET expires_at = ? WHERE entry_id = ?")
 			.bind(new Date(0).toISOString(), id)
 			.run();
 
@@ -424,9 +405,7 @@ describe("store submission review flow", () => {
 		expect(decideRes.status).toBe(410);
 		expect(await entryStatus(id)).toBe("requested");
 
-		const pageRes = await callWorker(
-			new Request(`https://store.example.com/admin/review/${token}`),
-		);
+		const pageRes = await callWorker(new Request(`https://store.example.com/admin/review/${token}`));
 		expect(pageRes.status).toBe(200);
 		expect(await pageRes.text()).toContain("失効しました");
 	});
@@ -522,9 +501,7 @@ describe("store submission review flow", () => {
 		await submitEntryWithVideo(videoBytes);
 		const token = mock.getToken();
 
-		const res = await callWorker(
-			new Request(`https://store.example.com/admin/review/${token}/video`),
-		);
+		const res = await callWorker(new Request(`https://store.example.com/admin/review/${token}/video`));
 		expect(res.status).toBe(200);
 		expect(res.headers.get("content-type")).toBe("video/mp4");
 		expect(res.headers.get("accept-ranges")).toBe("bytes");
@@ -532,9 +509,7 @@ describe("store submission review flow", () => {
 		expect(body).toEqual(videoBytes);
 
 		// レビューページ自体にも<video>タグが埋め込まれていること。
-		const pageRes = await callWorker(
-			new Request(`https://store.example.com/admin/review/${token}`),
-		);
+		const pageRes = await callWorker(new Request(`https://store.example.com/admin/review/${token}`));
 		const pageHtml = await pageRes.text();
 		expect(pageHtml).toContain(`/admin/review/${token}/video`);
 	});
@@ -565,14 +540,10 @@ describe("store submission review flow", () => {
 			.bind(200 * 1024 * 1024, id)
 			.run();
 
-		const videoRes = await callWorker(
-			new Request(`https://store.example.com/admin/review/${token}/video`),
-		);
+		const videoRes = await callWorker(new Request(`https://store.example.com/admin/review/${token}/video`));
 		expect(videoRes.status).toBe(413);
 
-		const pageRes = await callWorker(
-			new Request(`https://store.example.com/admin/review/${token}`),
-		);
+		const pageRes = await callWorker(new Request(`https://store.example.com/admin/review/${token}`));
 		const pageHtml = await pageRes.text();
 		expect(pageHtml).toContain("プレビューできません");
 		expect(pageHtml).toContain(`/admin/review/${token}/download`);
@@ -589,15 +560,11 @@ describe("store submission review flow", () => {
 			.run();
 
 		// /download (公開用) はrequestedの間は404になるはず。
-		const publicDownload = await callWorker(
-			new Request(`https://store.example.com/download/${id}`),
-		);
+		const publicDownload = await callWorker(new Request(`https://store.example.com/download/${id}`));
 		expect(publicDownload.status).toBe(404);
 
 		// が、トークン付きのレビュー用downloadは生バイト列をそのまま返す。
-		const reviewDownload = await callWorker(
-			new Request(`https://store.example.com/admin/review/${token}/download`),
-		);
+		const reviewDownload = await callWorker(new Request(`https://store.example.com/admin/review/${token}/download`));
 		expect(reviewDownload.status).toBe(200);
 		const body = new Uint8Array(await reviewDownload.arrayBuffer());
 		expect(body.byteLength).toBeGreaterThan(0);
@@ -611,9 +578,7 @@ describe("store submission review flow", () => {
 		const objectKey = `packages/${id}.lwpkg`;
 		const thumbnailKey = `thumbnails/${id}.jpg`;
 		await env.STORE_BUCKET.put(thumbnailKey, new TextEncoder().encode("thumb"));
-		await env.STORE_DB.prepare("UPDATE store_entries SET thumbnail_key = ? WHERE id = ?")
-			.bind(thumbnailKey, id)
-			.run();
+		await env.STORE_DB.prepare("UPDATE store_entries SET thumbnail_key = ? WHERE id = ?").bind(thumbnailKey, id).run();
 
 		expect(await env.STORE_BUCKET.head(objectKey)).not.toBeNull();
 		expect(await env.STORE_BUCKET.head(thumbnailKey)).not.toBeNull();
@@ -629,7 +594,7 @@ describe("store submission review flow", () => {
 	it("recording the review-token action stays consistent regardless of which path decided the entry", async () => {
 		// ADMIN_KEY直叩き(admin.sh)経由でも、トークンのaction列が実際の結果に
 		// 同期されること(#7)。
-		const mock = mockResendEmail();
+		mockResendEmail();
 		const { id } = await submitEntry();
 
 		await callWorker(
@@ -669,9 +634,7 @@ describe("store submission review flow", () => {
 		expect(decideRes.status).toBe(410);
 		expect(await entryStatus(id)).toBe("published");
 
-		const tokenRow = await env.STORE_DB.prepare(
-			"SELECT action FROM store_review_tokens WHERE entry_id = ?",
-		)
+		const tokenRow = await env.STORE_DB.prepare("SELECT action FROM store_review_tokens WHERE entry_id = ?")
 			.bind(id)
 			.first<{ action: string | null }>();
 		// 記録されるactionは要求されなかった"reject"ではなく実際の結果("published")。
@@ -682,14 +645,20 @@ describe("store submission review flow", () => {
 		const id = crypto.randomUUID();
 		const objectKey = `packages/${id}.lwpkg`;
 		await env.STORE_BUCKET.put(objectKey, new Uint8Array([1]));
-		const res = await callWorker(new Request("https://store.example.com/submit", {
-			method: "POST",
-			headers: { "content-type": "application/json" },
-			body: JSON.stringify({
-				id, title: "Oversized", author: "Tester", sha256: "a".repeat(64),
-				sizeBytes: 500 * 1024 * 1024 + 1, objectKey,
+		const res = await callWorker(
+			new Request("https://store.example.com/submit", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					id,
+					title: "Oversized",
+					author: "Tester",
+					sha256: "a".repeat(64),
+					sizeBytes: 500 * 1024 * 1024 + 1,
+					objectKey,
+				}),
 			}),
-		}));
+		);
 		expect(res.status).toBe(413);
 	});
 
@@ -697,15 +666,21 @@ describe("store submission review flow", () => {
 		const mock = mockResendEmail();
 		const { id } = await submitEntry();
 		void mock;
-		const report = () => callWorker(new Request("https://store.example.com/report", {
-			method: "POST",
-			headers: { "content-type": "application/json", "cf-connecting-ip": crypto.randomUUID() },
-			body: JSON.stringify({ entryId: id, reason: "test" }),
-		}));
+		const report = () =>
+			callWorker(
+				new Request("https://store.example.com/report", {
+					method: "POST",
+					headers: { "content-type": "application/json", "cf-connecting-ip": crypto.randomUUID() },
+					body: JSON.stringify({ entryId: id, reason: "test" }),
+				}),
+			);
 		expect((await report()).status).toBe(404);
-		await callWorker(new Request(`https://store.example.com/admin/entries/${id}/reject`, {
-			method: "POST", headers: { "x-admin-key": ADMIN_KEY },
-		}));
+		await callWorker(
+			new Request(`https://store.example.com/admin/entries/${id}/reject`, {
+				method: "POST",
+				headers: { "x-admin-key": ADMIN_KEY },
+			}),
+		);
 		expect((await report()).status).toBe(404);
 		expect(await entryStatus(id)).toBe("rejected");
 	});
@@ -715,11 +690,15 @@ describe("store submission review flow", () => {
 		for (let i = 0; i < 3; i++) {
 			const { id } = await submitEntry({ title: `Same Time ${i}` });
 			ids.push(id);
-			await callWorker(new Request(`https://store.example.com/admin/entries/${id}/approve`, {
-				method: "POST", headers: { "x-admin-key": ADMIN_KEY },
-			}));
+			await callWorker(
+				new Request(`https://store.example.com/admin/entries/${id}/approve`, {
+					method: "POST",
+					headers: { "x-admin-key": ADMIN_KEY },
+				}),
+			);
 			await env.STORE_DB.prepare("UPDATE store_entries SET created_at = ? WHERE id = ?")
-				.bind("2026-01-01T00:00:00.000Z", id).run();
+				.bind("2026-01-01T00:00:00.000Z", id)
+				.run();
 		}
 		const seen: string[] = [];
 		let cursor: string | null = null;
@@ -728,8 +707,9 @@ describe("store submission review flow", () => {
 			url.searchParams.set("limit", "1");
 			url.searchParams.set("q", "Same Time");
 			if (cursor) url.searchParams.set("cursor", cursor);
-			const json = await (await callWorker(new Request(url))).json() as {
-				entries: { id: string }[]; nextCursor: string | null;
+			const json = (await (await callWorker(new Request(url))).json()) as {
+				entries: { id: string }[];
+				nextCursor: string | null;
 			};
 			seen.push(...json.entries.map((entry) => entry.id));
 			cursor = json.nextCursor;
@@ -742,9 +722,7 @@ describe("store submission review flow", () => {
 		const mock = mockResendEmail();
 		await submitEntryWithVideo(hugeVideo);
 		const token = mock.getToken();
-		const res = await callWorker(
-			new Request(`https://store.example.com/admin/review/${token}/video`),
-		);
+		const res = await callWorker(new Request(`https://store.example.com/admin/review/${token}/video`));
 		expect(res.status).toBe(404);
 	});
 
@@ -754,16 +732,11 @@ describe("store submission review flow", () => {
 		const { id: freshId } = await submitEntry({ title: "Fresh" });
 		void mock;
 
-		await env.STORE_DB.prepare(
-			"UPDATE store_review_tokens SET expires_at = ? WHERE entry_id = ?",
-		)
+		await env.STORE_DB.prepare("UPDATE store_review_tokens SET expires_at = ? WHERE entry_id = ?")
 			.bind(new Date(0).toISOString(), staleId)
 			.run();
 
-		await worker.scheduled(
-			{ cron: "0 * * * *", scheduledTime: Date.now(), noRetry: () => {} } as never,
-			env,
-		);
+		await worker.scheduled({ cron: "0 * * * *", scheduledTime: Date.now(), noRetry: () => {} } as never, env);
 
 		expect(await entryStatus(staleId)).toBe("rejected");
 		expect(await entryStatus(freshId)).toBe("requested");

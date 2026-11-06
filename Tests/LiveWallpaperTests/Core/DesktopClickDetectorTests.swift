@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 /// The window list mirrors what CGWindowList returned on a real 1470×956 screen
 /// (front to back): the menu bar, the Dock's full-screen transparent window, an app
@@ -17,18 +16,48 @@ final class DesktopClickDetectorTests: XCTestCase {
 
     private var windows: [OnScreenWindow] {
         [
-            OnScreenWindow(ownerPID: windowServer, isWindowServer: true, layer: 24,
-                           bounds: CGRect(x: 0, y: 0, width: 1470, height: 33), alpha: 1),
-            OnScreenWindow(ownerPID: dock, isWindowServer: false, layer: 20,
-                           bounds: CGRect(x: 0, y: 0, width: 1470, height: 956), alpha: 1),
-            OnScreenWindow(ownerPID: app, isWindowServer: false, layer: 0,
-                           bounds: CGRect(x: 138, y: 209, width: 600, height: 400), alpha: 1),
-            OnScreenWindow(ownerPID: windowServer, isWindowServer: true, layer: desktopLayer + 1,
-                           bounds: CGRect(x: 0, y: 0, width: 1470, height: 81), alpha: 1),
-            OnScreenWindow(ownerPID: widgets, isWindowServer: false, layer: desktopLayer + 1,
-                           bounds: CGRect(x: 1031, y: 176, width: 400, height: 300), alpha: 1),
-            OnScreenWindow(ownerPID: finder, isWindowServer: false, layer: desktopLayer,
-                           bounds: CGRect(x: 0, y: 0, width: 1470, height: 956), alpha: 1),
+            OnScreenWindow(
+                ownerPID: windowServer,
+                isWindowServer: true,
+                layer: 24,
+                bounds: CGRect(x: 0, y: 0, width: 1470, height: 33),
+                alpha: 1
+            ),
+            OnScreenWindow(
+                ownerPID: dock,
+                isWindowServer: false,
+                layer: 20,
+                bounds: CGRect(x: 0, y: 0, width: 1470, height: 956),
+                alpha: 1
+            ),
+            OnScreenWindow(
+                ownerPID: app,
+                isWindowServer: false,
+                layer: 0,
+                bounds: CGRect(x: 138, y: 209, width: 600, height: 400),
+                alpha: 1
+            ),
+            OnScreenWindow(
+                ownerPID: windowServer,
+                isWindowServer: true,
+                layer: desktopLayer + 1,
+                bounds: CGRect(x: 0, y: 0, width: 1470, height: 81),
+                alpha: 1
+            ),
+            OnScreenWindow(
+                ownerPID: widgets,
+                isWindowServer: false,
+                layer: desktopLayer + 1,
+                bounds: CGRect(x: 1031, y: 176, width: 400, height: 300),
+                alpha: 1
+            ),
+            OnScreenWindow(
+                ownerPID: finder,
+                isWindowServer: false,
+                layer: desktopLayer,
+                bounds: CGRect(x: 0, y: 0, width: 1470, height: 956),
+                alpha: 1
+            )
         ]
     }
 
@@ -55,8 +84,16 @@ final class DesktopClickDetectorTests: XCTestCase {
 
     func testPointerWindowIsLookedThrough() {
         var list = windows
-        list.insert(OnScreenWindow(ownerPID: windowServer, isWindowServer: true, layer: DesktopClickDetector.cursorLayer,
-                                   bounds: CGRect(x: 880, y: 780, width: 28, height: 40), alpha: 1), at: 0)
+        list.insert(
+            OnScreenWindow(
+                ownerPID: windowServer,
+                isWindowServer: true,
+                layer: DesktopClickDetector.cursorLayer,
+                bounds: CGRect(x: 880, y: 780, width: 28, height: 40),
+                alpha: 1
+            ),
+            at: 0
+        )
         XCTAssertTrue(isDesktop(900, 800, windows: list))
     }
 
@@ -65,14 +102,28 @@ final class DesktopClickDetectorTests: XCTestCase {
         var list = windows
         // Stage Manager overlay, the screenshot UI and a Stage Manager thumbnail.
         for layer in [18, 24] {
-            list.insert(OnScreenWindow(ownerPID: overlay, isWindowServer: false, layer: layer,
-                                       bounds: CGRect(x: 0, y: 0, width: 1470, height: 956), alpha: 1), at: 2)
+            list.insert(OnScreenWindow(
+                ownerPID: overlay,
+                isWindowServer: false,
+                layer: layer,
+                bounds: CGRect(x: 0, y: 0, width: 1470, height: 956),
+                alpha: 1
+            ), at: 2)
         }
-        list.insert(OnScreenWindow(ownerPID: overlay, isWindowServer: false, layer: 18,
-                                   bounds: CGRect(x: 20, y: 200, width: 120, height: 90), alpha: 1), at: 2)
+        list.insert(
+            OnScreenWindow(
+                ownerPID: overlay,
+                isWindowServer: false,
+                layer: 18,
+                bounds: CGRect(x: 20, y: 200, width: 120, height: 90),
+                alpha: 1
+            ),
+            at: 2
+        )
         func check(_ x: CGFloat, _ y: CGFloat) -> Bool {
             DesktopClickDetector.isDesktopClick(
-                at: CGPoint(x: x, y: y), windows: list, finderPID: finder, dockPID: dock, ownPID: own,
+                at: CGPoint(x: x, y: y), windows: list, finderPID: finder, dockPID: dock,
+                ownPID: own,
                 screenSizes: [CGSize(width: 1470, height: 956)]
             )
         }
@@ -82,24 +133,47 @@ final class DesktopClickDetectorTests: XCTestCase {
 
     func testFinderWindowIsNotTheDesktop() {
         var list = windows
-        list.insert(OnScreenWindow(ownerPID: finder, isWindowServer: false, layer: 0,
-                                   bounds: CGRect(x: 800, y: 600, width: 300, height: 200), alpha: 1), at: 2)
+        list.insert(OnScreenWindow(
+            ownerPID: finder,
+            isWindowServer: false,
+            layer: 0,
+            bounds: CGRect(x: 800, y: 600, width: 300, height: 200),
+            alpha: 1
+        ), at: 2)
         XCTAssertFalse(isDesktop(900, 700, windows: list))
     }
 
     func testInvisibleWindowsAreLookedThrough() {
         var list = windows
-        list.insert(OnScreenWindow(ownerPID: app, isWindowServer: false, layer: 5,
-                                   bounds: CGRect(x: 800, y: 600, width: 300, height: 200), alpha: 0), at: 0)
-        list.insert(OnScreenWindow(ownerPID: app, isWindowServer: false, layer: 5,
-                                   bounds: CGRect(x: 900, y: 700, width: 0, height: 0), alpha: 1), at: 0)
+        list.insert(OnScreenWindow(
+            ownerPID: app,
+            isWindowServer: false,
+            layer: 5,
+            bounds: CGRect(x: 800, y: 600, width: 300, height: 200),
+            alpha: 0
+        ), at: 0)
+        list.insert(
+            OnScreenWindow(
+                ownerPID: app,
+                isWindowServer: false,
+                layer: 5,
+                bounds: CGRect(x: 900, y: 700, width: 0, height: 0),
+                alpha: 1
+            ),
+            at: 0
+        )
         XCTAssertTrue(isDesktop(900, 700, windows: list))
     }
 
     func testSecondDisplayDesktopCounts() {
         var list = windows
-        list.append(OnScreenWindow(ownerPID: finder, isWindowServer: false, layer: desktopLayer,
-                                   bounds: CGRect(x: 1470, y: 0, width: 1920, height: 1080), alpha: 1))
+        list.append(OnScreenWindow(
+            ownerPID: finder,
+            isWindowServer: false,
+            layer: desktopLayer,
+            bounds: CGRect(x: 1470, y: 0, width: 1920, height: 1080),
+            alpha: 1
+        ))
         XCTAssertTrue(isDesktop(2000, 500, windows: list))
         XCTAssertFalse(isDesktop(5000, 500, windows: list))
     }

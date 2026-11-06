@@ -3,6 +3,7 @@
 
 included:
     - Sources
+    - Tests
 
 excluded:
     - Carthage
@@ -23,6 +24,11 @@ disabled_rules:
     - opening_brace
     - closure_parameter_position
     - nesting
+    # String(decoding:as:) is chosen on purpose where a lossy decode (stderr, error
+    # bodies, logs) beats dropping the text.
+    - optional_data_string_conversion
+    # SwiftFormat owns brace and else placement; the two disagree on `if x { a }\n else { b }`.
+    - statement_position
 
 opt_in_rules:
     - empty_count
@@ -32,6 +38,8 @@ opt_in_rules:
 cyclomatic_complexity:
     warning: 15
     error: 30
+    # Exhaustive switches over enums are flat, not tangled.
+    ignores_case_statements: true
 
 function_parameter_count:
     warning: 8

@@ -17,27 +17,32 @@ final class SceneScriptApprovalTests: XCTestCase {
         for target in [path, copy] {
             SceneScriptPermissions.revoke(scene(), path: target)
             SceneScriptPermissions.revoke(scene(source: "changed"), path: target)
-            for version in ["v1", "v2", "v3", "v4"] { SceneScriptPermissions.revoke(scene(source: version), path: target) }
+            for version in ["v1", "v2", "v3", "v4"] {
+                SceneScriptPermissions.revoke(
+                    scene(source: version),
+                    path: target
+                )
+            }
         }
     }
 
     func testAllowedScriptsRunAgainWhenTheSceneIsRegisteredAgain() throws {
         let model = WallpaperModel()
         model.registerImportedScene(scene(), path: path)
-        XCTAssertTrue(model.sceneDocumentsByPath[path]!.hasUnapprovedScripts)
+        XCTAssertTrue(try XCTUnwrap(model.sceneDocumentsByPath[path]?.hasUnapprovedScripts))
         model.requestSceneScriptApproval(id: "item", name: "Item", path: path)
         let request = try XCTUnwrap(model.sceneScriptApprovalRequests.first)
         model.answerSceneScriptApproval(request, allow: true)
         XCTAssertTrue(model.sceneScriptApprovalRequests.isEmpty)
-        XCTAssertTrue(model.sceneDocumentsByPath[path]!.scripts[0].canRun)
+        XCTAssertTrue(try XCTUnwrap(model.sceneDocumentsByPath[path]?.scripts[0].canRun))
 
         // A relaunch registers the prepared scene again.
         let relaunched = WallpaperModel()
         relaunched.registerImportedScene(scene(), path: path)
-        XCTAssertTrue(relaunched.sceneDocumentsByPath[path]!.scripts[0].canRun)
+        XCTAssertTrue(try XCTUnwrap(relaunched.sceneDocumentsByPath[path]?.scripts[0].canRun))
         // Changed code asks again.
         relaunched.registerImportedScene(scene(source: "changed"), path: path)
-        XCTAssertFalse(relaunched.sceneDocumentsByPath[path]!.scripts[0].canRun)
+        XCTAssertFalse(try XCTUnwrap(relaunched.sceneDocumentsByPath[path]?.scripts[0].canRun))
     }
 
     func testDecliningLeavesScriptsStoppedAndAsksOnlyOnce() throws {
@@ -46,23 +51,26 @@ final class SceneScriptApprovalTests: XCTestCase {
         model.requestSceneScriptApproval(id: "item", name: "Item", path: path)
         model.requestSceneScriptApproval(id: "item", name: "Item", path: path)
         XCTAssertEqual(model.sceneScriptApprovalRequests.count, 1)
-        model.answerSceneScriptApproval(try XCTUnwrap(model.sceneScriptApprovalRequests.first), allow: false)
-        XCTAssertFalse(model.sceneDocumentsByPath[path]!.scripts[0].canRun)
+        try model.answerSceneScriptApproval(
+            XCTUnwrap(model.sceneScriptApprovalRequests.first),
+            allow: false
+        )
+        XCTAssertFalse(try XCTUnwrap(model.sceneDocumentsByPath[path]?.scripts[0].canRun))
     }
 
-    func testApprovalCarriesToTheLibraryCopyButNotThroughAPackage() {
+    func testApprovalCarriesToTheLibraryCopyButNotThroughAPackage() throws {
         SceneScriptPermissions.authorizeAll(scene(), path: path)
         SceneScriptPermissions.carry(scene(), from: path, to: copy)
         let model = WallpaperModel()
         model.registerImportedScene(scene(), path: copy)
-        XCTAssertTrue(model.sceneDocumentsByPath[copy]!.scripts[0].canRun)
+        XCTAssertTrue(try XCTUnwrap(model.sceneDocumentsByPath[copy]?.scripts[0].canRun))
         model.registerImportedScene(scene(), path: copy, asksAgain: true)
-        XCTAssertFalse(model.sceneDocumentsByPath[copy]!.scripts[0].canRun)
+        XCTAssertFalse(try XCTUnwrap(model.sceneDocumentsByPath[copy]?.scripts[0].canRun))
     }
 
     func testUnchangedImportedBundleCanBeEnabledFromTheEditorWithManyLayers() async throws {
         let model = WallpaperModel()
-        let layers = (0..<200).map { SceneLayer(name: "layer\($0)", imageFile: "a.png") }
+        let layers = (0 ..< 200).map { SceneLayer(name: "layer\($0)", imageFile: "a.png") }
         var document = SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: layers)
         var script = SceneScript(source: "export function update(c){return []}", layerIDs: [])
         script.modules = ["helper": "export const value=1;"]
@@ -92,9 +100,11 @@ final class SceneScriptApprovalTests: XCTestCase {
         let previousApproved = SceneScriptPermissions.restored(previous, path: path)
 
         let reconverted = converted(origin: "a", bridge: "v2")
-        XCTAssertFalse(SceneScriptPermissions.restored(reconverted, path: path).scripts[0].isAuthorized)
+        XCTAssertFalse(SceneScriptPermissions.restored(reconverted, path: path).scripts[0]
+            .isAuthorized)
         SceneScriptPermissions.carry(reconverted, replacing: previousApproved, path: path)
-        XCTAssertTrue(SceneScriptPermissions.restored(reconverted, path: path).scripts[0].isAuthorized)
+        XCTAssertTrue(SceneScriptPermissions.restored(reconverted, path: path).scripts[0]
+            .isAuthorized)
     }
 
     func testReconversionAsksAgainWhenTheOriginChangedOrWasNeverAllowedOrIsUnknown() {
@@ -103,11 +113,14 @@ final class SceneScriptApprovalTests: XCTestCase {
         let approved = SceneScriptPermissions.restored(previous, path: path)
         let notAllowed = converted(origin: "a", bridge: "v1")
 
-        for (reconverted, before) in [(converted(origin: "b", bridge: "v2"), approved),
-                                      (converted(origin: nil, bridge: "v3"), approved),
-                                      (converted(origin: "a", bridge: "v4"), notAllowed)] {
+        for (reconverted, before) in [
+            (converted(origin: "b", bridge: "v2"), approved),
+            (converted(origin: nil, bridge: "v3"), approved),
+            (converted(origin: "a", bridge: "v4"), notAllowed)
+        ] {
             SceneScriptPermissions.carry(reconverted, replacing: before, path: path)
-            XCTAssertFalse(SceneScriptPermissions.restored(reconverted, path: path).scripts[0].isAuthorized)
+            XCTAssertFalse(SceneScriptPermissions.restored(reconverted, path: path).scripts[0]
+                .isAuthorized)
         }
     }
 }

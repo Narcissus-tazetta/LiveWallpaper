@@ -14,6 +14,7 @@ final class PlayerView: NSView {
             updateVideoRendering()
         }
     }
+
     /// Holds the video and the switch-effect picture so the cursor parallax can move
     /// them as one without touching playerLayer's own fit/zoom frame.
     private let contentLayer: CALayer = .init()
@@ -204,13 +205,13 @@ final class PlayerView: NSView {
                 self?.sceneClockReading() ?? SceneClockReading(time: 0, isRunning: false)
             }
             layer.frameDidComplete = { [weak self] in
-                guard let self, self.sceneLayer?.renderer != nil, self.sceneRemovalObservation == nil,
+                guard let self, sceneLayer?.renderer != nil, sceneRemovalObservation == nil,
                       !self.sceneCoversVideo
                 else {
                     return
                 }
-                self.sceneCoversVideo = true
-                self.updateVideoRendering()
+                sceneCoversVideo = true
+                updateVideoRendering()
             }
             contentLayer.insertSublayer(layer, above: playerLayer)
             sceneLayer = layer
@@ -246,7 +247,8 @@ final class PlayerView: NSView {
             let origin = sceneClockOrigin ?? CACurrentMediaTime()
             sceneClockOrigin = origin
             return SceneClockReading(
-                time: CACurrentMediaTime() - origin, isRunning: running, isRealTime: sceneRunsInRealTime
+                time: CACurrentMediaTime() - origin, isRunning: running,
+                isRealTime: sceneRunsInRealTime
             )
         }
         let seconds = player.currentTime().seconds
@@ -267,7 +269,12 @@ final class PlayerView: NSView {
         let size = widthLimited
             ? CGSize(width: frame.width, height: frame.width / CGFloat(aspectRatio))
             : CGSize(width: frame.height * CGFloat(aspectRatio), height: frame.height)
-        return CGRect(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2, width: size.width, height: size.height)
+        return CGRect(
+            x: frame.midX - size.width / 2,
+            y: frame.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
     }
 
     /// Call after changing playerLayer.frame.
@@ -295,16 +302,17 @@ final class PlayerView: NSView {
             removeScene()
             return
         }
-        let observation = playerLayer.observe(\.isReadyForDisplay, options: [.new]) { [weak self] _, change in
-            guard change.newValue == true else {
-                return
-            }
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    self?.finishSceneRemoval()
+        let observation = playerLayer
+            .observe(\.isReadyForDisplay, options: [.new]) { [weak self] _, change in
+                guard change.newValue == true else {
+                    return
+                }
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        self?.finishSceneRemoval()
+                    }
                 }
             }
-        }
         sceneRemovalObservation = observation
         // isReadyForDisplay may take a couple of seconds for heavy 4K videos on startup;
         // keep the scene layer visible until the video is genuinely ready.
@@ -365,7 +373,10 @@ final class PlayerView: NSView {
     /// `offset` and `scale` come from CursorEffectGeometry; identity turns it off.
     func setParallax(offset: CGSize, scale: CGFloat) {
         let target = CATransform3DMakeAffineTransform(
-            CGAffineTransform(translationX: offset.width, y: offset.height).scaledBy(x: scale, y: scale)
+            CGAffineTransform(translationX: offset.width, y: offset.height).scaledBy(
+                x: scale,
+                y: scale
+            )
         )
         guard !CATransform3DEqualToTransform(contentLayer.transform, target) else {
             return
@@ -397,7 +408,12 @@ final class PlayerView: NSView {
         cursorOverlayView.setTrail(position: position, emitting: emitting)
     }
 
-    func showClick(at point: CGPoint, style: CursorClickStyle, color: CursorEffectColor, customColor: RGBAColor) {
+    func showClick(
+        at point: CGPoint,
+        style: CursorClickStyle,
+        color: CursorEffectColor,
+        customColor: RGBAColor
+    ) {
         cursorOverlayView.showClick(at: point, style: style, color: color, customColor: customColor)
     }
 
@@ -463,29 +479,35 @@ final class PlayerView: NSView {
             return
         }
         let finish: () -> Void = { [weak self] in
-            if let self, generation == self.transitionGeneration {
-                self.clearTransitionLayer()
+            if let self, generation == transitionGeneration {
+                clearTransitionLayer()
             }
             completion()
         }
         switch style {
         case .crossfade:
-            animateOpacity(of: transitionLayer, from: 1, to: 0, duration: duration, completion: finish)
+            animateOpacity(
+                of: transitionLayer,
+                from: 1,
+                to: 0,
+                duration: duration,
+                completion: finish
+            )
         case .dipToBlack:
             let wait = max(blackoutCompletesAt - CACurrentMediaTime(), 0)
             DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
-                guard let self, generation == self.transitionGeneration else {
+                guard let self, generation == transitionGeneration else {
                     completion()
                     return
                 }
                 // Fully black now: drop the old picture and reveal the new one.
                 CATransaction.begin()
                 CATransaction.setDisableActions(true)
-                self.transitionLayer.isHidden = true
-                self.transitionLayer.player = nil
+                transitionLayer.isHidden = true
+                transitionLayer.player = nil
                 CATransaction.commit()
-                self.animateOpacity(
-                    of: self.blackoutLayer, from: 1, to: 0, duration: duration / 2, completion: finish
+                animateOpacity(
+                    of: blackoutLayer, from: 1, to: 0, duration: duration / 2, completion: finish
                 )
             }
         }

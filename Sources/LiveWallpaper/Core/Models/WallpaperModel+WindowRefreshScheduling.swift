@@ -135,7 +135,7 @@ extension WallpaperModel {
         )
 
         AppLog.windowRefresh.info(
-            "run reason=\(reason.rawValue, privacy: .public) allowReorder=\(allowReorder, privacy: .public) windowCount=\(self.windows.count) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
+            "run reason=\(reason.rawValue, privacy: .public) allowReorder=\(allowReorder, privacy: .public) windowCount=\(windows.count) at=\(Self.windowRefreshTimestamp(), privacy: .public)"
         )
 
         for (index, window) in windows.enumerated() {

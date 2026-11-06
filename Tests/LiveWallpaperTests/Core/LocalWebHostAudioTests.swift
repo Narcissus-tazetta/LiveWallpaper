@@ -1,12 +1,14 @@
+@testable import LiveWallpaper
 import WebKit
 import XCTest
-@testable import LiveWallpaper
 
 @MainActor
 final class LocalWebHostAudioTests: XCTestCase {
     private final class Navigation: NSObject, WKNavigationDelegate {
         var onFinish: (() -> Void)?
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { onFinish?() }
+        func webView(_: WKWebView, didFinish _: WKNavigation!) {
+            onFinish?()
+        }
     }
 
     private func makeHost(audioEnabled: Bool) async throws -> (WKWebView, Navigation) {
@@ -20,18 +22,24 @@ final class LocalWebHostAudioTests: XCTestCase {
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
-        let webView = WKWebView(frame: .init(x: 0, y: 0, width: 100, height: 100), configuration: configuration)
+        let webView = WKWebView(
+            frame: .init(x: 0, y: 0, width: 100, height: 100),
+            configuration: configuration
+        )
         let navigation = Navigation()
         webView.navigationDelegate = navigation
         let loaded = expectation(description: "page loaded")
         navigation.onFinish = { loaded.fulfill() }
-        webView.loadHTMLString("<html><body></body></html>", baseURL: URL(string: "https://example.test/"))
+        webView.loadHTMLString(
+            "<html><body></body></html>",
+            baseURL: URL(string: "https://example.test/")
+        )
         await fulfillment(of: [loaded], timeout: 15)
         return (webView, navigation)
     }
 
-    // A page's own `new Audio()` is never attached to the document, which is how Blue Archive
-    // Memorial Lobby plays its BGM and voice lines.
+    /// A page's own `new Audio()` is never attached to the document, which is how Blue Archive
+    /// Memorial Lobby plays its BGM and voice lines.
     private let startDetachedAudio = """
     const samples = 8000, bytes = new Uint8Array(44 + samples * 2);
     const view = new DataView(bytes.buffer);

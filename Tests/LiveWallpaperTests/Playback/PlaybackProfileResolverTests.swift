@@ -1,5 +1,5 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class PlaybackProfileResolverTests: XCTestCase {
     private func makeInputs(
@@ -29,7 +29,11 @@ final class PlaybackProfileResolverTests: XCTestCase {
     }
 
     func testLightweightModeForcesUltraLightProfile() {
-        let inputs = makeInputs(lightweightMode: true, targetMaxPixelWidth: 3840, qualityPreset: .quality)
+        let inputs = makeInputs(
+            lightweightMode: true,
+            targetMaxPixelWidth: 3840,
+            qualityPreset: .quality
+        )
         let profile = PlaybackProfileResolver.resolve(inputs)
         XCTAssertEqual(profile.bitRate, 900_000)
         XCTAssertEqual(profile.buffer, 0.08)
@@ -43,8 +47,13 @@ final class PlaybackProfileResolverTests: XCTestCase {
     }
 
     func testSmallScreenAutoQualityFallsBackToLowPowerProfile() {
-        // width <= 1920, preset != .quality, frameRate != .fps60 => resolvedWorkProfile == .lowPower
-        let inputs = makeInputs(targetMaxPixelWidth: 1920, qualityPreset: .auto, frameRateLimit: .off)
+        // width <= 1920, preset != .quality, frameRate != .fps60 => resolvedWorkProfile ==
+        // .lowPower
+        let inputs = makeInputs(
+            targetMaxPixelWidth: 1920,
+            qualityPreset: .auto,
+            frameRateLimit: .off
+        )
         let profile = PlaybackProfileResolver.resolve(inputs)
         XCTAssertEqual(profile.bitRate, 1_350_000)
         XCTAssertEqual(profile.buffer, 0.15)
@@ -61,8 +70,16 @@ final class PlaybackProfileResolverTests: XCTestCase {
     }
 
     func testHigherFrameRateLimitIncreasesBitRate() {
-        let base = makeInputs(targetMaxPixelWidth: 1920, qualityPreset: .quality, frameRateLimit: .off)
-        let fast = makeInputs(targetMaxPixelWidth: 1920, qualityPreset: .quality, frameRateLimit: .fps60)
+        let base = makeInputs(
+            targetMaxPixelWidth: 1920,
+            qualityPreset: .quality,
+            frameRateLimit: .off
+        )
+        let fast = makeInputs(
+            targetMaxPixelWidth: 1920,
+            qualityPreset: .quality,
+            frameRateLimit: .fps60
+        )
         let baseProfile = PlaybackProfileResolver.resolve(base)
         let fastProfile = PlaybackProfileResolver.resolve(fast)
         XCTAssertGreaterThan(fastProfile.bitRate, baseProfile.bitRate)
@@ -138,7 +155,11 @@ final class AutoFrameRatePolicyTests: XCTestCase {
 
     func testDisabledAutoFrameRateIgnoresThermalAndPowerSignals() {
         let result = AutoFrameRatePolicy.resolve(
-            makeInputs(autoFrameRateEnabled: false, thermalState: .critical, isLowPowerModeEnabled: true)
+            makeInputs(
+                autoFrameRateEnabled: false,
+                thermalState: .critical,
+                isLowPowerModeEnabled: true
+            )
         )
         XCTAssertEqual(result.bitRateFactor, 1.0)
         XCTAssertEqual(result.bufferAdjustment, 0)

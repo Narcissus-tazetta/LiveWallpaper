@@ -48,7 +48,8 @@ final class SceneParticleSimulator {
         var uvSize: SIMD2<Float>
         /// Straight alpha.
         var color: SIMD4<Float>
-        /// Distance off the layer's plane (layer pixels); only a scene seen through its camera draws it.
+        /// Distance off the layer's plane (layer pixels); only a scene seen through its camera
+        /// draws it.
         var depth: Float = 0
     }
 
@@ -68,7 +69,11 @@ final class SceneParticleSimulator {
         var parent: Int?
         var frame: Int
         /// Per oscillation behaviour: frequency, amplitude and phase on each axis.
-        var oscillations: [(frequency: SIMD3<Double>, amplitude: SIMD3<Double>, phase: SIMD3<Double>)]
+        var oscillations: [(
+            frequency: SIMD3<Double>,
+            amplitude: SIMD3<Double>,
+            phase: SIMD3<Double>
+        )]
         /// What the oscillations last added to the position.
         var oscillationOffset: SIMD3<Double> = .zero
         /// Particles owed by each following child, carried between frames.
@@ -93,9 +98,14 @@ final class SceneParticleSimulator {
             trigger = child.trigger
             origin = SceneParticleSimulator.vector(child.origin)
             probability = child.probability
-            simulator = SceneParticleSimulator(system: child.system.value, seed: seed, runsEmitters: child.trigger == .start,
-                                               originOffset: child.trigger == .start ? origin : .zero,
-                                               scale: SceneParticleSimulator.vector(child.scale, fill: 1), turn: child.angleZ)
+            simulator = SceneParticleSimulator(
+                system: child.system.value,
+                seed: seed,
+                runsEmitters: child.trigger == .start,
+                originOffset: child.trigger == .start ? origin : .zero,
+                scale: SceneParticleSimulator.vector(child.scale, fill: 1),
+                turn: child.angleZ
+            )
         }
     }
 
@@ -132,8 +142,14 @@ final class SceneParticleSimulator {
         particles.count
     }
 
-    init(system: SceneParticleSystem, seed: UInt64, runsEmitters: Bool = true, originOffset: SIMD3<Double> = .zero,
-         scale: SIMD3<Double> = .one, turn: Double = 0) {
+    init(
+        system: SceneParticleSystem,
+        seed: UInt64,
+        runsEmitters: Bool = true,
+        originOffset: SIMD3<Double> = .zero,
+        scale: SIMD3<Double> = .one,
+        turn: Double = 0
+    ) {
         self.system = system
         self.turn = turn
         self.runsEmitters = runsEmitters
@@ -148,7 +164,8 @@ final class SceneParticleSimulator {
         }
         followChildren = children.indices.filter { children[$0].trigger == .follow }
         for index in system.emitters.indices {
-            if let periodic = system.emitters[index].periodic { periods[index].left = sample(periodic.duration) }
+            if let periodic = system.emitters[index]
+                .periodic { periods[index].left = sample(periodic.duration) }
         }
         particles.reserveCapacity(min(max(system.maxCount, 0), 4096))
         if system.startTime > 0 {
@@ -193,7 +210,13 @@ final class SceneParticleSimulator {
                 continue
             }
             let before = particle.position
-            update(&particle, dt: dt, drag: drag, surroundings: surroundings, steering: steering.isEmpty ? .zero : steering[index])
+            update(
+                &particle,
+                dt: dt,
+                drag: drag,
+                surroundings: surroundings,
+                steering: steering.isEmpty ? .zero : steering[index]
+            )
             if !followChildren.isEmpty { moved[particle.id] = particle.position - before }
             particles[kept] = particle
             kept += 1
@@ -217,8 +240,12 @@ final class SceneParticleSimulator {
                     let owed = Int(particles[index].followDebts[slot])
                     if owed > 0 {
                         particles[index].followDebts[slot] -= Double(owed)
-                        child.simulator.spawn(owed, emitters: child.simulator.system.emitters.indices,
-                                              at: particles[index].position + child.origin, parent: particles[index].id)
+                        child.simulator.spawn(
+                            owed,
+                            emitters: child.simulator.system.emitters.indices,
+                            at: particles[index].position + child.origin,
+                            parent: particles[index].id
+                        )
                     }
                 }
             }
@@ -237,7 +264,10 @@ final class SceneParticleSimulator {
                 while periods[index].left <= 0 {
                     periods[index].on.toggle()
                     periods[index].emitted = 0
-                    periods[index].left += max(sample(periods[index].on ? periodic.duration : periodic.pause), 1e-3)
+                    periods[index].left += max(
+                        sample(periods[index].on ? periodic.duration : periodic.pause),
+                        1e-3
+                    )
                 }
                 guard periods[index].on else { continue }
                 if let most = periodic.maxPerBurst { limit = max(most - periods[index].emitted, 0) }
@@ -266,7 +296,8 @@ final class SceneParticleSimulator {
             break
         }
         for particle in particles {
-            let (fraction, size, alpha, color) = appearance(particle)
+            let look = appearance(particle)
+            let fraction = look.fraction, size = look.size, alpha = look.alpha, color = look.color
             guard size > 0 else { continue }
             let right: SIMD2<Double>
             let up: SIMD2<Double>
@@ -294,16 +325,25 @@ final class SceneParticleSimulator {
                     frame = particle.frame
                 case .sequence:
                     let progress = fraction * sheet.speed
-                    frame = min(Int((progress - floor(progress)) * Double(sheet.frameCount)), sheet.frameCount - 1)
+                    frame = min(
+                        Int((progress - floor(progress)) * Double(sheet.frameCount)),
+                        sheet.frameCount - 1
+                    )
                 }
                 uvSize = SIMD2(1 / Float(sheet.columns), 1 / Float(sheet.rows))
-                uvOrigin = SIMD2(Float(frame % sheet.columns), Float(frame / sheet.columns)) * uvSize
+                uvOrigin = SIMD2(Float(frame % sheet.columns), Float(frame / sheet.columns)) *
+                    uvSize
             }
             result.append(Instance(
                 center: SIMD2(Float(particle.position.x), Float(particle.position.y)),
                 right: SIMD2<Float>(right), up: SIMD2<Float>(up),
                 uvOrigin: uvOrigin, uvSize: uvSize,
-                color: SIMD4(Float(color.x), Float(color.y), Float(color.z), Float(min(max(alpha, 0), 1))),
+                color: SIMD4(
+                    Float(color.x),
+                    Float(color.y),
+                    Float(color.z),
+                    Float(min(max(alpha, 0), 1))
+                ),
                 depth: Float(particle.position.z)
             ))
         }
@@ -320,7 +360,14 @@ final class SceneParticleSimulator {
 
     /// Size (drawn, half the particle's), alpha and colour as the behaviours leave
     /// them at this point of the particle's life.
-    private func appearance(_ particle: Particle) -> (fraction: Double, size: Double, alpha: Double, color: SIMD3<Double>) {
+    private struct Appearance {
+        let fraction: Double
+        let size: Double
+        let alpha: Double
+        let color: SIMD3<Double>
+    }
+
+    private func appearance(_ particle: Particle) -> Appearance {
         let fraction = min(max(particle.age / max(particle.lifetime, 1e-9), 0), 1)
         var size = particle.size * 0.5
         var alpha = particle.alpha
@@ -336,34 +383,69 @@ final class SceneParticleSimulator {
             case let .alphaFade(fadeIn, fadeOut):
                 alpha *= Self.fade(fadeIn: fadeIn, fadeOut: fadeOut, at: fraction)
             case let .oscillateAlpha(oscillation):
-                alpha *= Self.blended(Self.oscillation(oscillation, pick: particle.picks[index], age: particle.age),
-                                      oscillation.ramp, fraction)
+                alpha *= Self.blended(
+                    Self.oscillation(oscillation, pick: particle.picks[index], age: particle.age),
+                    oscillation.ramp,
+                    fraction
+                )
             case let .oscillateSize(oscillation):
-                size *= Self.blended(Self.oscillation(oscillation, pick: particle.picks[index], age: particle.age),
-                                     oscillation.ramp, fraction)
+                size *= Self.blended(
+                    Self.oscillation(oscillation, pick: particle.picks[index], age: particle.age),
+                    oscillation.ramp,
+                    fraction
+                )
             case let .remap(remap) where [.size, .opacity, .color].contains(remap.output):
-                let value = remapValue(remap, particle, fraction: fraction, surroundings: lastSurroundings)
+                let value = remapValue(
+                    remap,
+                    particle,
+                    fraction: fraction,
+                    surroundings: lastSurroundings
+                )
                 let weight = Self.weight(remap.ramp, fraction)
                 switch remap.output {
-                case .size: size = Self.mix(size, Self.apply(remap.operation, size, value.x * (remap.operation == .assign || remap.operation == .add || remap.operation == .subtract ? 0.5 : 1)), weight)
-                case .opacity: alpha = Self.mix(alpha, Self.apply(remap.operation, alpha, value.x), weight)
+                case .size: size = Self.mix(
+                        size,
+                        Self
+                            .apply(
+                                remap.operation,
+                                size,
+                                value
+                                    .x *
+                                    (remap.operation == .assign || remap.operation == .add || remap
+                                        .operation == .subtract ? 0.5 : 1)
+                            ),
+                        weight
+                    )
+                case .opacity: alpha = Self.mix(
+                        alpha,
+                        Self.apply(remap.operation, alpha, value.x),
+                        weight
+                    )
                 default:
-                    color = SIMD3(Self.mix(color.x, Self.apply(remap.operation, color.x, value.x), weight),
-                                  Self.mix(color.y, Self.apply(remap.operation, color.y, value.y), weight),
-                                  Self.mix(color.z, Self.apply(remap.operation, color.z, value.z), weight))
+                    color = SIMD3(
+                        Self.mix(color.x, Self.apply(remap.operation, color.x, value.x), weight),
+                        Self.mix(color.y, Self.apply(remap.operation, color.y, value.y), weight),
+                        Self.mix(color.z, Self.apply(remap.operation, color.z, value.z), weight)
+                    )
                 }
             default:
                 break
             }
         }
-        return (fraction, size, alpha, color)
+        return Appearance(fraction: fraction, size: size, alpha: alpha, color: color)
     }
 
     /// Bands for the rope renderers: one quad per piece, along the piece, as wide
     /// as the particle is drawn.
     private func bands() -> [Instance] {
         var result: [Instance] = []
-        func band(from a: SIMD3<Double>, to b: SIMD3<Double>, width: Double, color: SIMD3<Double>, alpha: Double) {
+        func band(
+            from a: SIMD3<Double>,
+            to b: SIMD3<Double>,
+            width: Double,
+            color: SIMD3<Double>,
+            alpha: Double
+        ) {
             let along = SIMD2(b.x - a.x, b.y - a.y)
             let length = simd_length(along)
             guard length > 1e-9, width > 0 else { return }
@@ -372,14 +454,25 @@ final class SceneParticleSimulator {
             result.append(Instance(
                 center: SIMD2<Float>(middle), right: SIMD2<Float>(across), up: SIMD2<Float>(along),
                 uvOrigin: .zero, uvSize: .one,
-                color: SIMD4(Float(color.x), Float(color.y), Float(color.z), Float(min(max(alpha, 0), 1)))
+                color: SIMD4(
+                    Float(color.x),
+                    Float(color.y),
+                    Float(color.z),
+                    Float(min(max(alpha, 0), 1))
+                )
             ))
         }
         switch system.renderer {
         case .rope:
             for (first, second) in zip(particles, particles.dropFirst()) {
                 let look = appearance(first)
-                band(from: first.position, to: second.position, width: look.size, color: look.color, alpha: look.alpha)
+                band(
+                    from: first.position,
+                    to: second.position,
+                    width: look.size,
+                    color: look.color,
+                    alpha: look.alpha
+                )
             }
         case let .ropeTrail(_, segments, fadesAlpha):
             for particle in particles {
@@ -387,7 +480,13 @@ final class SceneParticleSimulator {
                 let points = [particle.position] + particle.history
                 for (index, (a, b)) in zip(points, points.dropFirst()).enumerated() {
                     let fade = fadesAlpha ? 1 - Double(index) / Double(max(segments, 1)) : 1
-                    band(from: b, to: a, width: look.size, color: look.color, alpha: look.alpha * fade)
+                    band(
+                        from: b,
+                        to: a,
+                        width: look.size,
+                        color: look.color,
+                        alpha: look.alpha * fade
+                    )
                 }
             }
         default:
@@ -398,18 +497,29 @@ final class SceneParticleSimulator {
 
     /// Steering for a flock: per particle, the acceleration from its neighbours.
     private func flockSteering() -> [SIMD3<Double>] {
-        guard let flock = system.behaviors.lazy.compactMap({ behavior -> SceneParticleSystem.Flock? in
-            if case let .flock(flock) = behavior { return flock }
-            return nil
-        }).first, particles.count > 1, flock.neighborThreshold > 0 else { return [] }
+        guard let flock = system.behaviors.lazy
+            .compactMap({ behavior -> SceneParticleSystem.Flock? in
+                if case let .flock(flock) = behavior { return flock }
+                return nil
+            }).first, particles.count > 1, flock.neighborThreshold > 0 else { return [] }
         let cell = flock.neighborThreshold
         var grid: [SIMD2<Int>: [Int]] = [:]
-        func key(_ p: SIMD3<Double>) -> SIMD2<Int> { SIMD2(Int(floor(p.x / cell)), Int(floor(p.y / cell))) }
-        for index in particles.indices { grid[key(particles[index].position), default: []].append(index) }
+        func key(_ p: SIMD3<Double>) -> SIMD2<Int> {
+            SIMD2(
+                Int(floor(p.x / cell)),
+                Int(floor(p.y / cell))
+            )
+        }
+        for index in particles
+            .indices
+        {
+            grid[key(particles[index].position), default: []].append(index)
+        }
         return particles.indices.map { index in
             let me = particles[index]
             let home = key(me.position)
-            var center = SIMD3<Double>.zero, heading = SIMD3<Double>.zero, apart = SIMD3<Double>.zero
+            var center = SIMD3<Double>.zero, heading = SIMD3<Double>.zero,
+                apart = SIMD3<Double>.zero
             var neighbours = 0.0
             for dx in -1 ... 1 {
                 for dy in -1 ... 1 {
@@ -448,7 +558,12 @@ final class SceneParticleSimulator {
 
     private func burst(at point: SIMD3<Double>, parent: Int?) {
         for index in system.emitters.indices {
-            spawn(system.emitters[index].burst, emitters: index ..< index + 1, at: point, parent: parent)
+            spawn(
+                system.emitters[index].burst,
+                emitters: index ..< index + 1,
+                at: point,
+                parent: parent
+            )
         }
     }
 
@@ -470,9 +585,13 @@ final class SceneParticleSimulator {
     /// `point` moves the emitters there (children follow their parent's particles).
     private func spawn(_ count: Int, emitters: Range<Int>, at point: SIMD3<Double>?, parent: Int?) {
         guard count > 0 else { return }
-        let available = max(Int((Double(system.maxCount) * countScale).rounded()) - particles.count, 0)
+        let available = max(
+            Int((Double(system.maxCount) * countScale).rounded()) - particles.count,
+            0
+        )
         for number in 0 ..< min(count, available) {
-            let emitter = emitters.isEmpty ? nil : system.emitters[emitters.lowerBound + number % emitters.count]
+            let emitter = emitters.isEmpty ? nil : system
+                .emitters[emitters.lowerBound + number % emitters.count]
             var particle = makeParticle(emitter: emitter)
             if let point { particle.position += point }
             if !system.initial.remaps.isEmpty { applyInitialRemaps(&particle) }
@@ -480,8 +599,14 @@ final class SceneParticleSimulator {
             particle.parent = parent
             nextID += 1
             particles.append(particle)
-            for child in children where (child.trigger == .birth || child.trigger == .follow) && chance(child.probability) {
-                child.simulator.burst(at: particle.position + child.origin, parent: child.trigger == .follow ? particle.id : nil)
+            for child in children
+                where (child.trigger == .birth || child.trigger == .follow) &&
+                chance(child.probability)
+            {
+                child.simulator.burst(
+                    at: particle.position + child.origin,
+                    parent: child.trigger == .follow ? particle.id : nil
+                )
             }
         }
     }
@@ -500,7 +625,11 @@ final class SceneParticleSimulator {
         }
         let seed = random.unit() * 1000
         if let turbulent = initial.turbulentVelocity {
-            let wander = ParticleNoise.value(clock * turbulent.timeScale + sample(turbulent.phase), 0.5, seed * 0.001)
+            let wander = ParticleNoise.value(
+                clock * turbulent.timeScale + sample(turbulent.phase),
+                0.5,
+                seed * 0.001
+            )
             let angle = (wander + turbulent.offset) * turbulent.scale * .pi
             let forward = Self.vector(turbulent.forward)
             let axis = Self.vector(turbulent.axis, fill: 0)
@@ -510,9 +639,13 @@ final class SceneParticleSimulator {
             let signs = Self.vector(offset.sign)
             var shift = SIMD3<Double>.zero
             for axis in 0 ..< 3 {
-                var value = ParticleNoise.fractal(clock * offset.timeScale + Double(axis) * 31.7,
-                                                  position.x * offset.scale, position.y * offset.scale)
-                if signs[axis] > 0 { value = abs(value) } else if signs[axis] < 0 { value = -abs(value) }
+                var value = ParticleNoise.fractal(
+                    clock * offset.timeScale + Double(axis) * 31.7,
+                    position.x * offset.scale,
+                    position.y * offset.scale
+                )
+                if signs[axis] > 0 { value = abs(value) }
+                else if signs[axis] < 0 { value = -abs(value) }
                 shift[axis] = value
             }
             position += shift * offset.distance * Self.vector(offset.directions, fill: 1)
@@ -521,7 +654,8 @@ final class SceneParticleSimulator {
             let step = Double(sequenceIndex) / max(sequence.count, 1e-9)
             sequenceIndex += 1
             let raw = sequence.boundsMin + (sequence.boundsMax - sequence.boundsMin) * step
-            let along = sequence.mirrors ? 1 - abs((raw.truncatingRemainder(dividingBy: 2)) - 1) : raw - floor(raw)
+            let along = sequence
+                .mirrors ? 1 - abs((raw.truncatingRemainder(dividingBy: 2)) - 1) : raw - floor(raw)
             switch sequence.path {
             case let .between(start, end, arc, arcDirection):
                 let a = controlPoint(start, surroundings: lastSurroundings) ?? .zero
@@ -534,31 +668,50 @@ final class SceneParticleSimulator {
                 let turnAxis = Self.vector(axis)
                 position = center + Self.rotate(position - center, about: turnAxis, by: angle)
                 let low = Self.vector(speedMin), high = Self.vector(speedMax)
-                velocity += Self.rotate(low + (high - low) * random.unit(), about: turnAxis, by: angle)
+                velocity += Self.rotate(
+                    low + (high - low) * random.unit(),
+                    about: turnAxis,
+                    by: angle
+                )
             }
         }
         velocity *= scale
         if turn != 0 {
             func turned(_ vector: SIMD3<Double>) -> SIMD3<Double> {
-                SIMD3(vector.x * cos(turn) - vector.y * sin(turn), vector.x * sin(turn) + vector.y * cos(turn), vector.z)
+                SIMD3(
+                    vector.x * cos(turn) - vector.y * sin(turn),
+                    vector.x * sin(turn) + vector.y * cos(turn),
+                    vector.z
+                )
             }
             position = originOffset + turned(position - originOffset)
             velocity = turned(velocity)
         }
         var color: SIMD3<Double>
         if !initial.colorChoices.isEmpty {
-            color = Self.vector(initial.colorChoices[Int(random.unit() * Double(initial.colorChoices.count)) % initial.colorChoices.count])
+            color = Self
+                .vector(initial
+                    .colorChoices[Int(random.unit() * Double(initial.colorChoices.count)) % initial
+                        .colorChoices.count])
         } else {
             let low = Self.vector(initial.colorMin)
             let high = Self.vector(initial.colorMax)
             color = low + (high - low) * random.unit()
         }
-        let oscillations = system.behaviors.compactMap { behavior -> (SIMD3<Double>, SIMD3<Double>, SIMD3<Double>)? in
+        let oscillations = system.behaviors.compactMap { behavior -> (
+            SIMD3<Double>,
+            SIMD3<Double>,
+            SIMD3<Double>
+        )? in
             guard case let .oscillatePosition(oscillation) = behavior else { return nil }
             func three(_ range: SceneParticleSystem.Range) -> SIMD3<Double> {
                 SIMD3(sample(range), sample(range), sample(range))
             }
-            return (three(oscillation.frequency), three(oscillation.amplitude) * Self.vector(oscillation.mask), three(oscillation.phase))
+            return (
+                three(oscillation.frequency),
+                three(oscillation.amplitude) * Self.vector(oscillation.mask),
+                three(oscillation.phase)
+            )
         }
         let frameCount = system.sheet?.frameCount ?? 1
         return Particle(
@@ -592,24 +745,46 @@ final class SceneParticleSimulator {
     private func applyInitialRemaps(_ particle: inout Particle) {
         for remap in system.initial.remaps {
             let value = remapValue(remap, particle, fraction: 0, surroundings: lastSurroundings)
-            func applied(_ base: Double, _ x: Double) -> Double { Self.apply(remap.operation, base, x) }
+            func applied(_ base: Double, _ x: Double) -> Double {
+                Self.apply(
+                    remap.operation,
+                    base,
+                    x
+                )
+            }
             switch remap.output {
             case .size: particle.size = applied(particle.size, value.x)
             case .opacity: particle.alpha = applied(particle.alpha, value.x)
-            case .color: particle.color = SIMD3(applied(particle.color.x, value.x), applied(particle.color.y, value.y), applied(particle.color.z, value.z))
-            case .velocity: particle.velocity = SIMD3(applied(particle.velocity.x, value.x), applied(particle.velocity.y, value.y), applied(particle.velocity.z, value.z))
+            case .color: particle.color = SIMD3(
+                    applied(particle.color.x, value.x),
+                    applied(particle.color.y, value.y),
+                    applied(particle.color.z, value.z)
+                )
+            case .velocity: particle.velocity = SIMD3(
+                    applied(particle.velocity.x, value.x),
+                    applied(particle.velocity.y, value.y),
+                    applied(particle.velocity.z, value.z)
+                )
             case .speed:
                 let speed = simd_length(particle.velocity)
                 if speed > 1e-9 { particle.velocity *= applied(speed, value.x) / speed }
             case .rotation: particle.rotation.z = applied(particle.rotation.z, value.x)
-            case .angularVelocity: particle.angularVelocity.z = applied(particle.angularVelocity.z, value.x)
+            case .angularVelocity: particle.angularVelocity.z = applied(
+                    particle.angularVelocity.z,
+                    value.x
+                )
             }
             particle.bornVelocity = particle.velocity
         }
     }
 
-    private func update(_ particle: inout Particle, dt: Double, drag dragStep: Double, surroundings: Surroundings,
-                        steering: SIMD3<Double>) {
+    private func update(
+        _ particle: inout Particle,
+        dt: Double,
+        drag dragStep: Double,
+        surroundings: Surroundings,
+        steering: SIMD3<Double>
+    ) {
         let fraction = min(max(particle.age / max(particle.lifetime, 1e-9), 0), 1)
         for (index, behavior) in system.behaviors.enumerated() {
             switch behavior {
@@ -631,7 +806,9 @@ final class SceneParticleSimulator {
                 if distance > 1e-9, distance < threshold {
                     // Fitted to the original at 30 fps (within 2 px over 3 s): fading
                     // linearly to nothing at the threshold, at 0.78 of `scale`.
-                    particle.velocity += toward / distance * (0.78 * scale * (1 - distance / threshold)) * dt
+                    particle
+                        .velocity += toward / distance *
+                        (0.78 * scale * (1 - distance / threshold)) * dt
                 }
             case let .turbulence(turbulence):
                 // A noise acceleration through space and time. The original's noise is
@@ -642,24 +819,40 @@ final class SceneParticleSimulator {
                 guard weight > 0 else { continue }
                 let time = clock * turbulence.timeScale * 0.001 + particle.picks[index].y + 0.37
                 let p = particle.position * turbulence.scale + 0.37
-                let push = SIMD3(ParticleNoise.value(p.x, p.y, time),
-                                 ParticleNoise.value(p.x + 31.4, p.y - 17.2, time + 5.3),
-                                 ParticleNoise.value(p.x - 23.9, p.y + 41.7, time - 8.1))
-                particle.velocity += push * Self.vector(turbulence.mask) * particle.picks[index].x * Self.turbulenceStrength * weight * dt
+                let push = SIMD3(
+                    ParticleNoise.value(p.x, p.y, time),
+                    ParticleNoise.value(p.x + 31.4, p.y - 17.2, time + 5.3),
+                    ParticleNoise.value(p.x - 23.9, p.y + 41.7, time - 8.1)
+                )
+                particle.velocity += push * Self.vector(turbulence.mask) * particle.picks[index]
+                    .x * Self.turbulenceStrength * weight * dt
             case let .vortex(vortex):
                 let weight = Self.weight(vortex.ramp, fraction)
-                guard weight > 0, let point = controlPoint(vortex.controlPoint, surroundings: surroundings) else { continue }
-                let axis = simd_length(Self.vector(vortex.axis)) > 1e-9 ? simd_normalize(Self.vector(vortex.axis)) : SIMD3(0, 0, 1)
+                guard weight > 0, let point = controlPoint(
+                    vortex.controlPoint,
+                    surroundings: surroundings
+                ) else { continue }
+                let axis = simd_length(Self.vector(vortex.axis)) > 1e-9 ?
+                    simd_normalize(Self.vector(vortex.axis)) : SIMD3(
+                        0,
+                        0,
+                        1
+                    )
                 var radial = particle.position - (point + Self.vector(vortex.offset))
                 radial -= axis * simd_dot(radial, axis)
                 let distance = simd_length(radial)
                 guard distance > 1e-9 else { continue }
                 let span = vortex.distanceOuter - vortex.distanceInner
-                let speed = distance <= vortex.distanceInner ? vortex.speedInner : distance >= vortex.distanceOuter || span <= 0
-                    ? vortex.speedOuter : vortex.speedInner + (vortex.speedOuter - vortex.speedInner) * (distance - vortex.distanceInner) / span
+                let speed = distance <= vortex.distanceInner ? vortex
+                    .speedInner : distance >= vortex.distanceOuter || span <= 0
+                    ? vortex.speedOuter : vortex
+                    .speedInner + (vortex.speedOuter - vortex.speedInner) *
+                    (distance - vortex.distanceInner) / span
                 // Fitted to the original at 30 fps (within 1 px over 1.5 s): an
                 // acceleration round the axis, clockwise about +z, at 0.83 of the speed.
-                particle.velocity += simd_normalize(simd_cross(radial, axis)) * 0.83 * speed * weight * dt
+                particle
+                    .velocity += simd_normalize(simd_cross(radial, axis)) * 0.83 * speed * weight *
+                    dt
             case let .capVelocity(maxSpeed, ramp):
                 let weight = Self.weight(ramp, fraction)
                 let speed = simd_length(particle.velocity)
@@ -667,36 +860,61 @@ final class SceneParticleSimulator {
                     particle.velocity *= 1 - weight + weight * maxSpeed / speed
                 }
             case let .reduceMovement(reduce):
-                guard let point = controlPoint(reduce.controlPoint, surroundings: surroundings) else { continue }
+                guard let point = controlPoint(reduce.controlPoint, surroundings: surroundings)
+                else { continue }
                 let distance = simd_length(particle.position - point)
                 let span = reduce.distanceOuter - reduce.distanceInner
-                let amount = distance <= reduce.distanceInner ? reduce.reductionInner : distance >= reduce.distanceOuter || span <= 0
-                    ? reduce.reductionOuter : reduce.reductionInner + (reduce.reductionOuter - reduce.reductionInner) * (distance - reduce.distanceInner) / span
+                let amount = distance <= reduce.distanceInner ? reduce
+                    .reductionInner : distance >= reduce.distanceOuter || span <= 0
+                    ? reduce.reductionOuter : reduce
+                    .reductionInner + (reduce.reductionOuter - reduce.reductionInner) *
+                    (distance - reduce.distanceInner) / span
                 particle.velocity *= exp(-amount * dt)
             case let .flock(flock):
                 particle.velocity += steering * dt
                 if let maxSpeed = flock.maxSpeed, simd_length(particle.velocity) > maxSpeed {
                     particle.velocity = simd_normalize(particle.velocity) * maxSpeed
                 }
-            case let .remap(remap) where [.velocity, .speed, .rotation, .angularVelocity].contains(remap.output):
+            case let .remap(remap)
+                where [.velocity, .speed, .rotation, .angularVelocity].contains(remap.output):
                 let weight = Self.weight(remap.ramp, fraction)
                 guard weight > 0 else { continue }
-                let value = remapValue(remap, particle, fraction: fraction, surroundings: surroundings)
+                let value = remapValue(
+                    remap,
+                    particle,
+                    fraction: fraction,
+                    surroundings: surroundings
+                )
                 // Each frame from the value at birth, so a multiply does not compound.
                 switch remap.output {
                 case .velocity:
                     let base = particle.bornVelocity
-                    let target = SIMD3(Self.apply(remap.operation, base.x, value.x), Self.apply(remap.operation, base.y, value.y),
-                                       Self.apply(remap.operation, base.z, value.z))
+                    let target = SIMD3(
+                        Self.apply(remap.operation, base.x, value.x),
+                        Self.apply(remap.operation, base.y, value.y),
+                        Self.apply(remap.operation, base.z, value.z)
+                    )
                     particle.velocity += (target - particle.velocity) * weight
                 case .speed:
                     let speed = simd_length(particle.velocity)
-                    let target = Self.apply(remap.operation, simd_length(particle.bornVelocity), value.x)
+                    let target = Self.apply(
+                        remap.operation,
+                        simd_length(particle.bornVelocity),
+                        value.x
+                    )
                     if speed > 1e-9 { particle.velocity *= Self.mix(speed, target, weight) / speed }
                 case .rotation:
-                    particle.rotation.z = Self.mix(particle.rotation.z, Self.apply(remap.operation, particle.rotation.z, value.x), weight)
+                    particle.rotation.z = Self.mix(
+                        particle.rotation.z,
+                        Self.apply(remap.operation, particle.rotation.z, value.x),
+                        weight
+                    )
                 default:
-                    particle.angularVelocity.z = Self.mix(particle.angularVelocity.z, Self.apply(remap.operation, particle.angularVelocity.z, value.x), weight)
+                    particle.angularVelocity.z = Self.mix(
+                        particle.angularVelocity.z,
+                        Self.apply(remap.operation, particle.angularVelocity.z, value.x),
+                        weight
+                    )
                 }
             default:
                 break
@@ -710,7 +928,11 @@ final class SceneParticleSimulator {
                 let oscillation = particle.oscillations[oscillationIndex]
                 oscillationIndex += 1
                 let angle = oscillation.frequency * particle.age + oscillation.phase
-                offset += oscillation.amplitude * SIMD3(sin(angle.x), sin(angle.y), sin(angle.z)) * Self.weight(settings.ramp, fraction)
+                offset += oscillation
+                    .amplitude * SIMD3(sin(angle.x), sin(angle.y), sin(angle.z)) * Self.weight(
+                        settings.ramp,
+                        fraction
+                    )
             }
             particle.position += offset - particle.oscillationOffset
             particle.oscillationOffset = offset
@@ -719,7 +941,9 @@ final class SceneParticleSimulator {
             particle.historyTimer -= dt
             if particle.historyTimer <= 0 {
                 particle.history.insert(particle.position, at: 0)
-                if particle.history.count > segments { particle.history.removeLast(particle.history.count - segments) }
+                if particle.history
+                    .count >
+                    segments { particle.history.removeLast(particle.history.count - segments) }
                 particle.historyTimer += length / Double(segments)
             }
         }
@@ -728,8 +952,12 @@ final class SceneParticleSimulator {
     /// Scales the noise in `turbulence` to the original's displacements.
     static let turbulenceStrength = 0.3
 
-    private func remapValue(_ remap: SceneParticleSystem.Remap, _ particle: Particle, fraction: Double,
-                            surroundings: Surroundings) -> SIMD3<Double> {
+    private func remapValue(
+        _ remap: SceneParticleSystem.Remap,
+        _ particle: Particle,
+        fraction: Double,
+        surroundings: Surroundings
+    ) -> SIMD3<Double> {
         let input: Double
         switch remap.input {
         case .lifetimeFraction: input = fraction
@@ -740,9 +968,13 @@ final class SceneParticleSimulator {
             input = Double(hours * 3600 + minutes * 60 + seconds) / 86400
         case .speed: input = simd_length(particle.velocity)
         case .distanceToControlPoint:
-            input = simd_length(particle.position - (controlPoint(remap.controlPoint, surroundings: surroundings) ?? .zero))
+            input = simd_length(particle.position - (controlPoint(
+                remap.controlPoint,
+                surroundings: surroundings
+            ) ?? .zero))
         }
-        var x = remap.inputMax != remap.inputMin ? (input - remap.inputMin) / (remap.inputMax - remap.inputMin) : 0
+        var x = remap.inputMax != remap
+            .inputMin ? (input - remap.inputMin) / (remap.inputMax - remap.inputMin) : 0
         if remap.clampsInput { x = min(max(x, 0), 1) }
         func shaped(_ offset: Double) -> Double {
             let t = x * remap.transformScale
@@ -753,7 +985,11 @@ final class SceneParticleSimulator {
             case .saw: return t / (2 * .pi) - floor(t / (2 * .pi))
             case .triangle: return 1 - abs(2 * (t / (2 * .pi) - floor(t / (2 * .pi))) - 1)
             case .noise: return 0.5 + 0.5 * ParticleNoise.value(t, particle.seed + offset, 0.5)
-            case .fractalNoise: return 0.5 + 0.5 * ParticleNoise.fractal(t, particle.seed + offset, 0.5)
+            case .fractalNoise: return 0.5 + 0.5 * ParticleNoise.fractal(
+                    t,
+                    particle.seed + offset,
+                    0.5
+                )
             }
         }
         let low = Self.vector(remap.outputMin), high = Self.vector(remap.outputMax)
@@ -807,14 +1043,19 @@ final class SceneParticleSimulator {
         let low = Self.vector(range.min)
         let high = Self.vector(range.max)
         let u = SIMD3(random.unit(), random.unit(), random.unit())
-        return low + (high - low) * SIMD3(pow(u.x, range.exponent), pow(u.y, range.exponent), pow(u.z, range.exponent))
+        return low + (high - low) * SIMD3(
+            pow(u.x, range.exponent),
+            pow(u.y, range.exponent),
+            pow(u.z, range.exponent)
+        )
     }
 
     private func sampleShape(_ emitter: SceneParticleSystem.Emitter) -> SIMD3<Double> {
         let directions = Self.vector(emitter.directions, fill: 1)
         let signs = Self.vector(emitter.sign)
         func signed(_ value: Double, _ axis: Int) -> Double {
-            let sign = signs[axis] > 0 ? 1.0 : signs[axis] < 0 ? -1.0 : (random.unit() < 0.5 ? -1.0 : 1.0)
+            let sign = signs[axis] > 0 ? 1.0 : signs[axis] < 0 ? -1.0 :
+                (random.unit() < 0.5 ? -1.0 : 1.0)
             return abs(value) * sign
         }
         switch emitter.shape {
@@ -835,20 +1076,30 @@ final class SceneParticleSimulator {
             if let cone = emitter.cone, cone != 0 {
                 // Measured (Windows, fixed radius): the cone bounds the direction before the
                 // directions are applied, and the result is renormalised, so cone 1 is a
-                // point on +X whatever the directions are. Radius is rmin + (rmax - rmin) * cbrt(u).
+                // point on +X whatever the directions are. Radius is rmin + (rmax - rmin) *
+                // cbrt(u).
                 let lowX = -cos(Double.pi * min(max(cone, 0), 1))
                 let x = lowX + (1 - lowX) * random.unit()
                 let ring = (1 - x * x).squareRoot()
                 let angle = 2 * Double.pi * random.unit()
                 let stretched = SIMD3(x, ring * cos(angle), ring * sin(angle)) * directions
                 let length = simd_length(stretched)
-                var point = length > 1e-12 ? stretched / length * (inner + (outer - inner) * cbrt(random.unit())) : .zero
-                for axis in 0 ..< 3 where signs[axis] != 0 { point[axis] = signed(point[axis], axis) }
+                var point = length > 1e-12 ? stretched / length *
+                    (inner + (outer - inner) * cbrt(random.unit())) : .zero
+                for axis in 0 ..< 3
+                    where signs[axis] != 0
+                {
+                    point[axis] = signed(point[axis], axis)
+                }
                 return point
             }
             var direction: SIMD3<Double>
             repeat {
-                direction = SIMD3(random.unit() * 2 - 1, random.unit() * 2 - 1, random.unit() * 2 - 1)
+                direction = SIMD3(
+                    random.unit() * 2 - 1,
+                    random.unit() * 2 - 1,
+                    random.unit() * 2 - 1
+                )
             } while simd_length_squared(direction) > 1 || simd_length_squared(direction) < 1e-12
             // Measured: a full ball flattened by the directions (a 0 there projects
             // it, filling the disc). An inner radius then stretches each point's
@@ -858,7 +1109,9 @@ final class SceneParticleSimulator {
             if inner > 0, outer > 0, length > 1e-12 {
                 point *= (inner + (outer - inner) * length / outer) / length
             }
-            for axis in 0 ..< 3 where signs[axis] != 0 { point[axis] = signed(point[axis], axis) }
+            for axis in 0 ..< 3 where signs[axis] != 0 {
+                point[axis] = signed(point[axis], axis)
+            }
             return point
         }
     }
@@ -869,7 +1122,13 @@ final class SceneParticleSimulator {
     /// Fitted to the frame rates measured in the original: about dt itself at 45
     /// and 60 fps, and less than dt below that (0.81 dt at 30 fps, 0.48 dt at 15).
     static func dragStep(_ dt: Double) -> Double {
-        let measured: [(dt: Double, factor: Double)] = [(0.0170, 1.02), (0.0226, 1.02), (0.0333, 0.81), (0.0526, 0.60), (0.0714, 0.48)]
+        let measured: [(dt: Double, factor: Double)] = [
+            (0.0170, 1.02),
+            (0.0226, 1.02),
+            (0.0333, 0.81),
+            (0.0526, 0.60),
+            (0.0714, 0.48)
+        ]
         guard dt > measured[0].dt else { return dt * measured[0].factor }
         for (low, high) in zip(measured, measured.dropFirst()) where dt <= high.dt {
             let t = (dt - low.dt) / (high.dt - low.dt)
@@ -879,12 +1138,23 @@ final class SceneParticleSimulator {
     }
 
     static func value(of change: SceneParticleSystem.Change, at fraction: Double) -> Double {
-        change.startValue + (change.endValue - change.startValue) * progress(fraction, change.startTime, change.endTime)
+        change.startValue + (change.endValue - change.startValue) * progress(
+            fraction,
+            change.startTime,
+            change.endTime
+        )
     }
 
-    static func value(of change: SceneParticleSystem.ColorChange, at fraction: Double) -> SIMD3<Double> {
+    static func value(
+        of change: SceneParticleSystem.ColorChange,
+        at fraction: Double
+    ) -> SIMD3<Double> {
         let start = vector(change.startValue, fill: 1)
-        return start + (vector(change.endValue, fill: 1) - start) * progress(fraction, change.startTime, change.endTime)
+        return start + (vector(change.endValue, fill: 1) - start) * progress(
+            fraction,
+            change.startTime,
+            change.endTime
+        )
     }
 
     private static func progress(_ fraction: Double, _ start: Double, _ end: Double) -> Double {
@@ -896,7 +1166,10 @@ final class SceneParticleSimulator {
     /// fade-out starts, the higher of the two holds until the fade-in finishes.
     static func fade(fadeIn: Double, fadeOut: Double, at fraction: Double) -> Double {
         let rising = fadeIn > 0 ? min(fraction / fadeIn, 1) : 1
-        let falling = fraction > fadeOut ? max(1 - (fraction - fadeOut) / max(1 - fadeOut, 1e-9), 0) : 1
+        let falling = fraction > fadeOut ? max(
+            1 - (fraction - fadeOut) / max(1 - fadeOut, 1e-9),
+            0
+        ) : 1
         if fraction < fadeIn, fraction > fadeOut {
             return max(rising, falling)
         }
@@ -921,13 +1194,23 @@ final class SceneParticleSimulator {
     /// How much of a behaviour acts at this point of the life.
     static func weight(_ ramp: SceneParticleSystem.Ramp?, _ fraction: Double) -> Double {
         guard let blend = ramp else { return 1 }
-        let rising = fraction < blend.inStart ? 0 : blend.inEnd > blend.inStart ? min((fraction - blend.inStart) / (blend.inEnd - blend.inStart), 1) : 1
-        let falling = fraction >= blend.outEnd ? 0 : blend.outEnd > blend.outStart ? min(max((blend.outEnd - fraction) / (blend.outEnd - blend.outStart), 0), 1) : 1
+        let rising = fraction < blend.inStart ? 0 : blend.inEnd > blend.inStart ? min(
+            (fraction - blend.inStart) / (blend.inEnd - blend.inStart),
+            1
+        ) : 1
+        let falling = fraction >= blend.outEnd ? 0 : blend.outEnd > blend.outStart ? min(
+            max((blend.outEnd - fraction) / (blend.outEnd - blend.outStart), 0),
+            1
+        ) : 1
         return rising * falling
     }
 
     /// A multiplier that acts only as much as the blend allows.
-    static func blended(_ value: Double, _ ramp: SceneParticleSystem.Ramp?, _ fraction: Double) -> Double {
+    static func blended(
+        _ value: Double,
+        _ ramp: SceneParticleSystem.Ramp?,
+        _ fraction: Double
+    ) -> Double {
         mix(1, value, weight(ramp, fraction))
     }
 
@@ -935,7 +1218,11 @@ final class SceneParticleSimulator {
         a + (b - a) * t
     }
 
-    static func apply(_ operation: SceneParticleSystem.Remap.Operation, _ base: Double, _ value: Double) -> Double {
+    static func apply(
+        _ operation: SceneParticleSystem.Remap.Operation,
+        _ base: Double,
+        _ value: Double
+    ) -> Double {
         switch operation {
         case .assign: return value
         case .multiply: return base * value
@@ -946,19 +1233,33 @@ final class SceneParticleSimulator {
 
     /// Between the amplitude's min and max along a sine of the particle's own
     /// frequency (radians per second, as measured for position) and phase.
-    static func oscillation(_ oscillation: SceneParticleSystem.Oscillation, pick: SIMD2<Double>, age: Double) -> Double {
+    static func oscillation(
+        _ oscillation: SceneParticleSystem.Oscillation,
+        pick: SIMD2<Double>,
+        age: Double
+    ) -> Double {
         let wave = 0.5 + 0.5 * sin(pick.x * age + pick.y)
-        return oscillation.amplitude.min + (oscillation.amplitude.max - oscillation.amplitude.min) * wave
+        return oscillation.amplitude
+            .min + (oscillation.amplitude.max - oscillation.amplitude.min) * wave
     }
 
-    static func rotate(_ vector: SIMD3<Double>, about axis: SIMD3<Double>, by angle: Double) -> SIMD3<Double> {
+    static func rotate(
+        _ vector: SIMD3<Double>,
+        about axis: SIMD3<Double>,
+        by angle: Double
+    ) -> SIMD3<Double> {
         guard simd_length(axis) > 1e-9 else { return vector }
         let k = simd_normalize(axis)
-        return vector * cos(angle) + simd_cross(k, vector) * sin(angle) + k * simd_dot(k, vector) * (1 - cos(angle))
+        return vector * cos(angle) + simd_cross(k, vector) * sin(angle) + k * simd_dot(k, vector) *
+            (1 - cos(angle))
     }
 
     static func vector(_ values: [Double], fill: Double = 0) -> SIMD3<Double> {
-        SIMD3(values.count > 0 ? values[0] : fill, values.count > 1 ? values[1] : fill, values.count > 2 ? values[2] : fill)
+        SIMD3(
+            !values.isEmpty ? values[0] : fill,
+            values.count > 1 ? values[1] : fill,
+            values.count > 2 ? values[2] : fill
+        )
     }
 }
 
@@ -998,7 +1299,9 @@ enum ParticleNoise {
     static func value(_ x: Double, _ y: Double, _ z: Double) -> Double {
         let xi = Int(floor(x)) & 255, yi = Int(floor(y)) & 255, zi = Int(floor(z)) & 255
         let xf = x - floor(x), yf = y - floor(y), zf = z - floor(z)
-        func fade(_ t: Double) -> Double { t * t * t * (t * (t * 6 - 15) + 10) }
+        func fade(_ t: Double) -> Double {
+            t * t * t * (t * (t * 6 - 15) + 10)
+        }
         func gradient(_ hash: Int, _ x: Double, _ y: Double, _ z: Double) -> Double {
             let h = hash & 15
             let u = h < 8 ? x : y
@@ -1009,12 +1312,34 @@ enum ParticleNoise {
         let a = p[xi] + yi, aa = p[a] + zi, ab = p[a + 1] + zi
         let b = p[xi + 1] + yi, ba = p[b] + zi, bb = p[b + 1] + zi
         let u = fade(xf), v = fade(yf), w = fade(zf)
-        func lerp(_ t: Double, _ a: Double, _ b: Double) -> Double { a + t * (b - a) }
-        return lerp(w,
-                    lerp(v, lerp(u, gradient(p[aa], xf, yf, zf), gradient(p[ba], xf - 1, yf, zf)),
-                         lerp(u, gradient(p[ab], xf, yf - 1, zf), gradient(p[bb], xf - 1, yf - 1, zf))),
-                    lerp(v, lerp(u, gradient(p[aa + 1], xf, yf, zf - 1), gradient(p[ba + 1], xf - 1, yf, zf - 1)),
-                         lerp(u, gradient(p[ab + 1], xf, yf - 1, zf - 1), gradient(p[bb + 1], xf - 1, yf - 1, zf - 1))))
+        func lerp(_ t: Double, _ a: Double, _ b: Double) -> Double {
+            a + t * (b - a)
+        }
+        return lerp(
+            w,
+            lerp(
+                v,
+                lerp(u, gradient(p[aa], xf, yf, zf), gradient(p[ba], xf - 1, yf, zf)),
+                lerp(
+                    u,
+                    gradient(p[ab], xf, yf - 1, zf),
+                    gradient(p[bb], xf - 1, yf - 1, zf)
+                )
+            ),
+            lerp(
+                v,
+                lerp(
+                    u,
+                    gradient(p[aa + 1], xf, yf, zf - 1),
+                    gradient(p[ba + 1], xf - 1, yf, zf - 1)
+                ),
+                lerp(
+                    u,
+                    gradient(p[ab + 1], xf, yf - 1, zf - 1),
+                    gradient(p[bb + 1], xf - 1, yf - 1, zf - 1)
+                )
+            )
+        )
     }
 
     /// Three octaves, halving the amplitude and doubling the frequency each time.

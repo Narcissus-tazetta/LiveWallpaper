@@ -96,7 +96,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
                 code: "tr",
                 displayNameKey: "Türkçe",
                 aliases: ["tr", "tr-TR"]
-            ),
+            )
         ]
     }
 
@@ -123,12 +123,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
-extension AppLanguage {
-    fileprivate static var optionByLanguage: [AppLanguage: LanguageOption] {
+private extension AppLanguage {
+    static var optionByLanguage: [AppLanguage: LanguageOption] {
         Dictionary(uniqueKeysWithValues: supportedOptions.map { ($0.language, $0) })
     }
 
-    fileprivate static func resolvePreferredLanguageCode(_ preferred: [String]) -> String {
+    static func resolvePreferredLanguageCode(_ preferred: [String]) -> String {
         for identifier in preferred {
             if let option = resolveSupportedOption(identifier) {
                 return option.code
@@ -137,7 +137,7 @@ extension AppLanguage {
         return optionByLanguage[.english]?.code ?? "en"
     }
 
-    fileprivate static func resolveSupportedOption(_ identifier: String) -> LanguageOption? {
+    static func resolveSupportedOption(_ identifier: String) -> LanguageOption? {
         let normalized = normalizeIdentifier(identifier)
         if normalized.isEmpty {
             return nil
@@ -155,7 +155,8 @@ extension AppLanguage {
         if let base = normalized.split(separator: "-").first {
             let baseCode = String(base)
             if baseCode == "zh" {
-                return optionByLanguage[usesTraditionalChinese(normalized) ? .traditionalChinese : .simplifiedChinese]
+                return optionByLanguage[usesTraditionalChinese(normalized) ? .traditionalChinese :
+                    .simplifiedChinese]
             }
             for option in supportedOptions {
                 if normalizeIdentifier(option.code) == baseCode {
@@ -172,7 +173,7 @@ extension AppLanguage {
 
     /// Identifiers such as "zh-Hant-JP" or "zh-TW" carry the script or region only as a
     /// suffix, so they miss the exact aliases above.
-    fileprivate static func usesTraditionalChinese(_ normalized: String) -> Bool {
+    static func usesTraditionalChinese(_ normalized: String) -> Bool {
         let parts = normalized.split(separator: "-").dropFirst()
         if parts.contains("hans") {
             return false
@@ -180,7 +181,7 @@ extension AppLanguage {
         return parts.contains { ["hant", "tw", "hk", "mo"].contains($0) }
     }
 
-    fileprivate static func normalizeIdentifier(_ identifier: String) -> String {
+    static func normalizeIdentifier(_ identifier: String) -> String {
         let canonical = Locale.canonicalLanguageIdentifier(from: identifier)
         return canonical.replacingOccurrences(of: "_", with: "-").lowercased()
     }

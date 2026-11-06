@@ -1,9 +1,9 @@
-import AVFoundation
 import AppKit
+import AVFoundation
 import ImageIO
+@testable import LiveWallpaper
 import UniformTypeIdentifiers
 import XCTest
-@testable import LiveWallpaper
 
 final class VideoThumbnailSidecarTests: XCTestCase {
     private var tempDirectory: URL!
@@ -12,7 +12,10 @@ final class VideoThumbnailSidecarTests: XCTestCase {
         let unique = UUID().uuidString
         tempDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("VideoThumbnailSidecarTests-\(unique)", isDirectory: true)
-        try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: tempDirectory,
+            withIntermediateDirectories: true
+        )
     }
 
     override func tearDown() async throws {
@@ -30,7 +33,8 @@ final class VideoThumbnailSidecarTests: XCTestCase {
         // 1. When no sidecar exists, returns nil
         XCTAssertNil(VideoThumbnailGenerator.sidecarURL(for: videoURL.path))
 
-        // 2. Generic "preview.jpg" in the same folder must NOT match (avoids flat Videos/ hijacking)
+        // 2. Generic "preview.jpg" in the same folder must NOT match (avoids flat Videos/
+        // hijacking)
         let genericPreview = tempDirectory.appendingPathComponent("preview.jpg")
         try Data("dummy-generic".utf8).write(to: genericPreview)
         XCTAssertNil(VideoThumbnailGenerator.sidecarURL(for: videoURL.path))
@@ -42,9 +46,15 @@ final class VideoThumbnailSidecarTests: XCTestCase {
 
         // 4. Exact stem match "<videoStem>.preview.jpg" matches
         let expectedURL = VideoThumbnailGenerator.expectedSidecarURL(for: videoURL.path)
-        XCTAssertEqual(expectedURL.path, tempDirectory.appendingPathComponent("my-video.preview.jpg").path)
+        XCTAssertEqual(
+            expectedURL.path,
+            tempDirectory.appendingPathComponent("my-video.preview.jpg").path
+        )
         try Data("dummy-exact".utf8).write(to: expectedURL)
-        XCTAssertEqual(VideoThumbnailGenerator.sidecarURL(for: videoURL.path)?.path, expectedURL.path)
+        XCTAssertEqual(
+            VideoThumbnailGenerator.sidecarURL(for: videoURL.path)?.path,
+            expectedURL.path
+        )
     }
 
     // MARK: - Normalization and ImageIO
@@ -63,7 +73,10 @@ final class VideoThumbnailSidecarTests: XCTestCase {
         }
         try pngData.write(to: sourceURL)
 
-        let success = VideoThumbnailGenerator.saveNormalizedPreview(from: sourceURL, to: destinationURL)
+        let success = VideoThumbnailGenerator.saveNormalizedPreview(
+            from: sourceURL,
+            to: destinationURL
+        )
         XCTAssertTrue(success)
         XCTAssertTrue(FileManager.default.fileExists(atPath: destinationURL.path))
 
@@ -89,13 +102,19 @@ final class VideoThumbnailSidecarTests: XCTestCase {
         let destinationURL = tempDirectory.appendingPathComponent("animated.preview.jpg")
 
         // 3 frames: 0: Black (fade-in), 1: Red (the only visible frame), 2: Black (fade-out)
-        guard let gifData = createMultiFrameGIF(colors: [.black, .red, .black], size: CGSize(width: 200, height: 200)) else {
+        guard let gifData = createMultiFrameGIF(
+            colors: [.black, .red, .black],
+            size: CGSize(width: 200, height: 200)
+        ) else {
             XCTFail("Failed to build multi-frame test GIF")
             return
         }
         try gifData.write(to: sourceURL)
 
-        let success = VideoThumbnailGenerator.saveNormalizedPreview(from: sourceURL, to: destinationURL)
+        let success = VideoThumbnailGenerator.saveNormalizedPreview(
+            from: sourceURL,
+            to: destinationURL
+        )
         XCTAssertTrue(success)
 
         guard let outputImage = NSImage(contentsOf: destinationURL) else {
@@ -105,7 +124,11 @@ final class VideoThumbnailSidecarTests: XCTestCase {
 
         // Red is the brightest frame, confirming both black fades were skipped
         let color = pixelColor(of: outputImage)
-        XCTAssertGreaterThan(color.redComponent, 0.7, "Expected the brightest frame to be red, but got: \(color)")
+        XCTAssertGreaterThan(
+            color.redComponent,
+            0.7,
+            "Expected the brightest frame to be red, but got: \(color)"
+        )
         XCTAssertLessThan(color.greenComponent, 0.3)
         XCTAssertLessThan(color.blueComponent, 0.3)
     }
@@ -115,7 +138,10 @@ final class VideoThumbnailSidecarTests: XCTestCase {
         try? Data("not-an-image".utf8).write(to: invalidURL)
         let destinationURL = tempDirectory.appendingPathComponent("dest.jpg")
 
-        let success = VideoThumbnailGenerator.saveNormalizedPreview(from: invalidURL, to: destinationURL)
+        let success = VideoThumbnailGenerator.saveNormalizedPreview(
+            from: invalidURL,
+            to: destinationURL
+        )
         XCTAssertFalse(success)
         XCTAssertFalse(FileManager.default.fileExists(atPath: destinationURL.path))
     }
@@ -164,8 +190,9 @@ final class VideoThumbnailSidecarTests: XCTestCase {
         try jpgData.write(to: cacheFileURL)
 
         let sourceAttrs = try FileManager.default.attributesOfItem(atPath: sourceURL.path)
-        let sourceSize = (sourceAttrs[.size] as! NSNumber).uint64Value
-        let sourceMtime = (sourceAttrs[.modificationDate] as! Date).timeIntervalSince1970
+        let sourceSize = try XCTUnwrap(sourceAttrs[.size] as? NSNumber).uint64Value
+        let sourceMtime = try XCTUnwrap(sourceAttrs[.modificationDate] as? Date)
+            .timeIntervalSince1970
 
         let entry = DiskThumbnailCache.Entry(
             fileName: cacheFileURL.lastPathComponent,
@@ -181,7 +208,7 @@ final class VideoThumbnailSidecarTests: XCTestCase {
             entry: entry,
             fileURL: cacheFileURL
         )
-        if case .data(let data) = resultWithoutSidecar {
+        if case let .data(data) = resultWithoutSidecar {
             XCTAssertFalse(data.isEmpty)
         } else {
             XCTFail("Expected .data, got \(resultWithoutSidecar)")
@@ -193,8 +220,14 @@ final class VideoThumbnailSidecarTests: XCTestCase {
 
         let oldCacheDate = Date(timeIntervalSince1970: 1000)
         let newerSidecarDate = Date(timeIntervalSince1970: 2000)
-        try FileManager.default.setAttributes([.modificationDate: oldCacheDate], ofItemAtPath: cacheFileURL.path)
-        try FileManager.default.setAttributes([.modificationDate: newerSidecarDate], ofItemAtPath: sidecarURL.path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: oldCacheDate],
+            ofItemAtPath: cacheFileURL.path
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: newerSidecarDate],
+            ofItemAtPath: sidecarURL.path
+        )
 
         let resultWithNewerSidecar = DiskThumbnailCache.loadThumbnailData(
             sourcePath: sourceURL.path,
@@ -204,12 +237,17 @@ final class VideoThumbnailSidecarTests: XCTestCase {
         if case .invalidSource = resultWithNewerSidecar {
             // Success: old cache recognized as invalid
         } else {
-            XCTFail("Expected .invalidSource when cacheMtime < sidecarMtime, got \(resultWithNewerSidecar)")
+            XCTFail(
+                "Expected .invalidSource when cacheMtime < sidecarMtime, got \(resultWithNewerSidecar)"
+            )
         }
 
         // 3. Update cache mtime to be NEWER than sidecar
         let freshestCacheDate = Date(timeIntervalSince1970: 3000)
-        try FileManager.default.setAttributes([.modificationDate: freshestCacheDate], ofItemAtPath: cacheFileURL.path)
+        try FileManager.default.setAttributes(
+            [.modificationDate: freshestCacheDate],
+            ofItemAtPath: cacheFileURL.path
+        )
 
         let resultWithFreshCache = DiskThumbnailCache.loadThumbnailData(
             sourcePath: sourceURL.path,
@@ -227,7 +265,10 @@ final class VideoThumbnailSidecarTests: XCTestCase {
 
     func testPerformReconcileImportedThumbnails() throws {
         let appSupport = tempDirectory.appendingPathComponent("AppSupport", isDirectory: true)
-        let weWallpapers = appSupport.appendingPathComponent("we-import/Wallpapers/we-789", isDirectory: true)
+        let weWallpapers = appSupport.appendingPathComponent(
+            "we-import/Wallpapers/we-789",
+            isDirectory: true
+        )
         try FileManager.default.createDirectory(at: weWallpapers, withIntermediateDirectories: true)
 
         let sourcePreview = weWallpapers.appendingPathComponent("preview.jpg")
@@ -320,9 +361,12 @@ final class VideoThumbnailSidecarTests: XCTestCase {
         return data as Data
     }
 
-    private func pixelColor(of image: NSImage) -> (redComponent: CGFloat, greenComponent: CGFloat, blueComponent: CGFloat) {
+    private func pixelColor(of image: NSImage)
+        -> (redComponent: CGFloat, greenComponent: CGFloat, blueComponent: CGFloat)
+    {
         guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff) else {
+              let bitmap = NSBitmapImageRep(data: tiff)
+        else {
             return (0, 0, 0)
         }
         let color = bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2) ?? .black

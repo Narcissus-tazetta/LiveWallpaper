@@ -76,9 +76,9 @@ struct CursorEffectsSettings: Codable, Equatable {
 
     init() {}
 
-    // Missing keys, and values this version does not know (a shape added later, say),
-    // fall back to the default for that field only: settings arrive in packages made
-    // by other versions, and one unknown value must not fail the whole import.
+    /// Missing keys, and values this version does not know (a shape added later, say),
+    /// fall back to the default for that field only: settings arrive in packages made
+    /// by other versions, and one unknown value must not fail the whole import.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = CursorEffectsSettings()
@@ -141,7 +141,8 @@ struct CursorEffectsSettings: Codable, Equatable {
 
     var trailAppearance: CursorTrailAppearance {
         CursorTrailAppearance(
-            shape: trailShape, color: trailColor, customColor: trailCustomColor, birthRate: trailBirthRate
+            shape: trailShape, color: trailColor, customColor: trailCustomColor,
+            birthRate: trailBirthRate
         )
     }
 
@@ -193,7 +194,8 @@ enum DesktopClickDetector {
     /// window list while transparent, so they are looked through too. Naming each of
     /// them breaks whenever macOS adds another.
     static func isDesktopClick(
-        at point: CGPoint, windows: [OnScreenWindow], finderPID: pid_t?, dockPID: pid_t?, ownPID: pid_t,
+        at point: CGPoint, windows: [OnScreenWindow], finderPID: pid_t?, dockPID: pid_t?,
+        ownPID: pid_t,
         screenSizes: [CGSize] = []
     ) -> Bool {
         for window in windows {
@@ -206,7 +208,9 @@ enum DesktopClickDetector {
             if window.isWindowServer, window.layer < 0 || window.layer == cursorLayer {
                 continue
             }
-            if window.layer > 0, window.layer <= overlayLayerCeiling, screenSizes.contains(window.bounds.size) {
+            if window.layer > 0, window.layer <= overlayLayerCeiling,
+               screenSizes.contains(window.bounds.size)
+            {
                 continue
             }
             return window.ownerPID == finderPID && window.layer == desktopIconLayer

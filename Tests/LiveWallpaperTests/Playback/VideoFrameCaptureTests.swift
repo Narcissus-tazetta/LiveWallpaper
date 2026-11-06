@@ -1,10 +1,9 @@
 import AVFoundation
 import CoreGraphics
 import ImageIO
+@testable import LiveWallpaper
 import UniformTypeIdentifiers
 import XCTest
-
-@testable import LiveWallpaper
 
 /// フリーズフレーム生成が生成器のキャッシュ越しでも正しく動くことを、実ファイルで確認する。
 /// キャッシュ自体は実装詳細なので、外から見える「毎回ちゃんとデコードできる」ことを見る。
@@ -45,9 +44,9 @@ final class VideoFrameCaptureTests: XCTestCase {
             let gray = CGFloat(index) / 3.0
             context.setFillColor(CGColor(red: gray, green: gray, blue: gray, alpha: 1))
             context.fill(CGRect(x: 0, y: 0, width: size, height: size))
-            CGImageDestinationAddImage(
+            try CGImageDestinationAddImage(
                 destination,
-                try XCTUnwrap(context.makeImage()),
+                XCTUnwrap(context.makeImage()),
                 [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.5]] as CFDictionary
             )
         }

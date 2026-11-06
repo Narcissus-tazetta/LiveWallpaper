@@ -93,7 +93,7 @@ enum WebWallpaperThumbnailProvider {
         }
         for candidate in [
             URL(string: "https://\(host)/favicon.ico"),
-            URL(string: "https://\(host)/apple-touch-icon.png"),
+            URL(string: "https://\(host)/apple-touch-icon.png")
         ].compactMap({ $0 }) {
             if let image = await downloadImage(from: candidate) {
                 return image
@@ -103,14 +103,20 @@ enum WebWallpaperThumbnailProvider {
     }
 
     static func downloadImage(from url: URL) async -> NSImage? {
-        var request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 15)
+        var request = URLRequest(
+            url: url,
+            cachePolicy: .returnCacheDataElseLoad,
+            timeoutInterval: 15
+        )
         request.setValue(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) LiveWallpaper/1.0",
             forHTTPHeaderField: "User-Agent"
         )
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
+            guard let http = response as? HTTPURLResponse,
+                  (200 ..< 300).contains(http.statusCode)
+            else {
                 return nil
             }
             return NSImage(data: data)
@@ -126,14 +132,20 @@ enum WebWallpaperThumbnailProvider {
             return nil
         }
 
-        var request = URLRequest(url: oembedURL, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 15)
+        var request = URLRequest(
+            url: oembedURL,
+            cachePolicy: .returnCacheDataElseLoad,
+            timeoutInterval: 15
+        )
         request.setValue(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) LiveWallpaper/1.0",
             forHTTPHeaderField: "User-Agent"
         )
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
+            guard let http = response as? HTTPURLResponse,
+                  (200 ..< 300).contains(http.statusCode)
+            else {
                 return nil
             }
             guard

@@ -82,7 +82,12 @@ final class WebSystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate, @
                 if analyzer?.sampleRate != sampleRate {
                     analyzer = SceneAudioAnalyzer(sampleRate: sampleRate)
                 }
-                if let output = analyzer!.append(left: left, right: right, frames: sampleBuffer.numSamples, stride: stride) {
+                if let output = analyzer!.append(
+                    left: left,
+                    right: right,
+                    frames: sampleBuffer.numSamples,
+                    stride: stride
+                ) {
                     onSpectrum(output.web)
                     onSceneSpectrum(output.scene)
                 }

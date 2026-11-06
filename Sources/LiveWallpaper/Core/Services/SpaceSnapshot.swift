@@ -11,7 +11,9 @@ struct SpaceInfo: Equatable, Identifiable {
     /// フルスクリーン Space は番号を持たないため nil。
     let ordinal: Int?
 
-    var id: String { uuid }
+    var id: String {
+        uuid
+    }
 }
 
 /// 1 ディスプレイぶんの Space 一覧と現在の Space。
@@ -98,7 +100,7 @@ enum SpaceSnapshotParser {
                         currentSpace[Key.uuid] as? String
                     ),
                     currentSpaceIsFullscreen:
-                        currentSpace[Key.tileLayoutManager] is [String: Any]
+                    currentSpace[Key.tileLayoutManager] is [String: Any]
                 )
             )
         }

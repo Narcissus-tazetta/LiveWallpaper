@@ -11,7 +11,8 @@ enum AppRelaunch {
         do {
             try process.run()
         } catch {
-            AppLog.appDelegate.error("relaunch failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.appDelegate
+                .error("relaunch failed: \(error.localizedDescription, privacy: .public)")
             return
         }
         NSApp.terminate(nil)

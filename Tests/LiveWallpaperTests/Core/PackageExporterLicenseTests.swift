@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 /// exportSingleWallpaperPackage(license:) が実際にパッケージ内の metadata.json へ
 /// 反映されることを検証する。以前は StoreClient から渡されたライセンス文字列が
@@ -88,7 +87,7 @@ final class PackageExporterLicenseTests: XCTestCase {
     func testStoreLimitIncludesTheWholePackage() async throws {
         let workDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: workDir, withIntermediateDirectories: true)
-        defer { try! fileManager.removeItem(at: workDir) }
+        defer { XCTAssertNoThrow(try fileManager.removeItem(at: workDir)) }
         let video = try makeStandInVideoFile(in: workDir)
         do {
             _ = try await PackageExporter().exportSingleWallpaperPackage(

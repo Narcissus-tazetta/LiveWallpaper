@@ -21,7 +21,8 @@ enum SceneModelShading {
 
     static func material(surface: SceneModelSurface, boneCount: Int?) -> SceneMeshMaterial {
         let images: [String: String] = Dictionary(uniqueKeysWithValues: zip(imageSlots, [
-            surface.baseColorImage, surface.metallicRoughnessImage, surface.normalImage, surface.occlusionImage, surface.emissiveImage
+            surface.baseColorImage, surface.metallicRoughnessImage, surface.normalImage,
+            surface.occlusionImage, surface.emissiveImage
         ]).compactMap { name, file in file.map { (name, $0) } })
         var defines = images.keys.sorted().map { "#define HAS_\($0.uppercased()) 1" }
         if boneCount != nil { defines.append("#define SKINNED 1") }
@@ -33,47 +34,68 @@ enum SceneModelShading {
 
         var fragment = Data(count: fragmentSize)
         func put(_ values: [Float], at offset: Int) {
-            values.withUnsafeBytes { fragment.replaceSubrange(offset ..< offset + $0.count, with: $0) }
+            values
+                .withUnsafeBytes { fragment.replaceSubrange(offset ..< offset + $0.count, with: $0)
+                }
         }
         put(surface.baseColor.map(Float.init), at: 64)
         put(surface.emissive.map(Float.init) + [Float(surface.alphaCutoff)], at: 80)
-        put([surface.metallic, surface.roughness, surface.normalScale, surface.occlusionStrength].map(Float.init), at: 96)
+        put(
+            [surface.metallic, surface.roughness, surface.normalScale, surface.occlusionStrength]
+                .map(Float.init),
+            at: 96
+        )
         var fragmentUpdates: [SceneRenderGraph.UniformUpdate] = [
             .init(offset: 0, value: .eyePosition),
             .init(offset: 16, value: .ambientColor),
             .init(offset: 32, value: .skylightColor),
             .init(offset: 48, value: .layerColor),
-            .init(offset: 60, value: .layerAlpha),
+            .init(offset: 60, value: .layerAlpha)
         ]
         fragmentUpdates += lightUpdates()
 
         var vertexUpdates: [SceneRenderGraph.UniformUpdate] = [
             .init(offset: 0, value: .modelViewProjection),
             .init(offset: 64, value: .model),
-            .init(offset: 128, value: .normalModel),
+            .init(offset: 128, value: .normalModel)
         ]
         var attributes: [SceneRenderGraph.Attribute] = [
             .init(location: 0, offset: 0, format: .float3, semantic: .position),
             .init(location: 1, offset: 0, format: .float3, semantic: .normal),
             .init(location: 2, offset: 0, format: .float4, semantic: .tangentSigned),
             .init(location: 3, offset: 0, format: .float2, semantic: .uv),
-            .init(location: 4, offset: 0, format: .float4, semantic: .color),
+            .init(location: 4, offset: 0, format: .float4, semantic: .color)
         ]
         if boneCount != nil {
             vertexUpdates.append(.init(offset: bonesOffset, value: .boneMatrices, stride: 64))
             attributes += [
                 .init(location: 5, offset: 0, format: .uint4, semantic: .joints),
-                .init(location: 6, offset: 0, format: .float4, semantic: .weights),
+                .init(location: 6, offset: 0, format: .float4, semantic: .weights)
             ]
         }
         let textures = imageSlots.enumerated().compactMap { index, name in
-            images[name] == nil ? nil : SceneRenderGraph.Texture(index: index, source: name, repeats: surface.repeats, linear: true)
+            images[name] == nil ? nil : SceneRenderGraph.Texture(
+                index: index,
+                source: name,
+                repeats: surface.repeats,
+                linear: true
+            )
         } + shadowTextures
         let draw = SceneRenderGraph.Draw(
-            vertex: .init(source: source, entryPoint: "surfaceVertex",
-                          uniforms: Data(count: bonesOffset + 64 * max(boneCount ?? 0, 1)), updates: vertexUpdates),
-            fragment: .init(source: source, entryPoint: "surfaceFragment", uniforms: fragment, updates: fragmentUpdates),
-            vertices: Data(), vertexStride: 0, vertexCount: 0, attributes: attributes, textures: textures,
+            vertex: .init(
+                source: source,
+                entryPoint: "surfaceVertex",
+                uniforms: Data(count: bonesOffset + 64 * max(boneCount ?? 0, 1)),
+                updates: vertexUpdates
+            ),
+            fragment: .init(
+                source: source,
+                entryPoint: "surfaceFragment",
+                uniforms: fragment,
+                updates: fragmentUpdates
+            ),
+            vertices: Data(), vertexStride: 0, vertexCount: 0, attributes: attributes,
+            textures: textures,
             blend: .sourceOver, depthTest: true, depthWrite: surface.alphaMode != .blend,
             cull: surface.doubleSided ? nil : .back
         )
@@ -84,27 +106,43 @@ enum SceneModelShading {
     static func floorMaterial() -> SceneMeshMaterial {
         let source = "#define FLOOR 1\n" + shaderSource
         let draw = SceneRenderGraph.Draw(
-            vertex: .init(source: source, entryPoint: "surfaceVertex", uniforms: Data(count: bonesOffset + 64), updates: [
-                .init(offset: 0, value: .modelViewProjection),
-                .init(offset: 64, value: .model),
-                .init(offset: 128, value: .normalModel),
-            ]),
-            fragment: .init(source: source, entryPoint: "floorFragment", uniforms: Data(count: fragmentSize), updates: lightUpdates()),
+            vertex: .init(
+                source: source,
+                entryPoint: "surfaceVertex",
+                uniforms: Data(count: bonesOffset + 64),
+                updates: [
+                    .init(offset: 0, value: .modelViewProjection),
+                    .init(offset: 64, value: .model),
+                    .init(offset: 128, value: .normalModel)
+                ]
+            ),
+            fragment: .init(
+                source: source,
+                entryPoint: "floorFragment",
+                uniforms: Data(count: fragmentSize),
+                updates: lightUpdates()
+            ),
             vertices: Data(), vertexStride: 0, vertexCount: 0,
             attributes: [
                 .init(location: 0, offset: 0, format: .float3, semantic: .position),
                 .init(location: 1, offset: 0, format: .float3, semantic: .normal),
                 .init(location: 2, offset: 0, format: .float4, semantic: .tangentSigned),
                 .init(location: 3, offset: 0, format: .float2, semantic: .uv),
-                .init(location: 4, offset: 0, format: .float4, semantic: .color),
+                .init(location: 4, offset: 0, format: .float4, semantic: .color)
             ],
-            textures: shadowTextures, blend: .sourceOver, depthTest: true, depthWrite: false, cull: nil
+            textures: shadowTextures, blend: .sourceOver, depthTest: true, depthWrite: false,
+            cull: nil
         )
         return SceneMeshMaterial(path: "floor", draw: draw, images: [:])
     }
 
     private static var shadowTextures: [SceneRenderGraph.Texture] {
-        (0 ..< maximumLights).map { .init(index: shadowTextureIndex + $0, source: "_shadow\($0)", repeats: false, linear: false) }
+        (0 ..< maximumLights).map { .init(
+            index: shadowTextureIndex + $0,
+            source: "_shadow\($0)",
+            repeats: false,
+            linear: false
+        ) }
     }
 
     private static func lightUpdates() -> [SceneRenderGraph.UniformUpdate] {
@@ -116,7 +154,11 @@ enum SceneModelShading {
                 .init(offset: base + 16, value: .lightAxis, key: "\(light)"),
                 .init(offset: base + 32, value: .lightColor, key: "\(light)"),
                 .init(offset: base + 48, value: .effectValue, key: "light\(light)", components: 4),
-                .init(offset: shadowMatricesOffset + light * 64, value: .shadowMatrix, key: "\(light)"),
+                .init(
+                    offset: shadowMatricesOffset + light * 64,
+                    value: .shadowMatrix,
+                    key: "\(light)"
+                )
             ]
         }
         updates.append(.init(offset: floorOffset, value: .effectValue, key: "floor", components: 4))

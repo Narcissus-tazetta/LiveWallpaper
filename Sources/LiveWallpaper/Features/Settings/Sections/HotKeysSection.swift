@@ -13,10 +13,9 @@ extension SettingsView {
         "前の壁紙に切り替え",
         "音声のオン/オフ",
         "デスクトップアイコンの表示/非表示",
-        "壁紙の一時停止/再開",
+        "壁紙の一時停止/再開"
     ]
 
-    @ViewBuilder
     var hotKeysSettingsSection: some View {
         Section(
             header: SettingsSectionHeader(title: model.localizedString("グローバルショートカット"))
@@ -116,7 +115,7 @@ final class HotKeyRecorderButton: NSButton {
     /// 現在録音中の行(常に高々1つ)。設定ウィンドウの既存キー監視
     /// (settingsKeyMonitor、Cmd+W/Cmd+Q をウィンドウを閉じる操作として横取りする)
     /// が、録音中はそれらのキーを素通りさせられるようにするための公開状態でもある。
-    static private(set) weak var activeRecorder: HotKeyRecorderButton?
+    private(set) weak static var activeRecorder: HotKeyRecorderButton?
 
     var currentCombo: HotKeyCombo?
     var onChange: ((HotKeyCombo?) -> Void)?
@@ -179,10 +178,10 @@ final class HotKeyRecorderButton: NSButton {
         isRecordingActive = true
         refreshTitle()
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
-            guard let self, self.isRecordingActive else {
+            guard let self, isRecordingActive else {
                 return event
             }
-            return self.handleRecordingEvent(event)
+            return handleRecordingEvent(event)
         }
     }
 

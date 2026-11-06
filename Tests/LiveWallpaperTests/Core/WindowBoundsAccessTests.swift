@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class WindowBoundsAccessTests: XCTestCase {
@@ -17,7 +16,7 @@ final class WindowBoundsAccessTests: XCTestCase {
     func testAnotherAppsWindowWithBoundsMeansReadable() {
         let list = [
             window(pid: ownPID, bounds: CGRect(x: 0, y: 0, width: 100, height: 100)),
-            window(pid: ownPID + 1, bounds: CGRect(x: 0, y: 0, width: 800, height: 600)),
+            window(pid: ownPID + 1, bounds: CGRect(x: 0, y: 0, width: 800, height: 600))
         ]
         XCTAssertTrue(WallpaperModel.otherAppWindowBoundsReadable(in: list))
     }
@@ -31,7 +30,7 @@ final class WindowBoundsAccessTests: XCTestCase {
     func testWithheldOrEmptyBoundsMeanUnreadable() {
         let list = [
             window(pid: ownPID + 1, bounds: nil),
-            window(pid: ownPID + 2, bounds: .zero),
+            window(pid: ownPID + 2, bounds: .zero)
         ]
         XCTAssertFalse(WallpaperModel.otherAppWindowBoundsReadable(in: list))
     }

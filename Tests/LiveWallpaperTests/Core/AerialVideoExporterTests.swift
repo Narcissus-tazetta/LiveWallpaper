@@ -159,7 +159,12 @@ final class AerialVideoExporterTests: XCTestCase {
         let first = try await generator.image(at: .zero).image
         let later = try await generator.image(at: CMTime(value: 1500, timescale: 1000)).image
         XCTAssertEqual(try brightness(of: first), 80, accuracy: 20)
-        XCTAssertEqual(try brightness(of: later), 200, accuracy: 20, "the part before the start plays at the end")
+        XCTAssertEqual(
+            try brightness(of: later),
+            200,
+            accuracy: 20,
+            "the part before the start plays at the end"
+        )
     }
 
     func testANonVideoIsRejected() async throws {

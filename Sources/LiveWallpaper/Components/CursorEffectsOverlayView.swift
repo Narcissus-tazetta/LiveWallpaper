@@ -26,7 +26,7 @@ final class CursorEffectsOverlayView: NSView {
         CALayer()
     }
 
-    // Clicks belong to the desktop below.
+    /// Clicks belong to the desktop below.
     override func hitTest(_: NSPoint) -> NSView? {
         nil
     }
@@ -106,17 +106,27 @@ final class CursorEffectsOverlayView: NSView {
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
-            AppLog.windowRefresh.error("spotlight mask context unavailable width=\(width) height=\(height)")
+            AppLog.windowRefresh
+                .error("spotlight mask context unavailable width=\(width) height=\(height)")
             return
         }
         context.setFillColor(NSColor.black.cgColor)
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        let colors = [NSColor.clear.cgColor, NSColor.clear.cgColor, NSColor.black.cgColor] as CFArray
-        let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 0.55, 1])!
+        let colors = [
+            NSColor.clear.cgColor,
+            NSColor.clear.cgColor,
+            NSColor.black.cgColor
+        ] as CFArray
+        let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: colors,
+            locations: [0, 0.55, 1]
+        )!
         let center = CGPoint(x: CGFloat(width) / 2, y: CGFloat(height) / 2)
         context.setBlendMode(.copy)
         context.drawRadialGradient(
-            gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: radius / scale,
+            gradient, startCenter: center, startRadius: 0, endCenter: center,
+            endRadius: radius / scale,
             options: []
         )
         CATransaction.begin()
@@ -198,7 +208,8 @@ final class CursorEffectsOverlayView: NSView {
         case .white:
             cell.color = NSColor.white.cgColor
         case .accent:
-            cell.color = NSColor.controlAccentColor.usingColorSpace(.sRGB)?.cgColor ?? NSColor.white.cgColor
+            cell.color = NSColor.controlAccentColor.usingColorSpace(.sRGB)?.cgColor ?? NSColor.white
+                .cgColor
         case .rainbow:
             cell.color = NSColor(srgbRed: 0.6, green: 0.6, blue: 0.6, alpha: 1).cgColor
             cell.redRange = 0.4
@@ -211,7 +222,12 @@ final class CursorEffectsOverlayView: NSView {
 
     // MARK: - Click
 
-    func showClick(at point: CGPoint, style: CursorClickStyle, color: CursorEffectColor, customColor: RGBAColor) {
+    func showClick(
+        at point: CGPoint,
+        style: CursorClickStyle,
+        color: CursorEffectColor,
+        customColor: RGBAColor
+    ) {
         switch style {
         case .ripple:
             showRipple(at: point, color: Self.resolvedColor(color, custom: customColor))
@@ -324,10 +340,15 @@ final class CursorEffectsOverlayView: NSView {
             return nil
         }
         let colors = [NSColor.white.cgColor, NSColor.white.withAlphaComponent(0).cgColor] as CFArray
-        let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1])!
+        let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: colors,
+            locations: [0, 1]
+        )!
         let center = CGPoint(x: size / 2, y: size / 2)
         context.drawRadialGradient(
-            gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: CGFloat(size) / 2,
+            gradient, startCenter: center, startRadius: 0, endCenter: center,
+            endRadius: CGFloat(size) / 2,
             options: []
         )
         return context.makeImage()
@@ -348,10 +369,18 @@ final class CursorEffectsOverlayView: NSView {
             return nil
         }
         let c = CGFloat(size) / 2
-        let colors = [NSColor.white.withAlphaComponent(0.5).cgColor, NSColor.white.withAlphaComponent(0).cgColor] as CFArray
-        let glow = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1])!
+        let colors = [
+            NSColor.white.withAlphaComponent(0.5).cgColor,
+            NSColor.white.withAlphaComponent(0).cgColor
+        ] as CFArray
+        let glow = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: colors,
+            locations: [0, 1]
+        )!
         context.drawRadialGradient(
-            glow, startCenter: CGPoint(x: c, y: c), startRadius: 0, endCenter: CGPoint(x: c, y: c), endRadius: c * 0.6,
+            glow, startCenter: CGPoint(x: c, y: c), startRadius: 0, endCenter: CGPoint(x: c, y: c),
+            endRadius: c * 0.6,
             options: []
         )
         let outer = c * 0.95
@@ -381,7 +410,12 @@ final class CursorEffectsOverlayView: NSView {
         context.setFillColor(NSColor.white.withAlphaComponent(0.15).cgColor)
         context.fillEllipse(in: rect)
         context.setFillColor(NSColor.white.withAlphaComponent(0.9).cgColor)
-        context.fillEllipse(in: CGRect(x: CGFloat(size) * 0.58, y: CGFloat(size) * 0.58, width: 5, height: 5))
+        context.fillEllipse(in: CGRect(
+            x: CGFloat(size) * 0.58,
+            y: CGFloat(size) * 0.58,
+            width: 5,
+            height: 5
+        ))
         return context.makeImage()
     }()
 }

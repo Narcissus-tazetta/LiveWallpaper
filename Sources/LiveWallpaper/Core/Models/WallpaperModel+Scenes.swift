@@ -111,13 +111,16 @@ extension WallpaperModel {
         for path in videoOverrideByScreenID.values {
             candidatePaths.insert(path)
         }
-        for path in candidatePaths where path.hasPrefix(cacheDirectory) || path.hasPrefix(externalDirectory) {
+        for path in candidatePaths
+            where path.hasPrefix(cacheDirectory) || path.hasPrefix(externalDirectory)
+        {
             do {
                 if var loaded = try SceneStore.load(videoPath: path) {
                     do {
                         loaded = try SceneStore.movingGeometryToFiles(loaded, videoPath: path)
                     } catch {
-                        // The scene still plays from the inline copy; only the memory saving is lost.
+                        // The scene still plays from the inline copy; only the memory saving is
+                        // lost.
                         AppLog.windowRefresh.error(
                             "scene geometry not moved to files path=\(path, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
                         )
@@ -194,7 +197,8 @@ extension WallpaperModel {
                 mediaImportErrorMessage = localizedString("変換をキャンセルしました")
                 return nil
             }
-            AppLog.windowRefresh.error("still import failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error("still import failed: \(error.localizedDescription, privacy: .public)")
             mediaImportErrorMessage = localizedString("画像を壁紙にできませんでした。")
                 + " " + error.localizedDescription
             return nil
@@ -214,7 +218,8 @@ extension WallpaperModel {
                 ScenePatternGenerator.image(pattern), prefix: "pattern", videoPath: path
             )
         } catch {
-            AppLog.windowRefresh.error("scene pattern not written: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error("scene pattern not written: \(error.localizedDescription, privacy: .public)")
             sceneErrorMessage = error.localizedDescription
             return nil
         }
@@ -253,7 +258,8 @@ extension WallpaperModel {
             key = coalescing ? try document.changeKey(from: previous) : nil
         } catch {
             sceneErrorMessage = error.localizedDescription
-            AppLog.windowRefresh.error("scene diff failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error("scene diff failed: \(error.localizedDescription, privacy: .public)")
             return
         }
         sceneHistories[path, default: EditHistory()].record(previous, coalescingKey: key)
@@ -305,7 +311,9 @@ extension WallpaperModel {
         sceneScriptIssues[path] = []
         scheduleSceneSave(path: path)
         refreshScenePresetTrial(path: path)
-        if previous?.usesTimeOfDay != document.usesTimeOfDay || previous?.timeBands != document.timeBands {
+        if previous?.usesTimeOfDay != document.usesTimeOfDay || previous?.timeBands != document
+            .timeBands
+        {
             scheduleNextSceneTimeOfDayUpdate(after: Date())
         }
         guard previous.map({ !document.rendersSame(as: $0) }) ?? true else {
@@ -323,7 +331,10 @@ extension WallpaperModel {
     /// per frame; writing each one cost more main thread time than drawing it.
     private static let sceneSaveDelay: TimeInterval = 0.4
     /// Serial, so writes land in the order the edits were made.
-    private static let sceneSaveQueue = DispatchQueue(label: "com.sakana.livewallpaper.scene-save", qos: .utility)
+    private static let sceneSaveQueue = DispatchQueue(
+        label: "com.sakana.livewallpaper.scene-save",
+        qos: .utility
+    )
 
     private func scheduleSceneSave(path: String) {
         sceneSaveWorkItems.removeValue(forKey: path)?.cancel()
@@ -405,7 +416,8 @@ extension WallpaperModel {
         switch result {
         case let .failure(error):
             sceneSaveFailures[path] = error.localizedDescription
-            AppLog.windowRefresh.error("scene save failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error("scene save failed: \(error.localizedDescription, privacy: .public)")
         case let .success(candidates):
             sceneSaveFailures[path] = nil
             if sceneSaveWorkItems[path] == nil, let document = sceneDocumentsByPath[path] {
@@ -505,7 +517,10 @@ extension WallpaperModel {
                 added.append(layer)
             } catch {
                 failure = error
-                AppLog.windowRefresh.error("adding scene layer failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.windowRefresh
+                    .error(
+                        "adding scene layer failed: \(error.localizedDescription, privacy: .public)"
+                    )
             }
         }
         if let failure {
@@ -530,7 +545,10 @@ extension WallpaperModel {
             removeLeftovers(of: [stagingFolder])
         }
         do {
-            try FileManager.default.createDirectory(at: stagingFolder, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: stagingFolder,
+                withIntermediateDirectories: true
+            )
             let layer = try await SceneStore.importVideo(at: videoURL, videoPath: stagingVideoPath)
             guard var document = sceneDocumentsByPath[path] else {
                 return nil
@@ -541,7 +559,10 @@ extension WallpaperModel {
             updateScene(document, path: path, coalescing: false)
             return layer.id
         } catch {
-            AppLog.windowRefresh.error("adding scene video layer failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error(
+                    "adding scene video layer failed: \(error.localizedDescription, privacy: .public)"
+                )
             sceneErrorMessage = error.localizedDescription
             return nil
         }
@@ -565,10 +586,17 @@ extension WallpaperModel {
         }
         let texture: String
         do {
-            texture = try SceneStore.writeImage(Self.softDotImage(), prefix: "particle", videoPath: path)
+            texture = try SceneStore.writeImage(
+                Self.softDotImage(),
+                prefix: "particle",
+                videoPath: path
+            )
         } catch {
             sceneErrorMessage = error.localizedDescription
-            AppLog.windowRefresh.error("writing particle sprite failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error(
+                    "writing particle sprite failed: \(error.localizedDescription, privacy: .public)"
+                )
             return nil
         }
         let system = SceneParticleSystem.risingLights(
@@ -596,8 +624,15 @@ extension WallpaperModel {
         do {
             let (width, height) = (current.canvasWidth, current.canvasHeight)
             let result = try await Task.detached(priority: .userInitiated) {
-                try FileManager.default.createDirectory(at: stagingFolder, withIntermediateDirectories: true)
-                let result = try SceneModelImporter.importModel(at: modelURL, canvasWidth: width, canvasHeight: height)
+                try FileManager.default.createDirectory(
+                    at: stagingFolder,
+                    withIntermediateDirectories: true
+                )
+                let result = try SceneModelImporter.importModel(
+                    at: modelURL,
+                    canvasWidth: width,
+                    canvasHeight: height
+                )
                 for file in result.files {
                     try file.data.write(to: stagingFolder.appendingPathComponent(file.name))
                 }
@@ -619,7 +654,10 @@ extension WallpaperModel {
             updateScene(document, path: path, coalescing: false)
             return result.layer.id
         } catch {
-            AppLog.windowRefresh.error("adding scene model layer failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error(
+                    "adding scene model layer failed: \(error.localizedDescription, privacy: .public)"
+                )
             sceneErrorMessage = error.localizedDescription
             return nil
         }
@@ -654,7 +692,10 @@ extension WallpaperModel {
             apply(layer.imageFile)
         } catch {
             sceneErrorMessage = error.localizedDescription
-            AppLog.windowRefresh.error("importing particle image failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error(
+                    "importing particle image failed: \(error.localizedDescription, privacy: .public)"
+                )
         }
     }
 
@@ -668,14 +709,24 @@ extension WallpaperModel {
         ),
             let gradient = CGGradient(
                 colorsSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-                colors: [CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1), CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0)] as CFArray,
+                colors: [
+                    CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1),
+                    CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0)
+                ] as CFArray,
                 locations: [0, 1]
             )
         else {
             throw SceneStore.StoreError.unreadableImage("particle sprite")
         }
         let center = CGPoint(x: Double(size) / 2, y: Double(size) / 2)
-        context.drawRadialGradient(gradient, startCenter: center, startRadius: 0, endCenter: center, endRadius: Double(size) / 2, options: [])
+        context.drawRadialGradient(
+            gradient,
+            startCenter: center,
+            startRadius: 0,
+            endCenter: center,
+            endRadius: Double(size) / 2,
+            options: []
+        )
         guard let image = context.makeImage() else {
             throw SceneStore.StoreError.unreadableImage("particle sprite")
         }
@@ -706,34 +757,49 @@ extension WallpaperModel {
                 self?.removeLeftovers(of: [stagingFolder])
             }
             do {
-                let (foregroundFile, backgroundFile) = try await Task.detached(priority: .userInitiated) {
-                    let separation = try SceneAI.separateForeground(imageURL: imageURL)
-                    return try (
-                        SceneStore.writeImage(separation.foreground, prefix: "layer", videoPath: stagingVideoPath),
-                        SceneStore.writeImage(separation.background, prefix: "layer", videoPath: stagingVideoPath)
-                    )
-                }.value
+                let (foregroundFile, backgroundFile) = try await Task
+                    .detached(priority: .userInitiated) {
+                        let separation = try SceneAI.separateForeground(imageURL: imageURL)
+                        return try (
+                            SceneStore.writeImage(
+                                separation.foreground,
+                                prefix: "layer",
+                                videoPath: stagingVideoPath
+                            ),
+                            SceneStore.writeImage(
+                                separation.background,
+                                prefix: "layer",
+                                videoPath: stagingVideoPath
+                            )
+                        )
+                    }.value
                 guard let self else {
                     return
                 }
-                self.sceneAIWork[layerID] = nil
-                guard var document = self.sceneDocumentsByPath[path],
+                sceneAIWork[layerID] = nil
+                guard var document = sceneDocumentsByPath[path],
                       let index = document.layers.firstIndex(where: { $0.id == layerID })
                 else {
                     return
                 }
-                try self.adoptStagedSceneFile(foregroundFile, from: stagingFolder, path: path)
-                try self.adoptStagedSceneFile(backgroundFile, from: stagingFolder, path: path)
+                try adoptStagedSceneFile(foregroundFile, from: stagingFolder, path: path)
+                try adoptStagedSceneFile(backgroundFile, from: stagingFolder, path: path)
                 document.layers[index].imageFile = backgroundFile
                 document.layers[index].name = backgroundName
-                let foreground = document.layers[index].separatedForeground(name: foregroundName, imageFile: foregroundFile)
+                let foreground = document.layers[index].separatedForeground(
+                    name: foregroundName,
+                    imageFile: foregroundFile
+                )
                 document.layers.insert(foreground, at: index + 1)
                 document.linkLayer(foreground.id, likeLayer: layerID)
-                self.updateScene(document, path: path, coalescing: false)
+                updateScene(document, path: path, coalescing: false)
             } catch {
                 self?.sceneAIWork[layerID] = nil
                 self?.sceneErrorMessage = error.localizedDescription
-                AppLog.windowRefresh.error("foreground separation failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.windowRefresh
+                    .error(
+                        "foreground separation failed: \(error.localizedDescription, privacy: .public)"
+                    )
             }
         }
     }
@@ -769,25 +835,29 @@ extension WallpaperModel {
                 self?.sceneAIWork[layerID] = .estimatingDepth
                 let file = try await Task.detached(priority: .userInitiated) {
                     try SceneStore.writeImage(
-                        SceneAI.estimateDepth(imageURL: imageURL), prefix: "depth", videoPath: stagingVideoPath
+                        SceneAI.estimateDepth(imageURL: imageURL), prefix: "depth",
+                        videoPath: stagingVideoPath
                     )
                 }.value
                 guard let self else {
                     return
                 }
-                self.sceneAIWork[layerID] = nil
-                guard var document = self.sceneDocumentsByPath[path],
+                sceneAIWork[layerID] = nil
+                guard var document = sceneDocumentsByPath[path],
                       let index = document.layers.firstIndex(where: { $0.id == layerID })
                 else {
                     return
                 }
-                try self.adoptStagedSceneFile(file, from: stagingFolder, path: path)
+                try adoptStagedSceneFile(file, from: stagingFolder, path: path)
                 document.layers[index].depthFile = file
-                self.updateScene(document, path: path, coalescing: false)
+                updateScene(document, path: path, coalescing: false)
             } catch {
                 self?.sceneAIWork[layerID] = nil
                 self?.sceneErrorMessage = error.localizedDescription
-                AppLog.windowRefresh.error("depth estimation failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.windowRefresh
+                    .error(
+                        "depth estimation failed: \(error.localizedDescription, privacy: .public)"
+                    )
             }
         }
     }
@@ -796,7 +866,11 @@ extension WallpaperModel {
     /// effect with it, and fills that place in this layer from its surroundings. Moving
     /// a separate layer moves the area's outline too, where an effect painted in place
     /// only bends what is inside. Returns the new layer's id.
-    func moveScenePaintedAreaToOwnLayer(effectID: UUID, layerID: UUID, path: String) async -> UUID? {
+    func moveScenePaintedAreaToOwnLayer(
+        effectID: UUID,
+        layerID: UUID,
+        path: String
+    ) async -> UUID? {
         guard sceneAIWork[layerID] == nil,
               let layer = sceneDocumentsByPath[path]?.layers.first(where: { $0.id == layerID }),
               layer.kind == .image,
@@ -822,16 +896,31 @@ extension WallpaperModel {
         do {
             let (areaFile, restFile, bounds) = try await Task.detached(priority: .userInitiated) {
                 let separation = try SceneAI.separateArea(imageURL: imageURL, maskURL: maskURL)
-                let small = try SceneStore.readPaintImage(maskFile, width: 256, height: 256, target: .mask, videoPath: path)
+                let small = try SceneStore.readPaintImage(
+                    maskFile,
+                    width: 256,
+                    height: 256,
+                    target: .mask,
+                    videoPath: path
+                )
                 return try (
-                    SceneStore.writeImage(separation.foreground, prefix: "layer", videoPath: stagingVideoPath),
-                    SceneStore.writeImage(separation.background, prefix: "layer", videoPath: stagingVideoPath),
+                    SceneStore.writeImage(
+                        separation.foreground,
+                        prefix: "layer",
+                        videoPath: stagingVideoPath
+                    ),
+                    SceneStore.writeImage(
+                        separation.background,
+                        prefix: "layer",
+                        videoPath: stagingVideoPath
+                    ),
                     SceneAreaBounds.of(small, width: 256, height: 256)
                 )
             }.value
             guard var document = sceneDocumentsByPath[path],
                   let index = document.layers.firstIndex(where: { $0.id == layerID }),
-                  let effectIndex = document.layers[index].effects.firstIndex(where: { $0.id == effectID })
+                  let effectIndex = document.layers[index].effects
+                  .firstIndex(where: { $0.id == effectID })
             else {
                 return nil
             }
@@ -861,7 +950,10 @@ extension WallpaperModel {
             return area.id
         } catch {
             sceneErrorMessage = error.localizedDescription
-            AppLog.windowRefresh.error("moving painted area failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error(
+                    "moving painted area failed: \(error.localizedDescription, privacy: .public)"
+                )
             return nil
         }
     }
@@ -911,7 +1003,9 @@ extension WallpaperModel {
         }
         let removed = document.layers.remove(at: index)
         if removed.modelPlacement != nil {
-            if let rig = removed.model?.skeleton, !document.layers.contains(where: { $0.model?.skeleton == rig }) {
+            if let rig = removed.model?.skeleton,
+               !document.layers.contains(where: { $0.model?.skeleton == rig })
+            {
                 document.rigs[rig] = nil
             }
             // Without imported models the scene's own camera lights its models again.
@@ -943,13 +1037,16 @@ extension WallpaperModel {
             updateScene(document, path: path, coalescing: false)
             return
         }
-        guard let effectIndex = document.layers[layerIndex].effects.firstIndex(where: { $0.id == effectID }) else {
+        guard let effectIndex = document.layers[layerIndex].effects
+            .firstIndex(where: { $0.id == effectID })
+        else {
             return
         }
         switch kind {
         case .mask:
             document.layers[layerIndex].effects[effectIndex].maskFile = fileName
-            document.layers[layerIndex].effects[effectIndex].areaBounds = fileName == nil ? nil : bounds
+            document.layers[layerIndex].effects[effectIndex]
+                .areaBounds = fileName == nil ? nil : bounds
         case .timeOffset:
             document.layers[layerIndex].effects[effectIndex].timeOffsetFile = fileName
         case .flow:
@@ -959,7 +1056,8 @@ extension WallpaperModel {
     }
 
     /// Deletes images in the scene folder that neither the scene, its undo history,
-    /// its comparison state nor a running task uses: removed layers, and masks replaced by a newer stroke.
+    /// its comparison state nor a running task uses: removed layers, and masks replaced by a newer
+    /// stroke.
     func pruneSceneFiles(_ document: SceneDocument, path: String) {
         // A pending or failed save leaves the disk document owning its old assets.
         guard sceneSaveGenerations[path] == nil, sceneSaveWorkItems[path] == nil,
@@ -981,7 +1079,8 @@ extension WallpaperModel {
         var used = SceneStore.referencedFiles(of: document)
         used.insert("scene.json")
         used.insert("properties.json")
-        let snapshots = (sceneHistories[path]?.snapshots ?? []) + [sceneComparisonSnapshots[path]].compactMap { $0 }
+        let snapshots = (sceneHistories[path]?.snapshots ?? []) + [sceneComparisonSnapshots[path]]
+            .compactMap { $0 }
         for snapshot in snapshots {
             used.formUnion(SceneStore.referencedFiles(of: snapshot))
         }
@@ -990,12 +1089,13 @@ extension WallpaperModel {
         })
     }
 
-    nonisolated private static func scenePruneCandidates(in folder: URL) -> [URL] {
+    private nonisolated static func scenePruneCandidates(in folder: URL) -> [URL] {
         let names: [String]
         do {
             names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
         } catch {
-            AppLog.windowRefresh.error("scene folder unreadable: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error("scene folder unreadable: \(error.localizedDescription, privacy: .public)")
             return []
         }
         // Dot files are writes in progress (SceneStore.write), possibly on another thread.
@@ -1006,10 +1106,15 @@ extension WallpaperModel {
     /// Files written off the main thread go here first, then into the scene folder
     /// once the scene names them: an edit meanwhile prunes files the scene does not name.
     private static func sceneStagingVideoPath() -> String {
-        FileManager.default.temporaryDirectory.appendingPathComponent("scene-staging-\(UUID().uuidString).mp4").path
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("scene-staging-\(UUID().uuidString).mp4").path
     }
 
-    private func adoptStagedSceneFile(_ name: String, from stagingFolder: URL, path: String) throws {
+    private func adoptStagedSceneFile(
+        _ name: String,
+        from stagingFolder: URL,
+        path: String
+    ) throws {
         try FileManager.default.moveItem(
             at: stagingFolder.appendingPathComponent(name),
             to: SceneStore.folderURL(forVideoPath: path).appendingPathComponent(name)
@@ -1070,7 +1175,10 @@ extension WallpaperModel {
         // scene.json, saved after the edit, stays newer than the video until a bake.
         sceneStaleVideoPaths.insert(path)
         guard sceneVideoIsWanted(path: path) else {
-            AppLog.windowRefresh.info("scene bake deferred, not on the lock screen or screen saver path=\(path, privacy: .public)")
+            AppLog.windowRefresh
+                .info(
+                    "scene bake deferred, not on the lock screen or screen saver path=\(path, privacy: .public)"
+                )
             refreshCursorEffects()
             return
         }
@@ -1130,7 +1238,7 @@ extension WallpaperModel {
         sceneBakingTimesOfDay[path] = timeOfDay
         scenesBakeRunning.insert(path)
         AppLog.windowRefresh.info(
-            "scene bake start path=\(path, privacy: .public), quality=\(self.bakeQuality.rawValue, privacy: .public)"
+            "scene bake start path=\(path, privacy: .public), quality=\(bakeQuality.rawValue, privacy: .public)"
         )
         sceneBakeTasks[path] = Task { [weak self] in
             guard let self else {
@@ -1138,30 +1246,36 @@ extension WallpaperModel {
             }
             let succeeded: Bool
             do {
-                try await self.bakeScene(document, videoPath: path, timeOfDay: timeOfDay, generation: generation)
+                try await bakeScene(
+                    document,
+                    videoPath: path,
+                    timeOfDay: timeOfDay,
+                    generation: generation
+                )
                 succeeded = true
             } catch is CancellationError {
                 return
             } catch {
-                self.sceneBakeFailures[path] = error.localizedDescription
-                self.sceneErrorMessage = error.localizedDescription
+                sceneBakeFailures[path] = error.localizedDescription
+                sceneErrorMessage = error.localizedDescription
                 NotificationCenter.default.post(
                     name: .sceneBakeDidFail,
                     object: path,
                     userInfo: ["error": error.localizedDescription]
                 )
-                AppLog.windowRefresh.error("scene bake failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.windowRefresh
+                    .error("scene bake failed: \(error.localizedDescription, privacy: .public)")
                 succeeded = false
             }
             guard !Task.isCancelled else {
                 return
             }
-            self.sceneBakeTasks[path] = nil
-            self.sceneBakeProgress[path] = nil
-            self.sceneBakingTimesOfDay[path] = nil
-            self.scenesBakeRunning.remove(path)
-            if self.sceneBakeWorkItems[path] == nil {
-                self.scenesBaking.remove(path)
+            sceneBakeTasks[path] = nil
+            sceneBakeProgress[path] = nil
+            sceneBakingTimesOfDay[path] = nil
+            scenesBakeRunning.remove(path)
+            if sceneBakeWorkItems[path] == nil {
+                scenesBaking.remove(path)
             }
             guard succeeded else {
                 // The desktop keeps drawing the scene live, so it still shows the edit.
@@ -1170,31 +1284,36 @@ extension WallpaperModel {
             NotificationCenter.default.post(name: .sceneDidBake, object: path)
             // A part of the day may have started while this one was baking.
             if document.usesTimeOfDay, document.timeOfDay(at: Date()) != timeOfDay {
-                self.updateSceneTimesOfDay()
+                updateSceneTimesOfDay()
             }
-            if self.lockScreenSyncEnabled, self.effectiveLockScreenVideoPath == path {
-                self.syncCurrentVideoToLockScreen()
+            if lockScreenSyncEnabled, effectiveLockScreenVideoPath == path {
+                syncCurrentVideoToLockScreen()
             }
-            self.reloadPlayback(forRewrittenPath: path)
+            reloadPlayback(forRewrittenPath: path)
             // Hand the screen back to the video once the new file is playing, so the
             // live layer does not drop out before the first new frame.
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.sceneHandOverDelay) { [weak self] in
-                MainActor.assumeIsolated {
-                    guard let self, self.sceneBakeGenerations[path] == generation,
-                          !self.scenesBaking.contains(path)
-                    else {
-                        return
+            DispatchQueue.main
+                .asyncAfter(deadline: .now() + Self.sceneHandOverDelay) { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self, self.sceneBakeGenerations[path] == generation,
+                              !self.scenesBaking.contains(path)
+                        else {
+                            return
+                        }
+                        self.sceneStaleVideoPaths.remove(path)
+                        self.refreshCursorEffects()
                     }
-                    self.sceneStaleVideoPaths.remove(path)
-                    self.refreshCursorEffects()
                 }
-            }
         }
     }
 
     /// Bakes a scene that is not in the library (one an external app offers), with
     /// its progress in sceneBakeProgress like any bake.
-    func bakeSceneOutsideLibrary(_ document: SceneDocument, videoPath: String, stillOnly: Bool = false) async throws {
+    func bakeSceneOutsideLibrary(
+        _ document: SceneDocument,
+        videoPath: String,
+        stillOnly: Bool = false
+    ) async throws {
         defer { sceneBakeProgress.removeValue(forKey: videoPath) }
         try await bakeScene(document, videoPath: videoPath, stillOnly: stillOnly)
     }
@@ -1211,7 +1330,8 @@ extension WallpaperModel {
         let timeOfDay = timeOfDay ?? document.timeOfDay(at: Date())
         try Task.checkCancellation()
         let output = URL(fileURLWithPath: videoPath)
-        let stagedOutput = output.deletingLastPathComponent().appendingPathComponent(".scene-\(UUID().uuidString).mp4")
+        let stagedOutput = output.deletingLastPathComponent()
+            .appendingPathComponent(".scene-\(UUID().uuidString).mp4")
         defer { removeLeftovers(of: [stagedOutput]) }
         if document.isAnimated, !stillOnly {
             let capacity = StorageUsage.checkBakeCapacity(
@@ -1230,14 +1350,16 @@ extension WallpaperModel {
         let throttle = MediaImportProgressThrottle()
         let userProps = SceneMetalLayer.loadUserProperties(forVideoPath: videoPath)
         try await SceneVideoBaker.bake(
-            document: document, videoPath: videoPath, timeOfDay: timeOfDay, userProperties: userProps, stillOnly: stillOnly, quality: bakeQuality.compressionQuality, to: stagedOutput
+            document: document, videoPath: videoPath, timeOfDay: timeOfDay,
+            userProperties: userProps, stillOnly: stillOnly,
+            quality: bakeQuality.compressionQuality, to: stagedOutput
         ) { [weak self] value in
             guard throttle.shouldReport(value) else { return }
             Task { @MainActor [weak self] in
-                if let self, self.sceneBakeGenerations[videoPath] == generation,
-                   self.sceneBakeProgress[videoPath] != nil
+                if let self, sceneBakeGenerations[videoPath] == generation,
+                   sceneBakeProgress[videoPath] != nil
                 {
-                    self.sceneBakeProgress[videoPath] = value
+                    sceneBakeProgress[videoPath] = value
                 }
             }
         }
@@ -1285,7 +1407,9 @@ extension WallpaperModel {
         let abandoned = names.filter { $0.hasPrefix(".scene-") || $0.hasPrefix("..scene-") }
             .map { directory.appendingPathComponent($0) }
             .filter { url in
-                guard let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
+                guard let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey])
+                    .contentModificationDate
+                else {
                     return false
                 }
                 return now.timeIntervalSince(modified) > 3600
@@ -1325,7 +1449,8 @@ extension WallpaperModel {
         return paths
     }
 
-    /// Every stored preference value as text, so a video named in any preference key counts as in use.
+    /// Every stored preference value as text, so a video named in any preference key counts as in
+    /// use.
     func preferencesProtectedText() -> String {
         UserDefaults.standard.dictionaryRepresentation().description
     }
@@ -1345,18 +1470,36 @@ extension WallpaperModel {
                 _ = try StorageUsage.deleteOrphans(orphans)
                 AppLog.persistence.info("cleaned \(orphans.count) orphan videos")
             } catch {
-                AppLog.persistence.error("orphan video cleanup failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.persistence
+                    .error(
+                        "orphan video cleanup failed: \(error.localizedDescription, privacy: .public)"
+                    )
             }
         }
-        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let backupsDir = appSupport.appendingPathComponent("LiveWallpaper/AuthorSettingsBackups", isDirectory: true)
-            let expired = StorageUsage.findExpiredAuthorSettingsBackups(in: backupsDir, keepLatestCount: 3, maxAgeDays: 30, now: now)
+        if let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first {
+            let backupsDir = appSupport.appendingPathComponent(
+                "LiveWallpaper/AuthorSettingsBackups",
+                isDirectory: true
+            )
+            let expired = StorageUsage.findExpiredAuthorSettingsBackups(
+                in: backupsDir,
+                keepLatestCount: 3,
+                maxAgeDays: 30,
+                now: now
+            )
             if !expired.isEmpty {
                 do {
                     _ = try StorageUsage.deleteBackups(expired)
-                    AppLog.persistence.info("cleaned \(expired.count) expired author settings backups")
+                    AppLog.persistence
+                        .info("cleaned \(expired.count) expired author settings backups")
                 } catch {
-                    AppLog.persistence.error("author settings backup cleanup failed: \(error.localizedDescription, privacy: .public)")
+                    AppLog.persistence
+                        .error(
+                            "author settings backup cleanup failed: \(error.localizedDescription, privacy: .public)"
+                        )
                 }
             }
         }
@@ -1370,7 +1513,9 @@ extension WallpaperModel {
     /// Display numbers can change when screens are reconnected; scripts' per-screen
     /// values follow the display's UUID instead.
     static func storageScreen(forDisplayID displayID: String) -> String {
-        guard let number = UInt32(displayID), let uuid = CGDisplayCreateUUIDFromDisplayID(number)?.takeRetainedValue() else {
+        guard let number = UInt32(displayID),
+              let uuid = CGDisplayCreateUUIDFromDisplayID(number)?.takeRetainedValue()
+        else {
             return displayID
         }
         return CFUUIDCreateString(nil, uuid) as String
@@ -1393,7 +1538,8 @@ extension WallpaperModel {
             maximumFramesPerSecond = min(maximumFramesPerSecond ?? 30, 30)
         }
         for view in playerViews {
-            guard let window = view.window, let displayID = displayIDByWindow[ObjectIdentifier(window)],
+            guard let window = view.window,
+                  let displayID = displayIDByWindow[ObjectIdentifier(window)],
                   let path = resolvedOverridePath(forScreenID: displayID)
                   ?? (isWebWallpaperActive ? nil : currentVideoPath),
                   let document = sceneDocumentsByPath[path]
@@ -1407,10 +1553,13 @@ extension WallpaperModel {
                 view.hideScene()
                 continue
             }
-            // Scripts decide when some sounds start and how loud they are, and only a live scene runs them.
+            // Scripts decide when some sounds start and how loud they are, and only a live scene
+            // runs them.
             let scriptsDriveSound = audioEnabled && document.soundsNeedScripts
             let listens = SceneSoundReaction.isEnabled(videoPath: path)
-            guard document.hasLiveInteraction(listensToAudio: listens) || isStale || scriptsDriveSound else {
+            guard document
+                .hasLiveInteraction(listensToAudio: listens) || isStale || scriptsDriveSound
+            else {
                 if view.isShowingScene {
                     AppLog.windowRefresh.info(
                         "scene video display=\(displayID, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"
@@ -1427,7 +1576,8 @@ extension WallpaperModel {
                 }
                 let userProps = SceneMetalLayer.loadUserProperties(forVideoPath: path)
                 try view.showScene(
-                    document, videoPath: path, freeClock: isStale || document.requiresRealTimePlayback,
+                    document, videoPath: path,
+                    freeClock: isStale || document.requiresRealTimePlayback,
                     timeOfDay: document.timeOfDay(at: Date()),
                     maximumFramesPerSecond: maximumFramesPerSecond,
                     effectResolutionScale: lightweight ? 0.5 : 1,
@@ -1435,15 +1585,16 @@ extension WallpaperModel {
                     userProperties: userProps
                 )
                 view.setSceneScriptIssueHandler { [weak self] issues in
-                    guard let self, self.sceneScriptIssues[path] != issues else { return }
-                    self.sceneScriptIssues[path] = issues
+                    guard let self, sceneScriptIssues[path] != issues else { return }
+                    sceneScriptIssues[path] = issues
                 }
                 view.setSceneSoundHandler { [weak self] states in
-                    guard let self, self.sceneSoundPlayer.key == path else { return }
-                    self.sceneSoundPlayer.setScriptedSounds(states)
+                    guard let self, sceneSoundPlayer.key == path else { return }
+                    sceneSoundPlayer.setScriptedSounds(states)
                 }
             } catch {
-                AppLog.windowRefresh.error("scene show failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.windowRefresh
+                    .error("scene show failed: \(error.localizedDescription, privacy: .public)")
                 view.hideScene()
             }
         }

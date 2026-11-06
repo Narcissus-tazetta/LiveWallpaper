@@ -33,7 +33,9 @@ enum ScreenSaverSelection {
                 if !isSaver(idle, saverURL: saverURL) {
                     replaced.append(SavedIdle(path: path, idle: idle))
                 }
-            } else if state["Type"] as? String == "linked", let linked = state["Linked"] as? [String: Any] {
+            } else if state["Type"] as? String == "linked",
+                      let linked = state["Linked"] as? [String: Any]
+            {
                 // One surface everywhere (as the lock screen sync leaves it): the
                 // desktop keeps it and the screen saver gets a surface of its own.
                 idle = [:]

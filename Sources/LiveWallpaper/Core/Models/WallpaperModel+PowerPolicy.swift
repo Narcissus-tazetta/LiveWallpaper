@@ -81,7 +81,10 @@ extension WallpaperModel {
                 model.handlePowerSourceChange()
             }
         }, context)?.takeRetainedValue() else {
-            AppLog.suspend.error("power source notification unavailable; battery policy follows launch state only")
+            AppLog.suspend
+                .error(
+                    "power source notification unavailable; battery policy follows launch state only"
+                )
             return
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
@@ -94,7 +97,7 @@ extension WallpaperModel {
             return
         }
         AppLog.suspend.info(
-            "power source onBattery=\(onBattery) policy=\(self.batteryPlaybackPolicy.rawValue, privacy: .public)"
+            "power source onBattery=\(onBattery) policy=\(batteryPlaybackPolicy.rawValue, privacy: .public)"
         )
         applyPowerPlaybackChange {
             isOnBatteryPower = onBattery

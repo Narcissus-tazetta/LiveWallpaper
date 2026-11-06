@@ -162,15 +162,23 @@ extension SceneEditorView {
     // MARK: - Canvas
 
     @ViewBuilder
-    private func sceneCanvasColumn(path: String, document: SceneDocument, selectedID: UUID?) -> some View {
-        let comparison = scenePreviewController.isComparing ? model.sceneComparisonSnapshots[path] : nil
+    private func sceneCanvasColumn(
+        path: String,
+        document: SceneDocument,
+        selectedID: UUID?
+    ) -> some View {
+        let comparison = scenePreviewController.isComparing ? model
+            .sceneComparisonSnapshots[path] : nil
         let trial = model.scenePresetTrial.flatMap { $0.path == path ? $0 : nil }
         let isEditable = comparison == nil && trial == nil
         let fixedTime = selectedID
             .flatMap { id in document.layers.first { $0.id == id } }
             .flatMap { selectedSceneKeyframe(in: $0) }
             .map { $0.time * Double(document.loopSeconds) }
-        let visibleRegions = model.desktopVisibleRegions(path: path, videoAspectRatio: document.aspectRatio)
+        let visibleRegions = model.desktopVisibleRegions(
+            path: path,
+            videoAspectRatio: document.aspectRatio
+        )
 
         VStack(spacing: 0) {
             ScenePreviewView(
@@ -193,11 +201,14 @@ extension SceneEditorView {
                 onTransformLayer: { id, transform in
                     applySceneTransform(transform, path: path, layerID: id)
                 },
-                markers: isEditable ? scenePreviewMarkers(document: document, layerID: selectedID) : [],
+                markers: isEditable ? scenePreviewMarkers(document: document, layerID: selectedID) :
+                    [],
                 fixedTime: fixedTime,
                 visibleRegions: visibleRegions,
                 onScriptIssues: { issues in
-                    if model.sceneScriptIssues[path] != issues { model.sceneScriptIssues[path] = issues }
+                    if model
+                        .sceneScriptIssues[path] !=
+                        issues { model.sceneScriptIssues[path] = issues }
                 },
                 onScriptLogs: { model.receiveSceneScriptLogs($0, path: path) }
             )
@@ -219,7 +230,9 @@ extension SceneEditorView {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                if scenePreviewController.simulatedTimeOfDay != nil || scenePreviewController.simulatedCursor != nil {
+                if scenePreviewController.simulatedTimeOfDay != nil || scenePreviewController
+                    .simulatedCursor != nil
+                {
                     HStack(spacing: 6) {
                         Text(scenePreviewConditionText())
                             .font(.caption)
@@ -240,7 +253,8 @@ extension SceneEditorView {
             .motionAnimation(Motion.quick, value: comparison != nil || trial != nil)
             .motionAnimation(
                 Motion.quick,
-                value: scenePreviewController.simulatedTimeOfDay != nil || scenePreviewController.simulatedCursor != nil
+                value: scenePreviewController.simulatedTimeOfDay != nil || scenePreviewController
+                    .simulatedCursor != nil
             )
             .accessibilityLabel(model.localizedString("プレビュー"))
             .padding(24)
@@ -258,8 +272,18 @@ extension SceneEditorView {
             Divider()
 
             VStack(alignment: .leading, spacing: 8) {
-                scenePlaybackBar(path: path, document: document, selectedID: selectedID, fixedTime: fixedTime)
-                sceneCanvasHint(path: path, comparison: comparison, trial: trial, visibleRegions: visibleRegions)
+                scenePlaybackBar(
+                    path: path,
+                    document: document,
+                    selectedID: selectedID,
+                    fixedTime: fixedTime
+                )
+                sceneCanvasHint(
+                    path: path,
+                    comparison: comparison,
+                    trial: trial,
+                    visibleRegions: visibleRegions
+                )
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -283,10 +307,14 @@ extension SceneEditorView {
         } else if case .pickCenter = sceneEditorTool {
             settingsFootnote(model.localizedString("プレビューをクリックして、中心にする位置を選びます。"))
         } else if case .addPins = sceneEditorTool {
-            settingsFootnote(model.localizedString("プレビューをクリックすると、その位置にピンを追加します。最初のピンは固定、それ以降は揺らすピンになります。"))
+            settingsFootnote(model
+                .localizedString("プレビューをクリックすると、その位置にピンを追加します。最初のピンは固定、それ以降は揺らすピンになります。"))
         } else {
             settingsFootnote(
-                model.localizedString("レイヤーをクリックして選び、ドラッグで移動します。四隅で拡大・縮小、上の丸で回転します(⇧で15°ずつ、⌘でスナップなし)。ポインタを動かすと、カーソルへの反応も確かめられます。")
+                model
+                    .localizedString(
+                        "レイヤーをクリックして選び、ドラッグで移動します。四隅で拡大・縮小、上の丸で回転します(⇧で15°ずつ、⌘でスナップなし)。ポインタを動かすと、カーソルへの反応も確かめられます。"
+                    )
             )
         }
         if visibleRegions.contains(where: { $0.width < 0.999 || $0.height < 0.999 }) {
@@ -296,7 +324,11 @@ extension SceneEditorView {
 
     // MARK: - Inspector
 
-    private func sceneInspectorColumn(path: String, document: SceneDocument, selectedLayer: SceneLayer?) -> some View {
+    private func sceneInspectorColumn(
+        path: String,
+        document: SceneDocument,
+        selectedLayer: SceneLayer?
+    ) -> some View {
         VStack(spacing: 0) {
             Picker(model.localizedString("インスペクタ"), selection: $inspectorTab) {
                 Text(model.localizedString("レイヤー")).tag(SceneInspectorTab.layer)
@@ -312,7 +344,11 @@ extension SceneEditorView {
             ScrollView {
                 ZStack {
                     VStack(alignment: .leading, spacing: 12) {
-                        sceneInspectorContent(path: path, document: document, selectedLayer: selectedLayer)
+                        sceneInspectorContent(
+                            path: path,
+                            document: document,
+                            selectedLayer: selectedLayer
+                        )
                     }
                     .id(inspectorTab)
                     .transition(Motion.crossfade)
@@ -326,7 +362,11 @@ extension SceneEditorView {
     }
 
     @ViewBuilder
-    private func sceneInspectorContent(path: String, document: SceneDocument, selectedLayer: SceneLayer?) -> some View {
+    private func sceneInspectorContent(
+        path: String,
+        document: SceneDocument,
+        selectedLayer: SceneLayer?
+    ) -> some View {
         switch inspectorTab {
         case .layer:
             scenePresetGuideCard(path: path, document: document)
@@ -352,8 +392,13 @@ extension SceneEditorView {
             sceneLinksSection(path: path, document: document, selectedLayerID: selectedLayer?.id)
         case .scene:
             sceneDocumentSettings(path: path, document: document)
-            SceneScriptPanel(model: model, editor: sceneScriptEditor, preview: scenePreviewController,
-                             path: path, selectedLayerID: selectedLayer?.id)
+            SceneScriptPanel(
+                model: model,
+                editor: sceneScriptEditor,
+                preview: scenePreviewController,
+                path: path,
+                selectedLayerID: selectedLayer?.id
+            )
         }
     }
 
@@ -406,7 +451,11 @@ extension SceneEditorView {
                 )
             ) {
                 ForEach(SceneDocument.loopSecondsChoices, id: \.self) { seconds in
-                    Text(String(format: model.localizedString("%d 秒"), locale: model.appLocale, seconds)).tag(seconds)
+                    Text(String(
+                        format: model.localizedString("%d 秒"),
+                        locale: model.appLocale,
+                        seconds
+                    )).tag(seconds)
                 }
             }
             .labelsHidden()
@@ -414,7 +463,10 @@ extension SceneEditorView {
             .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
         }
         settingsFootnote(
-            model.localizedString("動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。")
+            model
+                .localizedString(
+                    "動きはこの長さで一周します。ロック画面かスクリーンセーバーにこの壁紙を選ぶと、この長さの動画を書き出して使います。長いほど書き出しに時間がかかります。デスクトップに合わせたスクリーンセーバーには、最後に書き出した動画を使います。"
+                )
         )
         if document.usesAudio {
             SceneSoundReactionToggle(model: model, path: path)
@@ -470,7 +522,10 @@ extension SceneEditorView {
                 if model.sceneVideosAwaitingScriptApproval.contains(path) {
                     Image(systemName: "pause.circle")
                         .foregroundColor(.orange)
-                    Text(model.localizedString("未許可のスクリプトがあるため、ロック画面用の動画を更新していません。スクリプトを許可するか停止すると書き出します"))
+                    Text(model
+                        .localizedString(
+                            "未許可のスクリプトがあるため、ロック画面用の動画を更新していません。スクリプトを許可するか停止すると書き出します"
+                        ))
                         .fixedSize(horizontal: false, vertical: true)
                 } else if let failure = model.sceneBakeFailures[path] {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -483,7 +538,11 @@ extension SceneEditorView {
                     }
                     .controlSize(.small)
                 } else if model.scenesBakeRunning.contains(path) {
-                    SceneBakeRunningStatus(model: model, progress: model.sceneBakeProgressStore, path: path)
+                    SceneBakeRunningStatus(
+                        model: model,
+                        progress: model.sceneBakeProgressStore,
+                        path: path
+                    )
                 } else if model.scenesBaking.contains(path) {
                     Image(systemName: "clock")
                         .foregroundColor(.secondary)
@@ -506,7 +565,11 @@ extension SceneEditorView {
 
     // MARK: - Layer list
 
-    private func sceneLayerList(path: String, document: SceneDocument, selectedID: UUID?) -> some View {
+    private func sceneLayerList(
+        path: String,
+        document: SceneDocument,
+        selectedID: UUID?
+    ) -> some View {
         let selectedLayer = selectedID.flatMap { id in document.layers.first { $0.id == id } }
         return VStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -531,7 +594,12 @@ extension SceneEditorView {
                 LazyVStack(spacing: 1) {
                     // Top layer first, as in image editors.
                     ForEach(document.layers.reversed()) { layer in
-                        sceneLayerRow(path: path, document: document, layer: layer, isSelected: layer.id == selectedID)
+                        sceneLayerRow(
+                            path: path,
+                            document: document,
+                            layer: layer,
+                            isSelected: layer.id == selectedID
+                        )
                     }
                 }
                 .padding(6)
@@ -603,11 +671,18 @@ extension SceneEditorView {
         return SceneStore.folderURL(forVideoPath: path).appendingPathComponent(layer.imageFile)
     }
 
-    private func sceneLayerRow(path: String, document: SceneDocument, layer: SceneLayer, isSelected: Bool) -> some View {
+    private func sceneLayerRow(
+        path: String,
+        document: SceneDocument,
+        layer: SceneLayer,
+        isSelected: Bool
+    ) -> some View {
         let showsLock = layer.isLocked || hoveredSceneLayerID == layer.id || isSelected
         return HStack(spacing: 8) {
             Button {
-                updateSceneLayer(path: path, id: layer.id, allowLocked: true) { $0.isVisible.toggle() }
+                updateSceneLayer(path: path, id: layer.id, allowLocked: true) {
+                    $0.isVisible.toggle()
+                }
             } label: {
                 Image(systemName: layer.isVisible ? "eye" : "eye.slash")
                     .foregroundColor(layer.isVisible ? .secondary : .secondary.opacity(0.5))
@@ -699,7 +774,8 @@ extension SceneEditorView {
         .frame(height: 32)
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(isSelected ? Color.primary.opacity(0.12) : hoveredSceneLayerID == layer.id ? Color.primary.opacity(0.05) : Color.clear)
+                .fill(isSelected ? Color.primary.opacity(0.12) : hoveredSceneLayerID == layer
+                    .id ? Color.primary.opacity(0.05) : Color.clear)
         )
         .contextMenu {
             Button(model.localizedString("名前を変更")) {
@@ -727,7 +803,9 @@ extension SceneEditorView {
                 targetID: layer.id,
                 draggedID: $draggedSceneLayerID,
                 move: { draggedID in
-                    guard let destination = document.layers.firstIndex(where: { $0.id == layer.id }) else {
+                    guard let destination = document.layers
+                        .firstIndex(where: { $0.id == layer.id })
+                    else {
                         return
                     }
                     model.moveSceneLayer(id: draggedID, to: destination, path: path)
@@ -767,7 +845,6 @@ extension SceneEditorView {
 
     // MARK: - Inspector
 
-    @ViewBuilder
     private func sceneLayerInspector(path: String, layer: SceneLayer) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let particles = layer.particles {
@@ -788,7 +865,8 @@ extension SceneEditorView {
                 labelWidth: sceneRowLabelWidth
             )
 
-            // A model is drawn into the canvas with its own material, which no blend mode, parallax or mask reaches.
+            // A model is drawn into the canvas with its own material, which no blend mode, parallax
+            // or mask reaches.
             if layer.kind != .model {
                 sceneLayerCompositingControls(path: path, layer: layer)
             }
@@ -809,7 +887,10 @@ extension SceneEditorView {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(width: sceneRowLabelWidth, alignment: .leading)
             Spacer(minLength: 0)
-            Picker(model.localizedString("合成"), selection: sceneLayerBinding(path: path, layer: layer, \.blendMode)) {
+            Picker(
+                model.localizedString("合成"),
+                selection: sceneLayerBinding(path: path, layer: layer, \.blendMode)
+            ) {
                 sceneBlendModePickerContent()
             }
             .labelsHidden()
@@ -879,7 +960,10 @@ extension SceneEditorView {
             )
             settingsFootnote(
                 mask.mode == .hide
-                    ? model.localizedString("カーソルの周りだけ、下のレイヤーが見えます。上下に構図の同じ画像を重ねると、X 線で透かしたような表現になります。")
+                    ? model
+                    .localizedString(
+                        "カーソルの周りだけ、下のレイヤーが見えます。上下に構図の同じ画像を重ねると、X 線で透かしたような表現になります。"
+                    )
                     : model.localizedString("このレイヤーは、カーソルの周りにだけ表示されます。")
             )
         }
@@ -894,7 +978,8 @@ extension SceneEditorView {
                 path: path,
                 system: Binding(
                     get: {
-                        model.sceneDocumentsByPath[path]?.layers.first { $0.id == layer.id }?.particleSystem
+                        model.sceneDocumentsByPath[path]?.layers.first { $0.id == layer.id }?
+                            .particleSystem
                             ?? layer.particleSystem ?? SceneParticleSystem()
                     },
                     set: { system in
@@ -961,7 +1046,9 @@ extension SceneEditorView {
         Binding(
             get: { layer.cursorMask?[keyPath: keyPath] ?? 0 },
             set: { newValue in
-                updateSceneLayer(path: path, id: layer.id) { $0.cursorMask?[keyPath: keyPath] = newValue }
+                updateSceneLayer(path: path, id: layer.id) {
+                    $0.cursorMask?[keyPath: keyPath] = newValue
+                }
             }
         )
     }

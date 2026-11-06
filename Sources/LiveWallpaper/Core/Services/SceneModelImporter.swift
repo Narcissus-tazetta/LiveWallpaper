@@ -14,7 +14,9 @@ enum SceneModelImporter {
 
     struct ImportError: LocalizedError {
         let detail: String
-        var errorDescription: String? { detail }
+        var errorDescription: String? {
+            detail
+        }
     }
 
     static let maximumVertices = 2_000_000
@@ -48,27 +50,37 @@ enum SceneModelImporter {
         var parents: [Int: Int] = [:]
         var visited = Set<Int>()
         func visit(_ node: Int, parent: Int?) throws {
-            guard visited.insert(node).inserted else { throw ImportError(detail: "glTF: node \(node) appears twice in the tree") }
+            guard visited.insert(node).inserted
+            else { throw ImportError(detail: "glTF: node \(node) appears twice in the tree") }
             order.append(node)
             parents[node] = parent
-            for child in asset.nodes[node].children { try visit(child, parent: node) }
+            for child in asset.nodes[node].children {
+                try visit(child, parent: node)
+            }
         }
-        for root in asset.roots { try visit(root, parent: nil) }
+        for root in asset.roots {
+            try visit(root, parent: nil)
+        }
         var global: [Int: simd_float4x4] = [:]
         for node in order {
-            global[node] = parents[node].map { global[$0]! * asset.nodes[node].local } ?? asset.nodes[node].local
+            global[node] = parents[node].map { global[$0]! * asset.nodes[node].local } ?? asset
+                .nodes[node].local
         }
 
         let meshNodes = order.filter { asset.nodes[$0].mesh != nil }
-        guard !meshNodes.isEmpty else { throw ImportError(detail: "glTF: the file has no meshes to show") }
-        let animated = asset.animations.contains { $0.channels.contains { visited.contains($0.node) } }
+        guard !meshNodes.isEmpty
+        else { throw ImportError(detail: "glTF: the file has no meshes to show") }
+        let animated = asset.animations
+            .contains { $0.channels.contains { visited.contains($0.node) } }
         let skinned = meshNodes.contains { asset.nodes[$0].skin != nil }
         let rigged = animated || skinned
 
         var boneIndex: [Int: Int] = [:]
         var inverseBind: [simd_float4x4] = []
         if rigged {
-            for (index, node) in order.enumerated() { boneIndex[node] = index }
+            for (index, node) in order.enumerated() {
+                boneIndex[node] = index
+            }
             inverseBind = Array(repeating: matrix_identity_float4x4, count: order.count)
             var bound = Set<Int>()
             for skin in asset.skins {
@@ -76,9 +88,12 @@ enum SceneModelImporter {
                     guard let bone = boneIndex[node] else { continue }
                     let matrix = skin.inverseBind[joint]
                     if bound.contains(bone) {
-                        let difference = (0 ..< 4).map { simd_length(inverseBind[bone][$0] - matrix[$0]) }.max()!
+                        let difference = (0 ..< 4)
+                            .map { simd_length(inverseBind[bone][$0] - matrix[$0]) }.max()!
                         guard difference < 1e-3 else {
-                            throw ImportError(detail: "glTF: two skins bind the joint \(asset.nodes[node].name) differently")
+                            throw ImportError(
+                                detail: "glTF: two skins bind the joint \(asset.nodes[node].name) differently"
+                            )
                         }
                     }
                     inverseBind[bone] = matrix
@@ -122,11 +137,17 @@ enum SceneModelImporter {
                     var weights = SIMD4<Float>(1, 0, 0, 0)
                     if let rigidBone {
                         joints = SIMD4(UInt32(rigidBone), 0, 0, 0)
-                    } else if let skin, let primitiveJoints = primitive.joints, let primitiveWeights = primitive.weights {
+                    } else if let skin, let primitiveJoints = primitive.joints,
+                              let primitiveWeights = primitive.weights
+                    {
                         let local = primitiveJoints[i]
                         for slot in 0 ..< 4 {
-                            guard Int(local[slot]) < skin.joints.count, let bone = boneIndex[skin.joints[Int(local[slot])]] else {
-                                throw ImportError(detail: "glTF: a vertex names a joint outside its skin")
+                            guard Int(local[slot]) < skin.joints.count,
+                                  let bone = boneIndex[skin.joints[Int(local[slot])]]
+                            else {
+                                throw ImportError(
+                                    detail: "glTF: a vertex names a joint outside its skin"
+                                )
                             }
                             joints[slot] = UInt32(bone)
                         }
@@ -141,25 +162,36 @@ enum SceneModelImporter {
                         return SIMD4(turned.x, turned.y, turned.z, tangent[i].w)
                     } ?? SIMD4(1, 0, 0, 1)
                     vertices.append(Vertex(
-                        position: SIMD3(p.x, p.y, p.z), normal: simd_length(n) > 0 ? simd_normalize(n) : n, tangent: t,
-                        uv: primitive.uvs?[i] ?? .zero, color: primitive.colors?[i] ?? SIMD4(repeating: 1),
+                        position: SIMD3(p.x, p.y, p.z),
+                        normal: simd_length(n) > 0 ? simd_normalize(n) : n, tangent: t,
+                        uv: primitive.uvs?[i] ?? .zero,
+                        color: primitive.colors?[i] ?? SIMD4(repeating: 1),
                         joints: joints, weights: weights
                     ))
                 }
                 var indices = primitive.indices
                 if mirrored {
-                    for start in stride(from: 0, to: indices.count, by: 3) { indices.swapAt(start + 1, start + 2) }
+                    for start in stride(from: 0, to: indices.count, by: 3) {
+                        indices.swapAt(
+                            start + 1,
+                            start + 2
+                        )
+                    }
                 }
                 if primitive.normals == nil {
-                    // glTF asks for flat normals when a mesh has none: every triangle gets its own corners.
+                    // glTF asks for flat normals when a mesh has none: every triangle gets its own
+                    // corners.
                     let corners = indices.map { vertices[Int($0)] }
                     vertices = corners
                     indices = (0 ..< UInt32(corners.count)).map { $0 }
                     for start in stride(from: 0, to: vertices.count, by: 3) {
-                        let a = vertices[start].position, b = vertices[start + 1].position, c = vertices[start + 2].position
+                        let a = vertices[start].position, b = vertices[start + 1].position,
+                            c = vertices[start + 2].position
                         let cross = simd_cross(b - a, c - a)
                         let normal = simd_length(cross) > 0 ? simd_normalize(cross) : SIMD3(0, 0, 1)
-                        for corner in start ..< start + 3 { vertices[corner].normal = normal }
+                        for corner in start ..< start + 3 {
+                            vertices[corner].normal = normal
+                        }
                     }
                 }
                 let wantsTangents = material?.normalTexture != nil && primitive.uvs != nil
@@ -168,7 +200,9 @@ enum SceneModelImporter {
                 }
                 vertexTotal += vertices.count
                 guard vertexTotal <= maximumVertices else {
-                    throw ImportError(detail: "glTF: the model has more than \(maximumVertices) vertices")
+                    throw ImportError(
+                        detail: "glTF: the model has more than \(maximumVertices) vertices"
+                    )
                 }
                 var group = groups[primitive.material] ?? Group()
                 let offset = UInt32(group.vertices.count)
@@ -200,10 +234,16 @@ enum SceneModelImporter {
             guard !group.indices.isEmpty else { continue }
             var surface = SceneModelSurface()
             if let material = key.map({ asset.materials[$0] }) {
-                surface.baseColor = [material.baseColor.x, material.baseColor.y, material.baseColor.z, material.baseColor.w].map(Double.init)
+                surface.baseColor = [
+                    material.baseColor.x,
+                    material.baseColor.y,
+                    material.baseColor.z,
+                    material.baseColor.w
+                ].map(Double.init)
                 surface.metallic = Double(material.metallic)
                 surface.roughness = Double(material.roughness)
-                surface.emissive = [material.emissive.x, material.emissive.y, material.emissive.z].map(Double.init)
+                surface.emissive = [material.emissive.x, material.emissive.y, material.emissive.z]
+                    .map(Double.init)
                 surface.alphaMode = switch material.alphaMode {
                 case "MASK": .mask
                 case "BLEND": .blend
@@ -221,19 +261,28 @@ enum SceneModelImporter {
                 }
                 surface.normalScale = Double(material.normalTexture?.scale ?? 1)
                 surface.occlusionStrength = Double(material.occlusionTexture?.scale ?? 1)
-                surface.repeats = (material.baseColorTexture ?? material.normalTexture ?? material.metallicRoughnessTexture)?.repeats ?? true
+                surface
+                    .repeats = (material.baseColorTexture ?? material.normalTexture ?? material
+                        .metallicRoughnessTexture)?.repeats ?? true
             }
             let model = pack(group, rigged: rigged, skeleton: rigID, surface: surface)
             parts.append((surface.alphaMode == .blend, model))
         }
         // Opaque parts first, so that see-through ones are drawn over them.
         let ordered = parts.filter { !$0.blend }.map(\.model) + parts.filter(\.blend).map(\.model)
-        guard let first = ordered.first else { throw ImportError(detail: "glTF: the file has no triangles to show") }
+        guard let first = ordered.first
+        else { throw ImportError(detail: "glTF: the file has no triangles to show") }
 
         var rig: (UUID, SceneSkeleton)?
         var restMatrices: [simd_float4x4]?
         if let rigID {
-            let skeleton = try skeleton(asset, order: order, parents: parents, boneIndex: boneIndex, inverseBind: inverseBind)
+            let skeleton = try skeleton(
+                asset,
+                order: order,
+                parents: parents,
+                boneIndex: boneIndex,
+                inverseBind: inverseBind
+            )
             rig = (rigID, skeleton)
             restMatrices = order.indices.map { global[order[$0]]! * inverseBind[$0] }
         }
@@ -270,7 +319,12 @@ enum SceneModelImporter {
         return Result(layer: layer, rig: rig, files: files)
     }
 
-    private static func pack(_ group: Group, rigged: Bool, skeleton: UUID?, surface: SceneModelSurface) -> SceneStaticModel {
+    private static func pack(
+        _ group: Group,
+        rigged: Bool,
+        skeleton: UUID?,
+        surface: SceneModelSurface
+    ) -> SceneStaticModel {
         let semantics = SceneRenderGraph.Attribute.Semantic.allCases
         var included: Set<SceneRenderGraph.Attribute.Semantic> = [.position, .normal]
         if group.hasTangents { included.insert(.tangentSigned) }
@@ -287,20 +341,47 @@ enum SceneModelImporter {
                 switch semantic {
                 case .position: floats += [vertex.position.x, vertex.position.y, vertex.position.z]
                 case .normal: floats += [vertex.normal.x, vertex.normal.y, vertex.normal.z]
-                case .tangentSigned: floats += [vertex.tangent.x, vertex.tangent.y, vertex.tangent.z, vertex.tangent.w]
+                case .tangentSigned: floats += [
+                        vertex.tangent.x,
+                        vertex.tangent.y,
+                        vertex.tangent.z,
+                        vertex.tangent.w
+                    ]
                 case .uv: floats += [vertex.uv.x, vertex.uv.y]
-                case .color: floats += [vertex.color.x, vertex.color.y, vertex.color.z, vertex.color.w]
+                case .color: floats += [
+                        vertex.color.x,
+                        vertex.color.y,
+                        vertex.color.z,
+                        vertex.color.w
+                    ]
                 case .joints: floats += (0 ..< 4).map { Float(bitPattern: vertex.joints[$0]) }
-                case .weights: floats += [vertex.weights.x, vertex.weights.y, vertex.weights.z, vertex.weights.w]
+                case .weights: floats += [
+                        vertex.weights.x,
+                        vertex.weights.y,
+                        vertex.weights.z,
+                        vertex.weights.w
+                    ]
                 }
             }
         }
         var vertices = Data(capacity: floats.count * 4)
-        for value in floats { withUnsafeBytes(of: value.bitPattern.littleEndian) { vertices.append(contentsOf: $0) } }
+        for value in floats {
+            withUnsafeBytes(of: value.bitPattern.littleEndian) { vertices.append(contentsOf: $0) }
+        }
         var indices = Data(capacity: group.indices.count * 4)
-        for index in group.indices { withUnsafeBytes(of: index.littleEndian) { indices.append(contentsOf: $0) } }
-        return SceneStaticModel(material: -1, components: components, vertices: vertices, indices: indices,
-                                skeleton: skeleton, surface: surface)
+        for index in group
+            .indices
+        {
+            withUnsafeBytes(of: index.littleEndian) { indices.append(contentsOf: $0) }
+        }
+        return SceneStaticModel(
+            material: -1,
+            components: components,
+            vertices: vertices,
+            indices: indices,
+            skeleton: skeleton,
+            surface: surface
+        )
     }
 
     /// Per-vertex tangents from each triangle's texture direction, w the handedness.
@@ -336,13 +417,20 @@ enum SceneModelImporter {
     }
 
     private static func skeleton(
-        _ asset: GLTFAsset, order: [Int], parents: [Int: Int], boneIndex: [Int: Int], inverseBind: [simd_float4x4]
+        _ asset: GLTFAsset, order: [Int], parents: [Int: Int], boneIndex: [Int: Int],
+        inverseBind: [simd_float4x4]
     ) throws -> SceneSkeleton {
-        func transform(_ t: SIMD3<Float>, _ r: simd_quatf, _ s: SIMD3<Float>) -> SceneSkeleton.Transform {
+        func transform(_ t: SIMD3<Float>, _ r: simd_quatf, _ s: SIMD3<Float>) -> SceneSkeleton
+            .Transform
+        {
             let q = simd_normalize(r)
             // A zero scale cannot be undone, which the rig needs at rest.
             let scale = s.indices.map { abs(s[$0]) < 1e-6 ? (s[$0] < 0 ? -1e-6 : 1e-6) : s[$0] }
-            return .init(translation: [t.x, t.y, t.z], rotation: [q.imag.x, q.imag.y, q.imag.z, q.real], scale: scale)
+            return .init(
+                translation: [t.x, t.y, t.z],
+                rotation: [q.imag.x, q.imag.y, q.imag.z, q.real],
+                scale: scale
+            )
         }
         let bones = order.enumerated().map { index, node -> SceneSkeleton.Bone in
             let info = asset.nodes[node]
@@ -350,7 +438,12 @@ enum SceneModelImporter {
             return SceneSkeleton.Bone(
                 name: info.name, parent: parents[node].flatMap { boneIndex[$0] },
                 rest: transform(info.translation, info.rotation, info.scale),
-                inverseBind: [m.columns.0, m.columns.1, m.columns.2, m.columns.3].flatMap { [$0.x, $0.y, $0.z, $0.w] }
+                inverseBind: [m.columns.0, m.columns.1, m.columns.2, m.columns.3].flatMap { [
+                    $0.x,
+                    $0.y,
+                    $0.z,
+                    $0.w
+                ] }
             )
         }
         var clips: [SceneSkeleton.Clip] = []
@@ -359,40 +452,58 @@ enum SceneModelImporter {
             guard !channels.isEmpty else { continue }
             let duration = channels.map { $0.times.last! }.max()!
             guard duration <= maximumClipSeconds else {
-                throw ImportError(detail: "glTF: the animation \(animation.name) is longer than \(Int(maximumClipSeconds)) seconds")
+                throw ImportError(
+                    detail: "glTF: the animation \(animation.name) is longer than \(Int(maximumClipSeconds)) seconds"
+                )
             }
             let frameCount = max(1, Int((Double(duration) * framesPerSecond).rounded(.up)))
             var byNode: [Int: [GLTFAsset.Channel.Path: GLTFAsset.Channel]] = [:]
-            for channel in channels { byNode[channel.node, default: [:]][channel.path] = channel }
+            for channel in channels {
+                byNode[channel.node, default: [:]][channel.path] = channel
+            }
             let tracks = byNode.keys.sorted().map { node -> SceneSkeleton.Track in
                 let info = asset.nodes[node]
                 let paths = byNode[node]!
                 let samples = (0 ... frameCount).map { frame -> SceneSkeleton.Transform in
                     let time = Float(min(Double(frame) / framesPerSecond, Double(duration)))
-                    let t = paths[.translation].map { SIMD3(sample($0, at: time, width: 3)) } ?? info.translation
+                    let t = paths[.translation]
+                        .map { SIMD3(sample($0, at: time, width: 3)) } ?? info.translation
                     let r = paths[.rotation].map { channel -> simd_quatf in
                         let v = sample(channel, at: time, width: 4)
                         return simd_quatf(ix: v[0], iy: v[1], iz: v[2], r: v[3])
                     } ?? info.rotation
-                    let s = paths[.scale].map { SIMD3(sample($0, at: time, width: 3)) } ?? info.scale
+                    let s = paths[.scale].map { SIMD3(sample($0, at: time, width: 3)) } ?? info
+                        .scale
                     return transform(t, r, s)
                 }
                 return SceneSkeleton.Track(bone: boneIndex[node]!, transforms: samples)
             }
-            clips.append(SceneSkeleton.Clip(name: animation.name, framesPerSecond: framesPerSecond, frameCount: frameCount, tracks: tracks))
+            clips.append(SceneSkeleton.Clip(
+                name: animation.name,
+                framesPerSecond: framesPerSecond,
+                frameCount: frameCount,
+                tracks: tracks
+            ))
         }
         let skeleton = SceneSkeleton(
-            bones: bones, clips: clips, playback: clips.isEmpty ? [] : [SceneSkeleton.Playback(clip: 0)]
+            bones: bones, clips: clips,
+            playback: clips.isEmpty ? [] : [SceneSkeleton.Playback(clip: 0)]
         )
         do {
             _ = try SceneSkeletonEvaluator(skeleton)
         } catch {
-            throw ImportError(detail: "glTF: the rig could not be built (\(error.localizedDescription))")
+            throw ImportError(
+                detail: "glTF: the rig could not be built (\(error.localizedDescription))"
+            )
         }
         return skeleton
     }
 
-    private static func sample(_ channel: GLTFAsset.Channel, at time: Float, width: Int) -> [Float] {
+    private static func sample(
+        _ channel: GLTFAsset.Channel,
+        at time: Float,
+        width: Int
+    ) -> [Float] {
         let times = channel.times
         let cubic = channel.interpolation == "CUBICSPLINE"
         let stride = cubic ? width * 3 : width
@@ -417,13 +528,18 @@ enum SceneModelImporter {
             let p1 = value(high), m1 = value(high, 0).map { $0 * span }
             let u2 = u * u, u3 = u2 * u
             let result = (0 ..< width).map {
-                (2 * u3 - 3 * u2 + 1) * p0[$0] + (u3 - 2 * u2 + u) * m0[$0] + (-2 * u3 + 3 * u2) * p1[$0] + (u3 - u2) * m1[$0]
+                (2 * u3 - 3 * u2 + 1) * p0[$0] + (u3 - 2 * u2 + u) * m0[$0] + (-2 * u3 + 3 * u2) *
+                    p1[$0] + (u3 - u2) * m1[$0]
             }
             return width == 4 ? normalized(result) : result
         default:
             let a = value(low), b = value(high)
             if width == 4 {
-                let q = simd_slerp(simd_quatf(ix: a[0], iy: a[1], iz: a[2], r: a[3]), simd_quatf(ix: b[0], iy: b[1], iz: b[2], r: b[3]), u)
+                let q = simd_slerp(
+                    simd_quatf(ix: a[0], iy: a[1], iz: a[2], r: a[3]),
+                    simd_quatf(ix: b[0], iy: b[1], iz: b[2], r: b[3]),
+                    u
+                )
                 return [q.imag.x, q.imag.y, q.imag.z, q.real]
             }
             return (0 ..< width).map { a[$0] + (b[$0] - a[$0]) * u }

@@ -196,10 +196,15 @@ extension SettingsView {
 
     /// What a screen shows of `path` (nil: the screen with the menu bar), by the video's
     /// aspect ratio.
-    func screenRegion(path: String, screenID: String?, appliesPresentation: Bool = true) -> (Double) -> CGRect {
+    func screenRegion(
+        path: String,
+        screenID: String?,
+        appliesPresentation: Bool = true
+    ) -> (Double) -> CGRect {
         { [model] aspect in
             model.screenVisibleRegion(
-                path: path, screenID: screenID, videoAspectRatio: aspect, appliesPresentation: appliesPresentation
+                path: path, screenID: screenID, videoAspectRatio: aspect,
+                appliesPresentation: appliesPresentation
             )
         }
     }
@@ -227,11 +232,14 @@ extension SettingsView {
         }
     }
 
-    @ViewBuilder
     var lockScreenWallpaperPreview: some View {
         wallpaperPreviewThumbnail(
             image: lockScreenWallpaperPreviewImage(),
-            region: model.lockScreenVideoPath.map { screenRegion(path: $0, screenID: nil, appliesPresentation: false) },
+            region: model.lockScreenVideoPath.map { screenRegion(
+                path: $0,
+                screenID: nil,
+                appliesPresentation: false
+            ) },
             accessibilityLabel: model.localizedString("ロック画面壁紙プレビュー")
         )
     }
@@ -250,7 +258,6 @@ extension SettingsView {
         }
     }
 
-    @ViewBuilder
     /// `region` gives the part a screen shows for the video's aspect ratio; nil shows the
     /// middle of the whole video.
     func wallpaperPreviewThumbnail(
@@ -266,7 +273,8 @@ extension SettingsView {
                     Image(nsImage: image)
                         .resizable()
                         .showingVideoRegion(
-                            region?(aspect) ?? CGRect(x: 0, y: 0, width: 1, height: 1), videoAspectRatio: aspect
+                            region?(aspect) ?? CGRect(x: 0, y: 0, width: 1, height: 1),
+                            videoAspectRatio: aspect
                         )
                 } else {
                     Image(systemName: "photo")
@@ -275,15 +283,14 @@ extension SettingsView {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
-        )
-        .accessibilityLabel(accessibilityLabel)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.secondary.opacity(0.14), lineWidth: 1)
+            )
+            .accessibilityLabel(accessibilityLabel)
     }
 
-    @ViewBuilder
     var currentWallpaperPreview: some View {
         desktopWallpaperPreview
     }
@@ -377,5 +384,4 @@ extension SettingsView {
             _ = model.addSuspendExclusionFromAppURL(url)
         }
     }
-
 }

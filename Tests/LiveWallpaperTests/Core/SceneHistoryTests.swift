@@ -13,9 +13,9 @@ final class SceneHistoryTests: XCTestCase {
             .appendingPathComponent("SceneHistoryTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         video = directory.appendingPathComponent("scene.mp4")
-        let scene = SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: [
-            SceneLayer(name: "bottom", imageFile: try writeImage()),
-            SceneLayer(name: "top", imageFile: try writeImage())
+        let scene = try SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: [
+            SceneLayer(name: "bottom", imageFile: writeImage()),
+            SceneLayer(name: "top", imageFile: writeImage())
         ])
         try SceneStore.save(scene, videoPath: video.path)
         model = WallpaperModel()
@@ -33,7 +33,8 @@ final class SceneHistoryTests: XCTestCase {
             width: 8, height: 8, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 32,
             space: CGColorSpace(name: CGColorSpace.sRGB)!,
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-            provider: CGDataProvider(data: Data(repeating: 200, count: 8 * 8 * 4) as CFData)!, decode: nil,
+            provider: CGDataProvider(data: Data(repeating: 200, count: 8 * 8 * 4) as CFData)!,
+            decode: nil,
             shouldInterpolate: false, intent: .defaultIntent
         )!
         return try SceneStore.writeImage(image, prefix: "layer", videoPath: video.path)
@@ -81,7 +82,11 @@ final class SceneHistoryTests: XCTestCase {
         for value in stride(from: 0.9, through: 0.1, by: -0.1) {
             edit { $0.layers[1].opacity = value }
         }
-        XCTAssertEqual(try SceneStore.load(videoPath: video.path), saved, "a drag is not written per step")
+        XCTAssertEqual(
+            try SceneStore.load(videoPath: video.path),
+            saved,
+            "a drag is not written per step"
+        )
         XCTAssertTrue(model.scenesSaving.contains(video.path))
 
         model.flushSceneSave(path: video.path)
@@ -89,7 +94,8 @@ final class SceneHistoryTests: XCTestCase {
     }
 
     func testPruningLeavesWritesInProgressAlone() throws {
-        let partial = SceneStore.folderURL(forVideoPath: video.path).appendingPathComponent(".scene.json.partial")
+        let partial = SceneStore.folderURL(forVideoPath: video.path)
+            .appendingPathComponent(".scene.json.partial")
         try Data("{".utf8).write(to: partial)
         edit { $0.layers[1].opacity = 0.3 }
         model.flushSceneSave(path: video.path)
@@ -102,7 +108,8 @@ final class SceneHistoryTests: XCTestCase {
         try? FileManager.default.removeItem(at: SceneStore.folderURL(forVideoPath: video.path))
 
         model.flushAllSceneSaves()
-        XCTAssertFalse(FileManager.default.fileExists(atPath: SceneStore.folderURL(forVideoPath: video.path).path))
+        XCTAssertFalse(FileManager.default
+            .fileExists(atPath: SceneStore.folderURL(forVideoPath: video.path).path))
     }
 
     func testEditsToDifferentFieldsAreSeparateSteps() {
@@ -139,10 +146,17 @@ final class SceneHistoryTests: XCTestCase {
         var files: [String] = []
         for value: UInt8 in [100, 200] {
             let file = try SceneStore.writePaintImage(
-                [UInt8](repeating: value, count: 64), width: 8, height: 8, target: .mask, videoPath: video.path
+                [UInt8](repeating: value, count: 64), width: 8, height: 8, target: .mask,
+                videoPath: video.path
             )
             files.append(file)
-            model.setScenePaintFile(file, kind: .mask, effectID: effectID, layerID: layerID, path: video.path)
+            model.setScenePaintFile(
+                file,
+                kind: .mask,
+                effectID: effectID,
+                layerID: layerID,
+                path: video.path
+            )
         }
 
         model.undoScene(path: video.path)
@@ -150,6 +164,7 @@ final class SceneHistoryTests: XCTestCase {
         XCTAssertTrue(fileExists(files[0]))
         XCTAssertTrue(fileExists(files[1]), "redo still needs the later stroke")
     }
+
     func testDuplicateIsIndependentAndOneStep() throws {
         edit { $0.layers[1].effects = [SceneEffect(kind: .puppet)] }
         edit { $0.layers[1].effects[0].pins = [ScenePin(x: 0.2, y: 0.2, isAnchor: true)] }

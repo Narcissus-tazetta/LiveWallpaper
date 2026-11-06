@@ -17,7 +17,7 @@ enum DiagnosticsExporter {
             outputURL.deletingPathExtension().lastPathComponent
         )
         try FileManager.default.createDirectory(at: contentDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: workDir) }
+        defer { BlockingWork.removeInBackground(workDir) }
 
         let currentVideo = await currentVideoDescription(model.currentVideoPath)
         let logText = try await Task.detached(priority: .userInitiated) {
@@ -32,7 +32,10 @@ enum DiagnosticsExporter {
             stateReport(model: model, currentVideo: currentVideo),
             to: contentDir.appendingPathComponent("state.txt")
         )
-        try write(settingsJSON(model: model), to: contentDir.appendingPathComponent("settings.json"))
+        try write(
+            settingsJSON(model: model),
+            to: contentDir.appendingPathComponent("settings.json")
+        )
         try write(logText, to: contentDir.appendingPathComponent("log.txt"))
         try write(sessionLogText(), to: contentDir.appendingPathComponent("session-log.txt"))
         if !crashReports.isEmpty {
@@ -43,7 +46,7 @@ enum DiagnosticsExporter {
             }
         }
 
-        try PackageArchiveWriter().createPackage(from: contentDir, outputURL: outputURL)
+        try await PackageArchiveWriter().createPackage(from: contentDir, outputURL: outputURL)
     }
 
     static func defaultFileName(now: Date = Date()) -> String {
@@ -68,9 +71,18 @@ enum DiagnosticsExporter {
         let bundle = Bundle.main
         let info = ProcessInfo.processInfo
         var lines: [String] = []
-        lines.append("App version: \(bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown")")
-        lines.append("App build: \(bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown")")
-        lines.append("Bundle ID: \(bundle.bundleIdentifier ?? "none (not running from an app bundle)")")
+        lines
+            .append(
+                "App version: \(bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown")"
+            )
+        lines
+            .append(
+                "App build: \(bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown")"
+            )
+        lines
+            .append(
+                "Bundle ID: \(bundle.bundleIdentifier ?? "none (not running from an app bundle)")"
+            )
         lines.append("App path: \(bundle.bundlePath)")
         lines.append("macOS: \(info.operatingSystemVersionString)")
         lines.append("Hardware model: \(sysctlString("hw.model") ?? "unknown")")
@@ -90,7 +102,8 @@ enum DiagnosticsExporter {
         lines.append("")
         lines.append("Displays:")
         for screen in NSScreen.screens {
-            let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+            let number = screen
+                .deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
             var line = "- \(screen.localizedName) id=\(number?.stringValue ?? "?")"
             line += " frame=\(describe(screen.frame)) scale=\(screen.backingScaleFactor)"
             line += " edrPotential=\(screen.maximumPotentialExtendedDynamicRangeColorComponentValue)"
@@ -109,16 +122,25 @@ enum DiagnosticsExporter {
         lines.append("Current video format: \(currentVideo)")
         lines.append("Library videos: \(model.libraryVideoPaths.count)")
         lines.append("Playlists: \(model.playlists.count)")
-        lines.append("Web wallpapers: \(model.webWallpaperSources.count) (feature enabled: \(model.webWallpaperFeatureEnabled))")
+        lines
+            .append(
+                "Web wallpapers: \(model.webWallpaperSources.count) (feature enabled: \(model.webWallpaperFeatureEnabled))"
+            )
         lines.append("Web wallpaper load state: \(model.webWallpaperLoadState)")
         lines.append("Manual pause: \(model.manualPauseActive)")
         lines.append("On battery: \(model.isOnBatteryPower)")
-        lines.append("HDR display: \(model.effectiveHDRDisplay) (setting: \(model.hdrDisplayEnabled))")
+        lines
+            .append(
+                "HDR display: \(model.effectiveHDRDisplay) (setting: \(model.hdrDisplayEnabled))"
+            )
         lines.append("System Reduce Motion: \(model.systemReduceMotionEnabled)")
         lines.append("Window bounds readable (coverage): \(model.windowBoundsReadableForCoverage)")
         lines.append("Screen recording trusted: \(CGPreflightScreenCaptureAccess())")
         lines.append("Screen saver: \(model.screenSaverInstallState)")
-        lines.append("Hot key registration failures: \(model.hotKeyRegistrationFailures.map { "\($0)" }.sorted())")
+        lines
+            .append(
+                "Hot key registration failures: \(model.hotKeyRegistrationFailures.map { "\($0)" }.sorted())"
+            )
         lines.append("Persistence failure: \(model.persistenceFailureMessage ?? "none")")
         lines.append("Desktop icons failure: \(model.desktopIconsFailureMessage ?? "none")")
         lines.append("Screen saver error: \(model.screenSaverErrorMessage ?? "none")")
@@ -156,7 +178,10 @@ enum DiagnosticsExporter {
             )
             let codecs = formats.map { fourCC(CMFormatDescriptionGetMediaSubType($0)) }
             let transfer = formats.first.flatMap {
-                CMFormatDescriptionGetExtension($0, extensionKey: kCMFormatDescriptionExtension_TransferFunction)
+                CMFormatDescriptionGetExtension(
+                    $0,
+                    extensionKey: kCMFormatDescriptionExtension_TransferFunction
+                )
             } as? String
             return "\(Int(size.width))x\(Int(size.height)) \(String(format: "%.2f", fps)) fps"
                 + " codec=\(codecs.joined(separator: ","))"
@@ -169,7 +194,7 @@ enum DiagnosticsExporter {
 
     /// This process's entries since launch. Reading the system-wide store needs admin
     /// rights, while the current-process scope works for any user.
-    nonisolated private static func recentLogText() throws -> String {
+    private nonisolated static func recentLogText() throws -> String {
         let store = try OSLogStore(scope: .currentProcessIdentifier)
         let entries = try store.getEntries(
             at: store.position(timeIntervalSinceLatestBoot: 0),
@@ -226,7 +251,8 @@ enum DiagnosticsExporter {
                 at: directory, includingPropertiesForKeys: [.contentModificationDateKey]
             )
             for url in urls where isOwnCrashReport(fileName: url.lastPathComponent) {
-                let date = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+                let date = try url.resourceValues(forKeys: [.contentModificationDateKey])
+                    .contentModificationDate
                 if let date, date >= cutoff {
                     candidates.append((url, date))
                 }
@@ -237,7 +263,7 @@ enum DiagnosticsExporter {
             let text = try String(contentsOf: candidate.url, encoding: .utf8)
             // A report that does not parse cannot be redacted, so only the failure goes in.
             do {
-                return (name, try redactedCrashReport(text))
+                return try (name, redactedCrashReport(text))
             } catch {
                 return (name + ".txt", "could not redact \(name): \(error.localizedDescription)\n")
             }
@@ -248,7 +274,8 @@ enum DiagnosticsExporter {
     /// for resource and user-fault reports.
     nonisolated static func isOwnCrashReport(fileName: String) -> Bool {
         guard fileName.hasSuffix(".ips") else { return false }
-        let processPart = fileName.split(separator: "_", maxSplits: 1).last.map(String.init) ?? fileName
+        let processPart = fileName.split(separator: "_", maxSplits: 1).last
+            .map(String.init) ?? fileName
         return processPart.hasPrefix("LiveWallpaper-")
     }
 
@@ -263,13 +290,16 @@ enum DiagnosticsExporter {
             let options: JSONSerialization.WritingOptions = index == 0
                 ? [.withoutEscapingSlashes, .sortedKeys]
                 : [.withoutEscapingSlashes, .sortedKeys, .prettyPrinted]
-            let data = try JSONSerialization.data(withJSONObject: removingIdentifyingKeys(object), options: options)
+            let data = try JSONSerialization.data(
+                withJSONObject: removingIdentifyingKeys(object),
+                options: options
+            )
             return String(decoding: data, as: UTF8.self)
         }
         return rewritten.joined(separator: "\n") + "\n"
     }
 
-    nonisolated private static func removingIdentifyingKeys(_ object: Any) -> Any {
+    private nonisolated static func removingIdentifyingKeys(_ object: Any) -> Any {
         if let dictionary = object as? [String: Any] {
             return dictionary.filter { !crashReportIdentifyingKeys.contains($0.key) }
                 .mapValues(removingIdentifyingKeys)
@@ -301,7 +331,7 @@ enum DiagnosticsExporter {
         }
     }
 
-    nonisolated private static func levelName(_ level: OSLogEntryLog.Level) -> String {
+    private nonisolated static func levelName(_ level: OSLogEntryLog.Level) -> String {
         switch level {
         case .debug: return "debug"
         case .info: return "info"

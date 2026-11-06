@@ -1,5 +1,5 @@
-import AVFoundation
 import AppKit
+import AVFoundation
 import UniformTypeIdentifiers
 
 /// 編集内容を「外へ出す」操作 — 他の壁紙へのコピーと、カット済みファイルの
@@ -63,11 +63,19 @@ extension WallpaperEditorController {
     }
 
     private func copyResultMessage(applied: Int, skipped: Int) -> String {
-        let appliedText = String(format: model.localizedString("%d件にコピーしました"), locale: model.appLocale, applied)
+        let appliedText = String(
+            format: model.localizedString("%d件にコピーしました"),
+            locale: model.appLocale,
+            applied
+        )
         guard skipped > 0 else {
             return appliedText
         }
-        let skippedText = String(format: model.localizedString("%d件は尺が足りずスキップしました"), locale: model.appLocale, skipped)
+        let skippedText = String(
+            format: model.localizedString("%d件は尺が足りずスキップしました"),
+            locale: model.appLocale,
+            skipped
+        )
         return String(format: model.localizedString("%@(%@)"), appliedText, skippedText)
     }
 

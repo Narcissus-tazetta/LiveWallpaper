@@ -83,7 +83,12 @@ extension SceneEditorView {
 
     // MARK: - Playback bar under the preview
 
-    func scenePlaybackBar(path: String, document: SceneDocument, selectedID: UUID?, fixedTime: Double?) -> some View {
+    func scenePlaybackBar(
+        path: String,
+        document: SceneDocument,
+        selectedID: UUID?,
+        fixedTime: Double?
+    ) -> some View {
         let loop = Double(document.loopSeconds)
         let layer = selectedID.flatMap { id in document.layers.first { $0.id == id } }
         let keyframes = layer.map { $0.isKeyframed ? $0.keyframes : [] } ?? []
@@ -123,9 +128,13 @@ extension SceneEditorView {
             .help(model.localizedString("ループの終わりの 2 秒前から再生して、先頭へのつながりを確かめます"))
             .accessibilityLabel(model.localizedString("つなぎ目を確かめる"))
 
-            TimelineView(.animation(minimumInterval: 1.0 / 20, paused: !isPlaying || !scenePreviewController.isWindowVisible)) { _ in
+            TimelineView(.animation(
+                minimumInterval: 1.0 / 20,
+                paused: !isPlaying || !scenePreviewController.isWindowVisible
+            )) { _ in
                 let raw = fixedTime ?? scenePreviewController.time
-                let time = (raw.truncatingRemainder(dividingBy: loop) + loop).truncatingRemainder(dividingBy: loop)
+                let time = (raw.truncatingRemainder(dividingBy: loop) + loop)
+                    .truncatingRemainder(dividingBy: loop)
                 HStack(spacing: 8) {
                     SceneTimelineTrack(
                         loopSeconds: loop,
@@ -144,7 +153,12 @@ extension SceneEditorView {
                             guard let layerID = layer?.id else {
                                 return
                             }
-                            setSceneKeyframeTime(phase, keyframeID: id, path: path, layerID: layerID)
+                            setSceneKeyframeTime(
+                                phase,
+                                keyframeID: id,
+                                path: path,
+                                layerID: layerID
+                            )
                         }
                     )
                     .frame(height: 22)
@@ -207,14 +221,18 @@ struct SceneTimelineTrack: View {
                         .scaleEffect(isSelected ? 1.2 : 1)
                         .contentShape(Rectangle().size(width: 16, height: 22))
                         .offset(x: CGFloat(frame.time) * width)
-                        .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("track")).onChanged { value in
-                            onSelectKeyframe(frame.id)
-                            guard isEnabled, abs(value.translation.width) > 2 else {
-                                return
-                            }
-                            let phase = min(max((value.location.x - inset) / width, 0), Self.maxPhase)
-                            onMoveKeyframe(frame.id, phase)
-                        })
+                        .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("track"))
+                            .onChanged { value in
+                                onSelectKeyframe(frame.id)
+                                guard isEnabled, abs(value.translation.width) > 2 else {
+                                    return
+                                }
+                                let phase = min(
+                                    max((value.location.x - inset) / width, 0),
+                                    Self.maxPhase
+                                )
+                                onMoveKeyframe(frame.id, phase)
+                            })
                         .accessibilityElement()
                         .accessibilityLabel(String(format: "%.1f s", frame.time * loopSeconds))
                         .accessibilityAddTraits(isSelected ? .isSelected : [])

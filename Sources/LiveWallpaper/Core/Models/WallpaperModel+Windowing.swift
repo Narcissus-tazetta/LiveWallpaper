@@ -36,11 +36,11 @@ extension WallpaperModel {
             guard let self else {
                 return
             }
-            guard self.desktopLevelOffset != offset else {
+            guard desktopLevelOffset != offset else {
                 return
             }
-            self.desktopLevelOffset = offset
-            self.scheduleWindowOptionsApply()
+            desktopLevelOffset = offset
+            scheduleWindowOptionsApply()
         }
     }
 
@@ -53,11 +53,11 @@ extension WallpaperModel {
             guard let self else {
                 return
             }
-            guard self.useFullScreenAuxiliary != enabled else {
+            guard useFullScreenAuxiliary != enabled else {
                 return
             }
-            self.useFullScreenAuxiliary = enabled
-            self.scheduleWindowOptionsApply()
+            useFullScreenAuxiliary = enabled
+            scheduleWindowOptionsApply()
         }
     }
 
@@ -148,7 +148,10 @@ extension WallpaperModel {
         for screen in screens {
             let displayID = displayIDString(for: screen)
             let reusedWindow = reusableByDisplayID[displayID]
-            let window = reusedWindow ?? makeBorderlessWallpaperWindow(for: screen, opaqueBackground: false)
+            let window = reusedWindow ?? makeBorderlessWallpaperWindow(
+                for: screen,
+                opaqueBackground: false
+            )
             if hasWebOverride(forScreenID: displayID) {
                 // この画面は固定された Web 壁紙を表示する。playerViews は windows と添字を
                 // 揃える前提のコードが多いため、ウィンドウに載せない空の PlayerView を置く。
@@ -159,7 +162,10 @@ extension WallpaperModel {
                 displayIDByWindow[ObjectIdentifier(window)] = displayID
                 reusedWindowIDs.insert(ObjectIdentifier(window))
                 nextWindows.append(window)
-                nextPlayerViews.append(PlayerView(frame: CGRect(origin: .zero, size: screen.frame.size)))
+                nextPlayerViews.append(PlayerView(frame: CGRect(
+                    origin: .zero,
+                    size: screen.frame.size
+                )))
                 continue
             }
             let playerView = installPlayerView(
@@ -194,7 +200,9 @@ extension WallpaperModel {
     private func rebuildWebWindows() {
         // 共有の Web 壁紙に従う画面の専用プレイヤーだけを解放する。動画に固定した画面は
         // 共有が Web でもその動画を出すため、専用プレイヤーを残す。
-        for screenID in Array(dedicatedSlotsByScreenID.keys) where resolvedOverridePath(forScreenID: screenID) == nil {
+        for screenID in Array(dedicatedSlotsByScreenID.keys)
+            where resolvedOverridePath(forScreenID: screenID) == nil
+        {
             evictAllDedicatedSlots(forScreenID: screenID)
         }
         let screens: [NSScreen] = targetScreens()
@@ -219,13 +227,21 @@ extension WallpaperModel {
                 ?? makeBorderlessWallpaperWindow(for: screen, opaqueBackground: !isVideoPinned)
             if isVideoPinned {
                 nextPlayerViews.append(
-                    installPlayerView(in: window, screen: screen, displayID: displayID, sharedPlayer: nil)
+                    installPlayerView(
+                        in: window,
+                        screen: screen,
+                        displayID: displayID,
+                        sharedPlayer: nil
+                    )
                 )
             } else {
                 installWebView(in: window, screen: screen)
                 // playerViews は windows と添字を揃える前提のコードが多いため、ウィンドウに
                 // 載せない空の PlayerView を置く。
-                nextPlayerViews.append(PlayerView(frame: CGRect(origin: .zero, size: screen.frame.size)))
+                nextPlayerViews.append(PlayerView(frame: CGRect(
+                    origin: .zero,
+                    size: screen.frame.size
+                )))
             }
             if Self.shouldReassertOrderingOnRebuild(isReusedWindow: reusedWindow != nil) {
                 reassertWallpaperOrdering(window)

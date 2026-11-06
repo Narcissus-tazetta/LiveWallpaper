@@ -35,8 +35,11 @@ extension AppDelegate {
         window.minSize = NSSize(width: 1000, height: 640)
         window.setContentSize(NSSize(width: 1280, height: 800))
         if window.setFrameUsingName(Self.sceneEditorFrameAutosaveName) {
-            // A frame saved by an earlier build can already be collapsed, and restoring it does not apply minSize.
-            if window.frame.width < window.minSize.width || window.frame.height < window.minSize.height {
+            // A frame saved by an earlier build can already be collapsed, and restoring it does not
+            // apply minSize.
+            if window.frame.width < window.minSize.width || window.frame.height < window.minSize
+                .height
+            {
                 window.setContentSize(NSSize(width: 1280, height: 800))
                 window.center()
             }

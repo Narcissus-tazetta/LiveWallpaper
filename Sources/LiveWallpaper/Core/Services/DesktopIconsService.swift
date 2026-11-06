@@ -25,7 +25,8 @@ final class DesktopIconsService {
     init(
         readPreference: @escaping (_ domain: String, _ key: String) -> Bool? = DesktopIconsService
             .defaultReadPreference,
-        writePreference: @escaping (_ visible: Bool) -> Bool = DesktopIconsService.defaultWritePreference,
+        writePreference: @escaping (_ visible: Bool) -> Bool = DesktopIconsService
+            .defaultWritePreference,
         restartFinder: @escaping () throws -> Void = DesktopIconsService.killFinder
     ) {
         self.readPreference = readPreference
@@ -91,12 +92,11 @@ final class DesktopIconsService {
     }
 
     static func killFinder() throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
-        process.arguments = ["Finder"]
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
+        do {
+            try ProcessRunner.runSynchronously("/usr/bin/killall", arguments: ["Finder"])
+        } catch let failure as ProcessRunner.Failure {
+            AppLog.desktopIcons
+                .error("Finder restart failed: \(failure.localizedDescription, privacy: .public)")
             throw DesktopIconsError.finderRestartFailed
         }
     }

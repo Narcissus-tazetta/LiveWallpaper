@@ -130,7 +130,8 @@ struct LockScreenStartPicker: View {
         generator.requestedTimeToleranceBefore = tolerance
         generator.requestedTimeToleranceAfter = tolerance
         do {
-            return try await generator.image(at: CMTime(seconds: seconds, preferredTimescale: 600)).image
+            return try await generator.image(at: CMTime(seconds: seconds, preferredTimescale: 600))
+                .image
         } catch {
             // A drag moving on cancels the request; only a real failure is worth a log.
             guard !Task.isCancelled else {

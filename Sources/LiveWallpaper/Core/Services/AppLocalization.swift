@@ -15,7 +15,7 @@ enum AppLocalization {
         }
         let searchDirectories = [
             Bundle.main.bundleURL,
-            Bundle(for: BundleToken.self).bundleURL.deletingLastPathComponent(),
+            Bundle(for: BundleToken.self).bundleURL.deletingLastPathComponent()
         ]
         for directory in searchDirectories {
             guard let resources = Bundle(url: directory.appendingPathComponent(resourceBundleName)),

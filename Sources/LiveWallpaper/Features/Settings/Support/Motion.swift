@@ -27,14 +27,20 @@ private struct MotionAnimation<V: Equatable>: ViewModifier {
 
 extension View {
     /// `.animation(_:value:)` that is skipped under Reduce Motion.
-    func motionAnimation<V: Equatable>(_ animation: Animation = Motion.standard, value: V) -> some View {
+    func motionAnimation(
+        _ animation: Animation = Motion.standard,
+        value: some Equatable
+    ) -> some View {
         modifier(MotionAnimation(animation: animation, value: value))
     }
 }
 
 extension SettingsView {
     @discardableResult
-    func withMotion<Result>(_ animation: Animation = Motion.standard, _ body: () throws -> Result) rethrows -> Result {
+    func withMotion<Result>(
+        _ animation: Animation = Motion.standard,
+        _ body: () throws -> Result
+    ) rethrows -> Result {
         try withAnimation(reduceMotion ? nil : animation, body)
     }
 }

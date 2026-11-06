@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 /// wallpaperEditByPath の永続化(restoreState でのデコード)と、ライブラリから消えた
 /// パスの間引き(pruneWallpaperEditsForExistingPaths)を検証する。
@@ -36,7 +35,7 @@ final class WallpaperModelEditPersistenceTests: XCTestCase {
         let edits: [String: WallpaperEditMetadata] = [
             "/a.mp4": WallpaperEditMetadata(trimStart: 2, trimEnd: 8)
         ]
-        UserDefaults.standard.set(try JSONEncoder().encode(edits), forKey: editKey)
+        try UserDefaults.standard.set(JSONEncoder().encode(edits), forKey: editKey)
 
         let model = WallpaperModel()
 
@@ -47,13 +46,13 @@ final class WallpaperModelEditPersistenceTests: XCTestCase {
         UserDefaults.standard.set(["/a.mp4"], forKey: libraryKey)
         let edits: [String: WallpaperEditMetadata] = [
             "/a.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5),
-            "/stale.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5),
+            "/stale.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5)
         ]
-        UserDefaults.standard.set(try JSONEncoder().encode(edits), forKey: editKey)
+        try UserDefaults.standard.set(JSONEncoder().encode(edits), forKey: editKey)
 
         let model = WallpaperModel()
 
-        XCTAssertEqual(model.wallpaperEditByPath, ["/a.mp4": edits["/a.mp4"]!])
+        XCTAssertEqual(model.wallpaperEditByPath, try ["/a.mp4": XCTUnwrap(edits["/a.mp4"])])
     }
 
     func testPruneRemovesEditsForPathsNoLongerInLibrary() {
@@ -64,7 +63,7 @@ final class WallpaperModelEditPersistenceTests: XCTestCase {
         model.libraryVideoPaths = ["/a.mp4"]
         model.wallpaperEditByPath = [
             "/a.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5),
-            "/gone.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5),
+            "/gone.mp4": WallpaperEditMetadata(trimStart: 1, trimEnd: 5)
         ]
 
         model.pruneWallpaperEditsForExistingPaths()

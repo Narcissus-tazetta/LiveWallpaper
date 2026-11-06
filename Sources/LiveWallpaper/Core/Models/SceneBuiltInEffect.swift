@@ -1,11 +1,14 @@
 import Foundation
 
 /// Image effects the editor offers that are made from the scene's own shader passes. They are
-/// `SceneEffectKind.shader` effects whose render graph reads its settings from `SceneEffect.values`.
+/// `SceneEffectKind.shader` effects whose render graph reads its settings from
+/// `SceneEffect.values`.
 enum SceneBuiltInEffect: String, CaseIterable, Identifiable {
     case colorAdjust, blur, glow, chromaticAberration, pixelate, glitch
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     struct Parameter {
         var key: String
@@ -28,26 +31,26 @@ enum SceneBuiltInEffect: String, CaseIterable, Identifiable {
     var parameters: [Parameter] {
         switch self {
         case .colorAdjust: [
-            .init(key: "brightness", title: "明るさ", range: -1 ... 1, initial: 0),
-            .init(key: "contrast", title: "コントラスト", range: 0 ... 2, initial: 1),
-            .init(key: "saturation", title: "彩度", range: 0 ... 2, initial: 1),
-            .init(key: "hue", title: "色相", range: -0.5 ... 0.5, initial: 0),
-        ]
+                .init(key: "brightness", title: "明るさ", range: -1 ... 1, initial: 0),
+                .init(key: "contrast", title: "コントラスト", range: 0 ... 2, initial: 1),
+                .init(key: "saturation", title: "彩度", range: 0 ... 2, initial: 1),
+                .init(key: "hue", title: "色相", range: -0.5 ... 0.5, initial: 0)
+            ]
         case .blur: [.init(key: "radius", title: "ぼかしの半径", range: 0 ... 20, initial: 4)]
         case .glow: [
-            .init(key: "strength", title: "強さ", range: 0 ... 2, initial: 0.8),
-            .init(key: "threshold", title: "しきい値", range: 0 ... 1.5, initial: 0.6),
-            .init(key: "radius", title: "広がり", range: 1 ... 6, initial: 2.5),
-        ]
+                .init(key: "strength", title: "強さ", range: 0 ... 2, initial: 0.8),
+                .init(key: "threshold", title: "しきい値", range: 0 ... 1.5, initial: 0.6),
+                .init(key: "radius", title: "広がり", range: 1 ... 6, initial: 2.5)
+            ]
         case .chromaticAberration: [
-            .init(key: "amount", title: "ずれの大きさ", range: 0 ... 0.05, initial: 0.006),
-            .init(key: "angle", title: "ずれの向き(度)", range: 0 ... 360, initial: 0),
-        ]
+                .init(key: "amount", title: "ずれの大きさ", range: 0 ... 0.05, initial: 0.006),
+                .init(key: "angle", title: "ずれの向き(度)", range: 0 ... 360, initial: 0)
+            ]
         case .pixelate: [.init(key: "size", title: "ブロックの大きさ", range: 1 ... 128, initial: 12)]
         case .glitch: [
-            .init(key: "amount", title: "量", range: 0 ... 1, initial: 0.4),
-            .init(key: "speed", title: "速さ", range: 0.5 ... 30, initial: 8),
-        ]
+                .init(key: "amount", title: "量", range: 0 ... 1, initial: 0.4),
+                .init(key: "speed", title: "速さ", range: 0.5 ... 30, initial: 8)
+            ]
         }
     }
 
@@ -151,7 +154,9 @@ enum SceneBuiltInEffect: String, CaseIterable, Identifiable {
     }
     """
 
-    private static func data(_ values: [Float]) -> Data { values.withUnsafeBytes { Data($0) } }
+    private static func data(_ values: [Float]) -> Data {
+        values.withUnsafeBytes { Data($0) }
+    }
 
     private static func effect(_ key: String, at offset: Int) -> SceneRenderGraph.UniformUpdate {
         .init(offset: offset, value: .effectValue, key: key, components: 1)
@@ -163,9 +168,11 @@ enum SceneBuiltInEffect: String, CaseIterable, Identifiable {
         SceneRenderGraph.Draw(
             vertex: .init(source: vertex, entryPoint: "vertexMain"),
             fragment: .init(
-                source: source, entryPoint: "fragmentMain", uniforms: Data(count: bytes), updates: updates
+                source: source, entryPoint: "fragmentMain", uniforms: Data(count: bytes),
+                updates: updates
             ),
-            vertices: Data(repeating: 0, count: 12), vertexStride: 4, vertexCount: 3, attributes: [],
+            vertices: Data(repeating: 0, count: 12), vertexStride: 4, vertexCount: 3,
+            attributes: [],
             textures: textures.enumerated().map { .init(index: $0.offset, source: $0.element) }
         )
     }
@@ -176,60 +183,107 @@ enum SceneBuiltInEffect: String, CaseIterable, Identifiable {
         return target
     }
 
-    private static func single(_ source: String, bytes: Int, updates: [SceneRenderGraph.UniformUpdate]) -> SceneRenderGraph {
+    private static func single(
+        _ source: String,
+        bytes: Int,
+        updates: [SceneRenderGraph.UniformUpdate]
+    ) -> SceneRenderGraph {
         SceneRenderGraph(
             targets: [target("out")],
-            passes: [.init(operation: .draw, target: "out", draw: draw(source, bytes: bytes, updates: updates, textures: ["input"]))],
+            passes: [.init(
+                operation: .draw,
+                target: "out",
+                draw: draw(source, bytes: bytes, updates: updates, textures: ["input"])
+            )],
             output: "out"
         )
     }
 
     private var graph: SceneRenderGraph {
-        func effect(_ key: String, at offset: Int) -> SceneRenderGraph.UniformUpdate { Self.effect(key, at: offset) }
+        func effect(_ key: String, at offset: Int) -> SceneRenderGraph.UniformUpdate {
+            Self.effect(
+                key,
+                at: offset
+            )
+        }
         switch self {
         case .colorAdjust:
             return Self.single(Self.colorAdjustSource, bytes: 16, updates: [
-                effect("brightness", at: 0), effect("contrast", at: 4), effect("saturation", at: 8), effect("hue", at: 12),
+                effect("brightness", at: 0), effect("contrast", at: 4), effect("saturation", at: 8),
+                effect(
+                    "hue",
+                    at: 12
+                )
             ])
         case .chromaticAberration:
-            return Self.single(Self.chromaticSource, bytes: 8, updates: [effect("amount", at: 0), effect("angle", at: 4)])
+            return Self.single(
+                Self.chromaticSource,
+                bytes: 8,
+                updates: [effect("amount", at: 0), effect("angle", at: 4)]
+            )
         case .pixelate:
             return Self.single(Self.pixelateSource, bytes: 4, updates: [effect("size", at: 0)])
         case .glitch:
             return Self.single(Self.glitchSource, bytes: 16, updates: [
-                effect("amount", at: 0), effect("speed", at: 4), .init(offset: 8, value: .time),
+                effect("amount", at: 0), effect("speed", at: 4), .init(offset: 8, value: .time)
             ])
         case .blur:
             func pass(_ from: String, _ to: String, direction: [Float]) -> SceneRenderGraph.Pass {
                 var data = Self.draw(Self.blurSource, bytes: 24, updates: [
-                    .init(offset: 0, value: .texelSize, texture: from), effect("radius", at: 16),
+                    .init(offset: 0, value: .texelSize, texture: from), effect("radius", at: 16)
                 ], textures: [from])
                 data.fragment.uniforms.replaceSubrange(8 ..< 16, with: Self.data(direction))
                 return .init(operation: .draw, target: to, draw: data)
             }
             return SceneRenderGraph(
                 targets: [Self.target("blurH"), Self.target("out")],
-                passes: [pass("input", "blurH", direction: [1, 0]), pass("blurH", "out", direction: [0, 1])],
+                passes: [
+                    pass("input", "blurH", direction: [1, 0]),
+                    pass("blurH", "out", direction: [0, 1])
+                ],
                 output: "out"
             )
         case .glow:
-            var bright = Self.draw(SceneBloom.brightPass, bytes: 4, updates: [effect("threshold", at: 0)], textures: ["input"])
+            var bright = Self.draw(
+                SceneBloom.brightPass,
+                bytes: 4,
+                updates: [effect("threshold", at: 0)],
+                textures: ["input"]
+            )
             bright.vertex.source = SceneBloom.vertex
             func blur(_ from: String, direction: [Float]) -> SceneRenderGraph.Draw {
                 var blur = Self.draw(SceneBloom.blurPass, bytes: 24, updates: [
-                    .init(offset: 0, value: .texelSize, texture: from), effect("radius", at: 16),
+                    .init(offset: 0, value: .texelSize, texture: from), effect("radius", at: 16)
                 ], textures: [from])
                 blur.fragment.uniforms.replaceSubrange(8 ..< 16, with: Self.data(direction))
                 return blur
             }
-            let composite = Self.draw(SceneBloom.compositePass, bytes: 4, updates: [effect("strength", at: 0)], textures: ["input", "blurV"])
+            let composite = Self.draw(
+                SceneBloom.compositePass,
+                bytes: 4,
+                updates: [effect("strength", at: 0)],
+                textures: ["input", "blurV"]
+            )
             return SceneRenderGraph(
-                targets: [Self.target("bright", fit: 640), Self.target("blurH", fit: 640), Self.target("blurV", fit: 640), Self.target("out")],
+                targets: [
+                    Self.target("bright", fit: 640),
+                    Self.target("blurH", fit: 640),
+                    Self.target("blurV", fit: 640),
+                    Self.target("out")
+                ],
                 passes: [
                     .init(operation: .draw, target: "bright", draw: bright),
-                    .init(operation: .draw, target: "blurH", draw: blur("bright", direction: [1, 0])),
-                    .init(operation: .draw, target: "blurV", draw: blur("blurH", direction: [0, 1])),
-                    .init(operation: .draw, target: "out", draw: composite),
+                    .init(
+                        operation: .draw,
+                        target: "blurH",
+                        draw: blur("bright", direction: [1, 0])
+                    ),
+                    .init(
+                        operation: .draw,
+                        target: "blurV",
+                        draw: blur("blurH", direction: [0, 1])
+                    ),
+                    .init(operation: .draw, target: "out", draw: composite)
                 ],
                 output: "out"
             )

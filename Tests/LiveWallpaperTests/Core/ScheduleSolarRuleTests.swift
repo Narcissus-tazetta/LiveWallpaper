@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 /// Rules whose time range starts or ends at sunrise/sunset. Tokyo on 2026-06-21:
 /// sunrise 4:25, sunset 19:00 JST (see SolarDayTests).
@@ -15,7 +14,10 @@ final class ScheduleSolarRuleTests: XCTestCase {
         return calendar
     }
 
-    private func solar(_ start: ScheduleSolarEvent?, _ end: ScheduleSolarEvent?) -> ScheduleTimeRange {
+    private func solar(
+        _ start: ScheduleSolarEvent?,
+        _ end: ScheduleSolarEvent?
+    ) -> ScheduleTimeRange {
         ScheduleTimeRange(
             start: ScheduleTimeOfDay(hour: 12, minute: 0, solarEvent: start),
             end: ScheduleTimeOfDay(hour: 12, minute: 0, solarEvent: end)
@@ -31,7 +33,13 @@ final class ScheduleSolarRuleTests: XCTestCase {
         month: Int = 6, location: SolarLocation?, timeZone: String = "Asia/Tokyo"
     ) -> Bool {
         let calendar = calendar(timeZone)
-        let now = calendar.date(from: DateComponents(year: 2026, month: month, day: 21, hour: hour, minute: minute))!
+        let now = calendar.date(from: DateComponents(
+            year: 2026,
+            month: month,
+            day: 21,
+            hour: hour,
+            minute: minute
+        ))!
         return WallpaperModel.matchingScheduleRule(
             in: [rule(range)], scope: .shared, now: now, appearance: .light,
             calendar: calendar, location: location
@@ -72,10 +80,31 @@ final class ScheduleSolarRuleTests: XCTestCase {
         let night = solar(.sunset, .sunrise)
         // Midnight sun in June: daytime all day, night never.
         XCTAssertTrue(matches(day, at: 0, 30, month: 6, location: tromso, timeZone: "Europe/Oslo"))
-        XCTAssertFalse(matches(night, at: 0, 30, month: 6, location: tromso, timeZone: "Europe/Oslo"))
+        XCTAssertFalse(matches(
+            night,
+            at: 0,
+            30,
+            month: 6,
+            location: tromso,
+            timeZone: "Europe/Oslo"
+        ))
         // Polar night in December: the opposite.
-        XCTAssertFalse(matches(day, at: 12, 0, month: 12, location: tromso, timeZone: "Europe/Oslo"))
-        XCTAssertTrue(matches(night, at: 12, 0, month: 12, location: tromso, timeZone: "Europe/Oslo"))
+        XCTAssertFalse(matches(
+            day,
+            at: 12,
+            0,
+            month: 12,
+            location: tromso,
+            timeZone: "Europe/Oslo"
+        ))
+        XCTAssertTrue(matches(
+            night,
+            at: 12,
+            0,
+            month: 12,
+            location: tromso,
+            timeZone: "Europe/Oslo"
+        ))
     }
 
     // MARK: - Stored format
@@ -103,7 +132,8 @@ final class ScheduleSolarRuleTests: XCTestCase {
     // MARK: - Time zone location
 
     func testTimeZoneMapsToItsZoneTabCity() throws {
-        let location = try XCTUnwrap(SolarLocation.fromTimeZone(TimeZone(identifier: "Asia/Tokyo")!))
+        let location = try XCTUnwrap(try SolarLocation
+            .fromTimeZone(XCTUnwrap(TimeZone(identifier: "Asia/Tokyo"))))
         XCTAssertEqual(location.name, "Tokyo")
         XCTAssertEqual(location.latitude, 35.65, accuracy: 0.05)
         XCTAssertEqual(location.longitude, 139.74, accuracy: 0.05)

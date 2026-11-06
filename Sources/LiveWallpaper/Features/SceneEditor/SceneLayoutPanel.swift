@@ -28,7 +28,9 @@ extension SceneEditorView {
     func applySceneTransform(_ transform: SceneTransform, path: String, layerID: UUID) {
         updateSceneLayout(path: path, layerID: layerID) { layer in
             if layer.isKeyframed {
-                guard let index = layer.keyframes.firstIndex(where: { $0.id == selectedSceneKeyframeID }) else {
+                guard let index = layer.keyframes
+                    .firstIndex(where: { $0.id == selectedSceneKeyframeID })
+                else {
                     return
                 }
                 layer.keyframes[index].transform = transform
@@ -41,7 +43,9 @@ extension SceneEditorView {
     /// `phase` is 0..<1 of the loop.
     func setSceneKeyframeTime(_ phase: Double, keyframeID: UUID, path: String, layerID: UUID) {
         updateSceneLayout(path: path, layerID: layerID) { layer in
-            guard !layer.isLocked, let index = layer.keyframes.firstIndex(where: { $0.id == keyframeID }) else {
+            guard !layer.isLocked,
+                  let index = layer.keyframes.firstIndex(where: { $0.id == keyframeID })
+            else {
                 return
             }
             layer.keyframes[index].time = phase
@@ -60,7 +64,8 @@ extension SceneEditorView {
             .font(.headline)
 
         if let motion = layer.motion {
-            settingsFootnote(model.localizedString("読み込んだ動きで動きます。動きを外すと、最初の姿勢で止まり、配置を変えられるようになります。"))
+            settingsFootnote(model
+                .localizedString("読み込んだ動きで動きます。動きを外すと、最初の姿勢で止まり、配置を変えられるようになります。"))
             Button(model.localizedString("動きを外す")) {
                 updateSceneLayout(path: path, layerID: layer.id) { layer in
                     let first = motion.pose(at: 0)
@@ -71,13 +76,20 @@ extension SceneEditorView {
             }
             .disabled(layer.isLocked)
         } else {
-            sceneEditableLayoutControls(path: path, layer: layer, keyframe: keyframe, loopSeconds: loopSeconds, labelWidth: labelWidth)
+            sceneEditableLayoutControls(
+                path: path,
+                layer: layer,
+                keyframe: keyframe,
+                loopSeconds: loopSeconds,
+                labelWidth: labelWidth
+            )
         }
     }
 
     @ViewBuilder
     private func sceneEditableLayoutControls(
-        path: String, layer: SceneLayer, keyframe: SceneKeyframe?, loopSeconds: Double, labelWidth: CGFloat
+        path: String, layer: SceneLayer, keyframe: SceneKeyframe?, loopSeconds: Double,
+        labelWidth: CGFloat
     ) -> some View {
         Toggle(
             model.localizedString("時間で動かす"),
@@ -88,7 +100,10 @@ extension SceneEditorView {
                         if enabled {
                             // Start with the current pose at the loop start and half way.
                             let first = SceneKeyframe(time: 0, transform: layer.transform)
-                            layer.keyframes = [first, SceneKeyframe(time: 0.5, transform: layer.transform)]
+                            layer.keyframes = [
+                                first,
+                                SceneKeyframe(time: 0.5, transform: layer.transform)
+                            ]
                             selectedSceneKeyframeID = first.id
                         } else {
                             layer.transform = layer.keyframes.first?.transform ?? layer.transform
@@ -102,9 +117,15 @@ extension SceneEditorView {
 
         if layer.isKeyframed {
             settingsFootnote(
-                model.localizedString("キーフレームの姿勢を順に通って、最後のキーフレームから最初に戻ります。キーフレームを選んでいる間は、プレビューがその時刻で止まります。一時停止中に追加すると、その時刻に追加します。")
+                model
+                    .localizedString(
+                        "キーフレームの姿勢を順に通って、最後のキーフレームから最初に戻ります。キーフレームを選んでいる間は、プレビューがその時刻で止まります。一時停止中に追加すると、その時刻に追加します。"
+                    )
             )
-            ForEach(Array(layer.keyframes.sorted { $0.time < $1.time }.enumerated()), id: \.element.id) { index, frame in
+            ForEach(
+                Array(layer.keyframes.sorted { $0.time < $1.time }.enumerated()),
+                id: \.element.id
+            ) { index, frame in
                 let isSelected = frame.id == keyframe?.id
                 HStack(spacing: 8) {
                     Button {
@@ -114,7 +135,8 @@ extension SceneEditorView {
                             Image(systemName: "diamond.fill")
                                 .foregroundColor(isSelected ? .accentColor : .secondary)
                             Text(String(
-                                format: model.localizedString("キーフレーム %1$d(%2$@ 秒)"), locale: model.appLocale,
+                                format: model.localizedString("キーフレーム %1$d(%2$@ 秒)"),
+                                locale: model.appLocale,
                                 index + 1, String(format: "%.1f", frame.time * loopSeconds)
                             ))
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,7 +149,8 @@ extension SceneEditorView {
                         updateSceneLayout(path: path, layerID: layer.id) { layer in
                             layer.keyframes.removeAll { $0.id == frame.id }
                             if layer.keyframes.count < 2 {
-                                layer.transform = layer.keyframes.first?.transform ?? layer.transform
+                                layer.transform = layer.keyframes.first?.transform ?? layer
+                                    .transform
                                 layer.keyframes = []
                             }
                         }
@@ -161,7 +184,11 @@ extension SceneEditorView {
                         time = (bestStart + bestGap / 2).truncatingRemainder(dividingBy: 1)
                     }
                     let pose = layer.pose(at: time)
-                    let frame = SceneKeyframe(time: time, transform: pose.transform, opacity: pose.opacity)
+                    let frame = SceneKeyframe(
+                        time: time,
+                        transform: pose.transform,
+                        opacity: pose.opacity
+                    )
                     layer.keyframes.append(frame)
                     selectedSceneKeyframeID = frame.id
                 }
@@ -176,7 +203,12 @@ extension SceneEditorView {
             if let keyframe {
                 sceneLayoutSlider(
                     title: model.localizedString("時刻"),
-                    value: sceneKeyframeBinding(path: path, layerID: layer.id, keyframe: keyframe, \.time),
+                    value: sceneKeyframeBinding(
+                        path: path,
+                        layerID: layer.id,
+                        keyframe: keyframe,
+                        \.time
+                    ),
                     range: 0 ... 0.999,
                     factor: loopSeconds,
                     unit: "s",
@@ -186,7 +218,12 @@ extension SceneEditorView {
             }
             sceneLayoutSlider(
                 title: model.localizedString("横位置"),
-                value: sceneTransformBinding(path: path, layer: layer, keyframe: keyframe, \.offsetX),
+                value: sceneTransformBinding(
+                    path: path,
+                    layer: layer,
+                    keyframe: keyframe,
+                    \.offsetX
+                ),
                 range: -1 ... 1,
                 factor: 100,
                 unit: "%",
@@ -194,7 +231,12 @@ extension SceneEditorView {
             )
             sceneLayoutSlider(
                 title: model.localizedString("縦位置"),
-                value: sceneTransformBinding(path: path, layer: layer, keyframe: keyframe, \.offsetY),
+                value: sceneTransformBinding(
+                    path: path,
+                    layer: layer,
+                    keyframe: keyframe,
+                    \.offsetY
+                ),
                 range: -1 ... 1,
                 factor: 100,
                 unit: "%",
@@ -210,7 +252,12 @@ extension SceneEditorView {
             )
             sceneLayoutSlider(
                 title: model.localizedString("角度"),
-                value: sceneTransformBinding(path: path, layer: layer, keyframe: keyframe, \.rotation),
+                value: sceneTransformBinding(
+                    path: path,
+                    layer: layer,
+                    keyframe: keyframe,
+                    \.rotation
+                ),
                 range: -180 ... 180,
                 unit: "°",
                 labelWidth: labelWidth
@@ -218,7 +265,12 @@ extension SceneEditorView {
             if let keyframe {
                 sceneLayoutSlider(
                     title: model.localizedString("不透明度"),
-                    value: sceneKeyframeBinding(path: path, layerID: layer.id, keyframe: keyframe, \.opacity),
+                    value: sceneKeyframeBinding(
+                        path: path,
+                        layerID: layer.id,
+                        keyframe: keyframe,
+                        \.opacity
+                    ),
                     range: 0 ... 1,
                     factor: 100,
                     unit: "%",
@@ -228,7 +280,9 @@ extension SceneEditorView {
             let transform = keyframe?.transform ?? layer.transform
             Button(model.localizedString("配置を元に戻す")) {
                 updateSceneLayout(path: path, layerID: layer.id) { layer in
-                    if let id = keyframe?.id, let index = layer.keyframes.firstIndex(where: { $0.id == id }) {
+                    if let id = keyframe?.id,
+                       let index = layer.keyframes.firstIndex(where: { $0.id == id })
+                    {
                         layer.keyframes[index].transform = .identity
                     } else {
                         layer.transform = .identity
@@ -255,7 +309,10 @@ extension SceneEditorView {
                 .frame(width: labelWidth, alignment: .leading)
             Slider(value: value, in: range)
                 .accessibilityLabel(title)
-                .accessibilityValue(String(format: "%.\(fractionDigits)f\(unit)", value.wrappedValue * factor))
+                .accessibilityValue(String(
+                    format: "%.\(fractionDigits)f\(unit)",
+                    value.wrappedValue * factor
+                ))
             SceneNumberField(
                 title: title, value: value.wrappedValue, factor: factor, unit: unit, range: range,
                 fractionDigits: fractionDigits
@@ -276,7 +333,9 @@ extension SceneEditorView {
             get: { (keyframe?.transform ?? layer.transform)[keyPath: keyPath] },
             set: { newValue in
                 updateSceneLayout(path: path, layerID: layer.id) { layer in
-                    if let id = keyframe?.id, let index = layer.keyframes.firstIndex(where: { $0.id == id }) {
+                    if let id = keyframe?.id,
+                       let index = layer.keyframes.firstIndex(where: { $0.id == id })
+                    {
                         layer.keyframes[index].transform[keyPath: keyPath] = newValue
                     } else {
                         layer.transform[keyPath: keyPath] = newValue
@@ -296,7 +355,8 @@ extension SceneEditorView {
             get: { keyframe[keyPath: keyPath] },
             set: { newValue in
                 updateSceneLayout(path: path, layerID: layerID) { layer in
-                    guard let index = layer.keyframes.firstIndex(where: { $0.id == keyframe.id }) else {
+                    guard let index = layer.keyframes.firstIndex(where: { $0.id == keyframe.id })
+                    else {
                         return
                     }
                     layer.keyframes[index][keyPath: keyPath] = newValue
@@ -305,7 +365,11 @@ extension SceneEditorView {
         )
     }
 
-    private func updateSceneLayout(path: String, layerID: UUID, _ change: (inout SceneLayer) -> Void) {
+    private func updateSceneLayout(
+        path: String,
+        layerID: UUID,
+        _ change: (inout SceneLayer) -> Void
+    ) {
         guard var document = model.sceneDocumentsByPath[path],
               let index = document.layers.firstIndex(where: { $0.id == layerID })
         else {

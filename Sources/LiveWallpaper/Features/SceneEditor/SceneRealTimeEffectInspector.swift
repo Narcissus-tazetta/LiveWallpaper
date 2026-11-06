@@ -53,18 +53,42 @@ struct SceneRealTimeField: Identifiable {
                 .init(key: Key.angle, label: "向き", control: .angle, isMain: true),
                 .init(key: Key.exponent, label: "波の形", control: .slider(0.51 ... 4)),
                 .init(key: Key.dual, label: "2 つ目の波を重ねる", control: .toggle),
-                .init(key: Key.speed2, label: "2 つ目の速さ", control: .slider(0 ... 20), shownWhen: Key.dual),
-                .init(key: Key.scale2, label: "2 つ目の細かさ", control: .slider(1 ... 300), shownWhen: Key.dual),
+                .init(
+                    key: Key.speed2,
+                    label: "2 つ目の速さ",
+                    control: .slider(0 ... 20),
+                    shownWhen: Key.dual
+                ),
+                .init(
+                    key: Key.scale2,
+                    label: "2 つ目の細かさ",
+                    control: .slider(1 ... 300),
+                    shownWhen: Key.dual
+                ),
                 .init(key: Key.angle2, label: "2 つ目の向き", control: .angle, shownWhen: Key.dual),
-                .init(key: Key.exponent2, label: "2 つ目の波の形", control: .slider(0.51 ... 4), shownWhen: Key.dual),
-                .init(key: Key.offset2, label: "2 つ目のずれ", control: .slider(-5 ... 5), shownWhen: Key.dual)
+                .init(
+                    key: Key.exponent2,
+                    label: "2 つ目の波の形",
+                    control: .slider(0.51 ... 4),
+                    shownWhen: Key.dual
+                ),
+                .init(
+                    key: Key.offset2,
+                    label: "2 つ目のずれ",
+                    control: .slider(-5 ... 5),
+                    shownWhen: Key.dual
+                )
             ]
         case .flowShake:
             typealias Key = SceneEffect.FlowShakeKey
             return [
                 .init(key: Key.speed, label: "速さ", control: .slider(0 ... 10), isMain: true),
                 .init(key: Key.amplitude, label: "強さ", control: .slider(0 ... 0.5), isMain: true),
-                .init(key: Key.side, label: "振れる側", control: .choice([(0, "両側"), (1, "前だけ"), (2, "後ろだけ")])),
+                .init(
+                    key: Key.side,
+                    label: "振れる側",
+                    control: .choice([(0, "両側"), (1, "前だけ"), (2, "後ろだけ")])
+                ),
                 .init(key: Key.irregular, label: "不規則に揺らす", control: .toggle),
                 .init(key: Key.frictionX, label: "行きの緩急", control: .slider(0.1 ... 5)),
                 .init(key: Key.frictionY, label: "帰りの緩急", control: .slider(0.1 ... 5)),
@@ -82,18 +106,34 @@ struct SceneRealTimeField: Identifiable {
         case .normalRipples:
             typealias Key = SceneEffect.RipplesKey
             return [
-                .init(key: Key.animationSpeed, label: "速さ", control: .slider(0 ... 1), isMain: true),
+                .init(
+                    key: Key.animationSpeed,
+                    label: "速さ",
+                    control: .slider(0 ... 1),
+                    isMain: true
+                ),
                 .init(key: Key.scale, label: "細かさ", control: .slider(0.1 ... 10), isMain: true),
                 .init(key: Key.strength, label: "強さ", control: .slider(0 ... 0.5), isMain: true),
                 .init(key: Key.ratio, label: "縦の細かさ", control: .slider(0.1 ... 10)),
                 .init(key: Key.scrollSpeed, label: "流れる速さ", control: .slider(0 ... 1)),
                 .init(key: Key.scrollAngle, label: "流れる向き", control: .angle),
                 .init(key: Key.specular, label: "光の反射を足す", control: .toggle),
-                .init(key: Key.specularStrength, label: "反射の強さ", control: .slider(0 ... 5), shownWhen: Key.specular),
-                .init(key: Key.specularPower, label: "反射の鋭さ", control: .slider(0.1 ... 10), shownWhen: Key.specular),
+                .init(
+                    key: Key.specularStrength,
+                    label: "反射の強さ",
+                    control: .slider(0 ... 5),
+                    shownWhen: Key.specular
+                ),
+                .init(
+                    key: Key.specularPower,
+                    label: "反射の鋭さ",
+                    control: .slider(0.1 ... 10),
+                    shownWhen: Key.specular
+                ),
                 .init(
                     key: Key.specularRed, label: "反射の色",
-                    control: .colour(green: Key.specularGreen, blue: Key.specularBlue), shownWhen: Key.specular
+                    control: .colour(green: Key.specularGreen, blue: Key.specularBlue),
+                    shownWhen: Key.specular
                 )
             ]
         case .noiseDrift:
@@ -125,8 +165,17 @@ struct SceneRealTimeField: Identifiable {
                     key: Key.highRed, label: "明るい時の色",
                     control: .colour(green: Key.highGreen, blue: Key.highBlue), isMain: true
                 ),
-                .init(key: Key.blendMode, label: "合成", control: .choice(pulseBlendModes), isMain: true),
-                .init(key: Key.lowRed, label: "暗い時の色", control: .colour(green: Key.lowGreen, blue: Key.lowBlue)),
+                .init(
+                    key: Key.blendMode,
+                    label: "合成",
+                    control: .choice(pulseBlendModes),
+                    isMain: true
+                ),
+                .init(
+                    key: Key.lowRed,
+                    label: "暗い時の色",
+                    control: .colour(green: Key.lowGreen, blue: Key.lowBlue)
+                ),
                 .init(key: Key.phase, label: "始まりのずれ", control: .slider(0 ... 6.282)),
                 .init(key: Key.boundsMin, label: "使う振れ幅の下限", control: .slider(0 ... 1)),
                 .init(key: Key.boundsMax, label: "使う振れ幅の上限", control: .slider(0 ... 1)),
@@ -159,8 +208,18 @@ struct SceneRealTimeField: Identifiable {
                 .init(key: Key.phase, label: "始まりのずれ", control: .slider(0 ... 1)),
                 .init(key: Key.doubleSided, label: "軸の両側をしならせる", control: .toggle),
                 .init(key: Key.noise, label: "ゆらぎを足す", control: .toggle),
-                .init(key: Key.noiseAmount, label: "ゆらぎの量", control: .slider(0 ... 1), shownWhen: Key.noise),
-                .init(key: Key.noiseSpeed, label: "ゆらぎの速さ", control: .slider(0 ... 1), shownWhen: Key.noise)
+                .init(
+                    key: Key.noiseAmount,
+                    label: "ゆらぎの量",
+                    control: .slider(0 ... 1),
+                    shownWhen: Key.noise
+                ),
+                .init(
+                    key: Key.noiseSpeed,
+                    label: "ゆらぎの速さ",
+                    control: .slider(0 ... 1),
+                    shownWhen: Key.noise
+                )
             ]
         default:
             return []
@@ -177,7 +236,11 @@ struct SceneRealTimeField: Identifiable {
 
 extension SceneEditorView {
     @ViewBuilder
-    func sceneRealTimeEffectInspector(path: String, layerID: UUID, effect: SceneEffect) -> some View {
+    func sceneRealTimeEffectInspector(
+        path: String,
+        layerID: UUID,
+        effect: SceneEffect
+    ) -> some View {
         let fields = SceneRealTimeField.fields(for: effect.kind)
             .filter { field in field.shownWhen.map { effect.value($0) != 0 } ?? true }
         ForEach(fields.filter(\.isMain)) { field in
@@ -204,7 +267,12 @@ extension SceneEditorView {
         _ field: SceneRealTimeField, path: String, layerID: UUID, effect: SceneEffect
     ) -> some View {
         let title = model.localizedString(field.label)
-        let value = sceneEffectValueBinding(path: path, layerID: layerID, effect: effect, key: field.key)
+        let value = sceneEffectValueBinding(
+            path: path,
+            layerID: layerID,
+            effect: effect,
+            key: field.key
+        )
         HStack(spacing: 12) {
             Text(title)
                 .fixedSize(horizontal: false, vertical: true)
@@ -220,7 +288,11 @@ extension SceneEditorView {
                     .frame(width: 48, alignment: .trailing)
             case .angle:
                 let degrees = Binding(
-                    get: { (value.wrappedValue * 180 / .pi).truncatingRemainder(dividingBy: 360) + (value.wrappedValue < 0 ? 360 : 0) },
+                    get: {
+                        (value.wrappedValue * 180 / .pi)
+                            .truncatingRemainder(dividingBy: 360) +
+                            (value.wrappedValue < 0 ? 360 : 0)
+                    },
                     set: { value.wrappedValue = $0 * .pi / 180 }
                 )
                 Slider(value: degrees, in: 0 ... 359)
@@ -231,9 +303,15 @@ extension SceneEditorView {
                     .foregroundColor(.secondary)
                     .frame(width: 48, alignment: .trailing)
             case .toggle:
-                Toggle(title, isOn: Binding(get: { value.wrappedValue != 0 }, set: { value.wrappedValue = $0 ? 1 : 0 }))
-                    .labelsHidden()
-                    .toggleStyle(.checkbox)
+                Toggle(
+                    title,
+                    isOn: Binding(
+                        get: { value.wrappedValue != 0 },
+                        set: { value.wrappedValue = $0 ? 1 : 0 }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(.checkbox)
                 Spacer(minLength: 0)
             case let .choice(options):
                 Picker(title, selection: value) {
@@ -241,8 +319,12 @@ extension SceneEditorView {
                         Text(model.localizedString(option.label)).tag(option.value)
                     }
                     if !options.contains(where: { $0.value == value.wrappedValue }) {
-                        Text(String(format: model.localizedString("その他 (%d)"), locale: model.appLocale, Int(value.wrappedValue)))
-                            .tag(value.wrappedValue)
+                        Text(String(
+                            format: model.localizedString("その他 (%d)"),
+                            locale: model.appLocale,
+                            Int(value.wrappedValue)
+                        ))
+                        .tag(value.wrappedValue)
                     }
                 }
                 .labelsHidden()
@@ -250,13 +332,28 @@ extension SceneEditorView {
                 .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
                 Spacer(minLength: 0)
             case let .colour(greenKey, blueKey):
-                let green = sceneEffectValueBinding(path: path, layerID: layerID, effect: effect, key: greenKey)
-                let blue = sceneEffectValueBinding(path: path, layerID: layerID, effect: effect, key: blueKey)
+                let green = sceneEffectValueBinding(
+                    path: path,
+                    layerID: layerID,
+                    effect: effect,
+                    key: greenKey
+                )
+                let blue = sceneEffectValueBinding(
+                    path: path,
+                    layerID: layerID,
+                    effect: effect,
+                    key: blueKey
+                )
                 ColorPicker(
                     title,
                     selection: Binding(
                         get: {
-                            Color(.sRGB, red: value.wrappedValue, green: green.wrappedValue, blue: blue.wrappedValue)
+                            Color(
+                                .sRGB,
+                                red: value.wrappedValue,
+                                green: green.wrappedValue,
+                                blue: blue.wrappedValue
+                            )
                         },
                         set: { colour in
                             guard let components = NSColor(colour).usingColorSpace(.sRGB) else {
@@ -297,12 +394,23 @@ extension SceneEditorView {
                 Text(model.localizedString("時間差"))
                     .frame(width: sceneEffectLabelWidth, alignment: .leading)
                 Button(model.localizedString(effect.timeOffsetFile == nil ? "時間差を塗る" : "塗り直す")) {
-                    beginScenePainting(path: path, layerID: layerID, effect: effect, kind: .timeOffset)
+                    beginScenePainting(
+                        path: path,
+                        layerID: layerID,
+                        effect: effect,
+                        kind: .timeOffset
+                    )
                 }
                 if effect.timeOffsetFile != nil {
                     Button(model.localizedString("時間差をなくす")) {
                         endSceneEditorTool()
-                        model.setScenePaintFile(nil, kind: .timeOffset, effectID: effect.id, layerID: layerID, path: path)
+                        model.setScenePaintFile(
+                            nil,
+                            kind: .timeOffset,
+                            effectID: effect.id,
+                            layerID: layerID,
+                            path: path
+                        )
                     }
                 }
                 Spacer(minLength: 0)
@@ -310,11 +418,18 @@ extension SceneEditorView {
         }
     }
 
-    func sceneEffectValueBinding(path: String, layerID: UUID, effect: SceneEffect, key: String) -> Binding<Double> {
+    func sceneEffectValueBinding(
+        path: String,
+        layerID: UUID,
+        effect: SceneEffect,
+        key: String
+    ) -> Binding<Double> {
         Binding(
             get: { effect.value(key) },
             set: { newValue in
-                updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) { $0.values[key] = newValue }
+                updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) {
+                    $0.values[key] = newValue
+                }
             }
         )
     }
@@ -322,6 +437,7 @@ extension SceneEditorView {
     /// Up to three decimals, without trailing zeros.
     static func realTimeNumber(_ value: Double) -> String {
         let text = String(format: "%.3f", value)
-        return text.contains(".") ? String(text.reversed().drop { $0 == "0" }.reversed()).trimmingCharacters(in: CharacterSet(charactersIn: ".")) : text
+        return text.contains(".") ? String(text.reversed().drop { $0 == "0" }.reversed())
+            .trimmingCharacters(in: CharacterSet(charactersIn: ".")) : text
     }
 }

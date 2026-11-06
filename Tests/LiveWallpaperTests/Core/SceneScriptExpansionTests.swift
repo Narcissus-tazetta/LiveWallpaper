@@ -1,5 +1,5 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class SceneScriptExpansionTests: XCTestCase {
     private func scene(_ source: String) -> SceneDocument {
@@ -35,8 +35,10 @@ final class SceneScriptExpansionTests: XCTestCase {
         document.layers[0].effects[0].centerX = 0.25
         document.layers[0].effects[0].reversed = true
         let evaluator = SceneFrameEvaluator()
-        let first = try evaluator.evaluate(document, input: .rest, timeOfDay: .day).layers[document.layers[0].id]!
-        let repeated = try evaluator.evaluate(document, input: .rest, timeOfDay: .day).layers[document.layers[0].id]!
+        let first = try XCTUnwrap(try evaluator.evaluate(document, input: .rest, timeOfDay: .day)
+            .layers[document.layers[0].id])
+        let repeated = try XCTUnwrap(try evaluator.evaluate(document, input: .rest, timeOfDay: .day)
+            .layers[document.layers[0].id])
         XCTAssertEqual(first.layer, repeated.layer)
         XCTAssertEqual(first.transform.offsetX, 0.5)
         XCTAssertEqual(first.transform.offsetY, 2.squareRoot(), accuracy: 0.00001)
@@ -55,55 +57,94 @@ final class SceneScriptExpansionTests: XCTestCase {
     }
 
     func testExpandedFieldsStillRejectInvalidTypesAndHostResources() {
-        for output in ["appearance:{blendMode:null}", "appearance:{blendMode:'invalid'}",
-                       "appearance:{parallaxDepth:2}", "appearance:{isVisible:1}",
-                       "appearance:{cursorMask:{mode:'invalid'}}", "appearance:{depthFile:'/tmp/file'}",
-                       "appearance:{clearCursorMask:true,cursorMask:{radius:0.2}}",
-                       "particles:{preset:'invalid'}", "particles:{seed:-1}",
-                       "effects:[{id:l.effects[0].id,kind:'invalid'}]"] {
-            let document = scene("function update(c){return c.targets.map(l=>({id:l.id,\(output)}))}")
-            XCTAssertThrowsError(try SceneFrameEvaluator().evaluate(document, input: .rest, timeOfDay: .day), output)
+        for output in [
+            "appearance:{blendMode:null}",
+            "appearance:{blendMode:'invalid'}",
+            "appearance:{parallaxDepth:2}",
+            "appearance:{isVisible:1}",
+            "appearance:{cursorMask:{mode:'invalid'}}",
+            "appearance:{depthFile:'/tmp/file'}",
+            "appearance:{clearCursorMask:true,cursorMask:{radius:0.2}}",
+            "particles:{preset:'invalid'}",
+            "particles:{seed:-1}",
+            "effects:[{id:l.effects[0].id,kind:'invalid'}]"
+        ] {
+            let document =
+                scene("function update(c){return c.targets.map(l=>({id:l.id,\(output)}))}")
+            XCTAssertThrowsError(
+                try SceneFrameEvaluator().evaluate(document, input: .rest, timeOfDay: .day),
+                output
+            )
         }
     }
 
     func testThirtyTwoScriptsSaveButMoreAreRejected() throws {
         var document = scene(SceneScriptSample.blank.source)
         let template = document.scripts[0]
-        document.scripts = (0..<SceneScript.maximumCount).map { _ in
+        document.scripts = (0 ..< SceneScript.maximumCount).map { _ in
             var script = template; script.id = UUID(); return script
         }
-        let loaded = try JSONDecoder().decode(SceneDocument.self, from: JSONEncoder().encode(document))
+        let loaded = try JSONDecoder().decode(
+            SceneDocument.self,
+            from: JSONEncoder().encode(document)
+        )
         XCTAssertEqual(loaded.scripts.count, 32)
         XCTAssertFalse(loaded.scripts[0].canRun)
         var extra = template; extra.id = UUID(); document.scripts.append(extra)
-        XCTAssertThrowsError(try JSONDecoder().decode(SceneDocument.self, from: JSONEncoder().encode(document)))
+        XCTAssertThrowsError(try JSONDecoder().decode(
+            SceneDocument.self,
+            from: JSONEncoder().encode(document)
+        ))
         XCTAssertEqual(SceneScriptSample.allCases.first, .blank)
         XCTAssertFalse(SceneScriptSample.blank.usesTime)
     }
 
     func testVersionOneScriptsStillRun() throws {
-        var document = scene("function update(c){return [{id:c.targets[0].id,values:{offsetX:0.25}}]}")
+        var document =
+            scene("function update(c){return [{id:c.targets[0].id,values:{offsetX:0.25}}]}")
         document.scripts[0].version = 1
         XCTAssertTrue(document.scripts[0].canRun)
         let frame = try SceneFrameEvaluator().evaluate(document, input: .rest, timeOfDay: .day)
-        XCTAssertEqual(frame.layers[document.layers[0].id]!.transform.offsetX, 0.25)
+        XCTAssertEqual(frame.layers[document.layers[0].id]?.transform.offsetX, 0.25)
     }
 
     func testNewCursorAndTimeRenderingNeedsDeclaredInputs() throws {
-        var document = scene("function update(c){return [{id:c.targets[0].id,appearance:{parallaxDepth:0.5}}]}")
-        XCTAssertThrowsError(try SceneFrameEvaluator().evaluate(document, input: .rest, timeOfDay: .day))
+        var document =
+            scene(
+                "function update(c){return [{id:c.targets[0].id,appearance:{parallaxDepth:0.5}}]}"
+            )
+        XCTAssertThrowsError(try SceneFrameEvaluator().evaluate(
+            document,
+            input: .rest,
+            timeOfDay: .day
+        ))
         document.scripts[0].usesCursor = true
-        XCTAssertNoThrow(try SceneFrameEvaluator().evaluate(document, input: .rest, timeOfDay: .day))
+        XCTAssertNoThrow(try SceneFrameEvaluator().evaluate(
+            document,
+            input: .rest,
+            timeOfDay: .day
+        ))
         document.layers[0].isVisible = false
         document.scripts[0].usesTime = false
         document.scripts[0].source = "function update(c){return [{id:c.targets[0].id,appearance:{isVisible:true}}]}"
-        XCTAssertThrowsError(try SceneFrameEvaluator().evaluate(document, input: .rest, timeOfDay: .day))
+        XCTAssertThrowsError(try SceneFrameEvaluator().evaluate(
+            document,
+            input: .rest,
+            timeOfDay: .day
+        ))
         document.scripts[0].usesTime = true
-        XCTAssertNoThrow(try SceneFrameEvaluator().evaluate(document, input: .rest, timeOfDay: .day))
+        XCTAssertNoThrow(try SceneFrameEvaluator().evaluate(
+            document,
+            input: .rest,
+            timeOfDay: .day
+        ))
     }
 
     func testOneScriptIncludesNewLayersAndScopeSurvivesSaving() throws {
-        var document = scene("function update(c){return c.targets.map(l=>({id:l.id,values:{brightness:0.25}}))}")
+        var document =
+            scene(
+                "function update(c){return c.targets.map(l=>({id:l.id,values:{brightness:0.25}}))}"
+            )
         document.scripts[0].targetsAllLayers = true
         let evaluator = SceneFrameEvaluator()
         let second = SceneLayer(name: "New image", imageFile: "new.png")
@@ -118,11 +159,14 @@ final class SceneScriptExpansionTests: XCTestCase {
         document.scripts[0].targetsAllLayers = false
         let selected = try evaluator.evaluate(document, input: .rest, timeOfDay: .day)
         XCTAssertEqual(selected.layers[second.id]?.color.brightness, 0)
-        var json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
-        var scripts = json["scripts"] as! [[String: Any]]
+        var json = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var scripts = try XCTUnwrap(json["scripts"] as? [[String: Any]])
         scripts[0].removeValue(forKey: "targetsAllLayers")
         json["scripts"] = scripts
-        let legacy = try JSONDecoder().decode(SceneDocument.self, from: JSONSerialization.data(withJSONObject: json))
+        let legacy = try JSONDecoder().decode(
+            SceneDocument.self,
+            from: JSONSerialization.data(withJSONObject: json)
+        )
         XCTAssertFalse(legacy.scripts[0].targetsAllLayers)
     }
 }

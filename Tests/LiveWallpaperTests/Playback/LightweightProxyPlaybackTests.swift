@@ -182,7 +182,8 @@ final class LightweightProxyPlaybackTests: XCTestCase {
         model.lightweightMode = true
         let cachedPlayer = model.ensureDedicatedPlayer(forScreenID: "screen-a", path: first.path)
         XCTAssertFalse(cachedPlayer === a)
-        XCTAssertTrue(model.ensureDedicatedPlayer(forScreenID: "screen-a", path: first.path) === cachedPlayer)
+        XCTAssertTrue(model
+            .ensureDedicatedPlayer(forScreenID: "screen-a", path: first.path) === cachedPlayer)
         try await waitUntil { self.assetURL(cachedPlayer) == firstProxy }
     }
 
@@ -216,17 +217,20 @@ final class LightweightProxyPlaybackTests: XCTestCase {
         var cancelled = 0, completed = false
         cache
             .generateProxyIfNeeded(for: url.path) {
-                if case .cancelled = $0 { cancelled += 1 } else { XCTFail() }
+                if case .cancelled = $0 { cancelled += 1 }
+                else { XCTFail("expected .cancelled, got \($0)") }
             }
         cache
             .generateProxyIfNeeded(for: "missing") {
-                if case .cancelled = $0 { cancelled += 1 } else { XCTFail() }
+                if case .cancelled = $0 { cancelled += 1 }
+                else { XCTFail("expected .cancelled, got \($0)") }
             }
         try await waitUntil { cache.activeGeneration?.session != nil }
         cache.cancelActiveGeneration()
         cache
             .generateProxyIfNeeded(for: url.path) {
-                if case .ready = $0 { completed = true } else { XCTFail() }
+                if case .ready = $0 { completed = true }
+                else { XCTFail("expected .ready, got \($0)") }
             }
         try await waitUntil(timeout: 40) { completed }
         XCTAssertEqual(cancelled, 2)

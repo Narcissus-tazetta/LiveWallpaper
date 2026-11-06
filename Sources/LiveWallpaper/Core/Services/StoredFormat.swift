@@ -37,7 +37,8 @@ struct StoredFormat {
     struct Prepared {
         let data: Data
         let storedVersion: Int
-        /// The shape changed, so the stored file is worth keeping a copy of before it is overwritten.
+        /// The shape changed, so the stored file is worth keeping a copy of before it is
+        /// overwritten.
         let reshaped: Bool
     }
 
@@ -46,7 +47,9 @@ struct StoredFormat {
     /// `steps[n]` upgrades version n to n + 1; a file without a number is version 0.
     let steps: [Step]
 
-    var current: Int { steps.count }
+    var current: Int {
+        steps.count
+    }
 
     func prepare(_ data: Data) throws -> Prepared {
         let stored = try Self.storedVersion(of: data)
@@ -58,16 +61,23 @@ struct StoredFormat {
             return Prepared(data: data, storedVersion: stored, reshaped: false)
         }
         guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Top level must be an object"))
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: [],
+                debugDescription: "Top level must be an object"
+            ))
         }
         for step in pending {
             try step.apply(&object)
         }
         object[Self.versionKey] = current
-        return Prepared(data: try JSONSerialization.data(withJSONObject: object), storedVersion: stored, reshaped: true)
+        return try Prepared(
+            data: JSONSerialization.data(withJSONObject: object),
+            storedVersion: stored,
+            reshaped: true
+        )
     }
 
-    func encode<Value: Encodable>(_ value: Value, using encoder: JSONEncoder) throws -> Data {
+    func encode(_ value: some Encodable, using encoder: JSONEncoder) throws -> Data {
         try encoder.encode(Versioned(value: value, version: current))
     }
 
@@ -86,7 +96,9 @@ struct StoredFormat {
     private struct Versioned<Value: Encodable>: Encodable {
         struct Key: CodingKey {
             var stringValue: String
-            var intValue: Int? { nil }
+            var intValue: Int? {
+                nil
+            }
 
             init(stringValue: String) {
                 self.stringValue = stringValue

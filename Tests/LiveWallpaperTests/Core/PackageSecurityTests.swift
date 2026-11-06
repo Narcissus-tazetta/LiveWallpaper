@@ -1,6 +1,6 @@
 import Foundation
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class PackageSecurityTests: XCTestCase {
@@ -10,8 +10,8 @@ final class PackageSecurityTests: XCTestCase {
         var name: String
         var data: Data
         var isSymlink: Bool = false
-        var symlinkTarget: String? = nil
-        var spoofedUncompressedSize: UInt32? = nil
+        var symlinkTarget: String?
+        var spoofedUncompressedSize: UInt32?
     }
 
     /// Builds a valid ZIP archive in memory with custom entries.
@@ -31,15 +31,15 @@ final class PackageSecurityTests: XCTestCase {
             var localHeader = Data()
             localHeader.append(contentsOf: [0x50, 0x4B, 0x03, 0x04]) // signature
             localHeader.appendUInt16(20) // version needed
-            localHeader.appendUInt16(0)  // flags
-            localHeader.appendUInt16(0)  // compression (stored)
-            localHeader.appendUInt16(0)  // mod time
-            localHeader.appendUInt16(0)  // mod date
+            localHeader.appendUInt16(0) // flags
+            localHeader.appendUInt16(0) // compression (stored)
+            localHeader.appendUInt16(0) // mod time
+            localHeader.appendUInt16(0) // mod date
             localHeader.appendUInt32(crc)
             localHeader.appendUInt32(compressedSize)
             localHeader.appendUInt32(uncompressedSize)
             localHeader.appendUInt16(UInt16(nameBytes.count))
-            localHeader.appendUInt16(0)  // extra length
+            localHeader.appendUInt16(0) // extra length
             localHeader.append(contentsOf: nameBytes)
             localHeader.append(entryData)
             body.append(localHeader)
@@ -47,19 +47,19 @@ final class PackageSecurityTests: XCTestCase {
             // Central directory header
             centralDirectory.append(contentsOf: [0x50, 0x4B, 0x01, 0x02]) // signature
             centralDirectory.appendUInt16(0x031E) // version made by (UNIX 3.0)
-            centralDirectory.appendUInt16(20)     // version needed
-            centralDirectory.appendUInt16(0)      // flags
-            centralDirectory.appendUInt16(0)      // compression
-            centralDirectory.appendUInt16(0)      // mod time
-            centralDirectory.appendUInt16(0)      // mod date
+            centralDirectory.appendUInt16(20) // version needed
+            centralDirectory.appendUInt16(0) // flags
+            centralDirectory.appendUInt16(0) // compression
+            centralDirectory.appendUInt16(0) // mod time
+            centralDirectory.appendUInt16(0) // mod date
             centralDirectory.appendUInt32(crc)
             centralDirectory.appendUInt32(compressedSize)
             centralDirectory.appendUInt32(uncompressedSize)
             centralDirectory.appendUInt16(UInt16(nameBytes.count))
-            centralDirectory.appendUInt16(0)      // extra length
-            centralDirectory.appendUInt16(0)      // comment length
-            centralDirectory.appendUInt16(0)      // disk start
-            centralDirectory.appendUInt16(0)      // internal attr
+            centralDirectory.appendUInt16(0) // extra length
+            centralDirectory.appendUInt16(0) // comment length
+            centralDirectory.appendUInt16(0) // disk start
+            centralDirectory.appendUInt16(0) // internal attr
             // external attr: symlink is 0120777 << 16, regular is 0100644 << 16
             let externalAttr: UInt32 = entry.isSymlink ? (0o120777 << 16) : (0o100644 << 16)
             centralDirectory.appendUInt32(externalAttr)
@@ -88,11 +88,11 @@ final class PackageSecurityTests: XCTestCase {
     }
 
     private func crc32Checksum(_ data: Data) -> UInt32 {
-        var crc: UInt32 = 0xFFFFFFFF
+        var crc: UInt32 = 0xFFFF_FFFF
         for byte in data {
             crc ^= UInt32(byte)
-            for _ in 0..<8 {
-                let mask = (crc & 1) != 0 ? UInt32(0xEDB88320) : 0
+            for _ in 0 ..< 8 {
+                let mask = (crc & 1) != 0 ? UInt32(0xEDB8_8320) : 0
                 crc = (crc >> 1) ^ mask
             }
         }
@@ -102,9 +102,25 @@ final class PackageSecurityTests: XCTestCase {
     private func makeValidManifestData(videoID: String = "test-video") throws -> Data {
         let manifest = PackageManifest(
             version: "1.1",
-            manifest: .init(name: "Test", author: "tester", createdAt: "2026-11-05T00:00:00Z", description: "desc", license: nil),
+            manifest: .init(
+                name: "Test",
+                author: "tester",
+                createdAt: "2026-11-05T00:00:00Z",
+                description: "desc",
+                license: nil
+            ),
             videos: [
-                .init(id: videoID, source: .init(fileName: "\(videoID).mp4", size: nil), displayName: videoID, sha256: nil, thumbnail: nil, presentations: [:], edit: nil, duration: nil, hasAudio: nil)
+                .init(
+                    id: videoID,
+                    source: .init(fileName: "\(videoID).mp4", size: nil),
+                    displayName: videoID,
+                    sha256: nil,
+                    thumbnail: nil,
+                    presentations: [:],
+                    edit: nil,
+                    duration: nil,
+                    hasAudio: nil
+                )
             ],
             playlists: [],
             packaging: .init(videosIncluded: true, packageSizeBytes: nil)
@@ -112,15 +128,15 @@ final class PackageSecurityTests: XCTestCase {
         return try JSONEncoder().encode(manifest)
     }
 
-    // CASE 1: Zip slip (entry name contains ../)
+    /// CASE 1: Zip slip (entry name contains ../)
     func testZipSlipIsRejected() async throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempDir) }
 
         let canaryFile = tempDir.appendingPathComponent("escaped.txt")
-        let zipData = buildZip(entries: [
-            ZipEntry(name: "content/metadata.json", data: try makeValidManifestData()),
+        let zipData = try buildZip(entries: [
+            ZipEntry(name: "content/metadata.json", data: makeValidManifestData()),
             ZipEntry(name: "content/videos/test-video.mp4", data: Data("video-content".utf8)),
             ZipEntry(name: "../escaped.txt", data: Data("pwned".utf8))
         ])
@@ -136,15 +152,20 @@ final class PackageSecurityTests: XCTestCase {
         }
     }
 
-    // CASE 2: Symlink pointing outside extraction root
+    /// CASE 2: Symlink pointing outside extraction root
     func testSymlinkPointingOutsideIsRejected() async throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempDir) }
 
-        let zipData = buildZip(entries: [
-            ZipEntry(name: "content/metadata.json", data: try makeValidManifestData()),
-            ZipEntry(name: "content/videos/test-video.mp4", data: Data(), isSymlink: true, symlinkTarget: "/etc/passwd")
+        let zipData = try buildZip(entries: [
+            ZipEntry(name: "content/metadata.json", data: makeValidManifestData()),
+            ZipEntry(
+                name: "content/videos/test-video.mp4",
+                data: Data(),
+                isSymlink: true,
+                symlinkTarget: "/etc/passwd"
+            )
         ])
         let zipURL = tempDir.appendingPathComponent("symlink.lwpkg")
         try zipData.write(to: zipURL)
@@ -158,16 +179,20 @@ final class PackageSecurityTests: XCTestCase {
         }
     }
 
-    // CASE 3: Declared uncompressed size exceeds limit (Zip bomb)
+    /// CASE 3: Declared uncompressed size exceeds limit (Zip bomb)
     func testZipBombWithHugeDeclaredSizeIsRejected() async throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempDir) }
 
         // Spoof uncompressed size to 3GB (> 2GB limit)
-        let zipData = buildZip(entries: [
-            ZipEntry(name: "content/metadata.json", data: try makeValidManifestData()),
-            ZipEntry(name: "content/videos/test-video.mp4", data: Data("tiny".utf8), spoofedUncompressedSize: 3 * 1024 * 1024 * 1024)
+        let zipData = try buildZip(entries: [
+            ZipEntry(name: "content/metadata.json", data: makeValidManifestData()),
+            ZipEntry(
+                name: "content/videos/test-video.mp4",
+                data: Data("tiny".utf8),
+                spoofedUncompressedSize: 3 * 1024 * 1024 * 1024
+            )
         ])
         let zipURL = tempDir.appendingPathComponent("bomb.lwpkg")
         try zipData.write(to: zipURL)
@@ -183,30 +208,37 @@ final class PackageSecurityTests: XCTestCase {
         }
     }
 
-    // Packages the user exports are not size-capped, so a multi-GB scene video must still import;
-    // only the Store preset rejects it.
-    func testLargeDeclaredSizeIsAcceptedLocallyButNotForStore() async throws {
+    /// Packages the user exports are not size-capped, so a multi-GB scene video must still import;
+    /// only the Store preset rejects it.
+    func testLargeDeclaredSizeIsAcceptedLocallyButNotForStore() throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempDir) }
 
-        let zipData = buildZip(entries: [
-            ZipEntry(name: "content/metadata.json", data: try makeValidManifestData()),
-            ZipEntry(name: "content/videos/test-video.mp4", data: Data("tiny".utf8), spoofedUncompressedSize: 3 * 1024 * 1024 * 1024)
+        let zipData = try buildZip(entries: [
+            ZipEntry(name: "content/metadata.json", data: makeValidManifestData()),
+            ZipEntry(
+                name: "content/videos/test-video.mp4",
+                data: Data("tiny".utf8),
+                spoofedUncompressedSize: 3 * 1024 * 1024 * 1024
+            )
         ])
         let zipURL = tempDir.appendingPathComponent("large.lwpkg")
         try zipData.write(to: zipURL)
 
         let local = try PackageImporter.inspectZipArchive(at: zipURL, limits: .local)
         XCTAssertGreaterThan(local.totalUncompressedBytes, 3 * 1024 * 1024 * 1024)
-        XCTAssertThrowsError(try PackageImporter.inspectZipArchive(at: zipURL, limits: .store)) { error in
+        XCTAssertThrowsError(try PackageImporter.inspectZipArchive(
+            at: zipURL,
+            limits: .store
+        )) { error in
             guard case PackageImporter.ImportError.extractedSizeTooLarge = error else {
                 return XCTFail("Expected extractedSizeTooLarge, got \(error)")
             }
         }
     }
 
-    func testNamesContainingDoubleDotsInsideAComponentAreNotTreatedAsTraversal() async throws {
+    func testNamesContainingDoubleDotsInsideAComponentAreNotTreatedAsTraversal() throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempDir) }
@@ -219,17 +251,17 @@ final class PackageSecurityTests: XCTestCase {
         XCTAssertNoThrow(try PackageImporter.inspectZipArchive(at: zipURL, limits: .local))
     }
 
-    // CASE 4: Excessive entry count
+    /// CASE 4: Excessive entry count
     func testExcessiveEntryCountIsRejected() async throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempDir) }
 
-        var entries: [ZipEntry] = [
-            ZipEntry(name: "content/metadata.json", data: try makeValidManifestData()),
+        var entries: [ZipEntry] = try [
+            ZipEntry(name: "content/metadata.json", data: makeValidManifestData()),
             ZipEntry(name: "content/videos/test-video.mp4", data: Data("video".utf8))
         ]
-        for i in 0..<5001 {
+        for i in 0 ..< 5001 {
             entries.append(ZipEntry(name: "content/extra_\(i).txt", data: Data("a".utf8)))
         }
         let zipData = buildZip(entries: entries)
@@ -245,25 +277,42 @@ final class PackageSecurityTests: XCTestCase {
         }
     }
 
-    // CASE 5a: Malformed formatVersion in scene.json
+    /// CASE 5a: Malformed formatVersion in scene.json
     func testMalformedFormatVersionInSceneIsRejected() async throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempDir) }
 
-        let malformedSceneJSON = """
+        let malformedSceneJSON = Data("""
         {
             "formatVersion": -1,
             "canvasWidth": 1920,
             "canvasHeight": 1080
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let manifest = PackageManifest(
             version: "1.1",
-            manifest: .init(name: "Test", author: "tester", createdAt: "2026-11-05T00:00:00Z", description: "desc", license: nil),
+            manifest: .init(
+                name: "Test",
+                author: "tester",
+                createdAt: "2026-11-05T00:00:00Z",
+                description: "desc",
+                license: nil
+            ),
             videos: [
-                .init(id: "scene-video", source: .init(fileName: "scene-video.mp4", size: nil), displayName: "Scene", sha256: nil, thumbnail: nil, presentations: [:], edit: nil, duration: nil, hasAudio: nil, scene: true)
+                .init(
+                    id: "scene-video",
+                    source: .init(fileName: "scene-video.mp4", size: nil),
+                    displayName: "Scene",
+                    sha256: nil,
+                    thumbnail: nil,
+                    presentations: [:],
+                    edit: nil,
+                    duration: nil,
+                    hasAudio: nil,
+                    scene: true
+                )
             ],
             playlists: [],
             packaging: .init(videosIncluded: true, packageSizeBytes: nil)
@@ -288,7 +337,7 @@ final class PackageSecurityTests: XCTestCase {
         }
     }
 
-    // CASE 5b: Huge metadata.json (> 10MB limit)
+    /// CASE 5b: Huge metadata.json (> 10MB limit)
     func testHugeMetadataJSONIsRejected() async throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -312,8 +361,8 @@ final class PackageSecurityTests: XCTestCase {
         }
     }
 
-    // CASE 5c: Huge scene.json (> 500MB limit)
-    func testHugeSceneJSONIsRejected() async throws {
+    /// CASE 5c: Huge scene.json (> 500MB limit)
+    func testHugeSceneJSONIsRejected() throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: tempDir) }
@@ -324,7 +373,10 @@ final class PackageSecurityTests: XCTestCase {
         try handle.truncate(atOffset: UInt64(SceneStore.maximumSceneJSONBytes + 1024))
         try handle.close()
 
-        XCTAssertThrowsError(try SceneStore.importScene(from: tempDir, videoPath: "/tmp/video.mp4")) { error in
+        XCTAssertThrowsError(try SceneStore.importScene(
+            from: tempDir,
+            videoPath: "/tmp/video.mp4"
+        )) { error in
             guard case SceneStore.ImportError.sceneDefinitionTooLarge = error else {
                 XCTFail("Expected sceneDefinitionTooLarge error, got \(error)")
                 return
@@ -332,7 +384,7 @@ final class PackageSecurityTests: XCTestCase {
         }
     }
 
-    // CASE 5d: Unsupported manifest version
+    /// CASE 5d: Unsupported manifest version
     func testUnsupportedManifestVersionIsRejected() async throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -340,9 +392,25 @@ final class PackageSecurityTests: XCTestCase {
 
         let manifest = PackageManifest(
             version: "99.0",
-            manifest: .init(name: "Future", author: "tester", createdAt: "2026-11-05T00:00:00Z", description: "desc", license: nil),
+            manifest: .init(
+                name: "Future",
+                author: "tester",
+                createdAt: "2026-11-05T00:00:00Z",
+                description: "desc",
+                license: nil
+            ),
             videos: [
-                .init(id: "video", source: .init(fileName: "video.mp4", size: nil), displayName: "Video", sha256: nil, thumbnail: nil, presentations: [:], edit: nil, duration: nil, hasAudio: nil)
+                .init(
+                    id: "video",
+                    source: .init(fileName: "video.mp4", size: nil),
+                    displayName: "Video",
+                    sha256: nil,
+                    thumbnail: nil,
+                    presentations: [:],
+                    edit: nil,
+                    duration: nil,
+                    hasAudio: nil
+                )
             ],
             playlists: [],
             packaging: .init(videosIncluded: true, packageSizeBytes: nil)
@@ -364,7 +432,7 @@ final class PackageSecurityTests: XCTestCase {
         }
     }
 
-    // CASE 6: Video path traversal in manifest
+    /// CASE 6: Video path traversal in manifest
     func testVideoPathTraversalInManifestIsRejected() async throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -372,9 +440,25 @@ final class PackageSecurityTests: XCTestCase {
 
         let manifest = PackageManifest(
             version: "1.1",
-            manifest: .init(name: "Test", author: "tester", createdAt: "2026-11-05T00:00:00Z", description: "desc", license: nil),
+            manifest: .init(
+                name: "Test",
+                author: "tester",
+                createdAt: "2026-11-05T00:00:00Z",
+                description: "desc",
+                license: nil
+            ),
             videos: [
-                .init(id: "../evil", source: .init(fileName: "evil.mp4", size: nil), displayName: "Evil", sha256: nil, thumbnail: nil, presentations: [:], edit: nil, duration: nil, hasAudio: nil)
+                .init(
+                    id: "../evil",
+                    source: .init(fileName: "evil.mp4", size: nil),
+                    displayName: "Evil",
+                    sha256: nil,
+                    thumbnail: nil,
+                    presentations: [:],
+                    edit: nil,
+                    duration: nil,
+                    hasAudio: nil
+                )
             ],
             playlists: [],
             packaging: .init(videosIncluded: true, packageSizeBytes: nil)

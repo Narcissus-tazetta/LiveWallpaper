@@ -146,9 +146,11 @@ extension WallpaperModel {
 
     func restoreSpaceWallpaperState() {
         spaceWallpaperFeatureEnabled =
-            UserDefaults.standard.object(forKey: PrefsKey.spaceWallpaperFeatureEnabled) as? Bool ?? false
+            UserDefaults.standard
+                .object(forKey: PrefsKey.spaceWallpaperFeatureEnabled) as? Bool ?? false
         menuBarSpaceNumberEnabled =
-            UserDefaults.standard.object(forKey: PrefsKey.menuBarSpaceNumberEnabled) as? Bool ?? false
+            UserDefaults.standard
+                .object(forKey: PrefsKey.menuBarSpaceNumberEnabled) as? Bool ?? false
         if let saved = UserDefaults.standard.dictionary(forKey: PrefsKey.videoBySpaceUUID)
             as? [String: String]
         {
@@ -175,7 +177,7 @@ extension WallpaperModel {
         else {
             spacesSnapshotFailureCount += 1
             AppLog.spaces.error(
-                "snapshot failed count=\(self.spacesSnapshotFailureCount)"
+                "snapshot failed count=\(spacesSnapshotFailureCount)"
             )
             // 非公開APIの返却形式が変わった可能性。誤った壁紙を出し続ける
             // より機能ごと止めて従来動作へ戻す。
@@ -217,7 +219,8 @@ extension WallpaperModel {
             }
             for snapshot in snapshots {
                 if let displayID = appIDByCGSUUID[snapshot.cgsDisplayIdentifier] {
-                    orderedByDisplay[displayID] = snapshot.spaces.filter { !$0.isFullscreen }.map(\.uuid)
+                    orderedByDisplay[displayID] = snapshot.spaces.filter { !$0.isFullscreen }
+                        .map(\.uuid)
                 }
             }
         }
@@ -226,7 +229,7 @@ extension WallpaperModel {
         }
         orderedSpaceUUIDsByDisplayID = orderedByDisplay
         AppLog.spaces.info(
-            "snapshot desktops=\(self.knownDesktopSpaces.count) current=\(current, privacy: .public)"
+            "snapshot desktops=\(knownDesktopSpaces.count) current=\(current, privacy: .public)"
         )
     }
 

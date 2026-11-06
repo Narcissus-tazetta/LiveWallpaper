@@ -36,12 +36,22 @@ final class SceneSkeletonTests: XCTestCase {
         let skeleton = SceneSkeleton(
             bones: [.init(name: "root", rest: .init(), inverseBind: identity)],
             clips: [.init(name: "move", framesPerSecond: 10, frameCount: 7, tracks: [
-                .init(bone: 0, transforms: [0, 2, 4, 6, 6, 4, 2, 0].map { .init(translation: [Float($0), 0, 0]) })
+                .init(
+                    bone: 0,
+                    transforms: [0, 2, 4, 6, 6, 4, 2, 0]
+                        .map { .init(translation: [Float($0), 0, 0]) }
+                )
             ])], playback: [.init(clip: 0)]
         )
-        let live = try SceneSkeletonEvaluator(skeleton), baked = try SceneSkeletonEvaluator(skeleton)
+        let live = try SceneSkeletonEvaluator(skeleton),
+            baked = try SceneSkeletonEvaluator(skeleton)
         baked.setLoop(60)
-        func x(_ evaluator: SceneSkeletonEvaluator, _ time: Double) -> Float { evaluator.evaluate(time: time).matrices[0].columns.3.x }
+        func x(
+            _ evaluator: SceneSkeletonEvaluator,
+            _ time: Double
+        ) -> Float {
+            evaluator.evaluate(time: time).matrices[0].columns.3.x
+        }
         XCTAssertEqual(x(baked, 25), x(live, 25), "the first half plays at the clip's speed")
         XCTAssertEqual(x(baked, 59.999), x(baked, 0), accuracy: 0.05, "the baked loop closes")
         XCTAssertNotEqual(x(live, 59.999), x(live, 0), accuracy: 0.05)
@@ -111,14 +121,25 @@ final class SceneSkeletonTests: XCTestCase {
         let skeleton = SceneSkeleton(
             bones: [.init(name: "root", rest: .init(), inverseBind: identity)],
             clips: [
-                .init(name: "a", framesPerSecond: 1, frameCount: 1, tracks: [.init(bone: 0, transforms: [turn(0), turn(0)])]),
+                .init(
+                    name: "a",
+                    framesPerSecond: 1,
+                    frameCount: 1,
+                    tracks: [.init(bone: 0, transforms: [turn(0), turn(0)])]
+                ),
                 // The same quarter-pitch turn stored as the negated quaternion.
-                .init(name: "b", framesPerSecond: 1, frameCount: 1, tracks: [.init(bone: 0, transforms: [turn(.pi, sign: -1), turn(.pi, sign: -1)])])
+                .init(
+                    name: "b",
+                    framesPerSecond: 1,
+                    frameCount: 1,
+                    tracks: [.init(bone: 0, transforms: [turn(.pi, sign: -1), turn(.pi, sign: -1)])]
+                )
             ],
             playback: [.init(clip: 0), .init(clip: 1, weight: 0.25)]
         )
         let matrix = try SceneSkeletonEvaluator(skeleton).evaluate(time: 0).matrices[0]
-        // normalize(0.75 * (0,0,0,1) + 0.25 * (0,0,1,0)) is the angle 2 * atan(1/3), not a quarter of pi.
+        // normalize(0.75 * (0,0,0,1) + 0.25 * (0,0,1,0)) is the angle 2 * atan(1/3), not a quarter
+        // of pi.
         let expected = 2 * atan(Float(1) / 3)
         XCTAssertEqual(atan2(matrix.columns.0.y, matrix.columns.0.x), expected, accuracy: 1e-5)
     }

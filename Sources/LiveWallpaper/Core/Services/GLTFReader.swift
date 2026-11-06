@@ -7,7 +7,9 @@ import simd
 struct GLTFAsset {
     struct ReadError: LocalizedError {
         let detail: String
-        var errorDescription: String? { "glTF: \(detail)" }
+        var errorDescription: String? {
+            "glTF: \(detail)"
+        }
     }
 
     struct Primitive {
@@ -81,7 +83,8 @@ struct GLTFAsset {
         var node: Int
         var path: Path
         var times: [Float]
-        /// Three or four floats a key; three keys' worth (in-tangent, value, out-tangent) for a cubic spline.
+        /// Three or four floats a key; three keys' worth (in-tangent, value, out-tangent) for a
+        /// cubic spline.
         var values: [Float]
         var interpolation: String
     }
@@ -104,7 +107,10 @@ struct GLTFAsset {
 extension GLTFAsset {
     private struct JSONRoot: Decodable {
         struct Buffer: Decodable { var uri: String?; var byteLength: Int }
-        struct BufferView: Decodable { var buffer: Int; var byteOffset: Int?; var byteLength: Int; var byteStride: Int? }
+        struct BufferView: Decodable {
+            var buffer: Int; var byteOffset: Int?; var byteLength: Int; var byteStride: Int?
+        }
+
         struct Accessor: Decodable {
             var bufferView: Int?
             var byteOffset: Int?
@@ -114,6 +120,7 @@ extension GLTFAsset {
             var type: String
             var sparse: AnyCodable?
         }
+
         struct Primitive: Decodable {
             var attributes: [String: Int]
             var indices: Int?
@@ -121,6 +128,7 @@ extension GLTFAsset {
             var mode: Int?
             var targets: [[String: Int]]?
         }
+
         struct Mesh: Decodable { var primitives: [Primitive] }
         struct Node: Decodable {
             var name: String?
@@ -132,8 +140,12 @@ extension GLTFAsset {
             var rotation: [Float]?
             var scale: [Float]?
         }
+
         struct Skin: Decodable { var joints: [Int]; var inverseBindMatrices: Int? }
-        struct TextureInfo: Decodable { var index: Int; var texCoord: Int?; var scale: Float?; var strength: Float? }
+        struct TextureInfo: Decodable {
+            var index: Int; var texCoord: Int?; var scale: Float?; var strength: Float?
+        }
+
         struct PBR: Decodable {
             var baseColorFactor: [Float]?
             var baseColorTexture: TextureInfo?
@@ -141,6 +153,7 @@ extension GLTFAsset {
             var roughnessFactor: Float?
             var metallicRoughnessTexture: TextureInfo?
         }
+
         struct Material: Decodable {
             var name: String?
             var pbrMetallicRoughness: PBR?
@@ -153,6 +166,7 @@ extension GLTFAsset {
             var doubleSided: Bool?
             var extensions: [String: AnyCodable]?
         }
+
         struct Texture: Decodable { var sampler: Int?; var source: Int? }
         struct Sampler: Decodable { var wrapS: Int?; var wrapT: Int? }
         struct Image: Decodable { var uri: String?; var mimeType: String?; var bufferView: Int? }
@@ -161,8 +175,15 @@ extension GLTFAsset {
             var sampler: Int
             var target: Target
         }
-        struct AnimationSampler: Decodable { var input: Int; var output: Int; var interpolation: String? }
-        struct Animation: Decodable { var name: String?; var channels: [AnimationChannel]; var samplers: [AnimationSampler] }
+
+        struct AnimationSampler: Decodable {
+            var input: Int; var output: Int; var interpolation: String?
+        }
+
+        struct Animation: Decodable {
+            var name: String?; var channels: [AnimationChannel]; var samplers: [AnimationSampler]
+        }
+
         struct Scene: Decodable { var nodes: [Int]? }
         struct Asset: Decodable { var version: String }
 
@@ -192,7 +213,8 @@ extension GLTFAsset {
     /// are refused.
     private static let supportedExtensions: Set<String> = ["KHR_materials_unlit"]
 
-    /// An accessor without a buffer view is filled with zeros, so its count alone sizes the allocation.
+    /// An accessor without a buffer view is filled with zeros, so its count alone sizes the
+    /// allocation.
     private static let maximumElements = 1 << 26
 
     static func read(url: URL) throws -> GLTFAsset {
@@ -214,7 +236,9 @@ extension GLTFAsset {
         }
         let unsupported = Set(root.extensionsRequired ?? []).subtracting(supportedExtensions)
         guard unsupported.isEmpty else {
-            throw ReadError(detail: "needs \(unsupported.sorted().joined(separator: ", ")), which this app does not read")
+            throw ReadError(
+                detail: "needs \(unsupported.sorted().joined(separator: ", ")), which this app does not read"
+            )
         }
 
         let buffers = try (root.buffers ?? []).enumerated().map { index, buffer -> Data in
@@ -226,31 +250,49 @@ extension GLTFAsset {
             } else {
                 throw ReadError(detail: "buffer \(index) has no data")
             }
-            guard data.count >= buffer.byteLength else { throw ReadError(detail: "buffer \(index) is shorter than it says") }
+            guard data.count >= buffer.byteLength
+            else { throw ReadError(detail: "buffer \(index) is shorter than it says") }
             return data
         }
         let views = root.bufferViews ?? []
         let accessors = root.accessors ?? []
 
         func viewBytes(_ index: Int) throws -> Data {
-            guard views.indices.contains(index) else { throw ReadError(detail: "unknown buffer view \(index)") }
+            guard views.indices.contains(index)
+            else { throw ReadError(detail: "unknown buffer view \(index)") }
             let view = views[index]
-            guard buffers.indices.contains(view.buffer) else { throw ReadError(detail: "unknown buffer \(view.buffer)") }
+            guard buffers.indices.contains(view.buffer)
+            else { throw ReadError(detail: "unknown buffer \(view.buffer)") }
             let start = view.byteOffset ?? 0
-            guard start >= 0, view.byteLength >= 0, view.byteLength <= buffers[view.buffer].count - start else {
+            guard start >= 0, view.byteLength >= 0,
+                  view.byteLength <= buffers[view.buffer].count - start
+            else {
                 throw ReadError(detail: "buffer view \(index) runs past its buffer")
             }
             let buffer = buffers[view.buffer]
-            return buffer.subdata(in: buffer.startIndex + start ..< buffer.startIndex + start + view.byteLength)
+            return buffer
+                .subdata(in: buffer.startIndex + start ..< buffer.startIndex + start + view
+                    .byteLength)
         }
 
         /// The accessor's elements in `bytes`: their start and the distance between them.
         /// The file's numbers are checked before any arithmetic, which would trap on overflow.
-        func layout(_ index: Int, _ accessor: JSONRoot.Accessor, viewIndex: Int, elementSize: Int, bytes: Data) throws -> (offset: Int, stride: Int) {
+        func layout(
+            _ index: Int,
+            _ accessor: JSONRoot.Accessor,
+            viewIndex: Int,
+            elementSize: Int,
+            bytes: Data
+        ) throws -> (offset: Int, stride: Int) {
             let stride = views[viewIndex].byteStride ?? elementSize
             let offset = accessor.byteOffset ?? 0
-            guard (elementSize ... 256).contains(stride), (0 ... bytes.count).contains(offset), accessor.count <= bytes.count,
-                  accessor.count == 0 || offset + stride * (accessor.count - 1) + elementSize <= bytes.count
+            // An accessor's count is its element count, not a collection's size.
+            // swiftlint:disable:next empty_count
+            let hasNoElements = accessor.count == 0
+            let lastElementEnd = offset + stride * (accessor.count - 1) + elementSize
+            guard (elementSize ... 256).contains(stride), (0 ... bytes.count).contains(offset),
+                  accessor.count <= bytes.count,
+                  hasNoElements || lastElementEnd <= bytes.count
             else {
                 throw ReadError(detail: "accessor \(index) runs past its buffer view")
             }
@@ -258,19 +300,32 @@ extension GLTFAsset {
         }
 
         /// Each element's components as floats, normalized integers mapped as the spec says.
-        func floats(_ index: Int, components expected: Set<Int>) throws -> (values: [Float], components: Int) {
-            guard accessors.indices.contains(index) else { throw ReadError(detail: "unknown accessor \(index)") }
+        func floats(
+            _ index: Int,
+            components expected: Set<Int>
+        ) throws -> (values: [Float], components: Int) {
+            guard accessors.indices.contains(index)
+            else { throw ReadError(detail: "unknown accessor \(index)") }
             let accessor = accessors[index]
-            guard accessor.sparse == nil else { throw ReadError(detail: "sparse accessors are not supported") }
+            guard accessor.sparse == nil
+            else { throw ReadError(detail: "sparse accessors are not supported") }
             let components = try componentCount(accessor.type)
-            guard expected.contains(components) else { throw ReadError(detail: "accessor \(index) has type \(accessor.type)") }
-            guard (0 ... maximumElements).contains(accessor.count) else { throw ReadError(detail: "accessor \(index) has \(accessor.count) elements") }
+            guard expected.contains(components)
+            else { throw ReadError(detail: "accessor \(index) has type \(accessor.type)") }
+            guard (0 ... maximumElements).contains(accessor.count)
+            else { throw ReadError(detail: "accessor \(index) has \(accessor.count) elements") }
             guard let viewIndex = accessor.bufferView else {
                 return (Array(repeating: 0, count: accessor.count * components), components)
             }
             let size = try componentSize(accessor.componentType)
             let bytes = try viewBytes(viewIndex)
-            let (offset, stride) = try layout(index, accessor, viewIndex: viewIndex, elementSize: size * components, bytes: bytes)
+            let (offset, stride) = try layout(
+                index,
+                accessor,
+                viewIndex: viewIndex,
+                elementSize: size * components,
+                bytes: bytes
+            )
             let normalized = accessor.normalized == true
             var values = [Float]()
             values.reserveCapacity(accessor.count * components)
@@ -279,19 +334,43 @@ extension GLTFAsset {
                     for component in 0 ..< components {
                         let at = offset + element * stride + component * size
                         let value: Float = switch accessor.componentType {
-                        case 5126: Float(bitPattern: raw.loadUnaligned(fromByteOffset: at, as: UInt32.self).littleEndian)
+                        case 5126: Float(bitPattern: raw.loadUnaligned(
+                                fromByteOffset: at,
+                                as: UInt32.self
+                            ).littleEndian)
                         case 5120:
-                            normalized ? max(Float(raw.loadUnaligned(fromByteOffset: at, as: Int8.self)) / 127, -1)
+                            // swiftlint:disable:next void_function_in_ternary
+                            normalized ? max(
+                                Float(raw.loadUnaligned(fromByteOffset: at, as: Int8.self)) / 127,
+                                -1
+                            )
                                 : Float(raw.loadUnaligned(fromByteOffset: at, as: Int8.self))
                         case 5121:
-                            Float(raw.loadUnaligned(fromByteOffset: at, as: UInt8.self)) / (normalized ? 255 : 1)
+                            Float(raw.loadUnaligned(fromByteOffset: at, as: UInt8.self)) /
+                                (normalized ? 255 : 1)
                         case 5122:
-                            normalized ? max(Float(Int16(littleEndian: raw.loadUnaligned(fromByteOffset: at, as: Int16.self))) / 32767, -1)
-                                : Float(Int16(littleEndian: raw.loadUnaligned(fromByteOffset: at, as: Int16.self)))
+                            // swiftlint:disable:next void_function_in_ternary
+                            normalized ? max(
+                                Float(Int16(littleEndian: raw.loadUnaligned(
+                                    fromByteOffset: at,
+                                    as: Int16.self
+                                ))) / 32767,
+                                -1
+                            )
+                                : Float(Int16(littleEndian: raw.loadUnaligned(
+                                    fromByteOffset: at,
+                                    as: Int16.self
+                                )))
                         case 5123:
-                            Float(UInt16(littleEndian: raw.loadUnaligned(fromByteOffset: at, as: UInt16.self))) / (normalized ? 65535 : 1)
+                            Float(UInt16(littleEndian: raw.loadUnaligned(
+                                fromByteOffset: at,
+                                as: UInt16.self
+                            ))) / (normalized ? 65535 : 1)
                         default:
-                            Float(UInt32(littleEndian: raw.loadUnaligned(fromByteOffset: at, as: UInt32.self)))
+                            Float(UInt32(littleEndian: raw.loadUnaligned(
+                                fromByteOffset: at,
+                                as: UInt32.self
+                            )))
                         }
                         values.append(value)
                     }
@@ -301,27 +380,47 @@ extension GLTFAsset {
         }
 
         func integers(_ index: Int, components expected: Int) throws -> [UInt32] {
-            guard accessors.indices.contains(index) else { throw ReadError(detail: "unknown accessor \(index)") }
+            guard accessors.indices.contains(index)
+            else { throw ReadError(detail: "unknown accessor \(index)") }
             let accessor = accessors[index]
-            guard accessor.sparse == nil else { throw ReadError(detail: "sparse accessors are not supported") }
-            guard try componentCount(accessor.type) == expected, [5121, 5123, 5125].contains(accessor.componentType) else {
+            guard accessor.sparse == nil
+            else { throw ReadError(detail: "sparse accessors are not supported") }
+            guard try componentCount(accessor.type) == expected,
+                  [5121, 5123, 5125].contains(accessor.componentType)
+            else {
                 throw ReadError(detail: "accessor \(index) does not hold unsigned integers")
             }
-            guard (0 ... maximumElements).contains(accessor.count) else { throw ReadError(detail: "accessor \(index) has \(accessor.count) elements") }
-            guard let viewIndex = accessor.bufferView else { return Array(repeating: 0, count: accessor.count * expected) }
+            guard (0 ... maximumElements).contains(accessor.count)
+            else { throw ReadError(detail: "accessor \(index) has \(accessor.count) elements") }
+            guard let viewIndex = accessor.bufferView else { return Array(
+                repeating: 0,
+                count: accessor.count * expected
+            ) }
             let size = try componentSize(accessor.componentType)
             let bytes = try viewBytes(viewIndex)
-            let (offset, stride) = try layout(index, accessor, viewIndex: viewIndex, elementSize: size * expected, bytes: bytes)
+            let (offset, stride) = try layout(
+                index,
+                accessor,
+                viewIndex: viewIndex,
+                elementSize: size * expected,
+                bytes: bytes
+            )
             var values = [UInt32]()
             values.reserveCapacity(accessor.count * expected)
             bytes.withUnsafeBytes { raw in
                 for element in 0 ..< accessor.count {
                     for component in 0 ..< expected {
                         let at = offset + element * stride + component * size
-                        let value: UInt32 = switch accessor.componentType {
+                        let value = switch accessor.componentType {
                         case 5121: UInt32(raw.loadUnaligned(fromByteOffset: at, as: UInt8.self))
-                        case 5123: UInt32(UInt16(littleEndian: raw.loadUnaligned(fromByteOffset: at, as: UInt16.self)))
-                        default: UInt32(littleEndian: raw.loadUnaligned(fromByteOffset: at, as: UInt32.self))
+                        case 5123: UInt32(UInt16(littleEndian: raw.loadUnaligned(
+                                fromByteOffset: at,
+                                as: UInt16.self
+                            )))
+                        default: UInt32(littleEndian: raw.loadUnaligned(
+                                fromByteOffset: at,
+                                as: UInt32.self
+                            ))
                         }
                         values.append(value)
                     }
@@ -332,7 +431,11 @@ extension GLTFAsset {
 
         func vec3(_ index: Int) throws -> [SIMD3<Float>] {
             let (values, _) = try floats(index, components: [3])
-            return stride(from: 0, to: values.count, by: 3).map { SIMD3(values[$0], values[$0 + 1], values[$0 + 2]) }
+            return stride(from: 0, to: values.count, by: 3).map { SIMD3(
+                values[$0],
+                values[$0 + 1],
+                values[$0 + 2]
+            ) }
         }
 
         func vec4(_ index: Int, allowing components: Set<Int> = [4]) throws -> [SIMD4<Float>] {
@@ -351,31 +454,57 @@ extension GLTFAsset {
                     throw ReadError(detail: "mesh \(meshIndex) has a primitive without positions")
                 }
                 let positions = try vec3(positionAccessor)
-                let indices = try primitive.indices.map { try integers($0, components: 1) } ?? (0 ..< UInt32(positions.count)).map { $0 }
-                guard indices.count % 3 == 0, indices.allSatisfy({ Int($0) < positions.count }) else {
+                let indices = try primitive.indices
+                    .map { try integers($0, components: 1) } ?? (0 ..< UInt32(positions.count))
+                    .map { $0 }
+                guard indices.count % 3 == 0,
+                      indices.allSatisfy({ Int($0) < positions.count })
+                else {
                     throw ReadError(detail: "mesh \(meshIndex) has indices outside its vertices")
                 }
                 func matching<T>(_ values: [T]?, _ name: String) throws -> [T]? {
                     guard let values else { return nil }
-                    guard values.count == positions.count else { throw ReadError(detail: "mesh \(meshIndex) \(name) count differs from positions") }
+                    guard values.count == positions.count
+                    else {
+                        throw ReadError(
+                            detail: "mesh \(meshIndex) \(name) count differs from positions"
+                        )
+                    }
                     return values
                 }
                 let uvs = try primitive.attributes["TEXCOORD_0"].map { index -> [SIMD2<Float>] in
                     let (values, _) = try floats(index, components: [2])
-                    return stride(from: 0, to: values.count, by: 2).map { SIMD2(values[$0], values[$0 + 1]) }
+                    return stride(from: 0, to: values.count, by: 2).map { SIMD2(
+                        values[$0],
+                        values[$0 + 1]
+                    ) }
                 }
                 let joints = try primitive.attributes["JOINTS_0"].map { index -> [SIMD4<UInt32>] in
                     let values = try integers(index, components: 4)
-                    return stride(from: 0, to: values.count, by: 4).map { SIMD4(values[$0], values[$0 + 1], values[$0 + 2], values[$0 + 3]) }
+                    return stride(from: 0, to: values.count, by: 4).map { SIMD4(
+                        values[$0],
+                        values[$0 + 1],
+                        values[$0 + 2],
+                        values[$0 + 3]
+                    ) }
                 }
-                return Primitive(
+                return try Primitive(
                     positions: positions,
-                    normals: try matching(primitive.attributes["NORMAL"].map(vec3), "normal"),
-                    tangents: try matching(primitive.attributes["TANGENT"].map { try vec4($0) }, "tangent"),
-                    uvs: try matching(uvs, "uv"),
-                    colors: try matching(primitive.attributes["COLOR_0"].map { try vec4($0, allowing: [3, 4]) }, "colour"),
-                    joints: try matching(joints, "joint"),
-                    weights: try matching(primitive.attributes["WEIGHTS_0"].map { try vec4($0) }, "weight"),
+                    normals: matching(primitive.attributes["NORMAL"].map(vec3), "normal"),
+                    tangents: matching(
+                        primitive.attributes["TANGENT"].map { try vec4($0) },
+                        "tangent"
+                    ),
+                    uvs: matching(uvs, "uv"),
+                    colors: matching(
+                        primitive.attributes["COLOR_0"].map { try vec4($0, allowing: [3, 4]) },
+                        "colour"
+                    ),
+                    joints: matching(joints, "joint"),
+                    weights: matching(
+                        primitive.attributes["WEIGHTS_0"].map { try vec4($0) },
+                        "weight"
+                    ),
                     indices: indices,
                     material: primitive.material
                 )
@@ -383,21 +512,38 @@ extension GLTFAsset {
         }
 
         let nodes = try (root.nodes ?? []).enumerated().map { index, node -> Node in
-            var translation = SIMD3<Float>(repeating: 0), rotation = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1), scale = SIMD3<Float>(repeating: 1)
+            var translation = SIMD3<Float>(repeating: 0), rotation = simd_quatf(
+                ix: 0,
+                iy: 0,
+                iz: 0,
+                r: 1
+            ), scale = SIMD3<Float>(repeating: 1)
             if let m = node.matrix {
-                guard m.count == 16, m.allSatisfy(\.isFinite) else { throw ReadError(detail: "node \(index) has an invalid matrix") }
+                guard m.count == 16,
+                      m.allSatisfy(\.isFinite)
+                else { throw ReadError(detail: "node \(index) has an invalid matrix") }
                 (translation, rotation, scale) = decompose(simd_float4x4(columns: (
                     SIMD4(m[0], m[1], m[2], m[3]), SIMD4(m[4], m[5], m[6], m[7]),
                     SIMD4(m[8], m[9], m[10], m[11]), SIMD4(m[12], m[13], m[14], m[15])
                 )))
             }
             if let t = node.translation, t.count == 3 { translation = SIMD3(t[0], t[1], t[2]) }
-            if let r = node.rotation, r.count == 4 { rotation = simd_normalize(simd_quatf(ix: r[0], iy: r[1], iz: r[2], r: r[3])) }
+            if let r = node.rotation, r.count == 4 { rotation = simd_normalize(simd_quatf(
+                ix: r[0],
+                iy: r[1],
+                iz: r[2],
+                r: r[3]
+            )) }
             if let s = node.scale, s.count == 3 { scale = SIMD3(s[0], s[1], s[2]) }
-            if let mesh = node.mesh, !meshes.indices.contains(mesh) { throw ReadError(detail: "node \(index) names an unknown mesh") }
-            if let skin = node.skin, !(root.skins ?? []).indices.contains(skin) { throw ReadError(detail: "node \(index) names an unknown skin") }
+            if let mesh = node.mesh,
+               !meshes.indices
+               .contains(mesh) { throw ReadError(detail: "node \(index) names an unknown mesh") }
+            if let skin = node.skin,
+               !(root.skins ?? []).indices
+               .contains(skin) { throw ReadError(detail: "node \(index) names an unknown skin") }
             return Node(
-                name: node.name ?? "node \(index)", children: node.children ?? [], mesh: node.mesh, skin: node.skin,
+                name: node.name ?? "node \(index)", children: node.children ?? [], mesh: node.mesh,
+                skin: node.skin,
                 translation: translation, rotation: rotation, scale: scale
             )
         }
@@ -406,11 +552,15 @@ extension GLTFAsset {
         }
 
         let skins = try (root.skins ?? []).map { skin -> Skin in
-            guard skin.joints.allSatisfy(nodes.indices.contains) else { throw ReadError(detail: "a skin names an unknown joint") }
+            guard skin.joints.allSatisfy(nodes.indices.contains)
+            else { throw ReadError(detail: "a skin names an unknown joint") }
             let inverseBind: [simd_float4x4]
             if let accessor = skin.inverseBindMatrices {
                 let (values, _) = try floats(accessor, components: [16])
-                guard values.count == skin.joints.count * 16 else { throw ReadError(detail: "a skin's bind matrices do not match its joints") }
+                guard values.count == skin.joints.count * 16
+                else {
+                    throw ReadError(detail: "a skin's bind matrices do not match its joints")
+                }
                 inverseBind = stride(from: 0, to: values.count, by: 16).map { o in
                     simd_float4x4(columns: (
                         SIMD4(values[o], values[o + 1], values[o + 2], values[o + 3]),
@@ -430,39 +580,51 @@ extension GLTFAsset {
         let imageCount = (root.images ?? []).count
         func texture(_ info: JSONRoot.TextureInfo?) throws -> TextureRef? {
             guard let info else { return nil }
-            // Only the first set of texture coordinates is carried; a texture on another set is left out.
+            // Only the first set of texture coordinates is carried; a texture on another set is
+            // left out.
             guard (info.texCoord ?? 0) == 0 else { return nil }
-            guard textures.indices.contains(info.index), let image = textures[info.index].source, (0 ..< imageCount).contains(image) else {
+            guard textures.indices.contains(info.index), let image = textures[info.index].source,
+                  (0 ..< imageCount).contains(image)
+            else {
                 throw ReadError(detail: "a material names an unknown texture")
             }
-            let sampler = textures[info.index].sampler.flatMap { samplers.indices.contains($0) ? samplers[$0] : nil }
+            let sampler = textures[info.index].sampler
+                .flatMap { samplers.indices.contains($0) ? samplers[$0] : nil }
             // Mirrored repeat is drawn as plain repeat.
             let repeats = (sampler?.wrapS ?? 10497) != 33071 || (sampler?.wrapT ?? 10497) != 33071
-            return TextureRef(image: image, repeats: repeats, scale: info.scale ?? info.strength ?? 1)
+            return TextureRef(
+                image: image,
+                repeats: repeats,
+                scale: info.scale ?? info.strength ?? 1
+            )
         }
         let materials = try (root.materials ?? []).map { material -> Material in
             let pbr = material.pbrMetallicRoughness
             let base = pbr?.baseColorFactor ?? [1, 1, 1, 1]
             let emissive = material.emissiveFactor ?? [0, 0, 0]
-            guard base.count == 4, emissive.count == 3 else { throw ReadError(detail: "a material has malformed factors") }
-            return Material(
+            guard base.count == 4,
+                  emissive.count == 3
+            else { throw ReadError(detail: "a material has malformed factors") }
+            return try Material(
                 name: material.name ?? "",
                 baseColor: SIMD4(base[0], base[1], base[2], base[3]),
-                baseColorTexture: try texture(pbr?.baseColorTexture),
+                baseColorTexture: texture(pbr?.baseColorTexture),
                 metallic: pbr?.metallicFactor ?? 1,
                 roughness: pbr?.roughnessFactor ?? 1,
-                metallicRoughnessTexture: try texture(pbr?.metallicRoughnessTexture),
-                normalTexture: try texture(material.normalTexture),
-                occlusionTexture: try texture(material.occlusionTexture),
+                metallicRoughnessTexture: texture(pbr?.metallicRoughnessTexture),
+                normalTexture: texture(material.normalTexture),
+                occlusionTexture: texture(material.occlusionTexture),
                 emissive: SIMD3(emissive[0], emissive[1], emissive[2]),
-                emissiveTexture: try texture(material.emissiveTexture),
+                emissiveTexture: texture(material.emissiveTexture),
                 alphaMode: material.alphaMode ?? "OPAQUE",
                 alphaCutoff: material.alphaCutoff ?? 0.5,
                 doubleSided: material.doubleSided ?? false,
                 unlit: material.extensions?["KHR_materials_unlit"] != nil
             )
         }
-        guard meshes.allSatisfy({ $0.allSatisfy { $0.material.map(materials.indices.contains) ?? true } }) else {
+        guard meshes
+            .allSatisfy({ $0.allSatisfy { $0.material.map(materials.indices.contains) ?? true } })
+        else {
             throw ReadError(detail: "a mesh names an unknown material")
         }
 
@@ -475,50 +637,84 @@ extension GLTFAsset {
             } else {
                 throw ReadError(detail: "image \(index) has no data")
             }
-            if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return Image(data: data, fileExtension: "png") }
-            if data.starts(with: [0xFF, 0xD8, 0xFF]) { return Image(data: data, fileExtension: "jpg") }
+            if data.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return Image(
+                data: data,
+                fileExtension: "png"
+            ) }
+            if data
+                .starts(with: [0xFF, 0xD8, 0xFF]) { return Image(data: data, fileExtension: "jpg") }
             throw ReadError(detail: "image \(index) is neither PNG nor JPEG")
         }
 
-        let animations = try (root.animations ?? []).enumerated().map { index, animation -> Animation in
-            let channels = try animation.channels.compactMap { channel -> Channel? in
-                // Morph target weights are not carried.
-                guard let node = channel.target.node, let path = Channel.Path(rawValue: channel.target.path) else { return nil }
-                guard nodes.indices.contains(node), animation.samplers.indices.contains(channel.sampler) else {
-                    throw ReadError(detail: "animation \(index) names an unknown node or sampler")
+        let animations = try (root.animations ?? []).enumerated()
+            .map { index, animation -> Animation in
+                let channels = try animation.channels.compactMap { channel -> Channel? in
+                    // Morph target weights are not carried.
+                    guard let node = channel.target.node,
+                          let path = Channel.Path(rawValue: channel.target.path) else { return nil }
+                    guard nodes.indices.contains(node),
+                          animation.samplers.indices.contains(channel.sampler)
+                    else {
+                        throw ReadError(
+                            detail: "animation \(index) names an unknown node or sampler"
+                        )
+                    }
+                    let sampler = animation.samplers[channel.sampler]
+                    let (times, _) = try floats(sampler.input, components: [1])
+                    let (values, components) = try floats(sampler.output, components: [3, 4])
+                    let interpolation = sampler.interpolation ?? "LINEAR"
+                    let perKey = (path == .rotation ? 4 : 3) *
+                        (interpolation == "CUBICSPLINE" ? 3 : 1)
+                    guard components == (path == .rotation ? 4 : 3),
+                          values.count == times.count * perKey, !times.isEmpty,
+                          times.allSatisfy(\.isFinite),
+                          zip(times, times.dropFirst()).allSatisfy({ $0 <= $1 })
+                    else { throw ReadError(detail: "animation \(index) has malformed keys") }
+                    return Channel(
+                        node: node,
+                        path: path,
+                        times: times,
+                        values: values,
+                        interpolation: interpolation
+                    )
                 }
-                let sampler = animation.samplers[channel.sampler]
-                let (times, _) = try floats(sampler.input, components: [1])
-                let (values, components) = try floats(sampler.output, components: [3, 4])
-                let interpolation = sampler.interpolation ?? "LINEAR"
-                let perKey = (path == .rotation ? 4 : 3) * (interpolation == "CUBICSPLINE" ? 3 : 1)
-                guard components == (path == .rotation ? 4 : 3), values.count == times.count * perKey, !times.isEmpty,
-                      times.allSatisfy(\.isFinite), zip(times, times.dropFirst()).allSatisfy({ $0 <= $1 })
-                else { throw ReadError(detail: "animation \(index) has malformed keys") }
-                return Channel(node: node, path: path, times: times, values: values, interpolation: interpolation)
-            }
-            return Animation(name: animation.name ?? "animation \(index + 1)", channels: channels)
-        }.filter { !$0.channels.isEmpty }
+                return Animation(
+                    name: animation.name ?? "animation \(index + 1)",
+                    channels: channels
+                )
+            }.filter { !$0.channels.isEmpty }
 
         let scenes = root.scenes ?? []
         let roots: [Int]
         if let sceneIndex = root.scene ?? (scenes.isEmpty ? nil : 0) {
-            guard scenes.indices.contains(sceneIndex) else { throw ReadError(detail: "unknown scene \(sceneIndex)") }
+            guard scenes.indices.contains(sceneIndex)
+            else { throw ReadError(detail: "unknown scene \(sceneIndex)") }
             roots = scenes[sceneIndex].nodes ?? []
         } else {
             // Without scenes, every node that is no other's child is shown.
             let children = Set(nodes.flatMap(\.children))
             roots = nodes.indices.filter { !children.contains($0) }
         }
-        guard roots.allSatisfy(nodes.indices.contains) else { throw ReadError(detail: "the scene names an unknown node") }
+        guard roots.allSatisfy(nodes.indices.contains)
+        else { throw ReadError(detail: "the scene names an unknown node") }
 
-        return GLTFAsset(nodes: nodes, meshes: meshes, skins: skins, materials: materials, images: images,
-                         animations: animations, roots: roots)
+        return GLTFAsset(
+            nodes: nodes,
+            meshes: meshes,
+            skins: skins,
+            materials: materials,
+            images: images,
+            animations: animations,
+            roots: roots
+        )
     }
 
     private static func splitGLB(_ file: Data) throws -> (json: Data, binary: Data?) {
         func word(_ at: Int) -> UInt32 {
-            file.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: at, as: UInt32.self).littleEndian }
+            file
+                .withUnsafeBytes {
+                    $0.loadUnaligned(fromByteOffset: at, as: UInt32.self).littleEndian
+                }
         }
         guard word(4) == 2 else { throw ReadError(detail: "GLB version \(word(4)) is not 2") }
         let total = min(Int(word(8)), file.count)
@@ -528,8 +724,10 @@ extension GLTFAsset {
         while offset + 8 <= total {
             let length = Int(word(offset)), type = word(offset + 4)
             let start = offset + 8
-            guard start + length <= total else { throw ReadError(detail: "a GLB chunk runs past the file") }
-            let chunk = file.subdata(in: file.startIndex + start ..< file.startIndex + start + length)
+            guard start + length <= total
+            else { throw ReadError(detail: "a GLB chunk runs past the file") }
+            let chunk = file
+                .subdata(in: file.startIndex + start ..< file.startIndex + start + length)
             if type == 0x4E4F_534A, json == nil { json = chunk }
             if type == 0x004E_4942, binary == nil { binary = chunk }
             offset = start + (length + 3) / 4 * 4
@@ -587,7 +785,11 @@ extension GLTFAsset {
         let z = SIMD3(m.columns.2.x, m.columns.2.y, m.columns.2.z)
         var scale = SIMD3(simd_length(x), simd_length(y), simd_length(z))
         if simd_dot(simd_cross(x, y), z) < 0 { scale.x = -scale.x }
-        let safe = SIMD3(scale.x == 0 ? 1 : scale.x, scale.y == 0 ? 1 : scale.y, scale.z == 0 ? 1 : scale.z)
+        let safe = SIMD3(
+            scale.x == 0 ? 1 : scale.x,
+            scale.y == 0 ? 1 : scale.y,
+            scale.z == 0 ? 1 : scale.z
+        )
         let rotation = simd_quatf(simd_float3x3(columns: (x / safe.x, y / safe.y, z / safe.z)))
         return (SIMD3(m.columns.3.x, m.columns.3.y, m.columns.3.z), simd_normalize(rotation), scale)
     }

@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 final class PackageManifestCodecTests: XCTestCase {
     private func samplePackageVideo(

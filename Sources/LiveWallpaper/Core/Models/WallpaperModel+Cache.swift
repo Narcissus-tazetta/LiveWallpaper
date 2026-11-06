@@ -193,10 +193,10 @@ extension WallpaperModel {
         activeMediaImportTask = task
 
         switch await task.value {
-        case .success(let url):
+        case let .success(url):
             mediaImportProgress = 1
             return url
-        case .failure(let error):
+        case let .failure(error):
             mediaImportErrorMessage = mediaImportErrorText(for: error)
             return nil
         }

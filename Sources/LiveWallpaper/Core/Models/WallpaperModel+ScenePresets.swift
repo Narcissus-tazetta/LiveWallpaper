@@ -31,7 +31,8 @@ extension WallpaperModel {
         } catch {
             userScenePresets = []
             sceneErrorMessage = error.localizedDescription
-            AppLog.persistence.error("scene presets unreadable: \(error.localizedDescription, privacy: .public)")
+            AppLog.persistence
+                .error("scene presets unreadable: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -53,7 +54,10 @@ extension WallpaperModel {
                 fileNames = try store.copyFiles(of: preset, into: folder)
             } catch {
                 sceneErrorMessage = error.localizedDescription
-                AppLog.persistence.error("scene preset files not copied: \(error.localizedDescription, privacy: .public)")
+                AppLog.persistence
+                    .error(
+                        "scene preset files not copied: \(error.localizedDescription, privacy: .public)"
+                    )
                 return
             }
         }
@@ -62,12 +66,14 @@ extension WallpaperModel {
         for name in fileNames.values {
             retainSceneFile(folder.appendingPathComponent(name))
         }
-        guard let applied = preset.applied(to: document, layerID: layerID, fileNames: fileNames) else {
+        guard let applied = preset.applied(to: document, layerID: layerID, fileNames: fileNames)
+        else {
             releaseTrialFiles(fileNames, path: path)
             return
         }
         scenePresetTrial = ScenePresetTrial(
-            path: path, preset: preset, layerID: layerID, fileNames: fileNames, document: applied.document
+            path: path, preset: preset, layerID: layerID, fileNames: fileNames,
+            document: applied.document
         )
     }
 
@@ -77,7 +83,11 @@ extension WallpaperModel {
             return
         }
         guard let document = sceneDocumentsByPath[path],
-              let applied = trial.preset.applied(to: document, layerID: trial.layerID, fileNames: trial.fileNames)
+              let applied = trial.preset.applied(
+                  to: document,
+                  layerID: trial.layerID,
+                  fileNames: trial.fileNames
+              )
         else {
             endScenePresetTrial()
             return
@@ -96,7 +106,11 @@ extension WallpaperModel {
     /// Applies the preset on show as one undo step.
     func applyScenePresetTrial() {
         guard let trial = scenePresetTrial, let document = sceneDocumentsByPath[trial.path],
-              let applied = trial.preset.applied(to: document, layerID: trial.layerID, fileNames: trial.fileNames)
+              let applied = trial.preset.applied(
+                  to: document,
+                  layerID: trial.layerID,
+                  fileNames: trial.fileNames
+              )
         else {
             endScenePresetTrial()
             return
@@ -139,14 +153,16 @@ extension WallpaperModel {
         let preset = ScenePreset.capture(
             name: name,
             layer: layer,
-            particleLayers: includingParticles ? document.layers.filter { $0.kind == .particles } : [],
+            particleLayers: includingParticles ? document.layers
+                .filter { $0.kind == .particles } : [],
             includingPaint: includingPaint
         )
         do {
             try store.save(preset, filesFrom: SceneStore.folderURL(forVideoPath: path))
         } catch {
             sceneErrorMessage = error.localizedDescription
-            AppLog.persistence.error("scene preset not saved: \(error.localizedDescription, privacy: .public)")
+            AppLog.persistence
+                .error("scene preset not saved: \(error.localizedDescription, privacy: .public)")
             return false
         }
         userScenePresets?.append(preset)
@@ -164,7 +180,8 @@ extension WallpaperModel {
             try store.delete(id)
         } catch {
             sceneErrorMessage = error.localizedDescription
-            AppLog.persistence.error("scene preset not deleted: \(error.localizedDescription, privacy: .public)")
+            AppLog.persistence
+                .error("scene preset not deleted: \(error.localizedDescription, privacy: .public)")
             return
         }
         userScenePresets?.removeAll { $0.id == id }

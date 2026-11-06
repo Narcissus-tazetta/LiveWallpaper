@@ -55,7 +55,11 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         let tracks = try await asset.loadTracks(withMediaType: .video)
         let track = try XCTUnwrap(tracks.first)
         let frameRate = try await track.load(.nominalFrameRate)
-        XCTAssertEqual(round(Double(frameRate)), 30.0, "Gentle motion scene should be baked at 30 fps")
+        XCTAssertEqual(
+            round(Double(frameRate)),
+            30.0,
+            "Gentle motion scene should be baked at 30 fps"
+        )
     }
 
     func testBakeRapidMotionKeeps60FPSVideo() async throws {
@@ -69,7 +73,11 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         let tracks = try await asset.loadTracks(withMediaType: .video)
         let track = try XCTUnwrap(tracks.first)
         let frameRate = try await track.load(.nominalFrameRate)
-        XCTAssertEqual(round(Double(frameRate)), 60.0, "Rapid motion scene should be kept at 60 fps")
+        XCTAssertEqual(
+            round(Double(frameRate)),
+            60.0,
+            "Rapid motion scene should be kept at 60 fps"
+        )
     }
 
     func testHoldStatsIsDisqualifiedThresholds() {
@@ -82,23 +90,53 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         XCTAssertFalse(defaultStats.isDisqualified(totalOddFrames: -1))
 
         // minPSNR boundary (threshold: 42.0 dB)
-        let statsAtMinPSNR = SceneVideoBaker.HoldStats(totalMSE: 0, minPSNR: 42.0, maxChanged: 0, count: 1)
+        let statsAtMinPSNR = SceneVideoBaker.HoldStats(
+            totalMSE: 0,
+            minPSNR: 42.0,
+            maxChanged: 0,
+            count: 1
+        )
         XCTAssertFalse(statsAtMinPSNR.isDisqualified(totalOddFrames: totalOddFrames))
 
-        let statsBelowMinPSNR = SceneVideoBaker.HoldStats(totalMSE: 0, minPSNR: 41.999, maxChanged: 0, count: 1)
+        let statsBelowMinPSNR = SceneVideoBaker.HoldStats(
+            totalMSE: 0,
+            minPSNR: 41.999,
+            maxChanged: 0,
+            count: 1
+        )
         XCTAssertTrue(statsBelowMinPSNR.isDisqualified(totalOddFrames: totalOddFrames))
 
-        let statsAboveMinPSNR = SceneVideoBaker.HoldStats(totalMSE: 0, minPSNR: 42.001, maxChanged: 0, count: 1)
+        let statsAboveMinPSNR = SceneVideoBaker.HoldStats(
+            totalMSE: 0,
+            minPSNR: 42.001,
+            maxChanged: 0,
+            count: 1
+        )
         XCTAssertFalse(statsAboveMinPSNR.isDisqualified(totalOddFrames: totalOddFrames))
 
         // maxChanged boundary (threshold: 0.006)
-        let statsAtChanged = SceneVideoBaker.HoldStats(totalMSE: 0, minPSNR: 100, maxChanged: 0.006, count: 1)
+        let statsAtChanged = SceneVideoBaker.HoldStats(
+            totalMSE: 0,
+            minPSNR: 100,
+            maxChanged: 0.006,
+            count: 1
+        )
         XCTAssertFalse(statsAtChanged.isDisqualified(totalOddFrames: totalOddFrames))
 
-        let statsAboveChanged = SceneVideoBaker.HoldStats(totalMSE: 0, minPSNR: 100, maxChanged: 0.006001, count: 1)
+        let statsAboveChanged = SceneVideoBaker.HoldStats(
+            totalMSE: 0,
+            minPSNR: 100,
+            maxChanged: 0.006001,
+            count: 1
+        )
         XCTAssertTrue(statsAboveChanged.isDisqualified(totalOddFrames: totalOddFrames))
 
-        let statsBelowChanged = SceneVideoBaker.HoldStats(totalMSE: 0, minPSNR: 100, maxChanged: 0.005999, count: 1)
+        let statsBelowChanged = SceneVideoBaker.HoldStats(
+            totalMSE: 0,
+            minPSNR: 100,
+            maxChanged: 0.005999,
+            count: 1
+        )
         XCTAssertFalse(statsBelowChanged.isDisqualified(totalOddFrames: totalOddFrames))
 
         // average PSNR boundary (threshold: 45.0 dB)
@@ -108,12 +146,14 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         XCTAssertFalse(statsAtAvg.isDisqualified(totalOddFrames: totalOddFrames))
 
         let statsDisqualifiedByAvg = SceneVideoBaker.HoldStats(
-            totalMSE: (thresholdMSE + 0.01) * Double(totalOddFrames), minPSNR: 100, maxChanged: 0, count: 50
+            totalMSE: (thresholdMSE + 0.01) * Double(totalOddFrames), minPSNR: 100, maxChanged: 0,
+            count: 50
         )
         XCTAssertTrue(statsDisqualifiedByAvg.isDisqualified(totalOddFrames: totalOddFrames))
 
         let statsSafeAvg = SceneVideoBaker.HoldStats(
-            totalMSE: (thresholdMSE - 0.01) * Double(totalOddFrames), minPSNR: 100, maxChanged: 0, count: 50
+            totalMSE: (thresholdMSE - 0.01) * Double(totalOddFrames), minPSNR: 100, maxChanged: 0,
+            count: 50
         )
         XCTAssertFalse(statsSafeAvg.isDisqualified(totalOddFrames: totalOddFrames))
     }
@@ -122,7 +162,12 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         let totalOddFrames = 20
 
         // Once minPSNR drops below threshold, subsequent high-quality frames cannot revert it
-        var statsMinPSNR = SceneVideoBaker.HoldStats(totalMSE: 0, minPSNR: 41.5, maxChanged: 0, count: 1)
+        var statsMinPSNR = SceneVideoBaker.HoldStats(
+            totalMSE: 0,
+            minPSNR: 41.5,
+            maxChanged: 0,
+            count: 1
+        )
         XCTAssertTrue(statsMinPSNR.isDisqualified(totalOddFrames: totalOddFrames))
         for _ in 0 ..< 10 {
             // Even with perfect PSNR frames added, minPSNR remains <= 41.5
@@ -136,7 +181,12 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         }
 
         // Once maxChanged exceeds threshold, subsequent 0%-changed frames cannot revert it
-        var statsChanged = SceneVideoBaker.HoldStats(totalMSE: 0, minPSNR: 100, maxChanged: 0.01, count: 1)
+        var statsChanged = SceneVideoBaker.HoldStats(
+            totalMSE: 0,
+            minPSNR: 100,
+            maxChanged: 0.01,
+            count: 1
+        )
         XCTAssertTrue(statsChanged.isDisqualified(totalOddFrames: totalOddFrames))
         for _ in 0 ..< 10 {
             statsChanged = SceneVideoBaker.HoldStats(
@@ -151,7 +201,8 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         // Once totalMSE exceeds threshold, non-negative MSE increments cannot revert it
         let thresholdMSE = 65025.0 / pow(10.0, SceneVideoBaker.holdPSNRAverageThreshold / 10.0)
         var statsAvg = SceneVideoBaker.HoldStats(
-            totalMSE: (thresholdMSE + 0.1) * Double(totalOddFrames), minPSNR: 100, maxChanged: 0, count: 5
+            totalMSE: (thresholdMSE + 0.1) * Double(totalOddFrames), minPSNR: 100, maxChanged: 0,
+            count: 5
         )
         XCTAssertTrue(statsAvg.isDisqualified(totalOddFrames: totalOddFrames))
         for _ in 0 ..< 10 {
@@ -182,12 +233,24 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         let video = directory.appendingPathComponent("rapid-early.mp4")
         let scene = try makeScene(videoURL: video, cycles: 300)
 
-        let result = try await SceneVideoBaker.bake(document: scene, videoPath: video.path, to: video) { _ in }
+        let result = try await SceneVideoBaker.bake(
+            document: scene,
+            videoPath: video.path,
+            to: video
+        ) { _ in }
         let statistics = try XCTUnwrap(result)
 
-        XCTAssertEqual(statistics.reducedDisqualifiedAtFrame, 1, "Rapid motion scene must disqualify 30 fps sink on frame 1")
+        XCTAssertEqual(
+            statistics.reducedDisqualifiedAtFrame,
+            1,
+            "Rapid motion scene must disqualify 30 fps sink on frame 1"
+        )
         let stats = statistics.holdStats
-        XCTAssertEqual(stats.count, 1, "Only 1 odd frame should be evaluated after early disqualification")
+        XCTAssertEqual(
+            stats.count,
+            1,
+            "Only 1 odd frame should be evaluated after early disqualification"
+        )
         XCTAssertTrue(stats.isDisqualified(totalOddFrames: 300))
         XCTAssertFalse(stats.usesReducedRate)
 
@@ -202,12 +265,23 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         let video = directory.appendingPathComponent("gentle-full.mp4")
         let scene = try makeScene(videoURL: video, cycles: 1)
 
-        let result = try await SceneVideoBaker.bake(document: scene, videoPath: video.path, to: video) { _ in }
+        let result = try await SceneVideoBaker.bake(
+            document: scene,
+            videoPath: video.path,
+            to: video
+        ) { _ in }
         let statistics = try XCTUnwrap(result)
 
-        XCTAssertNil(statistics.reducedDisqualifiedAtFrame, "Gentle motion scene must not be disqualified")
+        XCTAssertNil(
+            statistics.reducedDisqualifiedAtFrame,
+            "Gentle motion scene must not be disqualified"
+        )
         let stats = statistics.holdStats
-        XCTAssertEqual(stats.count, 300, "All 300 odd frames must be evaluated for gentle motion scene")
+        XCTAssertEqual(
+            stats.count,
+            300,
+            "All 300 odd frames must be evaluated for gentle motion scene"
+        )
         XCTAssertTrue(stats.usesReducedRate)
 
         let asset = AVURLAsset(url: video)
@@ -227,13 +301,19 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
             stats.add(even: base, odd: slightlyDifferent)
             XCTAssertFalse(stats.isDisqualified(totalOddFrames: totalOddFrames))
             XCTAssertGreaterThanOrEqual(stats.minimumPSNR, SceneVideoBaker.holdPSNRMinimumThreshold)
-            XCTAssertLessThanOrEqual(stats.maximumChangedFraction, SceneVideoBaker.changedFractionMaximum)
+            XCTAssertLessThanOrEqual(
+                stats.maximumChangedFraction,
+                SceneVideoBaker.changedFractionMaximum
+            )
         }
 
         stats.add(even: base, odd: slightlyDifferent)
         XCTAssertTrue(stats.isDisqualified(totalOddFrames: totalOddFrames))
         XCTAssertGreaterThanOrEqual(stats.minimumPSNR, SceneVideoBaker.holdPSNRMinimumThreshold)
-        XCTAssertLessThanOrEqual(stats.maximumChangedFraction, SceneVideoBaker.changedFractionMaximum)
+        XCTAssertLessThanOrEqual(
+            stats.maximumChangedFraction,
+            SceneVideoBaker.changedFractionMaximum
+        )
     }
 
     func testConcurrentBakesReturnIndependentStatistics() async throws {
@@ -246,8 +326,16 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         gentle.layers[0].effects[0].kind = .sway
         gentle.layers[0].effects[0].strength = 0
 
-        async let rapidResult = SceneVideoBaker.bake(document: rapid, videoPath: rapidURL.path, to: rapidURL) { _ in }
-        async let gentleResult = SceneVideoBaker.bake(document: gentle, videoPath: gentleURL.path, to: gentleURL) { _ in }
+        async let rapidResult = SceneVideoBaker.bake(
+            document: rapid,
+            videoPath: rapidURL.path,
+            to: rapidURL
+        ) { _ in }
+        async let gentleResult = SceneVideoBaker.bake(
+            document: gentle,
+            videoPath: gentleURL.path,
+            to: gentleURL
+        ) { _ in }
         let (rapidValue, gentleValue) = try await (rapidResult, gentleResult)
         let rapidStats = try XCTUnwrap(rapidValue)
         let gentleStats = try XCTUnwrap(gentleValue)
@@ -277,9 +365,9 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
                 pixels[index + 2] = 0
             }
         }
-        let image = CGImage(
+        let image = try CGImage(
             width: 64, height: 64, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 256,
-            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            space: XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB)),
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
             provider: CGDataProvider(data: Data(pixels) as CFData)!, decode: nil,
             shouldInterpolate: false, intent: .defaultIntent
@@ -297,15 +385,27 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         var doc = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [layer])
         doc.loopSeconds = 1
 
-        let result = try await SceneVideoBaker.bake(document: doc, videoPath: video.path, to: video) { _ in }
+        let result = try await SceneVideoBaker.bake(
+            document: doc,
+            videoPath: video.path,
+            to: video
+        ) { _ in }
         let statistics = try XCTUnwrap(result)
 
         let frame = try XCTUnwrap(statistics.reducedDisqualifiedAtFrame)
         XCTAssertGreaterThan(frame, 1, "Must disqualify at an intermediate frame, not on frame 1")
         XCTAssertLessThan(frame, 60, "Must disqualify before loop completes")
         let stats = statistics.holdStats
-        XCTAssertGreaterThan(stats.count, 1, "Multiple odd frames must be evaluated before disqualification")
-        XCTAssertLessThan(stats.count, 30, "Subsequent frames must not be evaluated after disqualification")
+        XCTAssertGreaterThan(
+            stats.count,
+            1,
+            "Multiple odd frames must be evaluated before disqualification"
+        )
+        XCTAssertLessThan(
+            stats.count,
+            30,
+            "Subsequent frames must not be evaluated after disqualification"
+        )
         XCTAssertTrue(stats.isDisqualified(totalOddFrames: 30))
 
         let asset = AVURLAsset(url: video)
@@ -345,7 +445,11 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         return pb
     }
 
-    private func makePixelBuffer(width: Int = 16, height: Int = 16, fill: UInt8 = 0) -> CVPixelBuffer {
+    private func makePixelBuffer(
+        width: Int = 16,
+        height: Int = 16,
+        fill: UInt8 = 0
+    ) -> CVPixelBuffer {
         makePixelBuffer(width: width, height: height, blue: fill, green: fill, red: fill)
     }
 }

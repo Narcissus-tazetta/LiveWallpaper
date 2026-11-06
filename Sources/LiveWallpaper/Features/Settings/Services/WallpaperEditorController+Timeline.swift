@@ -15,7 +15,8 @@ extension WallpaperEditorController {
     }
 
     var canZoomOut: Bool {
-        draft.assetDuration > 0 && !timelineWindow.isFullyZoomedOut(assetDuration: draft.assetDuration)
+        draft.assetDuration > 0 && !timelineWindow
+            .isFullyZoomedOut(assetDuration: draft.assetDuration)
     }
 
     /// 動画を読み込み直したときの初期状態(全体表示)。

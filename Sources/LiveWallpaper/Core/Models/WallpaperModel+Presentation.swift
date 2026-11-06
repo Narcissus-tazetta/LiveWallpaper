@@ -388,11 +388,13 @@ extension WallpaperModel {
         var regions: [CGRect] = []
         for info in availableDisplayScreens() {
             let region = visibleRegion(
-                of: info, presentation: presentation(for: path, screenID: info.id), videoAspectRatio: videoAspectRatio
+                of: info, presentation: presentation(for: path, screenID: info.id),
+                videoAspectRatio: videoAspectRatio
             )
             let isDuplicate = regions.contains { other in
                 abs(other.minX - region.minX) < 0.001 && abs(other.minY - region.minY) < 0.001
-                    && abs(other.maxX - region.maxX) < 0.001 && abs(other.maxY - region.maxY) < 0.001
+                    && abs(other.maxX - region.maxX) < 0.001 && abs(other.maxY - region.maxY) <
+                    0.001
             }
             if !isDuplicate {
                 regions.append(region)
@@ -428,7 +430,10 @@ extension WallpaperModel {
             offsetX: presentation.offsetX,
             offsetY: presentation.offsetY
         )
-        return WallpaperGeometry.visibleVideoRect(containerSize: screen.frame.size, geometry: geometry)
+        return WallpaperGeometry.visibleVideoRect(
+            containerSize: screen.frame.size,
+            geometry: geometry
+        )
     }
 
     func videoNaturalSize(for path: String) -> CGSize? {

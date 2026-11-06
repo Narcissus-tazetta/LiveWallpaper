@@ -218,7 +218,12 @@ extension SettingsView {
         .motionAnimation(Motion.quick, value: model.pinCurrentVideo)
         .motionAnimation(
             Motion.quick,
-            value: [isDesktopAssigned, isLockScreenAssigned, isDisplayOverrideAssigned, isScreenSaverAssigned]
+            value: [
+                isDesktopAssigned,
+                isLockScreenAssigned,
+                isDisplayOverrideAssigned,
+                isScreenSaverAssigned
+            ]
         )
         .motionAnimation(.easeOut(duration: 0.25), value: hoverPreviewPath == path)
         // 選択枠のオーバーレイはカード個別の .motionAnimation より外側に置くことで、
@@ -332,7 +337,6 @@ extension SettingsView {
 
     /// この動画を特定のディスプレイに固定表示するメニュー。
     /// 選択で割り当て、割り当て済みの画面を選ぶと解除(トグル)。
-    @ViewBuilder
     func displayOverrideMenu(path: String) -> some View {
         Menu(model.localizedString("ディスプレイに割り当て…")) {
             ForEach(model.availableDisplayScreens()) { screen in
@@ -363,7 +367,6 @@ extension SettingsView {
 
     /// この動画を特定のデスクトップ(Space)に固定表示するメニュー。
     /// 選択で割り当て、割り当て済みのデスクトップを選ぶと解除(トグル)。
-    @ViewBuilder
     func spaceOverrideMenu(path: String) -> some View {
         Menu(model.localizedString("デスクトップに割り当て…")) {
             ForEach(model.knownDesktopSpaces) { space in
@@ -406,7 +409,6 @@ extension SettingsView {
         )
     }
 
-    @ViewBuilder
     func wallpaperAssignmentBadges(
         isDesktopAssigned: Bool,
         isLockScreenAssigned: Bool,

@@ -47,10 +47,17 @@ struct SceneSound: Codable, Equatable, Identifiable {
         volumeIsScripted = try c.decodeIfPresent(Bool.self, forKey: .volumeIsScripted) ?? false
         // Packages come from anyone: the names are opened inside the scene folder.
         guard files.count <= Self.maximumFiles,
-              files.allSatisfy({ !$0.isEmpty && !$0.contains("/") && !$0.contains("\\") && !$0.contains("\0") && $0 != "." && $0 != ".." }),
+              files
+              .allSatisfy({
+                  !$0.isEmpty && !$0.contains("/") && !$0.contains("\\") && !$0
+                      .contains("\0") && $0 != "." && $0 != ".." }),
               [volume, minimumPause, maximumPause].allSatisfy(\.isFinite)
         else {
-            throw DecodingError.dataCorruptedError(forKey: .files, in: c, debugDescription: "Invalid sound")
+            throw DecodingError.dataCorruptedError(
+                forKey: .files,
+                in: c,
+                debugDescription: "Invalid sound"
+            )
         }
         volume = min(max(volume, 0), 1)
         minimumPause = max(minimumPause, 0)
@@ -61,6 +68,7 @@ struct SceneSound: Codable, Equatable, Identifiable {
 extension SceneDocument {
     /// Some sounds start or get their volume only from a script, which needs the scene drawn live.
     var soundsNeedScripts: Bool {
-        scripts.contains(where: \.canRun) && sounds.contains { $0.volumeIsScripted || $0.startsSilent }
+        scripts.contains(where: \.canRun) && sounds
+            .contains { $0.volumeIsScripted || $0.startsSilent }
     }
 }

@@ -47,10 +47,14 @@ extension SceneEditorView {
             case (_, 0.001...): "下端"
             default: "中央"
             }
-            parts.append(String(format: model.localizedString("カーソル: %@"), model.localizedString(place)))
+            parts.append(String(
+                format: model.localizedString("カーソル: %@"),
+                model.localizedString(place)
+            ))
         }
         return String(
-            format: model.localizedString("%@ として表示中"), parts.joined(separator: model.localizedString("・"))
+            format: model.localizedString("%@ として表示中"),
+            parts.joined(separator: model.localizedString("・"))
         )
     }
 
@@ -58,7 +62,11 @@ extension SceneEditorView {
 
     /// Links of layers to the time of day and the cursor, for the whole scene.
     @ViewBuilder
-    func sceneLinksSection(path: String, document: SceneDocument, selectedLayerID: UUID?) -> some View {
+    func sceneLinksSection(
+        path: String,
+        document: SceneDocument,
+        selectedLayerID: UUID?
+    ) -> some View {
         let selected = document.links.first { $0.id == selectedSceneLinkID } ?? document.links.first
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -81,12 +89,20 @@ extension SceneEditorView {
             scenePreviewConditionRow(document: document)
 
             if document.links.isEmpty {
-                settingsFootnote(model.localizedString("時間帯で明るさや色を変えたり、カーソルの位置に合わせてレイヤーを動かしたりできます。「連動を追加」で、選んでいるレイヤーに設定します。"))
+                settingsFootnote(model
+                    .localizedString(
+                        "時間帯で明るさや色を変えたり、カーソルの位置に合わせてレイヤーを動かしたりできます。「連動を追加」で、選んでいるレイヤーに設定します。"
+                    ))
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(document.links) { link in
-                            sceneLinkRow(path: path, document: document, link: link, isSelected: link.id == selected?.id)
+                            sceneLinkRow(
+                                path: path,
+                                document: document,
+                                link: link,
+                                isSelected: link.id == selected?.id
+                            )
                         }
                         HStack(spacing: 4) {
                             Button {
@@ -111,7 +127,10 @@ extension SceneEditorView {
                     }
                 }
             }
-            settingsFootnote(model.localizedString("ロック画面・スクリーンセーバー・書き出した動画は、その時点の時間帯で、カーソルが中央にあるものとして表示します。時間帯が変わると動画を書き出し直します(アプリを終了している間は、最後に書き出した時間帯のままです)。"))
+            settingsFootnote(model
+                .localizedString(
+                    "ロック画面・スクリーンセーバー・書き出した動画は、その時点の時間帯で、カーソルが中央にあるものとして表示します。時間帯が変わると動画を書き出し直します(アプリを終了している間は、最後に書き出した時間帯のままです)。"
+                ))
         }
     }
 
@@ -127,9 +146,15 @@ extension SceneEditorView {
                 Text(model.localizedString("時間帯"))
                     .frame(width: sceneLinkLabelWidth, alignment: .leading)
                 Spacer(minLength: 0)
-                Picker(model.localizedString("時間帯"), selection: $scenePreviewController.simulatedTimeOfDay) {
-                    Text(String(format: model.localizedString("いまの時間帯(%@)"), sceneTimeOfDayName(now)))
-                        .tag(SceneTimeOfDay?.none)
+                Picker(
+                    model.localizedString("時間帯"),
+                    selection: $scenePreviewController.simulatedTimeOfDay
+                ) {
+                    Text(String(
+                        format: model.localizedString("いまの時間帯(%@)"),
+                        sceneTimeOfDayName(now)
+                    ))
+                    .tag(SceneTimeOfDay?.none)
                     ForEach(SceneTimeOfDay.allCases, id: \.self) { timeOfDay in
                         Text(sceneTimeOfDayName(timeOfDay)).tag(SceneTimeOfDay?.some(timeOfDay))
                     }
@@ -147,7 +172,8 @@ extension SceneEditorView {
                     selection: Binding(
                         get: { scenePreviewController.simulatedCursor.map { [$0.x, $0.y] } },
                         set: { value in
-                            scenePreviewController.simulatedCursor = value.map { SIMD2($0[0], $0[1]) }
+                            scenePreviewController.simulatedCursor = value
+                                .map { SIMD2($0[0], $0[1]) }
                         }
                     )
                 ) {
@@ -165,12 +191,19 @@ extension SceneEditorView {
         }
     }
 
-    private func sceneLinkRow(path: String, document: SceneDocument, link: SceneLink, isSelected: Bool) -> some View {
+    private func sceneLinkRow(
+        path: String,
+        document: SceneDocument,
+        link: SceneLink,
+        isSelected: Bool
+    ) -> some View {
         let names = link.layerIDs.compactMap { id in document.layers.first { $0.id == id }?.name }
         return HStack(spacing: 8) {
             Toggle(isOn: Binding(
                 get: { link.isEnabled },
-                set: { value in updateSceneLink(link.id, path: path, coalescing: false) { $0.isEnabled = value } }
+                set: { value in
+                    updateSceneLink(link.id, path: path, coalescing: false) { $0.isEnabled = value }
+                }
             )) {
                 EmptyView()
             }
@@ -185,7 +218,8 @@ extension SceneEditorView {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(sceneLinkInputName(link.input))
                         .foregroundColor(link.isEnabled ? .primary : .secondary)
-                    Text(names.isEmpty ? model.localizedString("対象のレイヤーなし") : names.joined(separator: model.localizedString("・")))
+                    Text(names.isEmpty ? model.localizedString("対象のレイヤーなし") : names
+                        .joined(separator: model.localizedString("・")))
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
@@ -207,8 +241,11 @@ extension SceneEditorView {
 
     // MARK: - Inspector
 
-    @ViewBuilder
-    private func sceneLinkInspector(path: String, document: SceneDocument, link: SceneLink) -> some View {
+    private func sceneLinkInspector(
+        path: String,
+        document: SceneDocument,
+        link: SceneLink
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(model.localizedString("対象のレイヤー"))
             // Bounded: imported scenes have hundreds of layers.
@@ -217,16 +254,16 @@ extension SceneEditorView {
                     // Top layer first, as in the layer list.
                     ForEach(document.layers.reversed()) { layer in
                         Toggle(isOn: Binding(
-                        get: { link.layerIDs.contains(layer.id) },
-                        set: { isOn in
-                            updateSceneLink(link.id, path: path, coalescing: false) { link in
-                                if isOn {
-                                    link.layerIDs.append(layer.id)
-                                } else {
-                                    link.layerIDs.removeAll { $0 == layer.id }
+                            get: { link.layerIDs.contains(layer.id) },
+                            set: { isOn in
+                                updateSceneLink(link.id, path: path, coalescing: false) { link in
+                                    if isOn {
+                                        link.layerIDs.append(layer.id)
+                                    } else {
+                                        link.layerIDs.removeAll { $0 == layer.id }
+                                    }
                                 }
                             }
-                        }
                         )) {
                             Text(layer.name)
                                 .lineLimit(1)
@@ -259,7 +296,11 @@ extension SceneEditorView {
     }
 
     @ViewBuilder
-    private func sceneTimeOfDayEditor(path: String, document: SceneDocument, link: SceneLink) -> some View {
+    private func sceneTimeOfDayEditor(
+        path: String,
+        document: SceneDocument,
+        link: SceneLink
+    ) -> some View {
         let editing = scenePreviewController.simulatedTimeOfDay ?? document.timeOfDay(at: Date())
         HStack(spacing: 12) {
             Text(model.localizedString("編集する時間帯"))
@@ -295,10 +336,19 @@ extension SceneEditorView {
         settingsFootnote(model.localizedString("それぞれの時間帯は、次の時間帯が始まるまで続きます。"))
     }
 
-    private func sceneTimeBandRow(path: String, document: SceneDocument, timeOfDay: SceneTimeOfDay) -> some View {
+    private func sceneTimeBandRow(
+        path: String,
+        document: SceneDocument,
+        timeOfDay: SceneTimeOfDay
+    ) -> some View {
         let minute = document.timeBands.first { $0.timeOfDay == timeOfDay }?.startMinute ?? 0
         let calendar = Calendar.current
-        let date = calendar.date(bySettingHour: minute / 60, minute: minute % 60, second: 0, of: Date()) ?? Date()
+        let date = calendar.date(
+            bySettingHour: minute / 60,
+            minute: minute % 60,
+            second: 0,
+            of: Date()
+        ) ?? Date()
         return HStack(spacing: 12) {
             Text(sceneTimeOfDayName(timeOfDay))
                 .frame(width: sceneLinkLabelWidth, alignment: .leading)
@@ -310,7 +360,8 @@ extension SceneEditorView {
                         let parts = calendar.dateComponents([.hour, .minute], from: newDate)
                         let newMinute = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
                         guard var document = model.sceneDocumentsByPath[path],
-                              let index = document.timeBands.firstIndex(where: { $0.timeOfDay == timeOfDay })
+                              let index = document.timeBands
+                              .firstIndex(where: { $0.timeOfDay == timeOfDay })
                         else {
                             return
                         }
@@ -339,7 +390,10 @@ extension SceneEditorView {
                     model.localizedString("編集する位置"),
                     selection: Binding(
                         get: { isEnd },
-                        set: { scenePreviewController.simulatedCursor = sceneLinkEdgeCursor(link.input, isEnd: $0) }
+                        set: { scenePreviewController.simulatedCursor = sceneLinkEdgeCursor(
+                            link.input,
+                            isEnd: $0
+                        ) }
                     )
                 ) {
                     Text(model.localizedString(link.input == .cursorX ? "左端" : "上端")).tag(false)
@@ -388,9 +442,24 @@ extension SceneEditorView {
                 }
             )
         }
-        sceneLinkSlider(model.localizedString("横位置"), binding(\.offsetX), -0.5 ... 0.5, text: percent(values.offsetX, signed: true))
-        sceneLinkSlider(model.localizedString("縦位置"), binding(\.offsetY), -0.5 ... 0.5, text: percent(values.offsetY, signed: true))
-        sceneLinkSlider(model.localizedString("角度"), binding(\.rotation), -180 ... 180, text: String(format: "%+.0f°", values.rotation))
+        sceneLinkSlider(
+            model.localizedString("横位置"),
+            binding(\.offsetX),
+            -0.5 ... 0.5,
+            text: percent(values.offsetX, signed: true)
+        )
+        sceneLinkSlider(
+            model.localizedString("縦位置"),
+            binding(\.offsetY),
+            -0.5 ... 0.5,
+            text: percent(values.offsetY, signed: true)
+        )
+        sceneLinkSlider(
+            model.localizedString("角度"),
+            binding(\.rotation),
+            -180 ... 180,
+            text: String(format: "%+.0f°", values.rotation)
+        )
         // In powers of two, so ×1 sits in the middle and halving mirrors doubling.
         sceneLinkSlider(
             model.localizedString("大きさ"),
@@ -398,13 +467,34 @@ extension SceneEditorView {
                 get: { log2(values.scale) },
                 set: { binding(\.scale).wrappedValue = exp2($0) }
             ),
-            log2(SceneLinkValues.scaleRange.lowerBound) ... log2(SceneLinkValues.scaleRange.upperBound),
+            log2(SceneLinkValues.scaleRange.lowerBound) ...
+                log2(SceneLinkValues.scaleRange.upperBound),
             text: String(format: "×%.2f", values.scale)
         )
-        sceneLinkSlider(model.localizedString("不透明度"), binding(\.opacity), 0 ... 1, text: percent(values.opacity, signed: false))
-        sceneLinkSlider(model.localizedString("明るさ"), binding(\.brightness), -1 ... 1, text: percent(values.brightness, signed: true))
-        sceneLinkSlider(model.localizedString("彩度"), binding(\.saturation), 0 ... 2, text: percent(values.saturation, signed: false))
-        sceneLinkSlider(model.localizedString("色温度"), binding(\.warmth), -1 ... 1, text: percent(values.warmth, signed: true))
+        sceneLinkSlider(
+            model.localizedString("不透明度"),
+            binding(\.opacity),
+            0 ... 1,
+            text: percent(values.opacity, signed: false)
+        )
+        sceneLinkSlider(
+            model.localizedString("明るさ"),
+            binding(\.brightness),
+            -1 ... 1,
+            text: percent(values.brightness, signed: true)
+        )
+        sceneLinkSlider(
+            model.localizedString("彩度"),
+            binding(\.saturation),
+            0 ... 2,
+            text: percent(values.saturation, signed: false)
+        )
+        sceneLinkSlider(
+            model.localizedString("色温度"),
+            binding(\.warmth),
+            -1 ... 1,
+            text: percent(values.warmth, signed: true)
+        )
         HStack {
             Spacer(minLength: 0)
             Button(model.localizedString("この値をリセット")) {
@@ -464,7 +554,12 @@ extension SceneEditorView {
         model.updateScene(document, path: path, coalescing: false)
     }
 
-    private func updateSceneLink(_ id: UUID, path: String, coalescing: Bool = true, _ change: (inout SceneLink) -> Void) {
+    private func updateSceneLink(
+        _ id: UUID,
+        path: String,
+        coalescing: Bool = true,
+        _ change: (inout SceneLink) -> Void
+    ) {
         guard var document = model.sceneDocumentsByPath[path],
               let index = document.links.firstIndex(where: { $0.id == id })
         else {

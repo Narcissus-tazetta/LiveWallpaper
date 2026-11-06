@@ -121,7 +121,9 @@ enum WebWallpaperURLResolver {
         }
 
         let components = url.pathComponents.filter { $0 != "/" }
-        if let shortsIndex = components.firstIndex(of: "shorts"), shortsIndex + 1 < components.count {
+        if let shortsIndex = components.firstIndex(of: "shorts"),
+           shortsIndex + 1 < components.count
+        {
             return components[shortsIndex + 1]
         }
         if let embedIndex = components.firstIndex(of: "embed"), embedIndex + 1 < components.count {
@@ -244,22 +246,22 @@ enum WebWallpaperURLResolver {
     }
 
     private static func isYouTubeHost(_ host: String) -> Bool {
-        let knownHosts: Set<String> = [
+        let knownHosts: Set = [
             "youtube.com",
             "www.youtube.com",
             "m.youtube.com",
             "music.youtube.com",
             "youtube-nocookie.com",
-            "www.youtube-nocookie.com",
+            "www.youtube-nocookie.com"
         ]
         return knownHosts.contains(host)
     }
 
     private static func isVimeoHost(_ host: String) -> Bool {
-        let knownHosts: Set<String> = [
+        let knownHosts: Set = [
             "vimeo.com",
             "www.vimeo.com",
-            "player.vimeo.com",
+            "player.vimeo.com"
         ]
         return knownHosts.contains(host)
     }
@@ -282,7 +284,7 @@ enum WebWallpaperURLResolver {
             URLQueryItem(name: "background", value: "1"),
             URLQueryItem(name: "autopause", value: "0"),
             URLQueryItem(name: "playsinline", value: "1"),
-            URLQueryItem(name: "texttrack", value: "false"),
+            URLQueryItem(name: "texttrack", value: "false")
         ]
         return components.url ?? URL(string: "https://player.vimeo.com/video/\(videoID)")!
     }

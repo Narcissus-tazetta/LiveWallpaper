@@ -58,7 +58,10 @@ extension WallpaperModel {
         }
         suspendExclusionBundleIDs.append(normalized)
         suspendExclusionBundleIDs.sort()
-        UserDefaults.standard.set(suspendExclusionBundleIDs, forKey: PrefsKey.suspendExclusionBundleIDs)
+        UserDefaults.standard.set(
+            suspendExclusionBundleIDs,
+            forKey: PrefsKey.suspendExclusionBundleIDs
+        )
         evaluateForegroundCoverageState()
     }
 
@@ -68,7 +71,10 @@ extension WallpaperModel {
             return
         }
         suspendExclusionBundleIDs.remove(at: index)
-        UserDefaults.standard.set(suspendExclusionBundleIDs, forKey: PrefsKey.suspendExclusionBundleIDs)
+        UserDefaults.standard.set(
+            suspendExclusionBundleIDs,
+            forKey: PrefsKey.suspendExclusionBundleIDs
+        )
         evaluateForegroundCoverageState()
     }
 
@@ -91,7 +97,7 @@ extension WallpaperModel {
             return false
         }
         guard let bundle = Bundle(url: resolvedURL),
-            let bundleID = bundle.bundleIdentifier
+              let bundleID = bundle.bundleIdentifier
         else {
             return false
         }
@@ -99,13 +105,13 @@ extension WallpaperModel {
         return true
     }
 
-    // Coverage detection is built entirely on our own wallpaper windows'
-    // NSWindow.occlusionState instead of inspecting other apps' windows via
-    // CGWindowList/Accessibility. This needs no special permission, updates
-    // immediately for every cause (app switch, resize-in-place, Space change,
-    // Stage Manager, minimize) because the window server itself computes it for
-    // us, and is exactly the right question to ask: "can the user currently see
-    // this wallpaper window at all?"
+    /// Coverage detection is built entirely on our own wallpaper windows'
+    /// NSWindow.occlusionState instead of inspecting other apps' windows via
+    /// CGWindowList/Accessibility. This needs no special permission, updates
+    /// immediately for every cause (app switch, resize-in-place, Space change,
+    /// Stage Manager, minimize) because the window server itself computes it for
+    /// us, and is exactly the right question to ask: "can the user currently see
+    /// this wallpaper window at all?"
     func configureForegroundCoverageMonitoring() {
         if let observer = frontmostAppObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
@@ -140,7 +146,7 @@ extension WallpaperModel {
         ) { [weak self] notification in
             MainActor.assumeIsolated {
                 guard let self, let window = notification.object as? NSWindow,
-                    self.displayIDByWindow[ObjectIdentifier(window)] != nil
+                      self.displayIDByWindow[ObjectIdentifier(window)] != nil
                 else {
                     return
                 }
@@ -278,7 +284,7 @@ extension WallpaperModel {
             return nil
         }
         if let bundleID = app.bundleIdentifier,
-            suspendExclusionBundleIDs.contains(normalizeBundleID(bundleID))
+           suspendExclusionBundleIDs.contains(normalizeBundleID(bundleID))
         {
             return nil
         }
@@ -323,7 +329,7 @@ extension WallpaperModel {
             return
         }
         AppLog.suspend.info(
-            "transition from=\(String(describing: self.suspendedDisplayIDs), privacy: .public) to=\(String(describing: filtered), privacy: .public) at=\(CFAbsoluteTimeGetCurrent(), format: .fixed(precision: 3))"
+            "transition from=\(String(describing: suspendedDisplayIDs), privacy: .public) to=\(String(describing: filtered), privacy: .public) at=\(CFAbsoluteTimeGetCurrent(), format: .fixed(precision: 3))"
         )
         suspendedDisplayIDs = filtered
         applySuspensionStateToPlayers()
@@ -341,7 +347,8 @@ extension WallpaperModel {
     static func otherAppWindowBoundsReadable(in windowInfo: [[String: Any]]) -> Bool {
         let ownPID = ProcessInfo.processInfo.processIdentifier
         return windowInfo.contains { info in
-            guard let pid = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value, pid != ownPID,
+            guard let pid = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
+                  pid != ownPID,
                   let boundsDictionary = info[kCGWindowBounds as String] as? NSDictionary,
                   let bounds = CGRect(dictionaryRepresentation: boundsDictionary)
             else {
@@ -358,7 +365,8 @@ extension WallpaperModel {
 
     @discardableResult
     func refreshWindowBoundsAccessForCoverage() -> Bool {
-        let readable = Self.coverageWindowInfo().map(Self.otherAppWindowBoundsReadable(in:)) ?? false
+        let readable = Self.coverageWindowInfo()
+            .map(Self.otherAppWindowBoundsReadable(in:)) ?? false
         publishWindowBoundsAccessForCoverage(readable)
         return readable
     }
@@ -368,10 +376,10 @@ extension WallpaperModel {
             return
         }
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.windowBoundsReadableForCoverage != readable else {
+            guard let self, windowBoundsReadableForCoverage != readable else {
                 return
             }
-            self.windowBoundsReadableForCoverage = readable
+            windowBoundsReadableForCoverage = readable
         }
     }
 
@@ -389,8 +397,8 @@ extension WallpaperModel {
                 guard let self else {
                     return
                 }
-                _ = self.refreshWindowBoundsAccessForCoverage()
-                self.scheduleForegroundCoverageEvaluation()
+                _ = refreshWindowBoundsAccessForCoverage()
+                scheduleForegroundCoverageEvaluation()
             }
         }
     }
@@ -449,7 +457,7 @@ extension WallpaperModel {
         targetScreens().map { screen in
             let displayID =
                 (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?
-                .uint32Value ?? 0
+                    .uint32Value ?? 0
             var frames = [screen.frame]
             let quartzFrame = CGDisplayBounds(displayID)
             if !quartzFrame.isNull, !quartzFrame.isEmpty, quartzFrame != screen.frame {

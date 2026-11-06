@@ -12,7 +12,9 @@ final class PackageManifestBuilder {
         self.fileManager = fileManager
     }
 
-    private func loadDurationAndAudioFlag(path: String) async -> (duration: Double?, hasAudio: Bool?) {
+    private func loadDurationAndAudioFlag(path: String) async
+        -> (duration: Double?, hasAudio: Bool?)
+    {
         let asset = AVURLAsset(url: URL(fileURLWithPath: path))
         let duration = try? await asset.load(.duration).seconds
         let audioTracks = try? await asset.loadTracks(withMediaType: .audio)
@@ -62,7 +64,8 @@ final class PackageManifestBuilder {
                 : try? fileManager.attributesOfItem(atPath: mediaPath)
             let fileSize = attrs?[.size] as? UInt64
 
-            let sha256 = includeVideos ? try checksum(path: mediaPath) : try? checksum(path: mediaPath)
+            let sha256 = includeVideos ? try await checksum(path: mediaPath) :
+                try? await checksum(path: mediaPath)
 
             let (duration, hasAudio) = await loadDurationAndAudioFlag(path: mediaPath)
 
@@ -138,7 +141,7 @@ final class PackageManifestBuilder {
             }
         }
 
-        let sha256 = try checksum(path: mediaPath)
+        let sha256 = try await checksum(path: mediaPath)
 
         let (duration, hasAudio) = await loadDurationAndAudioFlag(path: mediaPath)
 
@@ -178,8 +181,11 @@ final class PackageManifestBuilder {
         )
     }
 
-    private func checksum(path: String) throws -> String {
-        let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    /// Hashing a multi-gigabyte video takes seconds, so it stays off the main actor.
+    private func checksum(path: String) async throws -> String {
+        try await BlockingWork.run {
+            let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe)
+            return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        }
     }
 }

@@ -1,12 +1,11 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class WebDisplayOverrideTests: XCTestCase {
     private let keys = [
         PrefsKey.webOverrideByScreenID,
-        PrefsKey.videoOverrideByScreenID,
+        PrefsKey.videoOverrideByScreenID
     ]
     private var previousValues: [String: Any] = [:]
     private var videoURL: URL!

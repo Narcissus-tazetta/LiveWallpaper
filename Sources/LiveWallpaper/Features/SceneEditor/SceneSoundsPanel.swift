@@ -1,7 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Sounds the scene plays on its own. They follow the app's audio setting and stay silent on the lock screen and screen saver.
+/// Sounds the scene plays on its own. They follow the app's audio setting and stay silent on the
+/// lock screen and screen saver.
 struct SceneSoundsPanel: View {
     @ObservedObject var model: WallpaperModel
     let path: String
@@ -16,7 +17,10 @@ struct SceneSoundsPanel: View {
                         Spacer()
                     }
                     if document.sounds.isEmpty {
-                        Text(model.localizedString("音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。"))
+                        Text(model
+                            .localizedString(
+                                "音声ファイルを追加すると、デスクトップで鳴らせます。鳴るのは、アプリの設定で壁紙の音を出す場合だけです。"
+                            ))
                             .font(.caption).foregroundColor(.secondary)
                     }
                     ForEach(document.sounds) { sound in
@@ -54,20 +58,35 @@ struct SceneSoundsPanel: View {
                     .accessibilityLabel(model.localizedString("効果音を削除"))
             }
             HStack(spacing: 12) {
-                Text(model.localizedString("音量")).frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
-                Slider(value: Binding(get: { sound.volume }, set: { value in update(id) { $0.volume = value } }), in: 0 ... 1)
+                Text(model.localizedString("音量")).frame(
+                    width: SceneInspectorMetrics.labelWidth,
+                    alignment: .leading
+                )
+                Slider(
+                    value: Binding(get: { sound.volume }, set: { value in
+                        update(id) { $0.volume = value }
+                    }),
+                    in: 0 ... 1
+                )
                 Text("\(Int((sound.volume * 100).rounded()))%")
                     .font(.caption.monospacedDigit()).foregroundColor(.secondary)
                     .frame(width: 44, alignment: .trailing)
             }
             if sound.mode == .random {
                 HStack {
-                    // The player draws each pause from minimum...maximum, a range that must not run backward.
+                    // The player draws each pause from minimum...maximum, a range that must not run
+                    // backward.
                     pause(model.localizedString("間隔の最短(秒)"), sound.minimumPause) { value in
-                        update(id) { $0.minimumPause = value; $0.maximumPause = max($0.maximumPause, value) }
+                        update(id) { $0.minimumPause = value; $0.maximumPause = max(
+                            $0.maximumPause,
+                            value
+                        ) }
                     }
                     pause(model.localizedString("間隔の最長(秒)"), sound.maximumPause) { value in
-                        update(id) { $0.maximumPause = value; $0.minimumPause = min($0.minimumPause, value) }
+                        update(id) { $0.maximumPause = value; $0.minimumPause = min(
+                            $0.minimumPause,
+                            value
+                        ) }
                     }
                 }
             }
@@ -76,7 +95,11 @@ struct SceneSoundsPanel: View {
         }
     }
 
-    private func pause(_ title: String, _ value: Double, set: @escaping (Double) -> Void) -> some View {
+    private func pause(
+        _ title: String,
+        _ value: Double,
+        set: @escaping (Double) -> Void
+    ) -> some View {
         HStack(spacing: 4) {
             Text(title).font(.caption).foregroundColor(.secondary)
             TextField("", value: Binding(get: { value }, set: { set(max($0, 0)) }), format: .number)

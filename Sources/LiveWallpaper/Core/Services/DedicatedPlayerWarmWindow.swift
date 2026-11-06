@@ -18,7 +18,10 @@ enum DedicatedPlayerWarmWindow {
     }
 
     /// 現在温存中の集合(`existing`)を欲しい集合(`desired`)へ揃えるための差分。
-    static func diff(desired: Set<String>, existing: Set<String>) -> (toCreate: Set<String>, toEvict: Set<String>) {
+    static func diff(
+        desired: Set<String>,
+        existing: Set<String>
+    ) -> (toCreate: Set<String>, toEvict: Set<String>) {
         (toCreate: desired.subtracting(existing), toEvict: existing.subtracting(desired))
     }
 }

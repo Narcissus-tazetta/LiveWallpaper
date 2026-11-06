@@ -2,7 +2,8 @@ import SwiftUI
 
 extension SettingsView {
     var wallpaperTrimEditorPanel: some View {
-        let isDirty = wallpaperEditor.resolvedVideoPath().map { wallpaperEditor.isDraftDirty(path: $0) } ?? false
+        let isDirty = wallpaperEditor.resolvedVideoPath()
+            .map { wallpaperEditor.isDraftDirty(path: $0) } ?? false
         return VStack(alignment: .leading, spacing: 10) {
             if isDirty {
                 HStack {

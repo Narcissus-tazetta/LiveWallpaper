@@ -40,14 +40,23 @@ extension WallpaperModel {
         let active = webInteractionEnabled && clickThrough && hasWebDisplay && AXIsProcessTrusted()
         if active, webInteractionMonitor == nil {
             webInteractionMonitor = NSEvent.addGlobalMonitorForEvents(
-                matching: [.mouseMoved, .leftMouseDown, .leftMouseDragged, .leftMouseUp, .scrollWheel]
+                matching: [
+                    .mouseMoved,
+                    .leftMouseDown,
+                    .leftMouseDragged,
+                    .leftMouseUp,
+                    .scrollWheel
+                ]
             ) { [weak self] event in
                 let type = event.type
                 // scrollingDelta* raises for any other event type.
                 var scroll = CGVector.zero
                 if type == .scrollWheel {
                     let unit: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 10
-                    scroll = CGVector(dx: -event.scrollingDeltaX * unit, dy: -event.scrollingDeltaY * unit)
+                    scroll = CGVector(
+                        dx: -event.scrollingDeltaX * unit,
+                        dy: -event.scrollingDeltaY * unit
+                    )
                 }
                 MainActor.assumeIsolated {
                     self?.handleWebInteraction(type: type, scroll: scroll)
@@ -65,16 +74,21 @@ extension WallpaperModel {
         let location = NSEvent.mouseLocation
         switch type {
         case .mouseMoved:
-            // A pointer-move burst is coalesced to ~60 Hz so evaluateJavaScript calls do not pile up.
+            // A pointer-move burst is coalesced to ~60 Hz so evaluateJavaScript calls do not pile
+            // up.
             let now = ProcessInfo.processInfo.systemUptime
-            guard now - webInteractionLastHover >= 1.0 / 60, let (view, point) = webViewUnderCursor(at: location) else {
+            guard now - webInteractionLastHover >= 1.0 / 60,
+                  let (view, point) = webViewUnderCursor(at: location)
+            else {
                 return
             }
             webInteractionLastHover = now
             view.forwardPointer(.hover, at: point)
         case .leftMouseDown:
             webInteractionPressTarget = nil
-            guard let (view, point) = webViewUnderCursor(at: location), isEmptyDesktop(at: location) else {
+            guard let (view, point) = webViewUnderCursor(at: location),
+                  isEmptyDesktop(at: location)
+            else {
                 return
             }
             webInteractionPressTarget = view
@@ -84,7 +98,9 @@ extension WallpaperModel {
                 }
             }
         case .leftMouseDragged:
-            guard let view = webInteractionPressTarget, let (_, point) = webViewUnderCursor(at: location) else {
+            guard let view = webInteractionPressTarget,
+                  let (_, point) = webViewUnderCursor(at: location)
+            else {
                 return
             }
             view.forwardPointer(.move, at: point)
@@ -99,7 +115,9 @@ extension WallpaperModel {
                 view.forwardPointer(.up, at: CGPoint(x: -1, y: -1))
             }
         case .scrollWheel:
-            guard let (view, point) = webViewUnderCursor(at: location), wheelAccepted(at: location) else {
+            guard let (view, point) = webViewUnderCursor(at: location),
+                  wheelAccepted(at: location)
+            else {
                 return
             }
             view.forwardPointer(.wheel, at: point, scroll: scroll)
@@ -140,7 +158,10 @@ extension WallpaperModel {
         else {
             return false
         }
-        return DesktopIconProbe.isEmptyDesktop(at: CGPoint(x: location.x, y: primaryHeight - location.y))
+        return DesktopIconProbe.isEmptyDesktop(at: CGPoint(
+            x: location.x,
+            y: primaryHeight - location.y
+        ))
     }
 }
 
@@ -149,14 +170,17 @@ enum DesktopIconProbe {
     /// Anything Finder reports other than the desktop background (icons, stacks, labels)
     /// counts as occupied, and so does a failed lookup.
     static func isEmptyDesktop(at point: CGPoint) -> Bool {
-        guard let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first else {
+        guard let finder = NSRunningApplication
+            .runningApplications(withBundleIdentifier: "com.apple.finder").first
+        else {
             return false
         }
         let app = AXUIElementCreateApplication(finder.processIdentifier)
         AXUIElementSetMessagingTimeout(app, 0.2)
         var element: AXUIElement?
-        guard AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element) == .success,
-              let element
+        guard AXUIElementCopyElementAtPosition(app, Float(point.x), Float(point.y), &element) ==
+            .success,
+            let element
         else {
             return false
         }

@@ -7,7 +7,7 @@ struct ForegroundCoverageDisplay: Equatable {
 
     init(id: String, frame: CGRect) {
         self.id = id
-        self.frames = [frame]
+        frames = [frame]
     }
 
     init(id: String, frames: [CGRect]) {
@@ -48,18 +48,16 @@ enum ForegroundCoverageGeometry {
 
         var covered: Set<String> = []
         for window in windows where isRelevant(window, minimumWindowSize: minimumWindowSize) {
-            for display in displays {
-                if display.frames.contains(where: { frame in
-                    let intersection = window.bounds.intersection(frame)
-                    guard !intersection.isNull, !intersection.isEmpty else {
-                        return false
-                    }
-                    let area = max(frame.width * frame.height, 1)
-                    let ratio = (intersection.width * intersection.height) / area
-                    return ratio >= coverageThreshold
-                }) {
-                    covered.insert(display.id)
+            for display in displays where display.frames.contains(where: { frame in
+                let intersection = window.bounds.intersection(frame)
+                guard !intersection.isNull, !intersection.isEmpty else {
+                    return false
                 }
+                let area = max(frame.width * frame.height, 1)
+                let ratio = (intersection.width * intersection.height) / area
+                return ratio >= coverageThreshold
+            }) {
+                covered.insert(display.id)
             }
         }
         return covered
@@ -76,7 +74,7 @@ enum ForegroundCoverageGeometry {
             return false
         }
         guard window.bounds.width >= minimumWindowSize.width,
-            window.bounds.height >= minimumWindowSize.height
+              window.bounds.height >= minimumWindowSize.height
         else {
             return false
         }

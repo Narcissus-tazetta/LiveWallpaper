@@ -26,10 +26,19 @@ enum HotKeyAction: String, CaseIterable, Codable {
         // controlKey | optionKey | cmdKey
         let mods = UInt32(controlKey) | UInt32(optionKey) | UInt32(cmdKey)
         switch self {
-        case .nextWallpaper: return HotKeyCombo(keyCode: UInt32(kVK_ANSI_RightBracket), carbonModifiers: mods)
-        case .previousWallpaper: return HotKeyCombo(keyCode: UInt32(kVK_ANSI_LeftBracket), carbonModifiers: mods)
+        case .nextWallpaper: return HotKeyCombo(
+                keyCode: UInt32(kVK_ANSI_RightBracket),
+                carbonModifiers: mods
+            )
+        case .previousWallpaper: return HotKeyCombo(
+                keyCode: UInt32(kVK_ANSI_LeftBracket),
+                carbonModifiers: mods
+            )
         case .toggleAudio: return HotKeyCombo(keyCode: UInt32(kVK_ANSI_M), carbonModifiers: mods)
-        case .toggleDesktopIcons: return HotKeyCombo(keyCode: UInt32(kVK_ANSI_D), carbonModifiers: mods)
+        case .toggleDesktopIcons: return HotKeyCombo(
+                keyCode: UInt32(kVK_ANSI_D),
+                carbonModifiers: mods
+            )
         case .togglePause: return HotKeyCombo(keyCode: UInt32(kVK_ANSI_P), carbonModifiers: mods)
         }
     }
@@ -45,7 +54,8 @@ struct HotKeyCombo: Equatable, Codable {
 
     /// 少なくとも1つの修飾キーを含むか。グローバルホットキーとして成立する最低条件。
     var hasModifier: Bool {
-        carbonModifiers & (UInt32(cmdKey) | UInt32(optionKey) | UInt32(controlKey) | UInt32(shiftKey)) != 0
+        carbonModifiers &
+            (UInt32(cmdKey) | UInt32(optionKey) | UInt32(controlKey) | UInt32(shiftKey)) != 0
     }
 
     /// 「⌃⌥⇧⌘N」のような表示文字列。修飾キーは Apple 標準の並び順。
@@ -88,7 +98,7 @@ extension HotKeyCombo {
         kVK_ANSI_LeftBracket: "[", kVK_ANSI_RightBracket: "]",
         kVK_ANSI_Backslash: "\\", kVK_ANSI_Semicolon: ";",
         kVK_ANSI_Quote: "'", kVK_ANSI_Comma: ",", kVK_ANSI_Period: ".",
-        kVK_ANSI_Slash: "/", kVK_ANSI_Grave: "`",
+        kVK_ANSI_Slash: "/", kVK_ANSI_Grave: "`"
     ]
 
     private static let specialKeyNames: [Int: String] = [
@@ -98,7 +108,7 @@ extension HotKeyCombo {
         kVK_Home: "↖", kVK_End: "↘", kVK_PageUp: "⇞", kVK_PageDown: "⇟",
         kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4", kVK_F5: "F5",
         kVK_F6: "F6", kVK_F7: "F7", kVK_F8: "F8", kVK_F9: "F9", kVK_F10: "F10",
-        kVK_F11: "F11", kVK_F12: "F12",
+        kVK_F11: "F11", kVK_F12: "F12"
     ]
 }
 

@@ -32,10 +32,12 @@ struct AerialVideoExporter {
         }
         defer { VTCompressionSessionInvalidate(session) }
         let result = VTSessionSetProperty(
-            session, key: kVTCompressionPropertyKey_BaseLayerFrameRate, value: baseLayerFrameRate as CFNumber
+            session, key: kVTCompressionPropertyKey_BaseLayerFrameRate,
+            value: baseLayerFrameRate as CFNumber
         )
         if result != noErr {
-            AppLog.lockScreenSync.info("HEVC encoder has no temporal layers: \(result, privacy: .public)")
+            AppLog.lockScreenSync
+                .info("HEVC encoder has no temporal layers: \(result, privacy: .public)")
         }
         return result == noErr
     }()
@@ -105,7 +107,12 @@ struct AerialVideoExporter {
                     withIntermediateDirectories: true
                 )
             }
-            try await encode(AVURLAsset(url: sourceURL), to: encodedURL, start: start, progress: progress)
+            try await encode(
+                AVURLAsset(url: sourceURL),
+                to: encodedURL,
+                start: start,
+                progress: progress
+            )
             try await validatePreparedVideo(at: encodedURL)
             if let cachedURL {
                 try keepOnly(encodedURL, as: cachedURL)
@@ -365,7 +372,9 @@ struct AerialVideoExporter {
         }
         // An encoder that supports layers can still leave them out silently, and the
         // lock screen then freezes after the first unlock: fail here instead.
-        guard try !Self.supportsTemporalLayers || Self.hasTemporalLayers(asset: asset, track: track) else {
+        guard try !Self.supportsTemporalLayers || Self
+            .hasTemporalLayers(asset: asset, track: track)
+        else {
             throw LockScreenSyncError.exportFailed(
                 NSLocalizedString("ロック画面用の動画に時間階層の情報を付けられませんでした。", comment: "")
             )
@@ -459,10 +468,13 @@ private final class EncodeJob: @unchecked Sendable {
             }
             defer { source.reader.cancelReading() }
             let end = offset + source.range.duration
-            // The reader may hand over the frame that is showing at the range's start,
-            // which begins before it.
+            /// The reader may hand over the frame that is showing at the range's start,
+            /// which begins before it.
             func outputTime(_ time: CMTime) -> CMTime {
-                CMTimeMinimum(CMTimeMaximum(time, source.range.start) - source.range.start + offset, end)
+                CMTimeMinimum(
+                    CMTimeMaximum(time, source.range.start) - source.range.start + offset,
+                    end
+                )
             }
             var current: CVPixelBuffer?
             while true {
@@ -539,7 +551,8 @@ private final class LayeredHEVCEncoder: @unchecked Sendable {
                 ? kVTProfileLevel_HEVC_Main10_AutoLevel : kVTProfileLevel_HEVC_Main_AutoLevel
         ]
         if AerialVideoExporter.supportsTemporalLayers {
-            properties[kVTCompressionPropertyKey_BaseLayerFrameRate] = AerialVideoExporter.baseLayerFrameRate
+            properties[kVTCompressionPropertyKey_BaseLayerFrameRate] = AerialVideoExporter
+                .baseLayerFrameRate
         }
         // The colour description, and for HDR its mastering data, comes from the source.
         let extensions = sourceFormat

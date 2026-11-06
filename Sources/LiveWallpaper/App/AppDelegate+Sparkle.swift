@@ -35,19 +35,20 @@
                     updater.checkForUpdatesInBackground()
                     AppLog.sparkle.info("checkForUpdatesInBackground() requested")
                 } else {
-                    AppLog.sparkle.info("automatic updates are disabled due to update prerequisites")
+                    AppLog.sparkle
+                        .info("automatic updates are disabled due to update prerequisites")
                 }
             } catch {
                 Self.reportSparkleError(error)
                 #if !DEBUG
-                let message = error.localizedDescription
-                DispatchQueue.main.async {
-                    let alert = NSAlert()
-                    alert.messageText = self.localized("アップデータ初期化に失敗しました")
-                    alert.informativeText = message
-                    alert.alertStyle = .warning
-                    alert.runModal()
-                }
+                    let message = error.localizedDescription
+                    DispatchQueue.main.async {
+                        let alert = NSAlert()
+                        alert.messageText = self.localized("アップデータ初期化に失敗しました")
+                        alert.informativeText = message
+                        alert.alertStyle = .warning
+                        alert.runModal()
+                    }
                 #endif
             }
         }

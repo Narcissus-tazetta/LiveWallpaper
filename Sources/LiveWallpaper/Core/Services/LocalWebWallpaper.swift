@@ -49,13 +49,10 @@ struct LocalWebWallpaperPackage: Codable, Equatable {
     private static func bare(folder: URL) throws -> Self {
         let entry = try file(defaultEntryPoint, inside: folder)
         let html = try String(contentsOf: entry, encoding: .utf8)
-        func subscribes(_ feature: String) -> Bool {
-            html.contains(try! Regex("(?i)subscribe\\(\\s*['\"]\(feature)['\"]"))
-        }
         return Self(
             entryPoint: defaultEntryPoint,
-            supportsSpectrum: subscribes("spectrum"),
-            supportsMedia: subscribes("media")
+            supportsSpectrum: html.contains(#/(?i)subscribe\(\s*['"]spectrum['"]/#),
+            supportsMedia: html.contains(#/(?i)subscribe\(\s*['"]media['"]/#)
         )
     }
 
@@ -90,10 +87,10 @@ struct LocalWebWallpaperPackage: Codable, Equatable {
         ) else {
             throw CocoaError(.fileReadNoPermission, userInfo: [NSFilePathErrorKey: root.path])
         }
-        for case let file as URL in enumerator {
-            if try file.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true {
-                throw CocoaError(.fileReadNoPermission, userInfo: [NSFilePathErrorKey: file.path])
-            }
+        for case let file as URL in enumerator
+            where try file.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true
+        {
+            throw CocoaError(.fileReadNoPermission, userInfo: [NSFilePathErrorKey: file.path])
         }
         try FileManager.default.createDirectory(
             at: destination.deletingLastPathComponent(),
@@ -128,8 +125,9 @@ final class LocalWebWallpaperServer {
             startups[path] = Task { try await engine.start(port: port) }
         }
         let port: UInt16
-        do { port = try await startups[path]!.value }
-        catch { startups[path] = nil; engines[path] = nil; throw error }
+        do { port = try await startups[path]!.value } catch {
+            startups[path] = nil; engines[path] = nil; throw error
+        }
         let stored = persistPorts ? UserDefaults.standard
             .dictionary(forKey: Self.portsKey)?[key] as? [String: Any] : nil
         let previousToken = (stored?["token"] as? String).flatMap(UUID.init(uuidString:))?
@@ -205,7 +203,11 @@ final class LocalWebWallpaperServer {
                         }
                         listener.newConnectionHandler = { [weak self] connection in
                             guard let self else { connection.cancel(); return }
-                            let client = Client(connection: connection, roots: roots, userFolders: userFolders)
+                            let client = Client(
+                                connection: connection,
+                                roots: roots,
+                                userFolders: userFolders
+                            )
                             client.start(on: queue)
                         }
                         listener.start(queue: queue)
@@ -309,13 +311,14 @@ final class LocalWebWallpaperServer {
                 let url: URL
                 if relative.hasPrefix(served) {
                     guard let file = LocalWebUserDirectory.file(
-                        "/" + relative.dropFirst(served.count), inside: userFolders[components[0]] ?? []
+                        "/" + relative.dropFirst(served.count),
+                        inside: userFolders[components[0]] ?? []
                     ) else { send(status: "404 Not Found"); return }
                     url = file
                 } else {
                     url = try LocalWebWallpaperPackage.file(relative, inside: root)
                 }
-                let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize!
+                let size = try url.regularFileSize()
                 let rangeHeader = lines.dropFirst().first { $0.lowercased().hasPrefix("range:") }
                 let range = Self.byteRange(
                     rangeHeader
@@ -412,8 +415,7 @@ final class LocalWebWallpaperServer {
         private func finish() {
             timeout?.cancel()
             if let file {
-                do { try file.close() }
-                catch {
+                do { try file.close() } catch {
                     AppLog.externalWallpapers
                         .error(
                             "local web close failed: \(error.localizedDescription, privacy: .public)"

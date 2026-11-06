@@ -17,9 +17,24 @@ extension WallpaperModel {
                 }
             }
             sceneTimeOfDayObservers = [
-                workspace.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main, using: handler),
-                center.addObserver(forName: .NSSystemClockDidChange, object: nil, queue: .main, using: handler),
-                center.addObserver(forName: .NSSystemTimeZoneDidChange, object: nil, queue: .main, using: handler)
+                workspace.addObserver(
+                    forName: NSWorkspace.didWakeNotification,
+                    object: nil,
+                    queue: .main,
+                    using: handler
+                ),
+                center.addObserver(
+                    forName: .NSSystemClockDidChange,
+                    object: nil,
+                    queue: .main,
+                    using: handler
+                ),
+                center.addObserver(
+                    forName: .NSSystemTimeZoneDidChange,
+                    object: nil,
+                    queue: .main,
+                    using: handler
+                )
             ]
         }
         updateSceneTimesOfDay()
@@ -68,7 +83,11 @@ extension WallpaperModel {
         guard let next else {
             return
         }
-        let timer = Timer(fire: next.addingTimeInterval(1), interval: 0, repeats: false) { [weak self] _ in
+        let timer = Timer(
+            fire: next.addingTimeInterval(1),
+            interval: 0,
+            repeats: false
+        ) { [weak self] _ in
             Task { @MainActor in
                 self?.updateSceneTimesOfDay()
             }
@@ -88,7 +107,10 @@ extension WallpaperModel {
             let attributes = try FileManager.default.attributesOfItem(atPath: path)
             return (attributes[.modificationDate] as? Date).map { document.timeOfDay(at: $0) }
         } catch {
-            AppLog.windowRefresh.error("scene video date unreadable: \(error.localizedDescription, privacy: .public)")
+            AppLog.windowRefresh
+                .error(
+                    "scene video date unreadable: \(error.localizedDescription, privacy: .public)"
+                )
             return nil
         }
     }

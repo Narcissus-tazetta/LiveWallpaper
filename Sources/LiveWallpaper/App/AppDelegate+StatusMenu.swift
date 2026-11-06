@@ -25,7 +25,10 @@ extension AppDelegate {
         let powerStatusItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         powerStatusItem.isEnabled = false
         powerStatusItem.isHidden = true
-        powerStatusItem.image = menuIcon(systemSymbolName: "battery.50", accessibilityDescription: "")
+        powerStatusItem.image = menuIcon(
+            systemSymbolName: "battery.50",
+            accessibilityDescription: ""
+        )
         powerStatusItem.tag = MenuTag.powerPolicyStatus
         menu.addItem(powerStatusItem)
 
@@ -641,6 +644,9 @@ extension AppDelegate {
     }
 
     func refreshMenuIcon() -> NSImage? {
-        menuIcon(systemSymbolName: "arrow.clockwise", accessibilityDescription: localized("再生をリフレッシュ"))
+        menuIcon(
+            systemSymbolName: "arrow.clockwise",
+            accessibilityDescription: localized("再生をリフレッシュ")
+        )
     }
 }

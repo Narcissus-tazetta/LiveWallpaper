@@ -8,7 +8,7 @@ extension LightweightProxyCache {
         initializationState = .loading
 
         guard let dataURL = dataDirectory,
-              let metadataURL = self.metadataURL
+              let metadataURL
         else {
             initializationState = .ready
             return
@@ -22,7 +22,10 @@ extension LightweightProxyCache {
             do {
                 try fileManager.createDirectory(at: dataURL, withIntermediateDirectories: true)
             } catch {
-                AppLog.proxyCache.error("creating cache directory failed error=\(error.localizedDescription, privacy: .public)")
+                AppLog.proxyCache
+                    .error(
+                        "creating cache directory failed error=\(error.localizedDescription, privacy: .public)"
+                    )
             }
 
             var shouldWipeDataDirectory = false
@@ -41,7 +44,9 @@ extension LightweightProxyCache {
                 shouldWipeDataDirectory = true
             }
 
-            if shouldWipeDataDirectory, let contents = try? fileManager.contentsOfDirectory(atPath: dataURL.path) {
+            if shouldWipeDataDirectory,
+               let contents = try? fileManager.contentsOfDirectory(atPath: dataURL.path)
+            {
                 for item in contents {
                     try? fileManager.removeItem(at: dataURL.appendingPathComponent(item))
                 }

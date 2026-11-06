@@ -22,7 +22,8 @@ extension SceneEditorView {
             }
             Button(model.localizedString("テキスト")) {
                 if let id = model.addSceneTextLayer(
-                    string: model.localizedString("テキスト"), name: model.localizedString("テキスト"), path: path
+                    string: model.localizedString("テキスト"), name: model.localizedString("テキスト"),
+                    path: path
                 ) {
                     selectSceneLayer(id)
                 }
@@ -33,7 +34,8 @@ extension SceneEditorView {
             Button(model.localizedString("3Dモデル(glTF)…")) {
                 chooseSceneLayerModel(path: path)
             }
-            // A scene seen through its own camera stands its layers in space, where the stage does not apply.
+            // A scene seen through its own camera stands its layers in space, where the stage does
+            // not apply.
             .disabled(model.sceneDocumentsByPath[path]?.camera?.perspective == true)
             Section(model.localizedString("粒子")) {
                 Button(model.localizedString("動きを細かく決められる粒子")) {
@@ -46,7 +48,11 @@ extension SceneEditorView {
                 Divider()
                 ForEach(SceneParticlePreset.allCases, id: \.self) { preset in
                     Button(sceneParticleName(preset)) {
-                        if let id = model.addSceneParticleLayer(preset, name: sceneParticleName(preset), path: path) {
+                        if let id = model.addSceneParticleLayer(
+                            preset,
+                            name: sceneParticleName(preset),
+                            path: path
+                        ) {
                             selectSceneLayer(id)
                         }
                     }
@@ -63,7 +69,11 @@ extension SceneEditorView {
     }
 
     @ViewBuilder
-    func sceneParticleControls(path: String, layer: SceneLayer, particles: SceneParticles) -> some View {
+    func sceneParticleControls(
+        path: String,
+        layer: SceneLayer,
+        particles: SceneParticles
+    ) -> some View {
         let labelWidth = SceneInspectorMetrics.labelWidth
         let loopSeconds = model.sceneDocumentsByPath[path]?.loopSeconds ?? 20
 
@@ -105,15 +115,25 @@ extension SceneEditorView {
             title: model.localizedString("数"),
             value: Binding(
                 get: { Double(particles.count) },
-                set: { value in updateSceneParticles(path: path, layerID: layer.id) { $0.count = Int(value.rounded()) } }
+                set: { value in
+                    updateSceneParticles(path: path, layerID: layer.id) {
+                        $0.count = Int(value.rounded())
+                    }
+                }
             ),
-            range: Double(SceneParticles.countRange.lowerBound) ... Double(SceneParticles.countRange.upperBound),
+            range: Double(SceneParticles.countRange.lowerBound) ...
+                Double(SceneParticles.countRange.upperBound),
             valueText: "\(particles.count)",
             labelWidth: labelWidth
         )
         sceneParticleSlider(
             title: model.localizedString("大きさ"),
-            value: sceneParticleBinding(path: path, layerID: layer.id, particles: particles, \.size),
+            value: sceneParticleBinding(
+                path: path,
+                layerID: layer.id,
+                particles: particles,
+                \.size
+            ),
             range: 0 ... 1,
             valueText: "\(Int((particles.size * 100).rounded()))%",
             labelWidth: labelWidth
@@ -124,11 +144,17 @@ extension SceneEditorView {
                 Text(model.localizedString("速さ"))
                     .frame(width: labelWidth, alignment: .leading)
                 Stepper(
-                    value: sceneParticleBinding(path: path, layerID: layer.id, particles: particles, \.cycles),
+                    value: sceneParticleBinding(
+                        path: path,
+                        layerID: layer.id,
+                        particles: particles,
+                        \.cycles
+                    ),
                     in: SceneEffect.cyclesRange
                 ) {
                     Text(String(
-                        format: model.localizedString("ループ %1$d 秒の間に %2$d 回"), locale: model.appLocale,
+                        format: model.localizedString("ループ %1$d 秒の間に %2$d 回"),
+                        locale: model.appLocale,
                         loopSeconds, particles.cycles
                     ))
                     .font(.caption.monospacedDigit())
@@ -139,7 +165,12 @@ extension SceneEditorView {
                 Text(model.localizedString("向き"))
                     .frame(width: labelWidth, alignment: .leading)
                 Slider(
-                    value: sceneParticleBinding(path: path, layerID: layer.id, particles: particles, \.direction),
+                    value: sceneParticleBinding(
+                        path: path,
+                        layerID: layer.id,
+                        particles: particles,
+                        \.direction
+                    ),
                     in: 0 ... 359
                 )
                 .accessibilityLabel(model.localizedString("向き"))
@@ -150,7 +181,12 @@ extension SceneEditorView {
             }
             sceneParticleSlider(
                 title: model.localizedString("揺れ幅"),
-                value: sceneParticleBinding(path: path, layerID: layer.id, particles: particles, \.sway),
+                value: sceneParticleBinding(
+                    path: path,
+                    layerID: layer.id,
+                    particles: particles,
+                    \.sway
+                ),
                 range: 0 ... 1,
                 valueText: "\(Int((particles.sway * 100).rounded()))%",
                 labelWidth: labelWidth
@@ -166,7 +202,9 @@ extension SceneEditorView {
                 selection: Binding(
                     get: { Color(nsColor: particles.color.nsColor) },
                     set: { color in
-                        updateSceneParticles(path: path, layerID: layer.id) { $0.color = RGBAColor(NSColor(color)) }
+                        updateSceneParticles(path: path, layerID: layer.id) {
+                            $0.color = RGBAColor(NSColor(color))
+                        }
                     }
                 ),
                 supportsOpacity: true
@@ -180,7 +218,12 @@ extension SceneEditorView {
             Spacer(minLength: 0)
             Picker(
                 model.localizedString("カーソル"),
-                selection: sceneParticleBinding(path: path, layerID: layer.id, particles: particles, \.cursorMode)
+                selection: sceneParticleBinding(
+                    path: path,
+                    layerID: layer.id,
+                    particles: particles,
+                    \.cursorMode
+                )
             ) {
                 Text(model.localizedString("反応しない")).tag(SceneParticleCursorMode.none)
                 Text(model.localizedString("カーソルを避ける")).tag(SceneParticleCursorMode.repel)
@@ -205,7 +248,13 @@ extension SceneEditorView {
             if particles.maskFile != nil {
                 Button(model.localizedString("全体に戻す")) {
                     endSceneEditorTool()
-                    model.setScenePaintFile(nil, kind: .mask, effectID: layer.id, layerID: layer.id, path: path)
+                    model.setScenePaintFile(
+                        nil,
+                        kind: .mask,
+                        effectID: layer.id,
+                        layerID: layer.id,
+                        path: path
+                    )
                 }
             }
         }
@@ -235,13 +284,18 @@ extension SceneEditorView {
         }
     }
 
-    private func beginSceneParticlePainting(path: String, layer: SceneLayer, particles: SceneParticles) {
+    private func beginSceneParticlePainting(
+        path: String,
+        layer: SceneLayer,
+        particles: SceneParticles
+    ) {
         guard let document = model.sceneDocumentsByPath[path] else {
             return
         }
         sceneMaskPainter.onCommit = { [model] target, fileName, _ in
             model.setScenePaintFile(
-                fileName, kind: target.kind, effectID: target.effectID, layerID: target.layerID, path: target.path
+                fileName, kind: target.kind, effectID: target.effectID, layerID: target.layerID,
+                path: target.path
             )
         }
         sceneMaskPainter.onError = { [model] error in
@@ -265,12 +319,18 @@ extension SceneEditorView {
         Binding(
             get: { particles[keyPath: keyPath] },
             set: { newValue in
-                updateSceneParticles(path: path, layerID: layerID) { $0[keyPath: keyPath] = newValue }
+                updateSceneParticles(path: path, layerID: layerID) {
+                    $0[keyPath: keyPath] = newValue
+                }
             }
         )
     }
 
-    private func updateSceneParticles(path: String, layerID: UUID, _ change: (inout SceneParticles) -> Void) {
+    private func updateSceneParticles(
+        path: String,
+        layerID: UUID,
+        _ change: (inout SceneParticles) -> Void
+    ) {
         guard var document = model.sceneDocumentsByPath[path],
               let index = document.layers.firstIndex(where: { $0.id == layerID }),
               var particles = document.layers[index].particles

@@ -297,7 +297,12 @@ final class LocalWebWallpaperTests: XCTestCase {
         let server = LocalWebWallpaperServer()
         let url = try await server.url(folder: folder)
         let view = WebPlayerView(frame: NSRect(x: 0, y: 0, width: 320, height: 180))
-        let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        let window = NSWindow(
+            contentRect: view.frame,
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
         window.isReleasedWhenClosed = false
         window.contentView = view
         window.orderFront(nil)
@@ -306,7 +311,12 @@ final class LocalWebWallpaperTests: XCTestCase {
         view.onLoadStateChanged = { state in if state == .loaded { loaded.fulfill() } }
         view.setLocalConfiguration(values: ["speed": .number(3)], settings: LocalWebSettings())
         view.load(
-            request: .init(loadContent: .url(url), layoutMode: .generic, canonicalKey: "api", isLocalPackage: true),
+            request: .init(
+                loadContent: .url(url),
+                layoutMode: .generic,
+                canonicalKey: "api",
+                isLocalPackage: true
+            ),
             audioEnabled: false
         )
         await fulfillment(of: [loaded], timeout: 10)

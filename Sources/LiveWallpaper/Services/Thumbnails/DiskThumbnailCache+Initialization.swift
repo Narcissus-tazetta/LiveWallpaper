@@ -1,77 +1,77 @@
 import AppKit
 
 extension DiskThumbnailCache {
-  func ensureInitialized() {
-    guard initializationState == .idle else {
-      return
-    }
-    initializationState = .loading
-
-    guard let dataURL = Self.dataDirectoryURL(),
-          let metadataURL = Self.metadataFileURL()
-    else {
-      initializationState = .ready
-      bumpRevision()
-      return
-    }
-    ioQueue.async { [weak self] in
-      let fileManager = FileManager.default
-      var loadedMetadata = Metadata(version: Self.metadataVersion, entries: [:])
-      var shouldPersist = false
-
-      do {
-        try fileManager.createDirectory(
-          at: dataURL,
-          withIntermediateDirectories: true
-        )
-      } catch {
-        AppLog.thumbnailCache.error(
-          "creating cache directory failed error=\(error.localizedDescription, privacy: .public)"
-        )
-      }
-
-      if let data = try? Data(contentsOf: metadataURL),
-        let decoded = try? JSONDecoder().decode(Metadata.self, from: data),
-        decoded.version == Self.metadataVersion
-      {
-        loadedMetadata = decoded
-      } else {
-        shouldPersist = true
-      }
-
-      Task { @MainActor in
-        guard let self else {
-          return
+    func ensureInitialized() {
+        guard initializationState == .idle else {
+            return
         }
-        self.metadata = loadedMetadata
-        self.initializationState = .ready
-        if self.willTerminateObserver == nil {
-          let observer = NotificationCenter.default.addObserver(
-            forName: NSApplication.willTerminateNotification,
-            object: nil,
-            queue: .main
-          ) { [weak self] _ in
-            MainActor.assumeIsolated {
-              self?.flushMetadataImmediately()
+        initializationState = .loading
+
+        guard let dataURL = Self.dataDirectoryURL(),
+              let metadataURL = Self.metadataFileURL()
+        else {
+            initializationState = .ready
+            bumpRevision()
+            return
+        }
+        ioQueue.async { [weak self] in
+            let fileManager = FileManager.default
+            var loadedMetadata = Metadata(version: Self.metadataVersion, entries: [:])
+            var shouldPersist = false
+
+            do {
+                try fileManager.createDirectory(
+                    at: dataURL,
+                    withIntermediateDirectories: true
+                )
+            } catch {
+                AppLog.thumbnailCache.error(
+                    "creating cache directory failed error=\(error.localizedDescription, privacy: .public)"
+                )
             }
-          }
-          self.willTerminateObserver = observer
+
+            if let data = try? Data(contentsOf: metadataURL),
+               let decoded = try? JSONDecoder().decode(Metadata.self, from: data),
+               decoded.version == Self.metadataVersion
+            {
+                loadedMetadata = decoded
+            } else {
+                shouldPersist = true
+            }
+
+            Task { @MainActor in
+                guard let self else {
+                    return
+                }
+                self.metadata = loadedMetadata
+                self.initializationState = .ready
+                if self.willTerminateObserver == nil {
+                    let observer = NotificationCenter.default.addObserver(
+                        forName: NSApplication.willTerminateNotification,
+                        object: nil,
+                        queue: .main
+                    ) { [weak self] _ in
+                        MainActor.assumeIsolated {
+                            self?.flushMetadataImmediately()
+                        }
+                    }
+                    self.willTerminateObserver = observer
+                }
+                if shouldPersist {
+                    self.persistMetadata()
+                    self.flushMetadataIfNeeded()
+                }
+                if let validPaths = self.deferredPruneValidPaths {
+                    self.deferredPruneValidPaths = nil
+                    self.prune(validPaths: validPaths)
+                }
+                let pending = self.deferredRequests
+                self.deferredRequests.removeAll()
+                for path in pending {
+                    self.request(path: path)
+                }
+                self.bumpRevision()
+            }
         }
-        if shouldPersist {
-          self.persistMetadata()
-          self.flushMetadataIfNeeded()
-        }
-        if let validPaths = self.deferredPruneValidPaths {
-          self.deferredPruneValidPaths = nil
-          self.prune(validPaths: validPaths)
-        }
-        let pending = self.deferredRequests
-        self.deferredRequests.removeAll()
-        for path in pending {
-          self.request(path: path)
-        }
-        self.bumpRevision()
-      }
     }
-  }
 }

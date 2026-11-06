@@ -50,15 +50,15 @@ struct SceneLinkValues: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        offsetX = (try? container.decode(Double.self, forKey: .offsetX)) ?? 0
-        offsetY = (try? container.decode(Double.self, forKey: .offsetY)) ?? 0
-        rotation = (try? container.decode(Double.self, forKey: .rotation)) ?? 0
-        scale = (try? container.decode(Double.self, forKey: .scale)) ?? 1
-        scaleY = try? container.decodeIfPresent(Double.self, forKey: .scaleY)
-        opacity = (try? container.decode(Double.self, forKey: .opacity)) ?? 1
-        brightness = (try? container.decode(Double.self, forKey: .brightness)) ?? 0
-        saturation = (try? container.decode(Double.self, forKey: .saturation)) ?? 1
-        warmth = (try? container.decode(Double.self, forKey: .warmth)) ?? 0
+        offsetX = container.decodeLenient(Double.self, forKey: .offsetX, default: 0)
+        offsetY = container.decodeLenient(Double.self, forKey: .offsetY, default: 0)
+        rotation = container.decodeLenient(Double.self, forKey: .rotation, default: 0)
+        scale = container.decodeLenient(Double.self, forKey: .scale, default: 1)
+        scaleY = container.decodeLenientIfPresent(Double.self, forKey: .scaleY)
+        opacity = container.decodeLenient(Double.self, forKey: .opacity, default: 1)
+        brightness = container.decodeLenient(Double.self, forKey: .brightness, default: 0)
+        saturation = container.decodeLenient(Double.self, forKey: .saturation, default: 1)
+        warmth = container.decodeLenient(Double.self, forKey: .warmth, default: 0)
     }
 
     var changesColor: Bool {
@@ -135,13 +135,25 @@ struct SceneLink: Codable, Equatable, Identifiable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = (try? container.decode(UUID.self, forKey: .id)) ?? UUID()
+        id = container.decodeLenient(UUID.self, forKey: .id, default: UUID())
         input = try container.decode(SceneLinkInput.self, forKey: .input)
-        isEnabled = (try? container.decode(Bool.self, forKey: .isEnabled)) ?? true
-        layerIDs = (try? container.decode([UUID].self, forKey: .layerIDs)) ?? []
-        timeValues = (try? container.decode([SceneTimeOfDay: SceneLinkValues].self, forKey: .timeValues)) ?? [:]
-        start = (try? container.decode(SceneLinkValues.self, forKey: .start)) ?? SceneLinkValues()
-        end = (try? container.decode(SceneLinkValues.self, forKey: .end)) ?? SceneLinkValues()
+        isEnabled = container.decodeLenient(Bool.self, forKey: .isEnabled, default: true)
+        layerIDs = container.decodeLenient([UUID].self, forKey: .layerIDs, default: [])
+        timeValues = container.decodeLenient(
+            [SceneTimeOfDay: SceneLinkValues].self,
+            forKey: .timeValues,
+            default: [:]
+        )
+        start = container.decodeLenient(
+            SceneLinkValues.self,
+            forKey: .start,
+            default: SceneLinkValues()
+        )
+        end = container.decodeLenient(
+            SceneLinkValues.self,
+            forKey: .end,
+            default: SceneLinkValues()
+        )
     }
 
     /// `cursor` is -1...1 per axis (+y down), the same eased value the parallax uses.
@@ -150,9 +162,15 @@ struct SceneLink: Codable, Equatable, Identifiable {
         case .timeOfDay:
             return timeValues[timeOfDay] ?? .identity
         case .cursorX:
-            return cursor.x < 0 ? start.scaled(by: min(-cursor.x, 1)) : end.scaled(by: min(cursor.x, 1))
+            return cursor.x < 0 ? start.scaled(by: min(-cursor.x, 1)) : end.scaled(by: min(
+                cursor.x,
+                1
+            ))
         case .cursorY:
-            return cursor.y < 0 ? start.scaled(by: min(-cursor.y, 1)) : end.scaled(by: min(cursor.y, 1))
+            return cursor.y < 0 ? start.scaled(by: min(-cursor.y, 1)) : end.scaled(by: min(
+                cursor.y,
+                1
+            ))
         case .cursorDistance:
             return end.scaled(by: min((cursor.x * cursor.x + cursor.y * cursor.y).squareRoot(), 1))
         }
@@ -188,7 +206,11 @@ extension SceneDocument {
         timeBands.compactMap { band in
             calendar.nextDate(
                 after: date,
-                matching: DateComponents(hour: band.startMinute / 60, minute: band.startMinute % 60, second: 0),
+                matching: DateComponents(
+                    hour: band.startMinute / 60,
+                    minute: band.startMinute % 60,
+                    second: 0
+                ),
                 matchingPolicy: .nextTime
             )
         }.min()
@@ -197,7 +219,8 @@ extension SceneDocument {
     /// The scene looks the same in both parts of the day (the links set the same
     /// values for them), so a video baked for one serves the other.
     func looksSame(at first: SceneTimeOfDay, as second: SceneTimeOfDay) -> Bool {
-        if first != second, scripts.contains(where: { $0.canRun && $0.usesTimeOfDay }) { return false }
+        if first != second,
+           scripts.contains(where: { $0.canRun && $0.usesTimeOfDay }) { return false }
         return links.allSatisfy { link in
             link.input != .timeOfDay || !link.isEnabled || link.layerIDs.isEmpty
                 || (link.timeValues[first] ?? .identity) == (link.timeValues[second] ?? .identity)
@@ -205,11 +228,16 @@ extension SceneDocument {
     }
 
     var usesTimeOfDay: Bool {
-        links.contains { $0.input == .timeOfDay && $0.hasEffect } || scripts.contains { $0.canRun && $0.usesTimeOfDay }
+        links.contains { $0.input == .timeOfDay && $0.hasEffect } || scripts
+            .contains { $0.canRun && $0.usesTimeOfDay }
     }
 
     /// What the links change on the layer for these inputs; the identity when none apply.
-    func linkValues(layerID: UUID, timeOfDay: SceneTimeOfDay, cursor: SIMD2<Double>) -> SceneLinkValues {
+    func linkValues(
+        layerID: UUID,
+        timeOfDay: SceneTimeOfDay,
+        cursor: SIMD2<Double>
+    ) -> SceneLinkValues {
         var result = SceneLinkValues.identity
         for link in links where link.isEnabled && link.layerIDs.contains(layerID) {
             result = result.combined(with: link.values(timeOfDay: timeOfDay, cursor: cursor))
@@ -220,7 +248,10 @@ extension SceneDocument {
     /// Puts `newID` in every link `existingID` is in, for a layer split off another
     /// (a cut-out, a copy) that should keep looking the same.
     mutating func linkLayer(_ newID: UUID, likeLayer existingID: UUID) {
-        for index in links.indices where links[index].layerIDs.contains(existingID) && !links[index].layerIDs.contains(newID) {
+        for index in links.indices
+            where links[index].layerIDs.contains(existingID) && !links[index].layerIDs
+            .contains(newID)
+        {
             links[index].layerIDs.append(newID)
         }
         for index in scripts.indices where scripts[index].layerIDs.contains(existingID) {

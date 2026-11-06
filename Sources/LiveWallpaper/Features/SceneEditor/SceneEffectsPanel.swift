@@ -70,7 +70,11 @@ extension SceneEditorView {
                     return
                 }
                 // The first pins usually hold the picture; later ones move it.
-                var pin = ScenePin(x: Double(point.x), y: Double(point.y), isAnchor: effect.pins.isEmpty)
+                var pin = ScenePin(
+                    x: Double(point.x),
+                    y: Double(point.y),
+                    isAnchor: effect.pins.isEmpty
+                )
                 pin.direction = 90
                 effect.pins.append(pin)
                 added = pin
@@ -98,12 +102,12 @@ extension SceneEditorView {
     // MARK: - Painting bar
 
     /// Shown under the preview while painting a mask, a time offset or a flow map.
-    @ViewBuilder
     func scenePaintBar(kind: ScenePaintOverride.Target) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 Picker(model.localizedString("ブラシ"), selection: $sceneMaskPainter.tool) {
-                    Text(model.localizedString(kind.isGrey ? "塗る" : "向きを描く")).tag(SceneMaskPainter.Tool.paint)
+                    Text(model.localizedString(kind.isGrey ? "塗る" : "向きを描く"))
+                        .tag(SceneMaskPainter.Tool.paint)
                     Text(model.localizedString("消す")).tag(SceneMaskPainter.Tool.erase)
                 }
                 .labelsHidden()
@@ -183,14 +187,20 @@ extension SceneEditorView {
                         ForEach(SceneBuiltInEffect.allCases) { builtIn in
                             Button(model.localizedString(builtIn.title)) {
                                 let effect = builtIn.makeEffect()
-                                updateSceneLayerEffects(path: path, layerID: layer.id) { $0.append(effect) }
+                                updateSceneLayerEffects(path: path, layerID: layer.id) {
+                                    $0.append(effect)
+                                }
                                 selectedSceneEffectID = effect.id
                             }
                         }
                     }
                     Section(model.localizedString("細かく設定できる動き")) {
-                        // A shader effect needs a renderGraph only an import supplies; added by hand it would be empty.
-                        ForEach(SceneEffectKind.allCases.filter { $0.runsOnRealTime && $0 != .shader }, id: \.self) { kind in
+                        // A shader effect needs a renderGraph only an import supplies; added by
+                        // hand it would be empty.
+                        ForEach(
+                            SceneEffectKind.allCases.filter { $0.runsOnRealTime && $0 != .shader },
+                            id: \.self
+                        ) { kind in
                             sceneAddEffectButton(kind, path: path, layerID: layer.id)
                         }
                     }
@@ -208,12 +218,21 @@ extension SceneEditorView {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(layer.effects) { effect in
-                            sceneEffectRow(path: path, layerID: layer.id, effect: effect, isSelected: effect.id == selectedID)
+                            sceneEffectRow(
+                                path: path,
+                                layerID: layer.id,
+                                effect: effect,
+                                isSelected: effect.id == selectedID
+                            )
                         }
                         HStack(spacing: 4) {
                             Button {
                                 if let selectedID {
-                                    removeSceneEffect(path: path, layerID: layer.id, effectID: selectedID)
+                                    removeSceneEffect(
+                                        path: path,
+                                        layerID: layer.id,
+                                        effectID: selectedID
+                                    )
                                 }
                             } label: {
                                 Image(systemName: "minus")
@@ -223,7 +242,12 @@ extension SceneEditorView {
                             .accessibilityLabel(model.localizedString("選択した動きを削除"))
                             Spacer(minLength: 0)
                             Button {
-                                moveSceneEffect(path: path, layerID: layer.id, effectID: selectedID, by: -1)
+                                moveSceneEffect(
+                                    path: path,
+                                    layerID: layer.id,
+                                    effectID: selectedID,
+                                    by: -1
+                                )
                             } label: {
                                 Image(systemName: "arrow.up")
                             }
@@ -231,7 +255,12 @@ extension SceneEditorView {
                             .help(model.localizedString("先に掛ける"))
                             .accessibilityLabel(model.localizedString("先に掛ける"))
                             Button {
-                                moveSceneEffect(path: path, layerID: layer.id, effectID: selectedID, by: 1)
+                                moveSceneEffect(
+                                    path: path,
+                                    layerID: layer.id,
+                                    effectID: selectedID,
+                                    by: 1
+                                )
                             } label: {
                                 Image(systemName: "arrow.down")
                             }
@@ -243,7 +272,9 @@ extension SceneEditorView {
                     }
                     Divider()
 
-                    if let selectedID, let effect = layer.effects.first(where: { $0.id == selectedID }) {
+                    if let selectedID,
+                       let effect = layer.effects.first(where: { $0.id == selectedID })
+                    {
                         sceneEffectInspector(path: path, layerID: layer.id, effect: effect)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -252,7 +283,11 @@ extension SceneEditorView {
         }
     }
 
-    private func sceneAddEffectButton(_ kind: SceneEffectKind, path: String, layerID: UUID) -> some View {
+    private func sceneAddEffectButton(
+        _ kind: SceneEffectKind,
+        path: String,
+        layerID: UUID
+    ) -> some View {
         Button(sceneEffectName(kind)) {
             guard let effect = model.makeSceneEffect(kind, path: path) else {
                 return
@@ -262,13 +297,20 @@ extension SceneEditorView {
         }
     }
 
-    private func sceneEffectRow(path: String, layerID: UUID, effect: SceneEffect, isSelected: Bool) -> some View {
+    private func sceneEffectRow(
+        path: String,
+        layerID: UUID,
+        effect: SceneEffect,
+        isSelected: Bool
+    ) -> some View {
         HStack(spacing: 8) {
             Toggle(
                 isOn: Binding(
                     get: { effect.isEnabled },
                     set: { value in
-                        updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) { $0.isEnabled = value }
+                        updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) {
+                            $0.isEnabled = value
+                        }
                     }
                 )
             ) {
@@ -312,10 +354,16 @@ extension SceneEditorView {
     // MARK: - Inspector
 
     @ViewBuilder
-    private func sceneEffectInspector(path: String, layerID: UUID, effect: SceneEffect) -> some View {
+    private func sceneEffectInspector(
+        path: String,
+        layerID: UUID,
+        effect: SceneEffect
+    ) -> some View {
         let loopSeconds = model.sceneDocumentsByPath[path]?.loopSeconds ?? 20
         VStack(alignment: .leading, spacing: 8) {
-            if effect.kind == .shader, let builtIn = effect.builtIn.flatMap(SceneBuiltInEffect.init(rawValue:)) {
+            if effect.kind == .shader,
+               let builtIn = effect.builtIn.flatMap(SceneBuiltInEffect.init(rawValue:))
+            {
                 ForEach(builtIn.parameters, id: \.key) { parameter in
                     HStack(spacing: 12) {
                         Text(model.localizedString(parameter.title))
@@ -325,167 +373,232 @@ extension SceneEditorView {
                             value: Binding(
                                 get: { effect.values[parameter.key] ?? parameter.initial },
                                 set: { value in
-                                    updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) { $0.values[parameter.key] = value }
+                                    updateSceneEffect(
+                                        path: path,
+                                        layerID: layerID,
+                                        effectID: effect.id
+                                    ) { $0.values[parameter.key] = value }
                                 }
                             ),
                             in: parameter.range
                         )
                         .accessibilityLabel(model.localizedString(parameter.title))
-                        Text(String(format: "%.2f", locale: model.appLocale, effect.values[parameter.key] ?? parameter.initial))
-                            .font(.caption.monospacedDigit())
-                            .foregroundColor(.secondary)
-                            .frame(width: 44, alignment: .trailing)
+                        Text(String(
+                            format: "%.2f",
+                            locale: model.appLocale,
+                            effect.values[parameter.key] ?? parameter.initial
+                        ))
+                        .font(.caption.monospacedDigit())
+                        .foregroundColor(.secondary)
+                        .frame(width: 44, alignment: .trailing)
                     }
                 }
             } else if effect.kind == .shader {
                 settingsFootnote(model.localizedString("この効果は作品に含まれるシェーダーで描画します。範囲の描き直しには未対応です。"))
             } else {
-            if effect.kind == .opacityMask {
-                sceneEffectSlider(
-                    title: model.localizedString("不透明度"),
-                    value: sceneEffectValueBinding(path: path, layerID: layerID, effect: effect, key: "alpha"),
-                    range: 0 ... 1
-                )
-            }
-            if effect.kind.runsOnRealTime {
-                sceneRealTimeEffectInspector(path: path, layerID: layerID, effect: effect)
-            }
-            if effect.kind.usesCycles {
-            sceneEffectRow(title: model.localizedString("速さ")) {
-                Stepper(
-                    value: sceneEffectBinding(path: path, layerID: layerID, effect: effect, \.cycles),
-                    in: SceneEffect.cyclesRange
-                ) {
-                    Text(String(
-                        format: model.localizedString("ループ %1$d 秒の間に %2$d 回"), locale: model.appLocale,
-                        loopSeconds, effect.cycles
-                    ))
-                    .font(.caption.monospacedDigit())
+                if effect.kind == .opacityMask {
+                    sceneEffectSlider(
+                        title: model.localizedString("不透明度"),
+                        value: sceneEffectValueBinding(
+                            path: path,
+                            layerID: layerID,
+                            effect: effect,
+                            key: "alpha"
+                        ),
+                        range: 0 ... 1
+                    )
                 }
-                .accessibilityLabel(model.localizedString("速さ"))
-            }
-            }
+                if effect.kind.runsOnRealTime {
+                    sceneRealTimeEffectInspector(path: path, layerID: layerID, effect: effect)
+                }
+                if effect.kind.usesCycles {
+                    sceneEffectRow(title: model.localizedString("速さ")) {
+                        Stepper(
+                            value: sceneEffectBinding(
+                                path: path,
+                                layerID: layerID,
+                                effect: effect,
+                                \.cycles
+                            ),
+                            in: SceneEffect.cyclesRange
+                        ) {
+                            Text(String(
+                                format: model.localizedString("ループ %1$d 秒の間に %2$d 回"),
+                                locale: model.appLocale,
+                                loopSeconds, effect.cycles
+                            ))
+                            .font(.caption.monospacedDigit())
+                        }
+                        .accessibilityLabel(model.localizedString("速さ"))
+                    }
+                }
 
-            if effect.kind.usesStrength {
-                sceneEffectSlider(
-                    title: model.localizedString("強さ"),
-                    value: sceneEffectBinding(path: path, layerID: layerID, effect: effect, \.strength),
-                    range: 0 ... 1
-                )
-            }
-            if effect.kind.usesScale {
-                sceneEffectSlider(
-                    title: model.localizedString(effect.kind == .twirl ? "範囲" : "細かさ"),
-                    value: sceneEffectBinding(path: path, layerID: layerID, effect: effect, \.scale),
-                    range: 0 ... 1
-                )
-            }
-            if effect.kind.usesDirection {
-                sceneEffectRow(title: model.localizedString("向き")) {
-                    let direction = sceneEffectBinding(path: path, layerID: layerID, effect: effect, \.direction)
-                    Group {
-                        // Scrolling only loops in eight directions; a 1° step would
-                        // draw 360 tick marks.
-                        if effect.kind == .scroll {
-                            Slider(value: direction, in: 0 ... 315, step: 45)
-                        } else {
-                            Slider(value: direction, in: 0 ... 359)
+                if effect.kind.usesStrength {
+                    sceneEffectSlider(
+                        title: model.localizedString("強さ"),
+                        value: sceneEffectBinding(
+                            path: path,
+                            layerID: layerID,
+                            effect: effect,
+                            \.strength
+                        ),
+                        range: 0 ... 1
+                    )
+                }
+                if effect.kind.usesScale {
+                    sceneEffectSlider(
+                        title: model.localizedString(effect.kind == .twirl ? "範囲" : "細かさ"),
+                        value: sceneEffectBinding(
+                            path: path,
+                            layerID: layerID,
+                            effect: effect,
+                            \.scale
+                        ),
+                        range: 0 ... 1
+                    )
+                }
+                if effect.kind.usesDirection {
+                    sceneEffectRow(title: model.localizedString("向き")) {
+                        let direction = sceneEffectBinding(
+                            path: path,
+                            layerID: layerID,
+                            effect: effect,
+                            \.direction
+                        )
+                        Group {
+                            // Scrolling only loops in eight directions; a 1° step would
+                            // draw 360 tick marks.
+                            if effect.kind == .scroll {
+                                Slider(value: direction, in: 0 ... 315, step: 45)
+                            } else {
+                                Slider(value: direction, in: 0 ... 359)
+                            }
+                        }
+                        .accessibilityLabel(model.localizedString("向き"))
+                        Text("\(Int(effect.direction))°")
+                            .font(.caption.monospacedDigit())
+                            .foregroundColor(.secondary)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                }
+                if effect.kind == .spin || effect.kind == .twirl {
+                    Toggle(
+                        model.localizedString("逆向きに回す"),
+                        isOn: sceneEffectBinding(
+                            path: path,
+                            layerID: layerID,
+                            effect: effect,
+                            \.reversed
+                        )
+                    )
+                }
+                if effect.kind.usesCenter {
+                    sceneEffectRow(title: model.localizedString("中心")) {
+                        Button(model.localizedString(
+                            sceneEditorTool == .pickCenter(effectID: effect.id) ? "プレビューをクリック…" : "プレビューで選ぶ"
+                        )) {
+                            sceneMaskPainter.end()
+                            sceneEditorTool = sceneEditorTool == .pickCenter(effectID: effect.id)
+                                ? nil : .pickCenter(effectID: effect.id)
                         }
                     }
-                    .accessibilityLabel(model.localizedString("向き"))
-                    Text("\(Int(effect.direction))°")
-                        .font(.caption.monospacedDigit())
+                }
+                if effect.kind == .puppet {
+                    scenePuppetPins(path: path, layerID: layerID, effect: effect)
+                }
+                if effect.kind == .waterFlow {
+                    sceneEffectRow(title: model.localizedString("流れる向き")) {
+                        Button(model.localizedString(effect.flowFile == nil ? "向きを描く" : "描き直す")) {
+                            beginScenePainting(
+                                path: path,
+                                layerID: layerID,
+                                effect: effect,
+                                kind: .flow
+                            )
+                        }
+                    }
+                    if effect.flowFile == nil {
+                        settingsFootnote(model.localizedString("向きを描くまでは動きません。"))
+                    }
+                }
+                if effect.kind.usesFixedEdge {
+                    sceneEffectRow(title: model.localizedString("固定する側")) {
+                        Picker(
+                            model.localizedString("固定する側"),
+                            selection: sceneEffectBinding(
+                                path: path,
+                                layerID: layerID,
+                                effect: effect,
+                                \.fixedEdge
+                            )
+                        ) {
+                            Text(model.localizedString("なし")).tag(SceneFixedEdge.none)
+                            Text(model.localizedString("上")).tag(SceneFixedEdge.top)
+                            Text(model.localizedString("下")).tag(SceneFixedEdge.bottom)
+                            Text(model.localizedString("左")).tag(SceneFixedEdge.left)
+                            Text(model.localizedString("右")).tag(SceneFixedEdge.right)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
+                        Spacer(minLength: 0)
+                    }
+                    if effect.fixedEdge != .none {
+                        settingsFootnote(model
+                            .localizedString("選んだ側は動かさず、反対側ほど大きく動かします。髪の根元や枝の付け根を押さえるのに使います。"))
+                            .padding(.leading, sceneEffectLabelWidth + 12)
+                    }
+                }
+                sceneEffectRow(title: model.localizedString("範囲")) {
+                    Text(model.localizedString(effect.maskFile == nil ? "レイヤー全体" : "塗った範囲だけ"))
                         .foregroundColor(.secondary)
-                        .frame(width: 40, alignment: .trailing)
-                }
-            }
-            if effect.kind == .spin || effect.kind == .twirl {
-                Toggle(
-                    model.localizedString("逆向きに回す"),
-                    isOn: sceneEffectBinding(path: path, layerID: layerID, effect: effect, \.reversed)
-                )
-            }
-            if effect.kind.usesCenter {
-                sceneEffectRow(title: model.localizedString("中心")) {
-                    Button(model.localizedString(
-                        sceneEditorTool == .pickCenter(effectID: effect.id) ? "プレビューをクリック…" : "プレビューで選ぶ"
-                    )) {
-                        sceneMaskPainter.end()
-                        sceneEditorTool = sceneEditorTool == .pickCenter(effectID: effect.id)
-                            ? nil : .pickCenter(effectID: effect.id)
-                    }
-                }
-            }
-            if effect.kind == .puppet {
-                scenePuppetPins(path: path, layerID: layerID, effect: effect)
-            }
-            if effect.kind == .waterFlow {
-                sceneEffectRow(title: model.localizedString("流れる向き")) {
-                    Button(model.localizedString(effect.flowFile == nil ? "向きを描く" : "描き直す")) {
-                        beginScenePainting(path: path, layerID: layerID, effect: effect, kind: .flow)
-                    }
-                }
-                if effect.flowFile == nil {
-                    settingsFootnote(model.localizedString("向きを描くまでは動きません。"))
-                }
-            }
-            if effect.kind.usesFixedEdge {
-                sceneEffectRow(title: model.localizedString("固定する側")) {
-                    Picker(
-                        model.localizedString("固定する側"),
-                        selection: sceneEffectBinding(path: path, layerID: layerID, effect: effect, \.fixedEdge)
-                    ) {
-                        Text(model.localizedString("なし")).tag(SceneFixedEdge.none)
-                        Text(model.localizedString("上")).tag(SceneFixedEdge.top)
-                        Text(model.localizedString("下")).tag(SceneFixedEdge.bottom)
-                        Text(model.localizedString("左")).tag(SceneFixedEdge.left)
-                        Text(model.localizedString("右")).tag(SceneFixedEdge.right)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
                     Spacer(minLength: 0)
                 }
-                if effect.fixedEdge != .none {
-                    settingsFootnote(model.localizedString("選んだ側は動かさず、反対側ほど大きく動かします。髪の根元や枝の付け根を押さえるのに使います。"))
-                        .padding(.leading, sceneEffectLabelWidth + 12)
-                }
-            }
-            sceneEffectRow(title: model.localizedString("範囲")) {
-                Text(model.localizedString(effect.maskFile == nil ? "レイヤー全体" : "塗った範囲だけ"))
-                    .foregroundColor(.secondary)
-                Spacer(minLength: 0)
-            }
-            HStack(spacing: 8) {
-                Button(model.localizedString(effect.maskFile == nil ? "範囲を塗る" : "塗り直す")) {
-                    beginScenePainting(path: path, layerID: layerID, effect: effect, kind: .mask)
-                }
-                if effect.maskFile != nil {
-                    Button(model.localizedString("全体に戻す")) {
-                        endSceneEditorTool()
-                        model.setScenePaintFile(nil, kind: .mask, effectID: effect.id, layerID: layerID, path: path)
-                    }
-                }
-            }
-            .padding(.leading, sceneEffectLabelWidth + 12)
-            if effect.maskFile != nil, effect.kind.canMoveOnItsOwnLayer,
-               let owner = model.sceneDocumentsByPath[path]?.layers.first(where: { $0.id == layerID }),
-               owner.kind == .image, owner.videoFile == nil
-            {
                 HStack(spacing: 8) {
-                    Button(model.localizedString("塗った範囲を別のレイヤーにする")) {
-                        moveScenePaintedArea(path: path, layerID: layerID, effectID: effect.id)
+                    Button(model.localizedString(effect.maskFile == nil ? "範囲を塗る" : "塗り直す")) {
+                        beginScenePainting(
+                            path: path,
+                            layerID: layerID,
+                            effect: effect,
+                            kind: .mask
+                        )
                     }
-                    .disabled(model.sceneAIWork[layerID] != nil)
-                    if model.sceneAIWork[layerID] == .separating {
-                        ProgressView()
-                            .controlSize(.small)
+                    if effect.maskFile != nil {
+                        Button(model.localizedString("全体に戻す")) {
+                            endSceneEditorTool()
+                            model.setScenePaintFile(
+                                nil,
+                                kind: .mask,
+                                effectID: effect.id,
+                                layerID: layerID,
+                                path: path
+                            )
+                        }
                     }
                 }
                 .padding(.leading, sceneEffectLabelWidth + 12)
-                settingsFootnote(model.localizedString("塗った範囲だけを動かすと、輪郭はその場に残ります。別のレイヤーにすると輪郭ごと動き、元のレイヤーの抜けた所は周りの色で埋めます。"))
+                if effect.maskFile != nil, effect.kind.canMoveOnItsOwnLayer,
+                   let owner = model.sceneDocumentsByPath[path]?.layers
+                   .first(where: { $0.id == layerID }),
+                   owner.kind == .image, owner.videoFile == nil
+                {
+                    HStack(spacing: 8) {
+                        Button(model.localizedString("塗った範囲を別のレイヤーにする")) {
+                            moveScenePaintedArea(path: path, layerID: layerID, effectID: effect.id)
+                        }
+                        .disabled(model.sceneAIWork[layerID] != nil)
+                        if model.sceneAIWork[layerID] == .separating {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
                     .padding(.leading, sceneEffectLabelWidth + 12)
-            }
+                    settingsFootnote(model
+                        .localizedString(
+                            "塗った範囲だけを動かすと、輪郭はその場に残ります。別のレイヤーにすると輪郭ごと動き、元のレイヤーの抜けた所は周りの色で埋めます。"
+                        ))
+                        .padding(.leading, sceneEffectLabelWidth + 12)
+                }
             }
         }
     }
@@ -494,8 +607,12 @@ extension SceneEditorView {
     func moveScenePaintedArea(path: String, layerID: UUID, effectID: UUID) {
         endSceneEditorTool()
         Task {
-            guard let id = await model.moveScenePaintedAreaToOwnLayer(effectID: effectID, layerID: layerID, path: path),
-                  isStillEditing
+            guard let id = await model.moveScenePaintedAreaToOwnLayer(
+                effectID: effectID,
+                layerID: layerID,
+                path: path
+            ),
+                isStillEditing
             else {
                 return
             }
@@ -510,8 +627,12 @@ extension SceneEditorView {
     private func scenePuppetPins(path: String, layerID: UUID, effect: SceneEffect) -> some View {
         let isAdding = sceneEditorTool == .addPins(effectID: effect.id)
         sceneEffectRow(title: model.localizedString("ピン")) {
-            Text(String(format: model.localizedString("%d 本"), locale: model.appLocale, effect.pins.count))
-                .foregroundColor(.secondary)
+            Text(String(
+                format: model.localizedString("%d 本"),
+                locale: model.appLocale,
+                effect.pins.count
+            ))
+            .foregroundColor(.secondary)
             Spacer(minLength: 0)
             Button(model.localizedString(isAdding ? "追加を終える" : "ピンを追加")) {
                 sceneMaskPainter.end()
@@ -519,7 +640,8 @@ extension SceneEditorView {
             }
         }
         if effect.pins.isEmpty {
-            settingsFootnote(model.localizedString("固定するピンで動かさない所を押さえ、揺らすピンで動かしたい所を指定します。ピンが無い間は動きません。"))
+            settingsFootnote(model
+                .localizedString("固定するピンで動かさない所を押さえ、揺らすピンで動かしたい所を指定します。ピンが無い間は動きません。"))
         }
         ForEach(Array(effect.pins.enumerated()), id: \.element.id) { index, pin in
             let isSelected = pin.id == selectedScenePinID
@@ -531,8 +653,12 @@ extension SceneEditorView {
                         HStack(spacing: 6) {
                             Image(systemName: pin.isAnchor ? "pin.fill" : "waveform.path")
                                 .foregroundColor(.secondary)
-                            Text(String(format: model.localizedString("ピン %d"), locale: model.appLocale, index + 1))
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(String(
+                                format: model.localizedString("ピン %d"),
+                                locale: model.appLocale,
+                                index + 1
+                            ))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .contentShape(Rectangle())
                     }
@@ -540,7 +666,13 @@ extension SceneEditorView {
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                     Picker(
                         model.localizedString("ピンの種類"),
-                        selection: scenePinBinding(path: path, layerID: layerID, effectID: effect.id, pin: pin, \.isAnchor)
+                        selection: scenePinBinding(
+                            path: path,
+                            layerID: layerID,
+                            effectID: effect.id,
+                            pin: pin,
+                            \.isAnchor
+                        )
                     ) {
                         Text(model.localizedString("固定")).tag(true)
                         Text(model.localizedString("揺らす")).tag(false)
@@ -549,7 +681,11 @@ extension SceneEditorView {
                     .pickerStyle(.menu)
                     .frame(maxWidth: SceneInspectorMetrics.menuMaxWidth)
                     Button {
-                        updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) { effect in
+                        updateSceneEffect(
+                            path: path,
+                            layerID: layerID,
+                            effectID: effect.id
+                        ) { effect in
                             effect.pins.removeAll { $0.id == pin.id }
                         }
                     } label: {
@@ -562,12 +698,24 @@ extension SceneEditorView {
                 if isSelected, !pin.isAnchor {
                     sceneEffectSlider(
                         title: model.localizedString("揺れ幅"),
-                        value: scenePinBinding(path: path, layerID: layerID, effectID: effect.id, pin: pin, \.amount),
+                        value: scenePinBinding(
+                            path: path,
+                            layerID: layerID,
+                            effectID: effect.id,
+                            pin: pin,
+                            \.amount
+                        ),
                         range: 0 ... 1
                     )
                     sceneEffectRow(title: model.localizedString("向き")) {
                         Slider(
-                            value: scenePinBinding(path: path, layerID: layerID, effectID: effect.id, pin: pin, \.direction),
+                            value: scenePinBinding(
+                                path: path,
+                                layerID: layerID,
+                                effectID: effect.id,
+                                pin: pin,
+                                \.direction
+                            ),
                             in: 0 ... 359
                         )
                         .accessibilityLabel(model.localizedString("向き"))
@@ -578,7 +726,13 @@ extension SceneEditorView {
                     }
                     sceneEffectSlider(
                         title: model.localizedString("タイミングのずれ"),
-                        value: scenePinBinding(path: path, layerID: layerID, effectID: effect.id, pin: pin, \.phase),
+                        value: scenePinBinding(
+                            path: path,
+                            layerID: layerID,
+                            effectID: effect.id,
+                            pin: pin,
+                            \.phase
+                        ),
                         range: 0 ... 1
                     )
                 }
@@ -611,7 +765,8 @@ extension SceneEditorView {
     func scenePreviewMarkers(document: SceneDocument, layerID: UUID?) -> [ScenePreviewMarker] {
         guard let layerID,
               let layer = document.layers.first(where: { $0.id == layerID }),
-              let effect = layer.effects.first(where: { $0.id == selectedSceneEffectID }) ?? layer.effects.first
+              let effect = layer.effects.first(where: { $0.id == selectedSceneEffectID }) ?? layer
+              .effects.first
         else {
             return []
         }
@@ -641,7 +796,11 @@ extension SceneEditorView {
         }
     }
 
-    private func sceneEffectSlider(title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+    private func sceneEffectSlider(
+        title: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>
+    ) -> some View {
         sceneEffectRow(title: title) {
             Slider(value: value, in: range)
                 .accessibilityLabel(title)
@@ -655,7 +814,12 @@ extension SceneEditorView {
 
     // MARK: - Editing helpers
 
-    func beginScenePainting(path: String, layerID: UUID, effect: SceneEffect, kind: ScenePaintOverride.Target) {
+    func beginScenePainting(
+        path: String,
+        layerID: UUID,
+        effect: SceneEffect,
+        kind: ScenePaintOverride.Target
+    ) {
         guard let document = model.sceneDocumentsByPath[path],
               let layer = document.layers.first(where: { $0.id == layerID })
         else {
@@ -665,8 +829,10 @@ extension SceneEditorView {
         do {
             if let text = layer.text {
                 // Painted in the text's picture as it is drawn now.
-                let fontURL = text.fontFile.map { SceneStore.folderURL(forVideoPath: path).appendingPathComponent($0) }
-                guard let raster = try SceneTextRasterizer.render(text, fontURL: fontURL) else { return }
+                let fontURL = text.fontFile
+                    .map { SceneStore.folderURL(forVideoPath: path).appendingPathComponent($0) }
+                guard let raster = try SceneTextRasterizer.render(text, fontURL: fontURL)
+                else { return }
                 size = CGSize(width: raster.width, height: raster.height)
             } else {
                 size = try SceneStore.pixelSize(of: SceneStore.imageURL(layer, videoPath: path))
@@ -677,7 +843,8 @@ extension SceneEditorView {
         }
         sceneMaskPainter.onCommit = { [model] target, fileName, bounds in
             model.setScenePaintFile(
-                fileName, kind: target.kind, effectID: target.effectID, layerID: target.layerID, path: target.path,
+                fileName, kind: target.kind, effectID: target.effectID, layerID: target.layerID,
+                path: target.path,
                 bounds: bounds
             )
         }
@@ -694,7 +861,9 @@ extension SceneEditorView {
             layerPixelSize: size
         )
         if !effect.isEnabled {
-            updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) { $0.isEnabled = true }
+            updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) {
+                $0.isEnabled = true
+            }
         }
         sceneEditorTool = .paint(effectID: effect.id, kind: kind)
     }
@@ -708,12 +877,19 @@ extension SceneEditorView {
         Binding(
             get: { effect[keyPath: keyPath] },
             set: { newValue in
-                updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) { $0[keyPath: keyPath] = newValue }
+                updateSceneEffect(path: path, layerID: layerID, effectID: effect.id) {
+                    $0[keyPath: keyPath] = newValue
+                }
             }
         )
     }
 
-    func updateSceneEffect(path: String, layerID: UUID, effectID: UUID, _ change: (inout SceneEffect) -> Void) {
+    func updateSceneEffect(
+        path: String,
+        layerID: UUID,
+        effectID: UUID,
+        _ change: (inout SceneEffect) -> Void
+    ) {
         updateSceneLayerEffects(path: path, layerID: layerID) { effects in
             guard let index = effects.firstIndex(where: { $0.id == effectID }) else {
                 return
@@ -722,7 +898,11 @@ extension SceneEditorView {
         }
     }
 
-    private func updateSceneLayerEffects(path: String, layerID: UUID, _ change: (inout [SceneEffect]) -> Void) {
+    private func updateSceneLayerEffects(
+        path: String,
+        layerID: UUID,
+        _ change: (inout [SceneEffect]) -> Void
+    ) {
         guard var document = model.sceneDocumentsByPath[path],
               let index = document.layers.firstIndex(where: { $0.id == layerID })
         else {

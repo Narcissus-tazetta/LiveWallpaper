@@ -10,12 +10,17 @@ final class SceneSavePruningRegressionTests: XCTestCase {
     private var document: SceneDocument!
 
     override func setUpWithError() throws {
-        directory = FileManager.default.temporaryDirectory.appendingPathComponent("SceneSavePruning-\(UUID().uuidString)")
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SceneSavePruning-\(UUID().uuidString)")
         video = directory.appendingPathComponent("scene.mp4")
         var layer = SceneLayer(name: "model", imageFile: "")
         layer.kind = .model
-        layer.model = SceneStaticModel(material: 0, components: 1,
-                                       vertices: Data(repeating: 0, count: 12_000_000), indices: Data())
+        layer.model = SceneStaticModel(
+            material: 0,
+            components: 1,
+            vertices: Data(repeating: 0, count: 12_000_000),
+            indices: Data()
+        )
         document = SceneDocument(canvasWidth: 32, canvasHeight: 32, layers: [layer])
         try SceneStore.save(document, videoPath: video.path)
         model = WallpaperModel()
@@ -29,7 +34,8 @@ final class SceneSavePruningRegressionTests: XCTestCase {
     }
 
     private func writeTrialFile() throws -> URL {
-        let file = SceneStore.folderURL(forVideoPath: video.path).appendingPathComponent("trial.png")
+        let file = SceneStore.folderURL(forVideoPath: video.path)
+            .appendingPathComponent("trial.png")
         try Data([1, 2, 3]).write(to: file)
         model.retainSceneFile(file)
         return file
@@ -51,7 +57,9 @@ final class SceneSavePruningRegressionTests: XCTestCase {
         model.retrySceneSave(path: video.path)
         let trial = try writeTrialFile()
         let deadline = ProcessInfo.processInfo.systemUptime + 5
-        while model.scenesSaving.contains(video.path), ProcessInfo.processInfo.systemUptime < deadline {
+        while model.scenesSaving.contains(video.path),
+              ProcessInfo.processInfo.systemUptime < deadline
+        {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
         XCTAssertFalse(model.scenesSaving.contains(video.path))
@@ -61,11 +69,12 @@ final class SceneSavePruningRegressionTests: XCTestCase {
     }
 
     func testManualPruneDefersDeletionUntilPendingSaveSucceeds() throws {
-        let oldFile = SceneStore.folderURL(forVideoPath: video.path).appendingPathComponent("old.png")
+        let oldFile = SceneStore.folderURL(forVideoPath: video.path)
+            .appendingPathComponent("old.png")
         let newFile = oldFile.deletingLastPathComponent().appendingPathComponent("new.png")
         try Data([1]).write(to: oldFile)
         try Data([2]).write(to: newFile)
-        var saved = document!
+        var saved = try XCTUnwrap(document)
         saved.layers.append(SceneLayer(name: "image", imageFile: oldFile.lastPathComponent))
         try SceneStore.save(saved, videoPath: video.path)
         model.registerImportedScene(saved, path: video.path)

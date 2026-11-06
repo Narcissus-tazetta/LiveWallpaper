@@ -77,10 +77,10 @@ extension WallpaperModel {
         }
         if let folder = webWallpaperSources[index].localFolderPath,
            LocalWebWallpaperPackage.owns(URL(fileURLWithPath: folder)),
-           FileManager.default.fileExists(atPath: folder) {
+           FileManager.default.fileExists(atPath: folder)
+        {
             localWebWallpaperServer.remove(folder: URL(fileURLWithPath: folder))
-            do { try FileManager.default.removeItem(atPath: folder) }
-            catch {
+            do { try FileManager.default.removeItem(atPath: folder) } catch {
                 webWallpaperErrorMessage = error.localizedDescription
                 return
             }
@@ -100,7 +100,10 @@ extension WallpaperModel {
                 wallpaperKind = .video
                 currentWebWallpaperID = nil
                 webWallpaperLoadState = .idle
-                UserDefaults.standard.set(WallpaperKind.video.rawValue, forKey: PrefsKey.wallpaperKind)
+                UserDefaults.standard.set(
+                    WallpaperKind.video.rawValue,
+                    forKey: PrefsKey.wallpaperKind
+                )
                 UserDefaults.standard.removeObject(forKey: PrefsKey.currentWebWallpaperID)
                 scheduleWindowRebuild(delay: 0.05)
                 if let currentPath = currentVideoPath,
@@ -141,18 +144,19 @@ extension WallpaperModel {
     }
 
     func configureLocalWebEnvironment(_ view: WebPlayerView) {
-        let fps: Double
-        switch frameRateLimit {
-        case .fps30: fps = 30
-        case .fps60: fps = 60
-        case .off: fps = Double(view.window?.screen?.maximumFramesPerSecond ?? 60)
+        let fps: Double = switch frameRateLimit {
+        case .fps30: 30
+        case .fps60: 60
+        case .off: Double(view.window?.screen?.maximumFramesPerSecond ?? 60)
         }
         view.setHostEnvironment(volume: audioVolume, fps: fps, language: appLocale.identifier)
         configureLocalWebProperties(view)
     }
 
     func refreshLocalWebEnvironment() {
-        for view in webPlayerViews { configureLocalWebEnvironment(view) }
+        for view in webPlayerViews {
+            configureLocalWebEnvironment(view)
+        }
     }
 
     func refreshWebWallpaperState() {
@@ -167,7 +171,9 @@ extension WallpaperModel {
             return
         }
         let sharedSource = isWebWallpaperActive ? activeWebWallpaperSource : nil
-        if let source = sharedSource, WebWallpaperURLResolver.requiresReloadForAudioChange(source.url) {
+        if let source = sharedSource,
+           WebWallpaperURLResolver.requiresReloadForAudioChange(source.url)
+        {
             loadWebDisplays(force: true)
             return
         }
@@ -215,9 +221,11 @@ extension WallpaperModel {
                 if let folder = source.localFolderPath {
                     let url = URL(fileURLWithPath: folder)
                     guard LocalWebWallpaperPackage.owns(url),
-                          let package = try? LocalWebWallpaperPackage.load(folder: url) else { return nil }
+                          let package = try? LocalWebWallpaperPackage.load(folder: url)
+                    else { return nil }
                     var restored = source
-                    restored.thumbnailPath = package.preview.map { url.appendingPathComponent($0).path }
+                    restored.thumbnailPath = package.preview
+                        .map { url.appendingPathComponent($0).path }
                     return restored
                 }
                 return (try? WebWallpaperURLResolver.validateURL(source.url)) != nil ? source : nil
@@ -269,9 +277,12 @@ extension WallpaperModel {
         stopWebWallpaper()
         webOverrideByScreenID.removeAll()
         persistWebOverrides()
-        let folders = webWallpaperSources.compactMap(\.localFolderPath).map { URL(fileURLWithPath: $0) }
+        let folders = webWallpaperSources.compactMap(\.localFolderPath)
+            .map { URL(fileURLWithPath: $0) }
             .filter { LocalWebWallpaperPackage.owns($0) }
-        for folder in folders { localWebWallpaperServer.remove(folder: folder) }
+        for folder in folders {
+            localWebWallpaperServer.remove(folder: folder)
+        }
         removeLeftovers(of: folders)
         webWallpaperSources.removeAll()
         pruneWebWallpaperIDsFromPlaylists()

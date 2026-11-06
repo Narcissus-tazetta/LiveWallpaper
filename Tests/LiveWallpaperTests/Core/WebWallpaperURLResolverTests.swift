@@ -1,14 +1,14 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class WebWallpaperURLResolverTests: XCTestCase {
-    func testYouTubeWatchURLResolvesToHTMLWrapper() {
-        let original = URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ")!
+    func testYouTubeWatchURLResolvesToHTMLWrapper() throws {
+        let original = try XCTUnwrap(URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
         let request = WebWallpaperURLResolver.resolve(originalURL: original, audioEnabled: false)
 
         XCTAssertEqual(request.layoutMode, .videoEmbed)
         XCTAssertEqual(request.canonicalKey, "youtube:dQw4w9WgXcQ")
-        guard case .html(let html, let baseURL) = request.loadContent else {
+        guard case let .html(html, baseURL) = request.loadContent else {
             XCTFail("Expected HTML wrapper for YouTube")
             return
         }
@@ -23,50 +23,51 @@ final class WebWallpaperURLResolverTests: XCTestCase {
         XCTAssertTrue(html.contains("pauseWallpaperPlayback"))
     }
 
-    func testSpoofedYouTubeHostFallsThroughToGenericURL() {
-        let spoofed = URL(string: "https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ")!
+    func testSpoofedYouTubeHostFallsThroughToGenericURL() throws {
+        let spoofed =
+            try XCTUnwrap(URL(string: "https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ"))
         let request = WebWallpaperURLResolver.resolve(originalURL: spoofed, audioEnabled: false)
 
         XCTAssertEqual(request.layoutMode, .generic)
         XCTAssertFalse(request.awaitsEmbedPlayerReady)
-        guard case .url(let playbackURL) = request.loadContent else {
+        guard case let .url(playbackURL) = request.loadContent else {
             XCTFail("Expected generic URL passthrough")
             return
         }
         XCTAssertEqual(playbackURL, spoofed)
     }
 
-    func testSpoofedVimeoHostFallsThroughToGenericURL() {
-        let spoofed = URL(string: "https://vimeo.com.evil.example/123456789")!
+    func testSpoofedVimeoHostFallsThroughToGenericURL() throws {
+        let spoofed = try XCTUnwrap(URL(string: "https://vimeo.com.evil.example/123456789"))
         let request = WebWallpaperURLResolver.resolve(originalURL: spoofed, audioEnabled: false)
 
         XCTAssertEqual(request.layoutMode, .generic)
-        guard case .url(let playbackURL) = request.loadContent else {
+        guard case let .url(playbackURL) = request.loadContent else {
             XCTFail("Expected generic URL passthrough")
             return
         }
         XCTAssertEqual(playbackURL, spoofed)
     }
 
-    func testYouTubeShortURLUsesMutedEmbedWhenAudioDisabled() {
-        let original = URL(string: "https://youtu.be/abc123XYZ_0")!
+    func testYouTubeShortURLUsesMutedEmbedWhenAudioDisabled() throws {
+        let original = try XCTUnwrap(URL(string: "https://youtu.be/abc123XYZ_0"))
         let request = WebWallpaperURLResolver.resolve(originalURL: original, audioEnabled: true)
 
         XCTAssertEqual(request.canonicalKey, "youtube:abc123XYZ_0")
-        guard case .html(let html, _) = request.loadContent else {
+        guard case let .html(html, _) = request.loadContent else {
             XCTFail("Expected HTML wrapper for YouTube")
             return
         }
         XCTAssertTrue(html.contains("mute: 0"))
     }
 
-    func testVimeoURLResolvesToBackgroundPlayer() {
-        let original = URL(string: "https://vimeo.com/123456789")!
+    func testVimeoURLResolvesToBackgroundPlayer() throws {
+        let original = try XCTUnwrap(URL(string: "https://vimeo.com/123456789"))
         let request = WebWallpaperURLResolver.resolve(originalURL: original, audioEnabled: false)
 
         XCTAssertEqual(request.layoutMode, .videoEmbed)
         XCTAssertEqual(request.canonicalKey, "vimeo:123456789")
-        guard case .url(let playbackURL) = request.loadContent else {
+        guard case let .url(playbackURL) = request.loadContent else {
             XCTFail("Expected direct URL for Vimeo")
             return
         }
@@ -75,12 +76,12 @@ final class WebWallpaperURLResolverTests: XCTestCase {
         XCTAssertTrue(playbackURL.query?.contains("texttrack=false") == true)
     }
 
-    func testGenericURLIsPassedThrough() {
-        let original = URL(string: "https://example.com/page")!
+    func testGenericURLIsPassedThrough() throws {
+        let original = try XCTUnwrap(URL(string: "https://example.com/page"))
         let request = WebWallpaperURLResolver.resolve(originalURL: original, audioEnabled: false)
 
         XCTAssertEqual(request.layoutMode, .generic)
-        guard case .url(let playbackURL) = request.loadContent else {
+        guard case let .url(playbackURL) = request.loadContent else {
             XCTFail("Expected direct URL")
             return
         }
@@ -107,19 +108,25 @@ final class WebWallpaperURLResolverTests: XCTestCase {
     }
 
     func testNormalizeURLStringRejectsUnsupportedScheme() {
-        XCTAssertThrowsError(try WebWallpaperURLResolver.normalizeURLString("ftp://example.com")) { error in
+        XCTAssertThrowsError(try WebWallpaperURLResolver
+            .normalizeURLString("ftp://example.com"))
+        { error in
             XCTAssertEqual(error as? WebWallpaperURLError, .unsupportedScheme)
         }
     }
 
     func testNormalizeURLStringRejectsMissingHost() {
-        XCTAssertThrowsError(try WebWallpaperURLResolver.normalizeURLString("https:///path")) { error in
+        XCTAssertThrowsError(try WebWallpaperURLResolver
+            .normalizeURLString("https:///path"))
+        { error in
             XCTAssertEqual(error as? WebWallpaperURLError, .invalidURL)
         }
     }
 
-    func testValidateURLAcceptsHTTPAndHTTPS() {
-        XCTAssertNoThrow(try WebWallpaperURLResolver.validateURL(URL(string: "http://example.com")!))
-        XCTAssertNoThrow(try WebWallpaperURLResolver.validateURL(URL(string: "https://example.com")!))
+    func testValidateURLAcceptsHTTPAndHTTPS() throws {
+        XCTAssertNoThrow(try WebWallpaperURLResolver
+            .validateURL(XCTUnwrap(URL(string: "http://example.com"))))
+        XCTAssertNoThrow(try WebWallpaperURLResolver
+            .validateURL(XCTUnwrap(URL(string: "https://example.com"))))
     }
 }

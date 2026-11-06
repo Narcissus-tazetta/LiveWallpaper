@@ -4,16 +4,30 @@ import Foundation
 extension WallpaperModel {
     func receiveSceneScriptLogs(_ logs: [UUID: String], path: String) {
         let now = ProcessInfo.processInfo.systemUptime
-        guard now - (sceneScriptLogTimes[path] ?? 0) >= 0.5, sceneScriptLogs[path] != logs else { return }
+        guard now - (sceneScriptLogTimes[path] ?? 0) >= 0.5,
+              sceneScriptLogs[path] != logs else { return }
         sceneScriptLogTimes[path] = now
         sceneScriptLogs[path] = logs
     }
-    func applySceneScript(_ proposed: SceneScript, path: String, input: SceneFrameInput, timeOfDay: SceneTimeOfDay) async throws {
-        guard let original = sceneDocumentsByPath[path], original.scripts.contains(where: { $0.id == proposed.id }) else { return }
+
+    func applySceneScript(
+        _ proposed: SceneScript,
+        path: String,
+        input: SceneFrameInput,
+        timeOfDay: SceneTimeOfDay
+    ) async throws {
+        guard let original = sceneDocumentsByPath[path],
+              original.scripts.contains(where: { $0.id == proposed.id }) else { return }
         guard SceneScript.supports(version: proposed.version) else {
-            throw SceneScriptIssue(scriptID: proposed.id, name: proposed.name, message: "Unsupported script API version: \(proposed.version)")
+            throw SceneScriptIssue(
+                scriptID: proposed.id,
+                name: proposed.name,
+                message: "Unsupported script API version: \(proposed.version)"
+            )
         }
-        if proposed.modules != nil, original.scripts.first(where: { $0.id == proposed.id }) == proposed {
+        if proposed.modules != nil,
+           original.scripts.first(where: { $0.id == proposed.id }) == proposed
+        {
             // Unchanged imported bundles use the same consent path as the import prompt;
             // running their initialization as editor validation can exhaust its frame budget.
             var document = original
@@ -22,13 +36,23 @@ extension WallpaperModel {
             document.scripts[index].executionRevision += 1
             SceneScriptPermissions.authorize(document.scripts[index], path: path)
             sceneScriptIssues[path] = []
-            updateScene(SceneScriptPermissions.restored(document, path: path), path: path, coalescing: false)
+            updateScene(
+                SceneScriptPermissions.restored(document, path: path),
+                path: path,
+                coalescing: false
+            )
             return
         }
         let targets = proposed.targetLayerIDs(in: original.layers)
-        guard !targets.isEmpty, targets.count <= 128, proposed.source.utf8.count <= 65536, !proposed.source.contains("\0"),
-              proposed.params.count <= 64, proposed.params.allSatisfy({ $0.key.utf8.count <= 128 && $0.value.isFinite })
-        else { throw SceneScriptIssue(scriptID: proposed.id, name: proposed.name, message: "Select targets and use source / parameters within the supported limits") }
+        guard !targets.isEmpty, targets.count <= 128, proposed.source.utf8.count <= 65536,
+              !proposed.source.contains("\0"),
+              proposed.params.count <= 64,
+              proposed.params.allSatisfy({ $0.key.utf8.count <= 128 && $0.value.isFinite })
+        else { throw SceneScriptIssue(
+            scriptID: proposed.id,
+            name: proposed.name,
+            message: "Select targets and use source / parameters within the supported limits"
+        ) }
         var candidate = proposed
         candidate.version = SceneScript.apiVersion
         candidate.executionRevision += 1
@@ -39,10 +63,17 @@ extension WallpaperModel {
         _ = try await Task.detached(priority: .userInitiated) {
             try SceneFrameEvaluator().evaluate(validation, input: input, timeOfDay: timeOfDay)
         }.value
-        guard var document = sceneDocumentsByPath[path], let index = document.scripts.firstIndex(where: { $0.id == candidate.id }) else { return }
+        guard var document = sceneDocumentsByPath[path],
+              let index = document.scripts.firstIndex(where: { $0.id == candidate.id })
+        else { return }
         // Validation suspends: do not replace a script somebody edited or undid meanwhile.
-        guard document.scripts[index] == original.scripts.first(where: { $0.id == candidate.id }) else {
-            throw SceneScriptIssue(scriptID: proposed.id, name: proposed.name, message: "Script changed during validation. Run it again.")
+        guard document.scripts[index] == original.scripts.first(where: { $0.id == candidate.id })
+        else {
+            throw SceneScriptIssue(
+                scriptID: proposed.id,
+                name: proposed.name,
+                message: "Script changed during validation. Run it again."
+            )
         }
         SceneScriptPermissions.authorize(candidate, path: path)
         sceneScriptIssues[path] = []
@@ -51,8 +82,12 @@ extension WallpaperModel {
     }
 
     func addSceneScript(_ sample: SceneScriptSample, path: String, layerID: UUID?) -> UUID? {
-        guard var document = sceneDocumentsByPath[path], document.scripts.count < SceneScript.maximumCount else { return nil }
-        var script = SceneScript(source: sample.source, layerIDs: layerID.map { [$0] } ?? document.layers.map(\.id))
+        guard var document = sceneDocumentsByPath[path],
+              document.scripts.count < SceneScript.maximumCount else { return nil }
+        var script = SceneScript(
+            source: sample.source,
+            layerIDs: layerID.map { [$0] } ?? document.layers.map(\.id)
+        )
         script.name = localizedString(sample.title)
         script.isEnabled = false
         script.usesTime = sample.usesTime
@@ -81,7 +116,8 @@ extension WallpaperModel {
     }
 
     func stopSceneScript(_ id: UUID, path: String) {
-        guard var document = sceneDocumentsByPath[path], let index = document.scripts.firstIndex(where: { $0.id == id }) else { return }
+        guard var document = sceneDocumentsByPath[path],
+              let index = document.scripts.firstIndex(where: { $0.id == id }) else { return }
         document.scripts[index].isEnabled = false
         updateScene(document, path: path, coalescing: false)
     }
@@ -102,7 +138,11 @@ extension WallpaperModel {
         guard sceneDocumentsByPath[path]?.hasUnapprovedScripts == true,
               !sceneScriptApprovalRequests.contains(where: { $0.id == id })
         else { return }
-        sceneScriptApprovalRequests.append(SceneScriptApprovalRequest(id: id, name: name, path: path))
+        sceneScriptApprovalRequests.append(SceneScriptApprovalRequest(
+            id: id,
+            name: name,
+            path: path
+        ))
     }
 
     /// Allowed scripts run whenever the scene shows, from now on and after relaunches,
@@ -111,7 +151,9 @@ extension WallpaperModel {
     func answerSceneScriptApproval(_ request: SceneScriptApprovalRequest, allow: Bool) {
         sceneScriptApprovalRequests.removeAll { $0 == request }
         guard allow else { return }
-        for path in [request.path, libraryPath(forExternalWallpaperID: request.id)].compactMap({ $0 }) {
+        for path in [request.path, libraryPath(forExternalWallpaperID: request.id)]
+            .compactMap({ $0 })
+        {
             guard let document = sceneDocumentsByPath[path] else { continue }
             SceneScriptPermissions.authorizeAll(document, path: path)
             sceneDocumentsByPath[path] = SceneScriptPermissions.restored(document, path: path)

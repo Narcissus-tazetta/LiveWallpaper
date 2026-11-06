@@ -42,7 +42,7 @@ final class CGSSpacesBridge: @unchecked Sendable {
             )
             connectionSymbol =
                 connectionSymbol ?? resolve("CGSMainConnectionID")
-                ?? resolve("_CGSDefaultConnection")
+                    ?? resolve("_CGSDefaultConnection")
             copySymbol = copySymbol ?? resolve("CGSCopyManagedDisplaySpaces")
         }
 

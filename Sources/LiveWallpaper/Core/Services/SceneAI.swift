@@ -26,9 +26,15 @@ enum SceneAI {
             case .unsupportedOS:
                 return NSLocalizedString("被写体の切り抜きは macOS 14 以降で使えます。", comment: "")
             case let .downloadFailed(message):
-                return String(format: NSLocalizedString("奥行きを推定するモデルをダウンロードできませんでした: %@", comment: ""), message)
+                return String(
+                    format: NSLocalizedString("奥行きを推定するモデルをダウンロードできませんでした: %@", comment: ""),
+                    message
+                )
             case let .modelCorrupted(name):
-                return String(format: NSLocalizedString("ダウンロードしたモデルが壊れています: %@", comment: ""), name)
+                return String(
+                    format: NSLocalizedString("ダウンロードしたモデルが壊れています: %@", comment: ""),
+                    name
+                )
             case .noDepthOutput:
                 return NSLocalizedString("奥行きを推定できませんでした。", comment: "")
             }
@@ -108,8 +114,10 @@ enum SceneAI {
         var mask = [UInt8](repeating: 0, count: width * height)
         mask.withUnsafeMutableBytes { buffer in
             let context = CGContext(
-                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
-                space: CGColorSpace(name: CGColorSpace.linearGray)!, bitmapInfo: CGImageAlphaInfo.none.rawValue
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: width,
+                space: CGColorSpace(name: CGColorSpace.linearGray)!,
+                bitmapInfo: CGImageAlphaInfo.none.rawValue
             )
             context?.interpolationQuality = .high
             context?.draw(maskImage, in: CGRect(x: 0, y: 0, width: width, height: height))
@@ -148,8 +156,14 @@ enum SceneAI {
     private static let modelName = "DepthAnythingV2SmallF16"
     private static let modelFiles: [(path: String, sha256: String?)] = [
         ("Manifest.json", "2883ae290c48fe916dc5ececac03a7d847fa277165a49ef5652fa1d2b9cb55f7"),
-        ("Data/com.apple.CoreML/model.mlmodel", "44ac97a3efcfd52113183fb2862ff59cd0368e9ec2e30a90a54980dd11407042"),
-        ("Data/com.apple.CoreML/weights/weight.bin", "fa60d9b6a155734f59029ebb882fd54e549bfaee3539c1a9cbd2cbbab64a0fed")
+        (
+            "Data/com.apple.CoreML/model.mlmodel",
+            "44ac97a3efcfd52113183fb2862ff59cd0368e9ec2e30a90a54980dd11407042"
+        ),
+        (
+            "Data/com.apple.CoreML/weights/weight.bin",
+            "fa60d9b6a155734f59029ebb882fd54e549bfaee3539c1a9cbd2cbbab64a0fed"
+        )
     ]
     /// Shown before downloading.
     static let modelDownloadMegabytes = 50
@@ -175,7 +189,10 @@ enum SceneAI {
         if FileManager.default.fileExists(atPath: compiledModelURL.path) {
             return
         }
-        let staging = modelsDirectory.appendingPathComponent("download-\(UUID().uuidString)", isDirectory: true)
+        let staging = modelsDirectory.appendingPathComponent(
+            "download-\(UUID().uuidString)",
+            isDirectory: true
+        )
         let package = staging.appendingPathComponent("\(modelName).mlpackage", isDirectory: true)
         defer {
             do {
@@ -183,7 +200,10 @@ enum SceneAI {
                     try FileManager.default.removeItem(at: staging)
                 }
             } catch {
-                AppLog.windowRefresh.error("model staging cleanup failed: \(error.localizedDescription, privacy: .public)")
+                AppLog.windowRefresh
+                    .error(
+                        "model staging cleanup failed: \(error.localizedDescription, privacy: .public)"
+                    )
             }
         }
         let base = "https://huggingface.co/apple/coreml-depth-anything-v2-small/resolve/\(modelRevision)/\(modelName).mlpackage/"
@@ -197,12 +217,18 @@ enum SceneAI {
             )
             let (downloaded, response) = try await URLSession.shared.download(from: url)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                throw AIError.downloadFailed("HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1) \(file.path)")
+                throw AIError
+                    .downloadFailed(
+                        "HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1) \(file.path)"
+                    )
             }
             try FileManager.default.moveItem(at: downloaded, to: destination)
             if let expected = file.sha256 {
-                let digest = try SHA256.hash(data: Data(contentsOf: destination, options: .mappedIfSafe))
-                    .map { String(format: "%02x", $0) }.joined()
+                let digest = try SHA256.hash(data: Data(
+                    contentsOf: destination,
+                    options: .mappedIfSafe
+                ))
+                .map { String(format: "%02x", $0) }.joined()
                 guard digest == expected else {
                     throw AIError.modelCorrupted(file.path)
                 }
@@ -210,7 +236,10 @@ enum SceneAI {
             progress(Double(index + 1) / Double(modelFiles.count + 1))
         }
         let compiled = try await MLModel.compileModel(at: package)
-        try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: modelsDirectory,
+            withIntermediateDirectories: true
+        )
         try FileManager.default.moveItem(at: compiled, to: compiledModelURL)
         progress(1)
     }
@@ -224,7 +253,10 @@ enum SceneAI {
         let image = try decode(imageURL, maxEdge: maxEdge)
         let configuration = MLModelConfiguration()
         configuration.computeUnits = .all
-        let model = try VNCoreMLModel(for: MLModel(contentsOf: compiledModelURL, configuration: configuration))
+        let model = try VNCoreMLModel(for: MLModel(
+            contentsOf: compiledModelURL,
+            configuration: configuration
+        ))
         let request = VNCoreMLRequest(model: model)
         request.imageCropAndScaleOption = .scaleFill
         try VNImageRequestHandler(cgImage: image).perform([request])
@@ -250,8 +282,10 @@ enum SceneAI {
         let outWidth = max(Int(Double(image.width) * scale), 8)
         let outHeight = max(Int(Double(image.height) * scale), 8)
         guard let context = CGContext(
-            data: nil, width: outWidth, height: outHeight, bitsPerComponent: 8, bytesPerRow: outWidth,
-            space: CGColorSpace(name: CGColorSpace.linearGray)!, bitmapInfo: CGImageAlphaInfo.none.rawValue
+            data: nil, width: outWidth, height: outHeight, bitsPerComponent: 8,
+            bytesPerRow: outWidth,
+            space: CGColorSpace(name: CGColorSpace.linearGray)!,
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
         ) else {
             throw AIError.noDepthOutput
         }
@@ -286,8 +320,10 @@ enum SceneAI {
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
         bytes.withUnsafeMutableBytes { buffer in
             let context = CGContext(
-                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: width * 4,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
             )
             context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         }
@@ -301,8 +337,10 @@ enum SceneAI {
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
         bytes.withUnsafeMutableBytes { buffer in
             let context = CGContext(
-                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
-                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: width * 4,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
             )
             context?.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         }
@@ -312,7 +350,10 @@ enum SceneAI {
                 continue
             }
             for channel in 0 ..< 3 {
-                bytes[index * 4 + channel] = UInt8(min((Int(bytes[index * 4 + channel]) * 255 + a / 2) / a, 255))
+                bytes[index * 4 + channel] = UInt8(min(
+                    (Int(bytes[index * 4 + channel]) * 255 + a / 2) / a,
+                    255
+                ))
             }
         }
         return bytes
@@ -328,17 +369,31 @@ enum SceneAI {
         guard let base = CVPixelBufferGetBaseAddress(buffer) else {
             return [Float](repeating: 0, count: width * height)
         }
-        let isHalf = CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_OneComponent16Half
+        let isHalf = CVPixelBufferGetPixelFormatType(buffer) ==
+            kCVPixelFormatType_OneComponent16Half
         var halfPlane: [Float] = []
         if isHalf {
-            // Swift Float16 is unavailable on Intel; vImage handles the same IEEE-754 pixels on both architectures.
+            // Swift Float16 is unavailable on Intel; vImage handles the same IEEE-754 pixels on
+            // both architectures.
             halfPlane = [Float](repeating: 0, count: sourceWidth * sourceHeight)
             halfPlane.withUnsafeMutableBytes { bytes in
-                var source = vImage_Buffer(data: base, height: vImagePixelCount(sourceHeight),
-                                           width: vImagePixelCount(sourceWidth), rowBytes: rowBytes)
-                var destination = vImage_Buffer(data: bytes.baseAddress!, height: vImagePixelCount(sourceHeight),
-                                                width: vImagePixelCount(sourceWidth), rowBytes: sourceWidth * MemoryLayout<Float>.stride)
-                let status = vImageConvert_Planar16FtoPlanarF(&source, &destination, vImage_Flags(kvImageDoNotTile))
+                var source = vImage_Buffer(
+                    data: base,
+                    height: vImagePixelCount(sourceHeight),
+                    width: vImagePixelCount(sourceWidth),
+                    rowBytes: rowBytes
+                )
+                var destination = vImage_Buffer(
+                    data: bytes.baseAddress!,
+                    height: vImagePixelCount(sourceHeight),
+                    width: vImagePixelCount(sourceWidth),
+                    rowBytes: sourceWidth * MemoryLayout<Float>.stride
+                )
+                let status = vImageConvert_Planar16FtoPlanarF(
+                    &source,
+                    &destination,
+                    vImage_Flags(kvImageDoNotTile)
+                )
                 precondition(status == kvImageNoError, "Float16 plane conversion failed: \(status)")
             }
         }
@@ -432,9 +487,12 @@ enum SceneAI {
                 let ty = min(max(fy - Float(y0), 0), 1)
                 let index = (y * width + x) * 4
                 for channel in 0 ..< 3 {
-                    let a = filled[(y0 * w + x0) * 3 + channel] * (1 - tx) + filled[(y0 * w + x1) * 3 + channel] * tx
-                    let b = filled[(y1 * w + x0) * 3 + channel] * (1 - tx) + filled[(y1 * w + x1) * 3 + channel] * tx
-                    pixels[index + channel] = UInt8(min(max(a * (1 - ty) + b * ty, 0), 255).rounded())
+                    let a = filled[(y0 * w + x0) * 3 + channel] * (1 - tx) +
+                        filled[(y0 * w + x1) * 3 + channel] * tx
+                    let b = filled[(y1 * w + x0) * 3 + channel] * (1 - tx) +
+                        filled[(y1 * w + x1) * 3 + channel] * tx
+                    pixels[index + channel] = UInt8(min(max(a * (1 - ty) + b * ty, 0), 255)
+                        .rounded())
                 }
                 pixels[index + 3] = 255
             }
@@ -442,7 +500,12 @@ enum SceneAI {
     }
 
     /// Returns averaged colours for every pixel; `color` is weighted by `weight`.
-    private static func pushPull(color: [Float], weight: [Float], width: Int, height: Int) -> [Float] {
+    private static func pushPull(
+        color: [Float],
+        weight: [Float],
+        width: Int,
+        height: Int
+    ) -> [Float] {
         if width <= 1, height <= 1 {
             let w = max(weight[0], 1e-6)
             return [color[0] / w, color[1] / w, color[2] / w]
@@ -461,7 +524,12 @@ enum SceneAI {
                 }
             }
         }
-        let coarse = pushPull(color: smallColor, weight: smallWeight, width: halfWidth, height: halfHeight)
+        let coarse = pushPull(
+            color: smallColor,
+            weight: smallWeight,
+            width: halfWidth,
+            height: halfHeight
+        )
         var out = [Float](repeating: 0, count: width * height * 3)
         for y in 0 ..< height {
             // Bilinear position in the coarser level; nearest would leave blocks.
@@ -491,11 +559,18 @@ enum SceneAI {
         return out
     }
 
-    private static func makeImage(_ bytes: [UInt8], width: Int, height: Int, alpha: CGImageAlphaInfo) throws -> CGImage {
+    private static func makeImage(
+        _ bytes: [UInt8],
+        width: Int,
+        height: Int,
+        alpha: CGImageAlphaInfo
+    ) throws -> CGImage {
         guard let provider = CGDataProvider(data: Data(bytes) as CFData),
               let image = CGImage(
-                  width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
-                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: alpha.rawValue),
+                  width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                  bytesPerRow: width * 4,
+                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                  bitmapInfo: CGBitmapInfo(rawValue: alpha.rawValue),
                   provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent
               )
         else {
@@ -507,7 +582,8 @@ enum SceneAI {
     private static func makeGray(_ bytes: [UInt8], width: Int, height: Int) throws -> CGImage {
         guard let provider = CGDataProvider(data: Data(bytes) as CFData),
               let image = CGImage(
-                  width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: width,
+                  width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 8,
+                  bytesPerRow: width,
                   space: CGColorSpace(name: CGColorSpace.linearGray)!,
                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
                   provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent

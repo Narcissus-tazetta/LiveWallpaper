@@ -25,8 +25,8 @@ extension WallpaperModel {
         autoCleanOrphansAndExpiredBackups()
     }
 
-    // Web壁紙の機能フラグ復元前はWebだけのキューが空に見えるため、
-    // 最後のsyncActivePlaylistPaths()を終えてから固定を復元する。
+    /// Web壁紙の機能フラグ復元前はWebだけのキューが空に見えるため、
+    /// 最後のsyncActivePlaylistPaths()を終えてから固定を復元する。
     private func restorePinCurrentVideo() {
         guard UserDefaults.standard.bool(forKey: PrefsKey.pinCurrentVideo) else {
             return
@@ -472,11 +472,12 @@ extension WallpaperModel {
                 }
             }
             do {
-                let borrowedAsset = try await service.sync(videoURL: videoURL, start: start) { fraction in
-                    Task { @MainActor in
-                        updateProgress(fraction)
+                let borrowedAsset = try await service
+                    .sync(videoURL: videoURL, start: start) { fraction in
+                        Task { @MainActor in
+                            updateProgress(fraction)
+                        }
                     }
-                }
                 await MainActor.run {
                     guard let self, !Task.isCancelled else {
                         return
@@ -508,7 +509,10 @@ extension WallpaperModel {
         let elapsed = Date().timeIntervalSince(startedAt)
         // The first moments include opening the file and starting the encoder.
         let remaining = fraction >= 0.01 && elapsed >= 3 ? elapsed / fraction * (1 - fraction) : nil
-        lockScreenEncodeProgress = LockScreenEncodeProgress(fraction: fraction, remainingSeconds: remaining)
+        lockScreenEncodeProgress = LockScreenEncodeProgress(
+            fraction: fraction,
+            remainingSeconds: remaining
+        )
     }
 
     func releaseLockScreenBorrowIfNeeded() {

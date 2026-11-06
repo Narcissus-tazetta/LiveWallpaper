@@ -9,7 +9,10 @@ struct ScenePresetStore {
 
     static var standard: ScenePresetStore? {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first.map {
-            ScenePresetStore(directory: $0.appendingPathComponent("LiveWallpaper/ScenePresets", isDirectory: true))
+            ScenePresetStore(directory: $0.appendingPathComponent(
+                "LiveWallpaper/ScenePresets",
+                isDirectory: true
+            ))
         }
     }
 
@@ -25,7 +28,8 @@ struct ScenePresetStore {
             return ([], 0)
         }
         let folders = try FileManager.default.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: [.creationDateKey], options: [.skipsHiddenFiles]
+            at: directory, includingPropertiesForKeys: [.creationDateKey],
+            options: [.skipsHiddenFiles]
         )
         var loaded: [(Date, ScenePreset)] = []
         var newerVersionCount = 0
@@ -37,7 +41,8 @@ struct ScenePresetStore {
             do {
                 let prepared = try StoredFormat.scenePreset.prepare(Data(contentsOf: url))
                 let preset = try JSONDecoder().decode(ScenePreset.self, from: prepared.data)
-                let created = try folder.resourceValues(forKeys: [.creationDateKey]).creationDate ?? .distantPast
+                let created = try folder.resourceValues(forKeys: [.creationDateKey])
+                    .creationDate ?? .distantPast
                 loaded.append((created, preset))
             } catch let error as StoredFormat.NewerVersionError {
                 newerVersionCount += 1
@@ -55,17 +60,22 @@ struct ScenePresetStore {
 
     /// Writes the preset, copying the painted files it names from `sceneFolder`.
     func save(_ preset: ScenePreset, filesFrom sceneFolder: URL) throws {
-        let staging = directory.appendingPathComponent(".\(preset.id.uuidString)-\(UUID().uuidString)", isDirectory: true)
+        let staging = directory.appendingPathComponent(
+            ".\(preset.id.uuidString)-\(UUID().uuidString)",
+            isDirectory: true
+        )
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
         do {
             for name in preset.referencedFiles {
                 try FileManager.default.copyItem(
-                    at: sceneFolder.appendingPathComponent(name), to: staging.appendingPathComponent(name)
+                    at: sceneFolder.appendingPathComponent(name),
+                    to: staging.appendingPathComponent(name)
                 )
             }
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            try StoredFormat.scenePreset.encode(preset, using: encoder).write(to: staging.appendingPathComponent(Self.documentFileName))
+            try StoredFormat.scenePreset.encode(preset, using: encoder)
+                .write(to: staging.appendingPathComponent(Self.documentFileName))
             let destination = folderURL(of: preset.id)
             if FileManager.default.fileExists(atPath: destination.path) {
                 _ = try FileManager.default.replaceItemAt(destination, withItemAt: staging)
@@ -98,13 +108,17 @@ struct ScenePresetStore {
         for name in preset.referencedFiles {
             let source = folderURL(of: preset.id).appendingPathComponent(name)
             guard FileManager.default.fileExists(atPath: source.path) else {
-                AppLog.persistence.error("scene preset file missing: \(source.path, privacy: .public)")
+                AppLog.persistence
+                    .error("scene preset file missing: \(source.path, privacy: .public)")
                 continue
             }
             let ext = (name as NSString).pathExtension
             let prefix = name.split(separator: "-").first.map(String.init) ?? "paint"
             let newName = "\(prefix)-\(UUID().uuidString).\(ext.isEmpty ? "png" : ext)"
-            try FileManager.default.copyItem(at: source, to: sceneFolder.appendingPathComponent(newName))
+            try FileManager.default.copyItem(
+                at: source,
+                to: sceneFolder.appendingPathComponent(newName)
+            )
             names[name] = newName
         }
         return names

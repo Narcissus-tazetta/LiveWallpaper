@@ -6,7 +6,8 @@ import XCTest
 final class SceneParticleSystemTests: XCTestCase {
     private let step = 1.0 / 30
 
-    private func system(_ change: (inout SceneParticleSystem) -> Void = { _ in }) -> SceneParticleSystem {
+    private func system(_ change: (inout SceneParticleSystem) -> Void = { _ in
+    }) -> SceneParticleSystem {
         var system = SceneParticleSystem()
         system.emitters = [.init(shape: .box)]
         system.initial.lifetime = .fixed(100)
@@ -33,7 +34,10 @@ final class SceneParticleSystemTests: XCTestCase {
                 $0.maxCount = 400
             }, seed: 3)
             simulator.apply(.init(events: [.emit(400)]))
-            return simulator.instances(aspect: 1).map { SIMD2(Double($0.center.x), Double($0.center.y)) }
+            return simulator.instances(aspect: 1).map { SIMD2(
+                Double($0.center.x),
+                Double($0.center.y)
+            ) }
         }
         for point in born(cone: 1, directions: [0.1, 0.1, 1]) {
             XCTAssertEqual(point.x, 70, accuracy: 1e-3)
@@ -48,11 +52,23 @@ final class SceneParticleSystemTests: XCTestCase {
     }
 
     func testAnEmittersAudioResponseScalesItsRateByTheLoudestBandInRange() {
-        func born(channel: SceneParticleSystem.AudioResponse.Channel, exponent: Double = 1, left: Float, right: Float) -> Int {
+        func born(
+            channel: SceneParticleSystem.AudioResponse.Channel,
+            exponent: Double = 1,
+            left: Float,
+            right: Float
+        ) -> Int {
             let simulator = SceneParticleSimulator(system: system {
                 $0.maxCount = 10000
                 $0.emitters[0].rate = 20
-                $0.emitters[0].audio = .init(channel: channel, firstBand: 0, lastBand: 15, low: 0, high: 1, exponent: exponent)
+                $0.emitters[0].audio = .init(
+                    channel: channel,
+                    firstBand: 0,
+                    lastBand: 15,
+                    low: 0,
+                    high: 1,
+                    exponent: exponent
+                )
             }, seed: 1)
             var bands = Array(repeating: Float(0), count: SceneAudioSpectrum.bandCount)
             bands[0] = left
@@ -60,7 +76,9 @@ final class SceneParticleSystemTests: XCTestCase {
             other[0] = right
             var surroundings = SceneParticleSimulator.Surroundings()
             surroundings.audio = SceneAudioSpectrum(left: bands, right: other)
-            for _ in 0 ..< 300 { simulator.advance(by: step, surroundings: surroundings) }
+            for _ in 0 ..< 300 {
+                simulator.advance(by: step, surroundings: surroundings)
+            }
             return simulator.instances(aspect: 1).count
         }
         XCTAssertEqual(born(channel: .left, left: 1, right: 0), 200, accuracy: 1)
@@ -78,7 +96,12 @@ final class SceneParticleSystemTests: XCTestCase {
             child.emitters[0].burst = 1
             let parent = system {
                 $0.emitters[0].burst = 1
-                $0.children = [.init(trigger: .birth, origin: [20, 0, 0], angleZ: angleZ, system: .init(child))]
+                $0.children = [.init(
+                    trigger: .birth,
+                    origin: [20, 0, 0],
+                    angleZ: angleZ,
+                    system: .init(child)
+                )]
             }
             let simulator = SceneParticleSimulator(system: parent, seed: 1)
             run(simulator, seconds: 1)
@@ -97,7 +120,10 @@ final class SceneParticleSystemTests: XCTestCase {
     func testMaintainDistanceKeepsTheResidualAndRecomputesTheShareOnTheNewLine() {
         let simulator = SceneParticleSimulator(system: system {
             $0.emitters = [.init(shape: .box)]
-            $0.controlPoints = [.init(index: 0, anchor: .layer, offset: [0, 0, 0]), .init(index: 1, anchor: .pointer, offset: [0, 0, 0])]
+            $0.controlPoints = [
+                .init(index: 0, anchor: .layer, offset: [0, 0, 0]),
+                .init(index: 1, anchor: .pointer, offset: [0, 0, 0])
+            ]
             $0.behaviors.append(.maintainDistance(first: 0, second: 1))
         }, seed: 1)
         // A particle at (50, 30) beside the line from (0,0) to (200,0).
@@ -118,7 +144,14 @@ final class SceneParticleSystemTests: XCTestCase {
     func testAnAudioEmitterIsSilentWithoutAudio() {
         let simulator = SceneParticleSimulator(system: system {
             $0.emitters[0].rate = 20
-            $0.emitters[0].audio = .init(channel: .both, firstBand: 0, lastBand: 15, low: 0, high: 1, exponent: 1)
+            $0.emitters[0].audio = .init(
+                channel: .both,
+                firstBand: 0,
+                lastBand: 15,
+                low: 0,
+                high: 1,
+                exponent: 1
+            )
         }, seed: 1)
         run(simulator, seconds: 5)
         XCTAssertEqual(simulator.instances(aspect: 1).count, 0)
@@ -134,7 +167,7 @@ final class SceneParticleSystemTests: XCTestCase {
         XCTAssertEqual(simulator.count, 2)
     }
 
-    func testStoppedEmittersKeepTheParticlesMovingAndAging() {
+    func testStoppedEmittersKeepTheParticlesMovingAndAging() throws {
         let simulator = SceneParticleSimulator(system: system {
             $0.emitters[0].rate = 30
             $0.initial.lifetime = .fixed(1)
@@ -143,12 +176,16 @@ final class SceneParticleSystemTests: XCTestCase {
         simulator.apply(.init(emitting: false))
         simulator.apply(.init(events: [.emit(1)]))
         run(simulator, seconds: 0.5)
-        XCTAssertEqual(simulator.instances(aspect: 1).first!.center.x, 10, accuracy: 0.5)
+        XCTAssertEqual(
+            try XCTUnwrap(simulator.instances(aspect: 1).first?.center.x),
+            10,
+            accuracy: 0.5
+        )
         run(simulator, seconds: 0.6)
         XCTAssertEqual(simulator.count, 0)
     }
 
-    func testDragAt30FramesASecondDecaysAtAbout0_82PerSecondPerDrag() {
+    func testDragAt30FramesASecondDecaysAtAbout0_82PerSecondPerDrag() throws {
         let simulator = SceneParticleSimulator(system: system {
             $0.initial.velocity = .init([50, 0, 0], [50, 0, 0])
             $0.behaviors = [.movement(gravity: [0, 0, 0], drag: 1)]
@@ -156,35 +193,56 @@ final class SceneParticleSystemTests: XCTestCase {
         simulator.apply(.init(events: [.emit(1)]))
         run(simulator, seconds: 2)
         let k = 0.82
-        XCTAssertEqual(Double(simulator.instances(aspect: 1).first!.center.x), 50 / k * (1 - exp(-k * 2)), accuracy: 2)
+        XCTAssertEqual(
+            try Double(XCTUnwrap(simulator.instances(aspect: 1).first?.center.x)),
+            50 / k * (1 - exp(-k * 2)),
+            accuracy: 2
+        )
     }
 
-    func testADragThatStopsAParticleInOneFrameLeavesOneFrameOfTravel() {
+    func testADragThatStopsAParticleInOneFrameLeavesOneFrameOfTravel() throws {
         let simulator = SceneParticleSimulator(system: system {
             $0.initial.velocity = .init([600, 0, 0], [600, 0, 0])
             $0.behaviors = [.movement(gravity: [0, 0, 0], drag: 80)]
         }, seed: 1)
         simulator.apply(.init(events: [.emit(1)]))
         run(simulator, seconds: 1)
-        XCTAssertEqual(simulator.instances(aspect: 1).first!.center.x, 20, accuracy: 0.01)
+        XCTAssertEqual(
+            try XCTUnwrap(simulator.instances(aspect: 1).first?.center.x),
+            20,
+            accuracy: 0.01
+        )
     }
 
-    func testSpritesAreDrawnAtHalfTheirSizeTimesTheSizeChange() {
+    func testSpritesAreDrawnAtHalfTheirSizeTimesTheSizeChange() throws {
         let simulator = SceneParticleSimulator(system: system {
             $0.initial.size = .fixed(30)
             $0.initial.lifetime = .fixed(2)
-            $0.behaviors.append(.sizeChange(.init(startTime: 0, endTime: 0.5, startValue: 1, endValue: 0)))
+            $0.behaviors.append(.sizeChange(.init(
+                startTime: 0,
+                endTime: 0.5,
+                startValue: 1,
+                endValue: 0
+            )))
         }, seed: 1)
         simulator.apply(.init(events: [.emit(1)]))
-        XCTAssertEqual(simulator.instances(aspect: 1).first!.right.x, 15, accuracy: 0.01)
+        XCTAssertEqual(
+            try XCTUnwrap(simulator.instances(aspect: 1).first?.right.x),
+            15,
+            accuracy: 0.01
+        )
         run(simulator, seconds: 0.4)
-        XCTAssertEqual(simulator.instances(aspect: 1).first!.right.x, 9, accuracy: 0.01)
+        XCTAssertEqual(
+            try XCTUnwrap(simulator.instances(aspect: 1).first?.right.x),
+            9,
+            accuracy: 0.01
+        )
         run(simulator, seconds: 0.7)
         XCTAssertTrue(simulator.instances(aspect: 1).isEmpty)
         XCTAssertEqual(simulator.count, 1)
     }
 
-    func testScriptedInstanceFactorsScaleEmissionCapAndSizeFromThenOn() {
+    func testScriptedInstanceFactorsScaleEmissionCapAndSizeFromThenOn() throws {
         let simulator = SceneParticleSimulator(system: system {
             $0.maxCount = 1000
             $0.emitters[0].rate = 30
@@ -195,30 +253,58 @@ final class SceneParticleSystemTests: XCTestCase {
         simulator.apply(.init(rateScale: 2, sizeScale: 2))
         run(simulator, seconds: 1)
         XCTAssertEqual(simulator.count, 90, accuracy: 2)
-        XCTAssertEqual(simulator.instances(aspect: 1).first!.right.x, 15, accuracy: 0.01)
-        XCTAssertEqual(simulator.instances(aspect: 1).last!.right.x, 30, accuracy: 0.01)
+        XCTAssertEqual(
+            try XCTUnwrap(simulator.instances(aspect: 1).first?.right.x),
+            15,
+            accuracy: 0.01
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(simulator.instances(aspect: 1).last?.right.x),
+            30,
+            accuracy: 0.01
+        )
         simulator.apply(.init(rateScale: 1, countScale: 0.05))
         run(simulator, seconds: 1)
         XCTAssertEqual(simulator.count, 90, accuracy: 0)
     }
 
     func testAlphaFadeHoldsTheHigherFadeWhereTheyOverlap() {
-        XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0.5, fadeOut: 0.5, at: 0.25), 0.5, accuracy: 1e-9)
-        XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0.5, fadeOut: 0.5, at: 0.75), 0.5, accuracy: 1e-9)
-        XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0, fadeOut: 0, at: 0.25), 0.75, accuracy: 1e-9)
+        XCTAssertEqual(
+            SceneParticleSimulator.fade(fadeIn: 0.5, fadeOut: 0.5, at: 0.25),
+            0.5,
+            accuracy: 1e-9
+        )
+        XCTAssertEqual(
+            SceneParticleSimulator.fade(fadeIn: 0.5, fadeOut: 0.5, at: 0.75),
+            0.5,
+            accuracy: 1e-9
+        )
+        XCTAssertEqual(
+            SceneParticleSimulator.fade(fadeIn: 0, fadeOut: 0, at: 0.25),
+            0.75,
+            accuracy: 1e-9
+        )
         // fadeIn 0.7, fadeOut 0.3: high in between, then the fade-out line.
-        XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0.7, fadeOut: 0.3, at: 0.31), 0.986, accuracy: 0.001)
-        XCTAssertEqual(SceneParticleSimulator.fade(fadeIn: 0.7, fadeOut: 0.3, at: 0.75), 0.357, accuracy: 0.001)
+        XCTAssertEqual(
+            SceneParticleSimulator.fade(fadeIn: 0.7, fadeOut: 0.3, at: 0.31),
+            0.986,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            SceneParticleSimulator.fade(fadeIn: 0.7, fadeOut: 0.3, at: 0.75),
+            0.357,
+            accuracy: 0.001
+        )
     }
 
-    func testTrailLengthFollowsTheSpeedWithinItsBounds() {
+    func testTrailLengthFollowsTheSpeedWithinItsBounds() throws {
         let simulator = SceneParticleSimulator(system: system {
             $0.initial.size = .fixed(20)
             $0.initial.velocity = .init([100, 0, 0], [100, 0, 0])
             $0.renderer = .trail(length: 0.02, minLength: 5, maxLength: 100)
         }, seed: 1)
         simulator.apply(.init(events: [.emit(1)]))
-        let sprite = simulator.instances(aspect: 1).first!
+        let sprite = try XCTUnwrap(simulator.instances(aspect: 1).first)
         XCTAssertEqual(sprite.up.x, 50, accuracy: 0.01)
         XCTAssertEqual(abs(sprite.right.y), 10, accuracy: 0.01)
     }
@@ -246,14 +332,24 @@ final class SceneParticleSystemTests: XCTestCase {
         XCTAssertEqual(sprites[0].center.x, sprites[1].center.x, accuracy: 0.01)
     }
 
-    func testVortexTurnsClockwiseAboutPlusZAtTheFittedRate() {
+    func testVortexTurnsClockwiseAboutPlusZAtTheFittedRate() throws {
         let simulator = SceneParticleSimulator(system: system {
-            $0.emitters = [.init(shape: .box, distanceMin: [40, 0, 0], distanceMax: [40, 0, 0], sign: [1, 0, 0])]
-            $0.behaviors.append(.vortex(.init(distanceInner: 0, distanceOuter: 100, speedInner: 100, speedOuter: 100)))
+            $0.emitters = [.init(
+                shape: .box,
+                distanceMin: [40, 0, 0],
+                distanceMax: [40, 0, 0],
+                sign: [1, 0, 0]
+            )]
+            $0.behaviors.append(.vortex(.init(
+                distanceInner: 0,
+                distanceOuter: 100,
+                speedInner: 100,
+                speedOuter: 100
+            )))
         }, seed: 1)
         simulator.apply(.init(events: [.emit(1)]))
         run(simulator, seconds: 0.5)
-        let sprite = simulator.instances(aspect: 1).first!
+        let sprite = try XCTUnwrap(simulator.instances(aspect: 1).first)
         // Tangential acceleration 0.83 * 100 from rest: about 0.5 * 83 * 0.5^2 down.
         XCTAssertEqual(Double(sprite.center.y), -0.5 * 83 * 0.25, accuracy: 1.5)
         XCTAssertGreaterThan(sprite.center.x, 38)
@@ -271,7 +367,11 @@ final class SceneParticleSystemTests: XCTestCase {
 
     func testOscillatingAlphaStaysWithinItsBounds() {
         let simulator = SceneParticleSimulator(system: system {
-            $0.behaviors.append(.oscillateAlpha(.init(frequency: .init(5, 5), amplitude: .init(0.2, 0.6), phase: .init(0, 6))))
+            $0.behaviors.append(.oscillateAlpha(.init(
+                frequency: .init(5, 5),
+                amplitude: .init(0.2, 0.6),
+                phase: .init(0, 6)
+            )))
         }, seed: 3)
         simulator.apply(.init(events: [.emit(20)]))
         for _ in 0 ..< 30 {
@@ -287,7 +387,11 @@ final class SceneParticleSystemTests: XCTestCase {
         let simulator = SceneParticleSimulator(system: system {
             $0.maxCount = 1000
             $0.emitters[0].rate = 100
-            $0.emitters[0].periodic = .init(duration: .init(1, 1), pause: .init(1, 1), maxPerBurst: 30)
+            $0.emitters[0].periodic = .init(
+                duration: .init(1, 1),
+                pause: .init(1, 1),
+                maxPerBurst: 30
+            )
         }, seed: 1)
         run(simulator, seconds: 1.5)
         XCTAssertEqual(simulator.count, 30)
@@ -304,7 +408,7 @@ final class SceneParticleSystemTests: XCTestCase {
         XCTAssertEqual(simulator.instances(aspect: 1).count, 3)
     }
 
-    func testANewLayerFillsTheScreenOnTheFirstFrameAndRises() {
+    func testANewLayerFillsTheScreenOnTheFirstFrameAndRises() throws {
         let simulator = SceneParticleSimulator(
             system: .risingLights(canvasWidth: 1920, canvasHeight: 1080, textureFile: nil), seed: 1
         )
@@ -313,11 +417,18 @@ final class SceneParticleSystemTests: XCTestCase {
         XCTAssertLessThanOrEqual(first.count, 400)
         // Up to 10 s of sideways drift (15 px/s) and sway (16 px) past the edges.
         XCTAssertTrue(first.allSatisfy { abs($0.center.x) <= 960 + 15 * 10 + 16 })
-        XCTAssertGreaterThan(first.map { Double($0.center.y) }.max()!, 0, "some have risen past the middle")
+        XCTAssertGreaterThan(
+            try XCTUnwrap(first.map { Double($0.center.y) }.max()),
+            0,
+            "some have risen past the middle"
+        )
         simulator.apply(.init(events: [.clear, .emit(1)], emitting: false))
-        let born = simulator.instances(aspect: 1).first!.center.y
+        let born = try XCTUnwrap(simulator.instances(aspect: 1).first?.center.y)
         run(simulator, seconds: 1)
         // The slowest rise is 4% of the height a second.
-        XCTAssertGreaterThan(Double(simulator.instances(aspect: 1).first!.center.y - born), 1080 * 0.04 - 1)
+        XCTAssertGreaterThan(
+            try Double(XCTUnwrap(simulator.instances(aspect: 1).first?.center.y) - born),
+            1080 * 0.04 - 1
+        )
     }
 }

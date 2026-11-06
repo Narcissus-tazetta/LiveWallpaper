@@ -43,16 +43,30 @@ final class SceneMotionAreaTests: XCTestCase {
     /// BGRA.
     private func frame(_ scene: SceneDocument, time: Double) throws -> [UInt8] {
         let renderer = try SceneRenderer(document: scene, videoPath: video.path)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 64, height: 64, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm,
+            width: 64,
+            height: 64,
+            mipmapped: false
+        )
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .shared
         let texture = try XCTUnwrap(renderer.device.makeTexture(descriptor: descriptor))
         let command = try XCTUnwrap(renderer.commandQueue.makeCommandBuffer())
-        try renderer.encode(into: texture, commandBuffer: command, input: SceneFrameInput(time: time))
+        try renderer.encode(
+            into: texture,
+            commandBuffer: command,
+            input: SceneFrameInput(time: time)
+        )
         command.commit()
         command.waitUntilCompleted()
         var pixels = [UInt8](repeating: 0, count: 64 * 64 * 4)
-        texture.getBytes(&pixels, bytesPerRow: 256, from: MTLRegionMake2D(0, 0, 64, 64), mipmapLevel: 0)
+        texture.getBytes(
+            &pixels,
+            bytesPerRow: 256,
+            from: MTLRegionMake2D(0, 0, 64, 64),
+            mipmapLevel: 0
+        )
         return pixels
     }
 
@@ -68,7 +82,8 @@ final class SceneMotionAreaTests: XCTestCase {
         var shake = SceneEffect(kind: .shake)
         shake.strength = 1
         shake.maskFile = try SceneStore.writePaintImage(
-            (0 ..< 64 * 64).map { $0 % 64 < 32 ? 0 : 255 }, width: 64, height: 64, target: .mask, videoPath: video.path
+            (0 ..< 64 * 64).map { $0 % 64 < 32 ? 0 : 255 }, width: 64, height: 64, target: .mask,
+            videoPath: video.path
         )
         // A quarter of the loop: the shake is at its furthest, moving the picture right.
         let pixels = try frame(scene(file, shake), time: 5)
@@ -89,7 +104,10 @@ final class SceneMotionAreaTests: XCTestCase {
         let still = try frame(scene(file, SceneEffect(kind: .pulse)), time: 0)
         let moved = try frame(scene(file, sway), time: 5)
         func rowDifference(_ y: Int) -> Int {
-            (0 ..< 64).map { x in abs(Int(still[(y * 64 + x) * 4 + 2]) - Int(moved[(y * 64 + x) * 4 + 2])) }.max()!
+            (0 ..< 64)
+                .map { x in
+                    abs(Int(still[(y * 64 + x) * 4 + 2]) - Int(moved[(y * 64 + x) * 4 + 2]))
+                }.max()!
         }
         XCTAssertLessThanOrEqual(rowDifference(0), 1, "the top stays")
         XCTAssertGreaterThan(rowDifference(63), 4, "the bottom moves")

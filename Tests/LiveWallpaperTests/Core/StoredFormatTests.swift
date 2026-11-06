@@ -6,7 +6,8 @@ final class StoredFormatTests: XCTestCase {
     private var directory: URL!
 
     override func setUpWithError() throws {
-        directory = FileManager.default.temporaryDirectory.appendingPathComponent("StoredFormat-\(UUID().uuidString)")
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("StoredFormat-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
@@ -17,122 +18,122 @@ final class StoredFormatTests: XCTestCase {
     /// scene.json exactly as format 1 wrote it. Never regenerate it: it stands for every
     /// scene already on users' disks, which each later version has to keep opening.
     private static let formatOneScene = #"""
-{
-  "backgroundColor" : [
-    0.1,
-    0.2,
-    0.3
-  ],
-  "canvasHeight" : 360,
-  "canvasWidth" : 640,
-  "formatVersion" : 1,
-  "highDynamicRange" : true,
-  "layers" : [
     {
-      "blendMode" : "normal",
-      "capturesCanvas" : false,
-      "depthAutoCycles" : 1,
-      "depthAutoMotion" : 0,
-      "depthFollowsCursor" : true,
-      "depthStrength" : 0.5,
-      "effects" : [
+      "backgroundColor" : [
+        0.1,
+        0.2,
+        0.3
+      ],
+      "canvasHeight" : 360,
+      "canvasWidth" : 640,
+      "formatVersion" : 1,
+      "highDynamicRange" : true,
+      "layers" : [
+        {
+          "blendMode" : "normal",
+          "capturesCanvas" : false,
+          "depthAutoCycles" : 1,
+          "depthAutoMotion" : 0,
+          "depthFollowsCursor" : true,
+          "depthStrength" : 0.5,
+          "effects" : [
+
+          ],
+          "id" : "74249F9B-8CA2-46DB-9C5A-69BEB9AD6485",
+          "imageFile" : "bg.png",
+          "isLocked" : false,
+          "isVisible" : true,
+          "keyframes" : [
+
+          ],
+          "kind" : "image",
+          "name" : "bg",
+          "opacity" : 0.8,
+          "parallaxDepth" : 0,
+          "tint" : {
+            "alpha" : 1,
+            "blue" : 1,
+            "green" : 1,
+            "red" : 1
+          },
+          "transform" : {
+            "offsetX" : 0,
+            "offsetY" : 0,
+            "rotation" : 0,
+            "scale" : 1
+          },
+          "usesMediaArtwork" : false
+        },
+        {
+          "blendMode" : "normal",
+          "capturesCanvas" : false,
+          "depthAutoCycles" : 1,
+          "depthAutoMotion" : 0,
+          "depthFollowsCursor" : true,
+          "depthStrength" : 0.5,
+          "effects" : [
+
+          ],
+          "id" : "1ACFA333-01FB-49E4-8BCD-B4C11599DC8E",
+          "imageFile" : "fg.png",
+          "isLocked" : false,
+          "isVisible" : true,
+          "keyframes" : [
+
+          ],
+          "kind" : "image",
+          "name" : "fg",
+          "opacity" : 1,
+          "parallaxDepth" : 0,
+          "tint" : {
+            "alpha" : 1,
+            "blue" : 1,
+            "green" : 1,
+            "red" : 1
+          },
+          "transform" : {
+            "offsetX" : 0,
+            "offsetY" : 0,
+            "rotation" : 0,
+            "scale" : 1
+          },
+          "usesMediaArtwork" : false
+        }
+      ],
+      "links" : [
 
       ],
-      "id" : "74249F9B-8CA2-46DB-9C5A-69BEB9AD6485",
-      "imageFile" : "bg.png",
-      "isLocked" : false,
-      "isVisible" : true,
-      "keyframes" : [
+      "loopSeconds" : 30,
+      "rigs" : [
 
       ],
-      "kind" : "image",
-      "name" : "bg",
-      "opacity" : 0.8,
-      "parallaxDepth" : 0,
-      "tint" : {
-        "alpha" : 1,
-        "blue" : 1,
-        "green" : 1,
-        "red" : 1
-      },
-      "transform" : {
-        "offsetX" : 0,
-        "offsetY" : 0,
-        "rotation" : 0,
-        "scale" : 1
-      },
-      "usesMediaArtwork" : false
-    },
-    {
-      "blendMode" : "normal",
-      "capturesCanvas" : false,
-      "depthAutoCycles" : 1,
-      "depthAutoMotion" : 0,
-      "depthFollowsCursor" : true,
-      "depthStrength" : 0.5,
-      "effects" : [
+      "runsInRealTime" : false,
+      "scripts" : [
 
       ],
-      "id" : "1ACFA333-01FB-49E4-8BCD-B4C11599DC8E",
-      "imageFile" : "fg.png",
-      "isLocked" : false,
-      "isVisible" : true,
-      "keyframes" : [
+      "sounds" : [
 
       ],
-      "kind" : "image",
-      "name" : "fg",
-      "opacity" : 1,
-      "parallaxDepth" : 0,
-      "tint" : {
-        "alpha" : 1,
-        "blue" : 1,
-        "green" : 1,
-        "red" : 1
-      },
-      "transform" : {
-        "offsetX" : 0,
-        "offsetY" : 0,
-        "rotation" : 0,
-        "scale" : 1
-      },
-      "usesMediaArtwork" : false
+      "timeBands" : [
+        {
+          "startMinute" : 360,
+          "timeOfDay" : "morning"
+        },
+        {
+          "startMinute" : 600,
+          "timeOfDay" : "day"
+        },
+        {
+          "startMinute" : 1020,
+          "timeOfDay" : "evening"
+        },
+        {
+          "startMinute" : 1140,
+          "timeOfDay" : "night"
+        }
+      ]
     }
-  ],
-  "links" : [
-
-  ],
-  "loopSeconds" : 30,
-  "rigs" : [
-
-  ],
-  "runsInRealTime" : false,
-  "scripts" : [
-
-  ],
-  "sounds" : [
-
-  ],
-  "timeBands" : [
-    {
-      "startMinute" : 360,
-      "timeOfDay" : "morning"
-    },
-    {
-      "startMinute" : 600,
-      "timeOfDay" : "day"
-    },
-    {
-      "startMinute" : 1020,
-      "timeOfDay" : "evening"
-    },
-    {
-      "startMinute" : 1140,
-      "timeOfDay" : "night"
-    }
-  ]
-}
-"""#
+    """#
 
     private func install(_ json: String, name: String = "a") throws -> (video: String, file: URL) {
         let video = directory.appendingPathComponent("\(name).mp4").path
@@ -149,7 +150,10 @@ final class StoredFormatTests: XCTestCase {
 
     func testASavedSceneCarriesTheCurrentVersion() throws {
         let video = directory.appendingPathComponent("saved.mp4").path
-        try SceneStore.save(SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: []), videoPath: video)
+        try SceneStore.save(
+            SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: []),
+            videoPath: video
+        )
         let file = SceneStore.folderURL(forVideoPath: video).appendingPathComponent("scene.json")
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes(file)) as? [String: Any])
         XCTAssertEqual(json["formatVersion"] as? Int, StoredFormat.scene.current)
@@ -169,7 +173,10 @@ final class StoredFormatTests: XCTestCase {
     }
 
     func testASceneWithoutANumberLoadsAsIsAndNoCopyIsKept() throws {
-        let unnumbered = Self.formatOneScene.replacingOccurrences(of: "  \"formatVersion\" : 1,\n", with: "")
+        let unnumbered = Self.formatOneScene.replacingOccurrences(
+            of: "  \"formatVersion\" : 1,\n",
+            with: ""
+        )
         XCTAssertFalse(unnumbered.contains("formatVersion"))
         let (video, file) = try install(unnumbered)
         let before = try bytes(file)
@@ -178,19 +185,24 @@ final class StoredFormatTests: XCTestCase {
 
         XCTAssertEqual(scene.canvasWidth, 640)
         XCTAssertEqual(try bytes(file), before)
-        let leftovers = try FileManager.default.contentsOfDirectory(atPath: file.deletingLastPathComponent().path)
+        let leftovers = try FileManager.default
+            .contentsOfDirectory(atPath: file.deletingLastPathComponent().path)
         XCTAssertEqual(leftovers, ["scene.json"])
     }
 
     func testANewerSceneIsRefusedAndLeftUntouched() throws {
         let newer = """
-        {"formatVersion": \(StoredFormat.scene.current + 1), "layers": [{"kind": "hologram"}], "somethingNew": {}}
+        {"formatVersion": \(StoredFormat.scene
+            .current + 1), "layers": [{"kind": "hologram"}], "somethingNew": {}}
         """
         let (video, file) = try install(newer)
         let before = try bytes(file)
 
         XCTAssertThrowsError(try SceneStore.load(videoPath: video)) { error in
-            XCTAssertEqual((error as? StoredFormat.NewerVersionError)?.found, StoredFormat.scene.current + 1)
+            XCTAssertEqual(
+                (error as? StoredFormat.NewerVersionError)?.found,
+                StoredFormat.scene.current + 1
+            )
         }
         XCTAssertEqual(try bytes(file), before)
     }
@@ -198,8 +210,15 @@ final class StoredFormatTests: XCTestCase {
     func testInstallingANewerSceneFromAPackageIsRefused() throws {
         let source = directory.appendingPathComponent("package")
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
-        let newer = Self.formatOneScene.replacingOccurrences(of: "\"formatVersion\" : 1", with: "\"formatVersion\" : 99")
-        try newer.write(to: source.appendingPathComponent("scene.json"), atomically: true, encoding: .utf8)
+        let newer = Self.formatOneScene.replacingOccurrences(
+            of: "\"formatVersion\" : 1",
+            with: "\"formatVersion\" : 99"
+        )
+        try newer.write(
+            to: source.appendingPathComponent("scene.json"),
+            atomically: true,
+            encoding: .utf8
+        )
         let video = directory.appendingPathComponent("imported.mp4").path
 
         XCTAssertThrowsError(try SceneStore.importScene(from: source, videoPath: video)) { error in
@@ -211,7 +230,10 @@ final class StoredFormatTests: XCTestCase {
     func testANegativeOrFractionalNumberIsNotAFormat() throws {
         for value in ["-1", "1.5", "\"1\""] {
             let (video, _) = try install(
-                Self.formatOneScene.replacingOccurrences(of: "\"formatVersion\" : 1", with: "\"formatVersion\" : \(value)"),
+                Self.formatOneScene.replacingOccurrences(
+                    of: "\"formatVersion\" : 1",
+                    with: "\"formatVersion\" : \(value)"
+                ),
                 name: "bad\(value.count)\(value.hashValue.magnitude)"
             )
             XCTAssertThrowsError(try SceneStore.load(videoPath: video), value)
@@ -250,7 +272,8 @@ final class StoredFormatTests: XCTestCase {
         XCTAssertEqual(log, ["1to2", "2to3"])
         XCTAssertEqual(fromOne.storedVersion, 1)
         XCTAssertTrue(fromOne.reshaped)
-        let migrated = try XCTUnwrap(JSONSerialization.jsonObject(with: fromOne.data) as? [String: Any])
+        let migrated = try XCTUnwrap(JSONSerialization
+            .jsonObject(with: fromOne.data) as? [String: Any])
         XCTAssertEqual(migrated["formatVersion"] as? Int, 3)
 
         log = []
@@ -264,7 +287,8 @@ final class StoredFormatTests: XCTestCase {
         let preset = ScenePreset(name: "mine", effects: [])
         try store.save(preset, filesFrom: directory)
         let savedFile = store.folderURL(of: preset.id).appendingPathComponent("preset.json")
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes(savedFile)) as? [String: Any])
+        let json = try XCTUnwrap(JSONSerialization
+            .jsonObject(with: bytes(savedFile)) as? [String: Any])
         XCTAssertEqual(json["formatVersion"] as? Int, StoredFormat.scenePreset.current)
 
         let newerFolder = store.folderURL(of: UUID())

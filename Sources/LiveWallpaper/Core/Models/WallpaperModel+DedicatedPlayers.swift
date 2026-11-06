@@ -152,11 +152,11 @@ extension WallpaperModel {
                 }
             }
             guard let self, let player,
-                  self.dedicatedSlotsByScreenID[screenID]?[path]?.looper === looper,
-                  self.activeDedicatedPathByScreenID[screenID] == path else { return }
+                  dedicatedSlotsByScreenID[screenID]?[path]?.looper === looper,
+                  activeDedicatedPathByScreenID[screenID] == path else { return }
             if let item = player.currentItem, item.status == .readyToPlay,
                resumeTime.isNumeric,
-               let seconds = self.clampedResumeSeconds(
+               let seconds = clampedResumeSeconds(
                    resumeTime.seconds,
                    path: path,
                    itemDurationSeconds: item.duration.seconds
@@ -168,9 +168,9 @@ extension WallpaperModel {
                     toleranceAfter: .zero
                 )
             }
-            guard self.dedicatedSlotsByScreenID[screenID]?[path]?.looper === looper,
-                  self.activeDedicatedPathByScreenID[screenID] == path,
-                  !self.suspendedDisplayIDs.contains(screenID) else { return }
+            guard dedicatedSlotsByScreenID[screenID]?[path]?.looper === looper,
+                  activeDedicatedPathByScreenID[screenID] == path,
+                  !suspendedDisplayIDs.contains(screenID) else { return }
             if rate > 0 { player.playImmediately(atRate: rate) }
         }
     }
@@ -279,15 +279,17 @@ extension WallpaperModel {
         }
     }
 
-    func allDedicatedSlotEntries() -> [(
-        screenID: String,
-        path: String,
-        slot: DedicatedPlayerSlot,
-        isActive: Bool
-    )] {
+    struct DedicatedSlotEntry {
+        let screenID: String
+        let path: String
+        let slot: DedicatedPlayerSlot
+        let isActive: Bool
+    }
+
+    func allDedicatedSlotEntries() -> [DedicatedSlotEntry] {
         dedicatedSlotsByScreenID.flatMap { screenID, slots in
             slots.map { path, slot in
-                (
+                DedicatedSlotEntry(
                     screenID: screenID,
                     path: path,
                     slot: slot,

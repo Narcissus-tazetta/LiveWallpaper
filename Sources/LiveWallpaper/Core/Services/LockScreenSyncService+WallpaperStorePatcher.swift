@@ -12,14 +12,22 @@ enum WallpaperStorePatcher {
 
     static func verifySelection(assetID: String, in store: [String: Any]) -> Bool {
         var verifiedStateCount = 0
-        if !verifyState(store["AllSpacesAndDisplays"], assetID: assetID, count: &verifiedStateCount) {
+        if !verifyState(
+            store["AllSpacesAndDisplays"],
+            assetID: assetID,
+            count: &verifiedStateCount
+        ) {
             return false
         }
         if !verifyState(store["SystemDefault"], assetID: assetID, count: &verifiedStateCount) {
             return false
         }
         if let displays = store["Displays"] as? [String: Any] {
-            for state in displays.values where !verifyState(state, assetID: assetID, count: &verifiedStateCount) {
+            for state in displays.values where !verifyState(
+                state,
+                assetID: assetID,
+                count: &verifiedStateCount
+            ) {
                 return false
             }
         }
@@ -44,7 +52,10 @@ enum WallpaperStorePatcher {
         return verifiedStateCount > 0
     }
 
-    private static func aerialChoice(assetID: String, template: [String: Any]?) throws -> [String: Any] {
+    private static func aerialChoice(
+        assetID: String,
+        template: [String: Any]?
+    ) throws -> [String: Any] {
         var choice = template ?? [
             "Provider": "com.apple.wallpaper.choice.aerials",
             "Files": [],
@@ -82,7 +93,10 @@ enum WallpaperStorePatcher {
         return nil
     }
 
-    private static func applyLinkedWallpaperChoice(_ choice: [String: Any], to store: inout [String: Any]) {
+    private static func applyLinkedWallpaperChoice(
+        _ choice: [String: Any],
+        to store: inout [String: Any]
+    ) {
         if var allSpacesAndDisplays = store["AllSpacesAndDisplays"] as? [String: Any] {
             patchState(&allSpacesAndDisplays, choice: choice)
             store["AllSpacesAndDisplays"] = allSpacesAndDisplays
@@ -136,7 +150,8 @@ enum WallpaperStorePatcher {
     /// choice survives a sync.
     private static func patchState(_ state: inout [String: Any], choice: [String: Any]) {
         if state["Idle"] != nil {
-            var desktop = state["Desktop"] as? [String: Any] ?? state["Linked"] as? [String: Any] ?? [:]
+            var desktop = state["Desktop"] as? [String: Any] ?? state["Linked"] as? [String: Any] ??
+                [:]
             patchSurface(&desktop, choice: choice)
             state["Type"] = "individual"
             state["Desktop"] = desktop
@@ -170,14 +185,14 @@ enum WallpaperStorePatcher {
         guard let state = value as? [String: Any] else {
             return true
         }
-        let surface: [String: Any]?
-        switch state["Type"] as? String {
+        let surface: [String: Any]? = switch state["Type"] as? String {
         case "linked":
-            surface = state["Idle"] == nil && state["Desktop"] == nil ? state["Linked"] as? [String: Any] : nil
+            state["Idle"] == nil && state["Desktop"] == nil ? state["Linked"] as? [String: Any] :
+                nil
         case "individual":
-            surface = state["Linked"] == nil ? state["Desktop"] as? [String: Any] : nil
+            state["Linked"] == nil ? state["Desktop"] as? [String: Any] : nil
         default:
-            surface = nil
+            nil
         }
         guard let surface, linkedChoiceAssetID(surface) == assetID else {
             return false
@@ -193,9 +208,9 @@ enum WallpaperStorePatcher {
               choice["Provider"] as? String == "com.apple.wallpaper.choice.aerials",
               let configuration = choice["Configuration"] as? Data,
               let configurationPlist = try? PropertyListSerialization.propertyList(
-                from: configuration,
-                options: [],
-                format: nil
+                  from: configuration,
+                  options: [],
+                  format: nil
               ) as? [String: Any]
         else {
             return nil

@@ -32,7 +32,9 @@ extension SettingsView {
     }
 
     var desktopReadabilityDimOpacityBinding: Binding<Double> {
-        modelBinding(model.desktopReadabilityDimOpacity) { model.setDesktopReadabilityDimOpacity($0) }
+        modelBinding(model.desktopReadabilityDimOpacity) {
+            model.setDesktopReadabilityDimOpacity($0)
+        }
     }
 
     var displayModeBinding: Binding<DisplayMode> {
@@ -98,7 +100,7 @@ extension SettingsView {
                     switch choice {
                     case .off:
                         model.setWallpaperTransitionDuration(0)
-                    case .style(let style):
+                    case let .style(style):
                         model.setWallpaperTransitionStyle(style)
                         if model.wallpaperTransitionDuration <= 0 {
                             model.setWallpaperTransitionDuration(0.5)

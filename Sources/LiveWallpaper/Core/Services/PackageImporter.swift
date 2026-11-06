@@ -3,8 +3,11 @@ import AVFoundation
 import CryptoKit
 import Foundation
 
-@MainActor
-final class PackageImporter {
+/// Only `importPackage` touches the model and is main-actor bound; everything else is file
+/// work that runs on a background queue. Unchecked because FileManager is not marked
+/// Sendable, though Apple documents it as safe to call from any thread; all stored
+/// properties are immutable.
+final class PackageImporter: @unchecked Sendable {
     enum DuplicateResolution {
         case abort
         case replace
@@ -34,7 +37,10 @@ final class PackageImporter {
             case .missingMetadata:
                 return NSLocalizedString("metadata.jsonが見つかりません", comment: "")
             case let .invalidMetadataJSON(details):
-                return String(format: NSLocalizedString("metadata.jsonが破損しています: %@", comment: ""), details)
+                return String(
+                    format: NSLocalizedString("metadata.jsonが破損しています: %@", comment: ""),
+                    details
+                )
             case .unsupportedPackageVersion:
                 return NSLocalizedString("サポートされていないパッケージバージョンです", comment: "")
             case let .duplicateVideo(name):
@@ -44,7 +50,10 @@ final class PackageImporter {
             case let .corruptedVideoFile(name):
                 return String(format: NSLocalizedString("ビデオファイルが破損しています: %@", comment: ""), name)
             case let .invalidChecksum(name):
-                return String(format: NSLocalizedString("ビデオファイルのチェックサムが一致しません: %@", comment: ""), name)
+                return String(
+                    format: NSLocalizedString("ビデオファイルのチェックサムが一致しません: %@", comment: ""),
+                    name
+                )
             case .extractionFailed:
                 return NSLocalizedString("パッケージの展開に失敗しました", comment: "")
             case let .unsafeFileReference(name):
@@ -73,8 +82,15 @@ final class PackageImporter {
             case let .insufficientDiskSpace(required, available):
                 let formatter = ByteCountFormatter()
                 formatter.countStyle = .file
-                let template = NSLocalizedString("空き容量が不足しているため、パッケージを展開できません(必要: %@、空き: %@)", comment: "")
-                return String(format: template, formatter.string(fromByteCount: required), formatter.string(fromByteCount: available))
+                let template = NSLocalizedString(
+                    "空き容量が不足しているため、パッケージを展開できません(必要: %@、空き: %@)",
+                    comment: ""
+                )
+                return String(
+                    format: template,
+                    formatter.string(fromByteCount: required),
+                    formatter.string(fromByteCount: available)
+                )
             case let .excessiveEntryCount(count, max):
                 let template = NSLocalizedString("パッケージ内のファイル数が多すぎます(%d / 上限%d)", comment: "")
                 return String(format: template, count, max)
@@ -94,7 +110,7 @@ final class PackageImporter {
         static let local = Limits(
             maximumPackageFileBytes: 16 * 1024 * 1024 * 1024,
             maximumExtractedBytes: 32 * 1024 * 1024 * 1024,
-            maximumEntryCount: 20_000,
+            maximumEntryCount: 20000,
             maximumMetadataBytes: 10 * 1024 * 1024
         )
 
@@ -102,7 +118,7 @@ final class PackageImporter {
         static let store = Limits(
             maximumPackageFileBytes: 500 * 1024 * 1024,
             maximumExtractedBytes: 2 * 1024 * 1024 * 1024,
-            maximumEntryCount: 1_000,
+            maximumEntryCount: 1000,
             maximumMetadataBytes: 10 * 1024 * 1024
         )
     }
@@ -114,12 +130,17 @@ final class PackageImporter {
     private let videosDirectory: URL?
     private let limits: Limits
 
-    init(fileManager: FileManager = .default, videosDirectory: URL? = nil, limits: Limits = .local) {
+    init(
+        fileManager: FileManager = .default,
+        videosDirectory: URL? = nil,
+        limits: Limits = .local
+    ) {
         self.fileManager = fileManager
         self.videosDirectory = videosDirectory
         self.limits = limits
     }
 
+    @MainActor
     func importPackage(
         from packageURL: URL,
         into model: WallpaperModel,
@@ -127,88 +148,15 @@ final class PackageImporter {
     ) async throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { BlockingWork.removeInBackground(tempDir) }
 
-        defer {
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-                try? FileManager.default.removeItem(at: tempDir)
-            }
+        // One import at a time: the duplicate checks and destination names assume nothing
+        // else is writing into the library folder meanwhile.
+        let staged = try await BlockingWork.run(on: Self.stagingQueue) { [self] in
+            try stageFiles(from: packageURL, in: tempDir, duplicateResolution: duplicateResolution)
         }
-
-        let inspection = try Self.inspectZipArchive(at: packageURL, limits: limits)
-        let availableBytes = StorageUsage.availableDiskSpace(for: tempDir)
-        guard inspection.totalUncompressedBytes + Self.extractionHeadroomBytes <= availableBytes else {
-            throw ImportError.insufficientDiskSpace(
-                requiredBytes: inspection.totalUncompressedBytes + Self.extractionHeadroomBytes, availableBytes: availableBytes
-            )
-        }
-        try extractPackage(from: packageURL, to: tempDir)
-        if let enumerator = fileManager.enumerator(
-            at: tempDir,
-            includingPropertiesForKeys: [.isSymbolicLinkKey],
-            options: []
-        ) {
-            while let fileURL = enumerator.nextObject() as? URL {
-                let values = try fileURL.resourceValues(forKeys: [.isSymbolicLinkKey])
-                if values.isSymbolicLink == true {
-                    throw ImportError.unsafeFileReference(fileURL.lastPathComponent)
-                }
-            }
-        }
-        let extractedSize = StorageUsage.directoryAllocatedSize(at: tempDir)
-        guard extractedSize <= limits.maximumExtractedBytes else {
-            throw ImportError.extractedSizeTooLarge(extractedSize, max: limits.maximumExtractedBytes)
-        }
-        let (manifest, packageRootDir) = try loadManifest(from: tempDir)
-        try validateManifest(manifest)
-        try preflightVideos(
-            manifest.videos, from: packageRootDir, duplicateResolution: duplicateResolution
-        )
-
-        var importedVideoPaths: [String: String] = [:]
-        let existingFilesBeforeImport = Set(
-            (try? fileManager.contentsOfDirectory(
-                at: appSupportVideosDir(), includingPropertiesForKeys: nil
-            ))?.map(\.path) ?? []
-        )
-        let rollbackDirectory = tempDir.appendingPathComponent("rollback", isDirectory: true)
-        try fileManager.createDirectory(at: rollbackDirectory, withIntermediateDirectories: true)
-        var replacementBackups: [String: URL] = [:]
-
-        do {
-            for video in manifest.videos {
-                if case .replace = duplicateResolution,
-                   let existingPath = try findExistingVideoPath(for: video),
-                   replacementBackups[existingPath] == nil
-                {
-                    let backupURL = rollbackDirectory.appendingPathComponent(UUID().uuidString)
-                    try fileManager.copyItem(atPath: existingPath, toPath: backupURL.path)
-                    replacementBackups[existingPath] = backupURL
-                }
-                if let videoPath = try importVideo(
-                    video,
-                    from: packageRootDir,
-                    duplicateResolution: duplicateResolution
-                ) {
-                    importedVideoPaths[video.id] = videoPath
-                }
-            }
-        } catch {
-            for path in importedVideoPaths.values where !existingFilesBeforeImport.contains(path) {
-                try? fileManager.removeItem(atPath: path)
-            }
-            for (path, backupURL) in replacementBackups {
-                let targetURL = URL(fileURLWithPath: path)
-                let stagedURL = targetURL.deletingLastPathComponent()
-                    .appendingPathComponent(".\(UUID().uuidString).rollback")
-                do {
-                    try fileManager.copyItem(at: backupURL, to: stagedURL)
-                    _ = try fileManager.replaceItemAt(targetURL, withItemAt: stagedURL)
-                } catch {
-                    try? fileManager.removeItem(at: stagedURL)
-                }
-            }
-            throw error
-        }
+        let manifest = staged.manifest
+        let importedVideoPaths = staged.importedVideoPaths
 
         // 全ファイルが正常に配置できた後にだけモデルを更新する。
         // 後半のビデオで失敗した際に、ライブラリが半分だけ増えない。
@@ -270,7 +218,15 @@ final class PackageImporter {
             }
         }
 
-        importScenes(of: manifest, importedVideoPaths: importedVideoPaths, packageRoot: packageRootDir, into: model)
+        // Stays on the main actor: a replaced video's scene folder is also written by the
+        // model's debounced scene saves, which run here too.
+        for scene in Self.importSceneFiles(
+            of: manifest,
+            importedVideoPaths: importedVideoPaths,
+            packageRoot: staged.packageRoot
+        ) {
+            model.registerImportedScene(scene.document, path: scene.videoPath, asksAgain: true)
+        }
 
         var importedPlaylistIDs: [UUID] = []
         for playlist in manifest.playlists {
@@ -302,14 +258,143 @@ final class PackageImporter {
         }
     }
 
+    private static let stagingQueue = DispatchQueue(
+        label: "LiveWallpaper.packageImport",
+        qos: .userInitiated
+    )
+
+    private struct StagedImport {
+        let manifest: PackageManifest
+        let packageRoot: URL
+        /// Package video id → library path the video now lives at.
+        let importedVideoPaths: [String: String]
+    }
+
+    /// Unpacks, validates and copies the videos into the library. Only touches files, so it
+    /// runs off the main actor; the model is updated afterwards from the result.
+    private func stageFiles(
+        from packageURL: URL,
+        in tempDir: URL,
+        duplicateResolution: DuplicateResolution
+    ) throws -> StagedImport {
+        let inspection = try Self.inspectZipArchive(at: packageURL, limits: limits)
+        let availableBytes = StorageUsage.availableDiskSpace(for: tempDir)
+        guard inspection.totalUncompressedBytes + Self.extractionHeadroomBytes <= availableBytes
+        else {
+            throw ImportError.insufficientDiskSpace(
+                requiredBytes: inspection.totalUncompressedBytes + Self.extractionHeadroomBytes,
+                availableBytes: availableBytes
+            )
+        }
+        try Self.extractPackage(from: packageURL, to: tempDir)
+        if let enumerator = fileManager.enumerator(
+            at: tempDir,
+            includingPropertiesForKeys: [.isSymbolicLinkKey],
+            options: []
+        ) {
+            while let fileURL = enumerator.nextObject() as? URL {
+                let values = try fileURL.resourceValues(forKeys: [.isSymbolicLinkKey])
+                if values.isSymbolicLink == true {
+                    throw ImportError.unsafeFileReference(fileURL.lastPathComponent)
+                }
+            }
+        }
+        let extractedSize = StorageUsage.directoryAllocatedSize(at: tempDir)
+        guard extractedSize <= limits.maximumExtractedBytes else {
+            throw ImportError.extractedSizeTooLarge(
+                extractedSize,
+                max: limits.maximumExtractedBytes
+            )
+        }
+        let (manifest, packageRootDir) = try loadManifest(from: tempDir)
+        try validateManifest(manifest)
+        // Hashing every library video is the slow part of a duplicate check; each file is
+        // hashed at most once per import.
+        var libraryDigests: [String: String] = [:]
+        try preflightVideos(
+            manifest.videos, from: packageRootDir, duplicateResolution: duplicateResolution,
+            libraryDigests: &libraryDigests
+        )
+
+        var importedVideoPaths: [String: String] = [:]
+        // Must not fall back to an empty set: rollback deletes every imported path not in it,
+        // and a package that points at an already-present video imports that path.
+        // Spelled like the paths importVideo returns (see findExistingVideoPath).
+        let videosDirectory = try appSupportVideosDir()
+        let existingFilesBeforeImport = try Set(
+            fileManager.contentsOfDirectory(at: videosDirectory, includingPropertiesForKeys: nil)
+                .map { videosDirectory.appendingPathComponent($0.lastPathComponent).path }
+        )
+        let rollbackDirectory = tempDir.appendingPathComponent("rollback", isDirectory: true)
+        try fileManager.createDirectory(at: rollbackDirectory, withIntermediateDirectories: true)
+        var replacementBackups: [String: URL] = [:]
+
+        do {
+            for video in manifest.videos {
+                if case .replace = duplicateResolution,
+                   let existingPath = try findExistingVideoPath(
+                       for: video,
+                       libraryDigests: &libraryDigests
+                   ),
+                   replacementBackups[existingPath] == nil
+                {
+                    let backupURL = rollbackDirectory.appendingPathComponent(UUID().uuidString)
+                    try fileManager.copyItem(atPath: existingPath, toPath: backupURL.path)
+                    replacementBackups[existingPath] = backupURL
+                }
+                if let videoPath = try importVideo(
+                    video,
+                    from: packageRootDir,
+                    duplicateResolution: duplicateResolution,
+                    libraryDigests: &libraryDigests
+                ) {
+                    importedVideoPaths[video.id] = videoPath
+                }
+            }
+        } catch {
+            for path in importedVideoPaths.values where !existingFilesBeforeImport.contains(path) {
+                do {
+                    try fileManager.removeItem(atPath: path)
+                } catch {
+                    AppLog.persistence.error(
+                        "import rollback could not remove \(path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                    )
+                }
+            }
+            for (path, backupURL) in replacementBackups {
+                let targetURL = URL(fileURLWithPath: path)
+                let stagedURL = targetURL.deletingLastPathComponent()
+                    .appendingPathComponent(".\(UUID().uuidString).rollback")
+                do {
+                    try fileManager.copyItem(at: backupURL, to: stagedURL)
+                    _ = try fileManager.replaceItemAt(targetURL, withItemAt: stagedURL)
+                } catch {
+                    AppLog.persistence.error(
+                        "import rollback could not restore \(path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                    )
+                    try? fileManager.removeItem(at: stagedURL)
+                }
+            }
+            throw error
+        }
+        return StagedImport(
+            manifest: manifest, packageRoot: packageRootDir, importedVideoPaths: importedVideoPaths
+        )
+    }
+
+    private struct ImportedScene {
+        let document: SceneDocument
+        let videoPath: String
+    }
+
     /// A broken scene leaves the baked video as a plain wallpaper rather than failing
     /// the import. video.id was checked by validatedVideoURL.
-    private func importScenes(
+    private static func importSceneFiles(
         of manifest: PackageManifest,
         importedVideoPaths: [String: String],
-        packageRoot: URL,
-        into model: WallpaperModel
-    ) {
+        packageRoot: URL
+    ) -> [ImportedScene] {
+        var scenes: [ImportedScene] = []
         for video in manifest.videos where video.scene == true || video.scriptScene != nil {
             guard let videoPath = importedVideoPaths[video.id] else {
                 continue
@@ -318,13 +403,14 @@ final class PackageImporter {
                 .appendingPathComponent(video.id, isDirectory: true)
             do {
                 let document = try SceneStore.importScene(from: source, videoPath: videoPath)
-                model.registerImportedScene(document, path: videoPath, asksAgain: true)
+                scenes.append(ImportedScene(document: document, videoPath: videoPath))
             } catch {
                 AppLog.persistence.error(
                     "skipped scene of imported video id=\(video.id, privacy: .public): \(error.localizedDescription, privacy: .public)"
                 )
             }
         }
+        return scenes
     }
 
     struct ZipArchiveInspection {
@@ -333,9 +419,11 @@ final class PackageImporter {
     }
 
     @discardableResult
-    static func inspectZipArchive(at fileURL: URL, limits: Limits = .local) throws -> ZipArchiveInspection {
-        let attrs = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-        let archiveSize = (attrs[.size] as? Int64) ?? 0
+    static func inspectZipArchive(
+        at fileURL: URL,
+        limits: Limits = .local
+    ) throws -> ZipArchiveInspection {
+        let archiveSize = try Int64(fileURL.regularFileSize())
         guard archiveSize <= limits.maximumPackageFileBytes else {
             throw ImportError.packageTooLarge(archiveSize, max: limits.maximumPackageFileBytes)
         }
@@ -356,7 +444,9 @@ final class PackageImporter {
         let sig: [UInt8] = [0x50, 0x4B, 0x05, 0x06]
         if tailData.count >= 22 {
             for i in stride(from: tailData.count - 22, through: 0, by: -1) {
-                if tailData[i] == sig[0] && tailData[i + 1] == sig[1] && tailData[i + 2] == sig[2] && tailData[i + 3] == sig[3] {
+                if tailData[i] == sig[0], tailData[i + 1] == sig[1], tailData[i + 2] == sig[2],
+                   tailData[i + 3] == sig[3]
+                {
                     eocdOffsetInTail = i
                     break
                 }
@@ -366,7 +456,7 @@ final class PackageImporter {
             throw ImportError.invalidPackageFormat
         }
 
-        let eocd = tailData.subdata(in: eocdOffsetInTail..<tailData.count)
+        let eocd = tailData.subdata(in: eocdOffsetInTail ..< tailData.count)
         guard eocd.count >= 22 else { throw ImportError.invalidPackageFormat }
 
         let totalEntries = Int(readUInt16(from: eocd, at: 10))
@@ -381,17 +471,19 @@ final class PackageImporter {
         }
 
         try fileHandle.seek(toOffset: cdOffset)
-        guard let cdData = try fileHandle.read(upToCount: Int(cdSize)), cdData.count == Int(cdSize) else {
+        guard let cdData = try fileHandle.read(upToCount: Int(cdSize)),
+              cdData.count == Int(cdSize)
+        else {
             throw ImportError.invalidPackageFormat
         }
 
         var offset = 0
         var totalUncompressed: Int64 = 0
 
-        for _ in 0..<totalEntries {
+        for _ in 0 ..< totalEntries {
             guard offset + 46 <= cdData.count else { throw ImportError.invalidPackageFormat }
             let headerSig = readUInt32(from: cdData, at: offset)
-            guard headerSig == 0x02014B50 else { throw ImportError.invalidPackageFormat }
+            guard headerSig == 0x0201_4B50 else { throw ImportError.invalidPackageFormat }
 
             let uncompressedSize = UInt64(readUInt32(from: cdData, at: offset + 24))
             let filenameLen = Int(readUInt16(from: cdData, at: offset + 28))
@@ -405,19 +497,27 @@ final class PackageImporter {
             }
 
             let nameStart = offset + 46
-            guard nameStart + filenameLen <= cdData.count else { throw ImportError.invalidPackageFormat }
-            let nameData = cdData.subdata(in: (cdData.startIndex + nameStart)..<(cdData.startIndex + nameStart + filenameLen))
+            guard nameStart + filenameLen <= cdData.count
+            else { throw ImportError.invalidPackageFormat }
+            let nameData = cdData
+                .subdata(in: (cdData.startIndex + nameStart) ..<
+                    (cdData.startIndex + nameStart + filenameLen))
             guard let name = String(data: nameData, encoding: .utf8) else {
                 throw ImportError.invalidPackageFormat
             }
 
-            if name.split(separator: "/").contains("..") || name.hasPrefix("/") || name.contains("\\") || name.contains("\0") {
+            if name.split(separator: "/").contains("..") || name.hasPrefix("/") || name
+                .contains("\\") || name.contains("\0")
+            {
                 throw ImportError.unsafeFileReference(name)
             }
 
             totalUncompressed += Int64(uncompressedSize)
             guard totalUncompressed <= limits.maximumExtractedBytes else {
-                throw ImportError.extractedSizeTooLarge(totalUncompressed, max: limits.maximumExtractedBytes)
+                throw ImportError.extractedSizeTooLarge(
+                    totalUncompressed,
+                    max: limits.maximumExtractedBytes
+                )
             }
 
             offset = nameStart + filenameLen + extraLen + commentLen
@@ -427,7 +527,10 @@ final class PackageImporter {
             throw ImportError.invalidPackageFormat
         }
 
-        return ZipArchiveInspection(totalEntries: totalEntries, totalUncompressedBytes: totalUncompressed)
+        return ZipArchiveInspection(
+            totalEntries: totalEntries,
+            totalUncompressedBytes: totalUncompressed
+        )
     }
 
     private static func readUInt16(from data: Data, at offset: Int) -> UInt16 {
@@ -446,18 +549,15 @@ final class PackageImporter {
         return b0 | b1 | b2 | b3
     }
 
-    private func extractPackage(from packageURL: URL, to targetDir: URL) throws {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        task.arguments = ["-q", packageURL.path, "-d", targetDir.path]
-
-        let errorPipe = Pipe()
-        task.standardError = errorPipe
-
-        try task.run()
-        task.waitUntilExit()
-
-        guard task.terminationStatus == 0 else {
+    private static func extractPackage(from packageURL: URL, to targetDir: URL) throws {
+        do {
+            try ProcessRunner.runSynchronously(
+                "/usr/bin/unzip", arguments: ["-q", packageURL.path, "-d", targetDir.path]
+            )
+        } catch let failure as ProcessRunner.Failure {
+            AppLog.persistence.error(
+                "package extraction failed: \(failure.localizedDescription, privacy: .public)"
+            )
             throw ImportError.extractionFailed
         }
     }
@@ -479,8 +579,7 @@ final class PackageImporter {
             throw ImportError.missingMetadata
         }
 
-        let metadataAttrs = try fileManager.attributesOfItem(atPath: metadataURL.path)
-        let metadataSize = (metadataAttrs[.size] as? Int64) ?? 0
+        let metadataSize = try Int64(metadataURL.regularFileSize())
         guard metadataSize <= limits.maximumMetadataBytes else {
             throw ImportError.metadataTooLarge(metadataSize, max: limits.maximumMetadataBytes)
         }
@@ -584,7 +683,8 @@ final class PackageImporter {
     private func preflightVideos(
         _ videos: [PackageManifest.PackageVideo],
         from packageRoot: URL,
-        duplicateResolution: DuplicateResolution
+        duplicateResolution: DuplicateResolution,
+        libraryDigests: inout [String: String]
     ) throws {
         var ids = Set<String>()
         for video in videos {
@@ -593,7 +693,8 @@ final class PackageImporter {
             }
             let videosDir = packageRoot.appendingPathComponent("videos", isDirectory: true)
             if !fileManager.fileExists(atPath: videosDir.path) {
-                guard try findExistingVideoPath(for: video) != nil else {
+                guard try findExistingVideoPath(for: video, libraryDigests: &libraryDigests) != nil
+                else {
                     throw ImportError.videoNotFound(video.source.fileName)
                 }
                 continue
@@ -605,13 +706,12 @@ final class PackageImporter {
                 throw ImportError.corruptedVideoFile(video.source.fileName)
             }
             if let expected = video.sha256,
-               try computeSHA256(for: videoURL.path)
-               .caseInsensitiveCompare(expected) != .orderedSame
+               try !Self.digestsMatch(computeSHA256(for: videoURL.path), expected)
             {
                 throw ImportError.invalidChecksum(video.source.fileName)
             }
             if case .abort = duplicateResolution,
-               try findExistingVideoPath(for: video) != nil
+               try findExistingVideoPath(for: video, libraryDigests: &libraryDigests) != nil
             {
                 throw ImportError.duplicateVideo(video.source.fileName)
             }
@@ -621,7 +721,8 @@ final class PackageImporter {
     private func importVideo(
         _ video: PackageManifest.PackageVideo,
         from tempDir: URL,
-        duplicateResolution: DuplicateResolution
+        duplicateResolution: DuplicateResolution,
+        libraryDigests: inout [String: String]
     ) throws -> String? {
         let sourceFileName = video.source.fileName
         guard Self.isSafePathComponent(video.id), Self.isSafePathComponent(sourceFileName) else {
@@ -630,7 +731,10 @@ final class PackageImporter {
         let videosDir = tempDir.appendingPathComponent("videos")
 
         if !fileManager.fileExists(atPath: videosDir.path) {
-            if let matchedPath = try findExistingVideoPath(for: video) {
+            if let matchedPath = try findExistingVideoPath(
+                for: video,
+                libraryDigests: &libraryDigests
+            ) {
                 return matchedPath
             }
             throw ImportError.videoNotFound(sourceFileName)
@@ -648,12 +752,15 @@ final class PackageImporter {
 
         if let expectedSHA256 = video.sha256 {
             let actualSHA256 = try computeSHA256(for: videoFile.path)
-            guard actualSHA256 == expectedSHA256 else {
+            guard Self.digestsMatch(actualSHA256, expectedSHA256) else {
                 throw ImportError.invalidChecksum(sourceFileName)
             }
         }
 
-        if let existingPath = try findExistingVideoPath(for: video) {
+        if let existingPath = try findExistingVideoPath(
+            for: video,
+            libraryDigests: &libraryDigests
+        ) {
             switch duplicateResolution {
             case .abort:
                 throw ImportError.duplicateVideo(sourceFileName)
@@ -727,7 +834,16 @@ final class PackageImporter {
         return destPath
     }
 
-    private func findExistingVideoPath(for video: PackageManifest.PackageVideo) throws -> String? {
+    /// The manifest's digest is written by whoever made the package, so its letter case is not
+    /// ours.
+    private static func digestsMatch(_ lhs: String, _ rhs: String) -> Bool {
+        lhs.caseInsensitiveCompare(rhs) == .orderedSame
+    }
+
+    private func findExistingVideoPath(
+        for video: PackageManifest.PackageVideo,
+        libraryDigests: inout [String: String]
+    ) throws -> String? {
         let appSupportDir = try appSupportVideosDir()
         let existingFiles = try fileManager.contentsOfDirectory(
             at: appSupportDir,
@@ -736,13 +852,22 @@ final class PackageImporter {
         )
 
         for fileURL in existingFiles where fileURL.hasDirectoryPath == false {
-            let path = fileURL.path
+            // contentsOfDirectory resolves symlinks in the folder's path; the library stores
+            // the spelling new imports get, so a replaced video must not come back as a second
+            // entry.
+            let path = appSupportDir.appendingPathComponent(fileURL.lastPathComponent).path
             let attrs = try? fileManager.attributesOfItem(atPath: path)
             let existingSize = attrs?[.size] as? UInt64
 
             if let expectedSHA256 = video.sha256 {
-                let actualSHA256 = try computeSHA256(for: path)
-                if actualSHA256 == expectedSHA256 {
+                let actualSHA256: String
+                if let cached = libraryDigests[path] {
+                    actualSHA256 = cached
+                } else {
+                    actualSHA256 = try computeSHA256(for: path)
+                    libraryDigests[path] = actualSHA256
+                }
+                if Self.digestsMatch(actualSHA256, expectedSHA256) {
                     return path
                 }
                 continue

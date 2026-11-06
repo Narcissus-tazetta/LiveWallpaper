@@ -5,13 +5,16 @@ extension SceneEditorView {
         ("", [.normal]),
         ("暗くする系", [.darken, .multiply, .colorBurn, .subtract, .minimum]),
         ("明るくする系", [.lighten, .screen, .colorDodge, .add, .maximum, .plus, .brighten, .glow]),
-        ("コントラスト系", [.overlay, .softLight, .hardLight, .vividLight, .linearLight, .pinLight, .hardMix]),
+        (
+            "コントラスト系",
+            [.overlay, .softLight, .hardLight, .vividLight, .linearLight, .pinLight, .hardMix]
+        ),
         ("差・反転系", [.difference, .exclusion, .negation, .average, .reflect, .phoenix]),
-        ("色の合成", [.hue, .saturation, .color, .luminosity, .tint]),
+        ("色の合成", [.hue, .saturation, .color, .luminosity, .tint])
     ]
 
     func sceneBlendModeName(_ mode: SceneBlendMode) -> String {
-        let key: String = switch mode {
+        let key = switch mode {
         case .normal: "通常"
         case .multiply: "乗算"
         case .screen: "スクリーン"
@@ -49,7 +52,6 @@ extension SceneEditorView {
     }
 
     /// Every blend mode, grouped by what it does to the layers below.
-    @ViewBuilder
     func sceneBlendModePickerContent() -> some View {
         ForEach(Self.sceneBlendModeGroups, id: \.title) { group in
             if group.title.isEmpty {

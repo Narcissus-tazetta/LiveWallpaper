@@ -49,14 +49,18 @@ final class WebNowPlayingReader: @unchecked Sendable {
                 let track = property("pTrk")
                 var value = WebNowPlaying()
                 value.state = playback == code("kPSp") ? "paused" : "playing"
-                value.title = try get(property("pnam", inside: track), target: target).stringValue ?? ""
+                value.title = try get(property("pnam", inside: track), target: target)
+                    .stringValue ?? ""
                 value.artist = try get(property(
                     "pArt",
                     inside: track
                 ), target: target).stringValue ?? ""
-                value.album = try get(property("pAlb", inside: track), target: target).stringValue ?? ""
-                value.albumArtist = try get(property("pAlA", inside: track), target: target).stringValue ?? ""
-                value.duration = try get(property("pDur", inside: track), target: target).doubleValue
+                value.album = try get(property("pAlb", inside: track), target: target)
+                    .stringValue ?? ""
+                value.albumArtist = try get(property("pAlA", inside: track), target: target)
+                    .stringValue ?? ""
+                value.duration = try get(property("pDur", inside: track), target: target)
+                    .doubleValue
                 // Spotify's Apple event duration uses milliseconds; Music uses seconds.
                 if spotify { value.duration /= 1000 }
                 value.position = try get(property("pPos"), target: target).doubleValue
@@ -90,7 +94,10 @@ final class WebNowPlayingReader: @unchecked Sendable {
                         let firstArtwork = artwork
                             .coerce(toDescriptorType: UInt32(typeObjectSpecifier))!
                         do {
-                            let raw = try get(property("pRaw", inside: firstArtwork), target: target)
+                            let raw = try get(
+                                property("pRaw", inside: firstArtwork),
+                                target: target
+                            )
                             if let source = CGImageSourceCreateWithData(raw.data as CFData, nil),
                                let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                                    kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -113,7 +120,8 @@ final class WebNowPlayingReader: @unchecked Sendable {
             } catch let error as NSError where error.domain == NSOSStatusErrorDomain
                 && [Int(errAENoSuchObject), Int(errAETimeout)].contains(error.code)
             {
-                AppLog.externalWallpapers.error("media poll skipped for \(id, privacy: .public): \(error.code)")
+                AppLog.externalWallpapers
+                    .error("media poll skipped for \(id, privacy: .public): \(error.code)")
                 continue
             }
         }

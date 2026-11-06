@@ -10,8 +10,14 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
 
     override func setUpWithError() throws {
         tempDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("WallpaperAuthorSettingsTests-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+            .appendingPathComponent(
+                "WallpaperAuthorSettingsTests-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        try FileManager.default.createDirectory(
+            at: tempDirectory,
+            withIntermediateDirectories: true
+        )
         // Clean up any stale keys from prior test runs
         UserDefaults.standard.removeObject(forKey: "authorSettings.external.test-provider/item-1")
         UserDefaults.standard.removeObject(forKey: "authorSettings.scene.wallpaper-1.mp4")
@@ -213,7 +219,11 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         XCTAssertEqual(frame.layers[layer.id]?.transform.scale, 3.5)
 
         let inputWithoutProps = SceneFrameInput(time: 0)
-        let frameDefault = try evaluator.evaluate(document, input: inputWithoutProps, timeOfDay: .day)
+        let frameDefault = try evaluator.evaluate(
+            document,
+            input: inputWithoutProps,
+            timeOfDay: .day
+        )
         XCTAssertEqual(frameDefault.layers[layer.id]?.transform.scale, 1.0)
 
         // Verify empty dictionary is passed as an object, allowing script to see empty props
@@ -224,7 +234,8 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
 
     func testHasAuthorSettingsSkipsSceneJSONWhenPropertiesJSONExists() throws {
         let model = WallpaperModel()
-        let videoURL = tempDirectory.appendingPathComponent("skip-scene-json-\(UUID().uuidString).mp4")
+        let videoURL = tempDirectory
+            .appendingPathComponent("skip-scene-json-\(UUID().uuidString).mp4")
         try Data([0, 1, 2]).write(to: videoURL)
 
         let sceneURL = SceneStore.folderURL(forVideoPath: videoURL.path)
@@ -236,9 +247,10 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
 
         // Write corrupt or broken scene.json that would fail JSON parsing if opened
         let sceneJSONURL = sceneURL.appendingPathComponent("scene.json")
-        try "BROKEN_JSON_DATA".data(using: .utf8)!.write(to: sceneJSONURL)
+        try Data("BROKEN_JSON_DATA".utf8).write(to: sceneJSONURL)
 
-        // If properties.json is respected as fast-path, it returns false without attempting to parse scene.json
+        // If properties.json is respected as fast-path, it returns false without attempting to
+        // parse scene.json
         XCTAssertFalse(model.hasAuthorSettings(forPath: videoURL.path))
         XCTAssertNil(model.sceneDocumentsByPath[videoURL.path])
     }
@@ -271,7 +283,8 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
     }
 
     func testSceneMetalLayerLoadUserProperties() throws {
-        let videoURL = tempDirectory.appendingPathComponent("test-load-props-\(UUID().uuidString).mp4")
+        let videoURL = tempDirectory
+            .appendingPathComponent("test-load-props-\(UUID().uuidString).mp4")
         let normalizedPath = videoURL.standardizedFileURL.path
         let normalizedKey = "authorSettings.scene." + normalizedPath
         createdUserDefaultsKeys.insert(normalizedKey)
@@ -344,7 +357,12 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         let propData = try JSONEncoder().encode([prop])
         try propData.write(to: sceneURL.appendingPathComponent("properties.json"))
 
-        let document = SceneDocument(canvasWidth: 1920, canvasHeight: 1080, layers: [], properties: nil)
+        let document = SceneDocument(
+            canvasWidth: 1920,
+            canvasHeight: 1080,
+            layers: [],
+            properties: nil
+        )
         model.sceneDocumentsByPath[path] = document
 
         var changeCount = 0
@@ -362,7 +380,8 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
 
     func testHasAuthorSettingsNeverMutatesPublishedStateForUnloadedSceneWithPropertiesJSON() throws {
         let model = WallpaperModel()
-        let videoURL = tempDirectory.appendingPathComponent("unloaded-prop-\(UUID().uuidString).mp4")
+        let videoURL = tempDirectory
+            .appendingPathComponent("unloaded-prop-\(UUID().uuidString).mp4")
         let path = videoURL.path
         try Data([0, 1, 2]).write(to: videoURL)
 
@@ -393,7 +412,8 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
 
     func testHasAuthorSettingsNeverMutatesPublishedStateForUnloadedSceneWithSceneJSON() throws {
         let model = WallpaperModel()
-        let videoURL = tempDirectory.appendingPathComponent("unloaded-scene-\(UUID().uuidString).mp4")
+        let videoURL = tempDirectory
+            .appendingPathComponent("unloaded-scene-\(UUID().uuidString).mp4")
         let path = videoURL.path
         try Data([0, 1, 2]).write(to: videoURL)
 
@@ -406,7 +426,12 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
             label: ["en": "Intensity"],
             value: .number(2.0)
         )
-        let document = SceneDocument(canvasWidth: 100, canvasHeight: 100, layers: [], properties: [prop])
+        let document = SceneDocument(
+            canvasWidth: 100,
+            canvasHeight: 100,
+            layers: [],
+            properties: [prop]
+        )
         let sceneData = try JSONEncoder().encode(document)
         try sceneData.write(to: sceneURL.appendingPathComponent("scene.json"))
 
@@ -425,14 +450,20 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
 
     func testHasAuthorSettingsNeverMutatesPublishedStateWhenNoProperties() throws {
         let model = WallpaperModel()
-        let videoURL = tempDirectory.appendingPathComponent("unloaded-empty-\(UUID().uuidString).mp4")
+        let videoURL = tempDirectory
+            .appendingPathComponent("unloaded-empty-\(UUID().uuidString).mp4")
         let path = videoURL.path
         try Data([0, 1, 2]).write(to: videoURL)
 
         let sceneURL = SceneStore.folderURL(forVideoPath: path)
         try FileManager.default.createDirectory(at: sceneURL, withIntermediateDirectories: true)
 
-        let document = SceneDocument(canvasWidth: 100, canvasHeight: 100, layers: [], properties: nil)
+        let document = SceneDocument(
+            canvasWidth: 100,
+            canvasHeight: 100,
+            layers: [],
+            properties: nil
+        )
         let sceneData = try JSONEncoder().encode(document)
         try sceneData.write(to: sceneURL.appendingPathComponent("scene.json"))
 
@@ -449,11 +480,12 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
 
     func testHasAuthorSettingsForExternalWallpaperDoesNotDecodeSceneJSON() throws {
         let model = WallpaperModel()
-        let sceneFolder = tempDirectory.appendingPathComponent("external-scene-\(UUID().uuidString)")
+        let sceneFolder = tempDirectory
+            .appendingPathComponent("external-scene-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: sceneFolder, withIntermediateDirectories: true)
 
         let sceneJSONURL = sceneFolder.appendingPathComponent("scene.json")
-        try "CORRUPT_OR_MASSIVE_JSON".data(using: .utf8)!.write(to: sceneJSONURL)
+        try Data("CORRUPT_OR_MASSIVE_JSON".utf8).write(to: sceneJSONURL)
 
         let wallpaper = ExternalWallpaper(
             id: "provider/test-item",
@@ -470,7 +502,8 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
 
     func testHasAuthorSettingsForExternalWallpaperRelyOnPropertiesOrPropertiesJSON() throws {
         let model = WallpaperModel()
-        let sceneFolder = tempDirectory.appendingPathComponent("external-props-\(UUID().uuidString)")
+        let sceneFolder = tempDirectory
+            .appendingPathComponent("external-props-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: sceneFolder, withIntermediateDirectories: true)
 
         let prop = LocalWebProperty(
@@ -536,14 +569,25 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         XCTAssertNil(model.sceneDocumentsByPath[path])
         XCTAssertEqual(changeCount, 0)
     }
+
     func testResetDoesNotResurrectLegacySettings() throws {
         let model = WallpaperModel()
         let video = tempDirectory.appendingPathComponent("reset-\(UUID().uuidString).mp4")
         let normalizedKey = "authorSettings.scene." + video.standardizedFileURL.path
         let legacyKey = "authorSettings.scene." + video.lastPathComponent
         createdUserDefaultsKeys.formUnion([normalizedKey, legacyKey])
-        let property = LocalWebProperty(id: "speed", kind: "slider", label: ["en": "Speed"], value: .number(1))
-        model.sceneDocumentsByPath[video.path] = SceneDocument(canvasWidth: 100, canvasHeight: 80, layers: [], properties: [property])
+        let property = LocalWebProperty(
+            id: "speed",
+            kind: "slider",
+            label: ["en": "Speed"],
+            value: .number(1)
+        )
+        model.sceneDocumentsByPath[video.path] = SceneDocument(
+            canvasWidth: 100,
+            canvasHeight: 80,
+            layers: [],
+            properties: [property]
+        )
         try LocalWebSettings(values: ["speed": .number(9)]).save(key: legacyKey)
         let context = try XCTUnwrap(model.authorSettingsContext(forPath: video.path))
         XCTAssertEqual(try context.loadSettings().values["speed"], .number(9))
@@ -557,15 +601,25 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         try Data([0, 1, 2]).write(to: URL(fileURLWithPath: path))
         let document = SceneDocument(canvasWidth: 100, canvasHeight: 80, layers: [])
         try SceneStore.save(document, videoPath: path)
-        let sceneJSON = SceneStore.folderURL(forVideoPath: path).appendingPathComponent("scene.json")
-        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1)], ofItemAtPath: sceneJSON.path)
+        let sceneJSON = SceneStore.folderURL(forVideoPath: path)
+            .appendingPathComponent("scene.json")
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 1)],
+            ofItemAtPath: sceneJSON.path
+        )
         XCTAssertFalse(SceneStore.isNewerThanVideo(videoPath: path))
         let model = WallpaperModel()
         model.sceneDocumentsByPath[path] = document
-        try model.applySceneAuthorSettings(forPath: path, settings: LocalWebSettings(values: ["speed": .number(2)]))
+        try model.applySceneAuthorSettings(
+            forPath: path,
+            settings: LocalWebSettings(values: ["speed": .number(2)])
+        )
         XCTAssertTrue(SceneStore.isNewerThanVideo(videoPath: path))
         let reloadedModel = WallpaperModel()
-        reloadedModel.registerImportedScene(try XCTUnwrap(SceneStore.load(videoPath: path)), path: path)
+        try reloadedModel.registerImportedScene(
+            XCTUnwrap(SceneStore.load(videoPath: path)),
+            path: path
+        )
         XCTAssertTrue(reloadedModel.sceneStaleVideoPaths.contains(path))
     }
 
@@ -574,10 +628,26 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         let folder = tempDirectory.appendingPathComponent("audio.web")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try Data("<html></html>".utf8).write(to: folder.appendingPathComponent("index.html"))
-        let package = LocalWebWallpaperPackage(entryPoint: "index.html", properties: [], supportsSpectrum: true, supportsMedia: true)
-        try JSONEncoder().encode(package).write(to: folder.appendingPathComponent(LocalWebWallpaperPackage.fileName))
-        let source = WebWallpaperSource(url: folder.appendingPathComponent("index.html"), localFolderPath: folder.path)
-        let wallpaper = ExternalWallpaper(id: "audio", providerName: "Test", name: "Audio", path: "", webSource: source, properties: [])
+        let package = LocalWebWallpaperPackage(
+            entryPoint: "index.html",
+            properties: [],
+            supportsSpectrum: true,
+            supportsMedia: true
+        )
+        try JSONEncoder().encode(package)
+            .write(to: folder.appendingPathComponent(LocalWebWallpaperPackage.fileName))
+        let source = WebWallpaperSource(
+            url: folder.appendingPathComponent("index.html"),
+            localFolderPath: folder.path
+        )
+        let wallpaper = ExternalWallpaper(
+            id: "audio",
+            providerName: "Test",
+            name: "Audio",
+            path: "",
+            webSource: source,
+            properties: []
+        )
         XCTAssertTrue(model.hasAuthorSettings(forExternalWallpaper: wallpaper))
         let context = try XCTUnwrap(model.authorSettingsContext(forExternalWallpaper: wallpaper))
         XCTAssertTrue(context.supportsSpectrum)
@@ -588,7 +658,8 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         let path = tempDirectory.appendingPathComponent("prune.mp4").path
         let document = SceneDocument(canvasWidth: 100, canvasHeight: 80, layers: [])
         try SceneStore.save(document, videoPath: path)
-        let properties = SceneStore.folderURL(forVideoPath: path).appendingPathComponent("properties.json")
+        let properties = SceneStore.folderURL(forVideoPath: path)
+            .appendingPathComponent("properties.json")
         try Data("[]".utf8).write(to: properties)
         WallpaperModel().pruneSceneFiles(document, path: path)
         XCTAssertTrue(FileManager.default.fileExists(atPath: properties.path))
@@ -601,7 +672,10 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         let outside = tempDirectory.appendingPathComponent("outside.json")
         try Data("[]".utf8).write(to: outside)
         let source = SceneStore.folderURL(forVideoPath: sourceVideo.path)
-        try FileManager.default.createSymbolicLink(at: source.appendingPathComponent("properties.json"), withDestinationURL: outside)
+        try FileManager.default.createSymbolicLink(
+            at: source.appendingPathComponent("properties.json"),
+            withDestinationURL: outside
+        )
         let destination = tempDirectory.appendingPathComponent("destination.mp4").path
         XCTAssertThrowsError(try SceneStore.importScene(from: source, videoPath: destination))
         XCTAssertFalse(SceneStore.hasScene(videoPath: destination))
@@ -611,10 +685,21 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         let model = WallpaperModel()
         let path = tempDirectory.appendingPathComponent("old-import.mp4").path
         let document = SceneDocument(canvasWidth: 100, canvasHeight: 80, layers: [])
-        let property = LocalWebProperty(id: "speed", kind: "slider", label: ["en": "Speed"], value: .number(1))
+        let property = LocalWebProperty(
+            id: "speed",
+            kind: "slider",
+            label: ["en": "Speed"],
+            value: .number(1)
+        )
         let externalID = "provider/legacy"
         model.importedExternalWallpaperPaths[externalID] = path
-        model.externalWallpapers = [ExternalWallpaper(id: externalID, providerName: "Provider", name: "Legacy", path: "/provider/video.mp4", properties: [property])]
+        model.externalWallpapers = [ExternalWallpaper(
+            id: externalID,
+            providerName: "Provider",
+            name: "Legacy",
+            path: "/provider/video.mp4",
+            properties: [property]
+        )]
         model.sceneDocumentsByPath[path] = document
         var changeCount = 0
         let subscription = model.objectWillChange.sink { _ in changeCount += 1 }
@@ -634,14 +719,32 @@ final class WallpaperAuthorSettingsTests: XCTestCase {
         let path = tempDirectory.appendingPathComponent("old-import-sidecar.mp4").path
         let folder = tempDirectory.appendingPathComponent("provider.scene")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let property = LocalWebProperty(id: "tint", kind: "color", label: ["en": "Tint"], value: .string("1 0 0"))
-        try JSONEncoder().encode([property]).write(to: folder.appendingPathComponent("properties.json"))
+        let property = LocalWebProperty(
+            id: "tint",
+            kind: "color",
+            label: ["en": "Tint"],
+            value: .string("1 0 0")
+        )
+        try JSONEncoder().encode([property])
+            .write(to: folder.appendingPathComponent("properties.json"))
         let externalID = "provider/legacy-sidecar"
         model.importedExternalWallpaperPaths[externalID] = path
-        model.externalWallpapers = [ExternalWallpaper(id: externalID, providerName: "Provider", name: "Legacy", path: "/provider/video.mp4", sceneFolderPath: folder.path)]
-        model.sceneDocumentsByPath[path] = SceneDocument(canvasWidth: 100, canvasHeight: 80, layers: [])
+        model.externalWallpapers = [ExternalWallpaper(
+            id: externalID,
+            providerName: "Provider",
+            name: "Legacy",
+            path: "/provider/video.mp4",
+            sceneFolderPath: folder.path
+        )]
+        model.sceneDocumentsByPath[path] = SceneDocument(
+            canvasWidth: 100,
+            canvasHeight: 80,
+            layers: []
+        )
         XCTAssertTrue(model.hasAuthorSettings(forPath: path))
-        XCTAssertEqual(try XCTUnwrap(model.authorSettingsContext(forPath: path)).properties, [property])
+        XCTAssertEqual(
+            try XCTUnwrap(model.authorSettingsContext(forPath: path)).properties,
+            [property]
+        )
     }
-
 }

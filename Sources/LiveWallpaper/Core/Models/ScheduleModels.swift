@@ -31,9 +31,11 @@ struct ScheduleTimeOfDay: Codable, Equatable, Comparable {
     var minute: Int
     /// Set when the time follows the sun. hour/minute then hold the last resolved time so
     /// a version without this field still reads a sensible fixed time instead of failing.
-    var solarEvent: ScheduleSolarEvent? = nil
+    var solarEvent: ScheduleSolarEvent?
 
-    var minutesFromMidnight: Int { hour * 60 + minute }
+    var minutesFromMidnight: Int {
+        hour * 60 + minute
+    }
 
     static func < (lhs: ScheduleTimeOfDay, rhs: ScheduleTimeOfDay) -> Bool {
         lhs.minutesFromMidnight < rhs.minutesFromMidnight
@@ -196,18 +198,22 @@ struct ScheduleRule: Codable, Identifiable, Equatable {
         self.target = target
     }
 
-    // 将来のフィールド追加でも既存JSONを壊さないよう、id/name/target 以外は
-    // decodeIfPresent でデフォルト値にフォールバックする(WallpaperPlaylist と同じ手法)。
+    /// 将来のフィールド追加でも既存JSONを壊さないよう、id/name/target 以外は
+    /// decodeIfPresent でデフォルト値にフォールバックする(WallpaperPlaylist と同じ手法)。
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         target = try container.decode(ScheduleTarget.self, forKey: .target)
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
-        origin = try container.decodeIfPresent(ScheduleRuleOrigin.self, forKey: .origin) ?? .advanced
+        origin = try container
+            .decodeIfPresent(ScheduleRuleOrigin.self, forKey: .origin) ?? .advanced
         weekdays = try container.decodeIfPresent(Set<Int>.self, forKey: .weekdays) ?? Set(1 ... 7)
         timeRange = try container.decodeIfPresent(ScheduleTimeRange.self, forKey: .timeRange)
-        appearance = try container.decodeIfPresent(ScheduleAppearanceCondition.self, forKey: .appearance) ?? .any
+        appearance = try container.decodeIfPresent(
+            ScheduleAppearanceCondition.self,
+            forKey: .appearance
+        ) ?? .any
         scope = try container.decodeIfPresent(ScheduleScope.self, forKey: .scope) ?? .shared
     }
 }

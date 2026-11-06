@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Settings of the whole scene rather than a layer: background, dynamic range, glow, camera shake and parallax.
+/// Settings of the whole scene rather than a layer: background, dynamic range, glow, camera shake
+/// and parallax.
 struct SceneWorldPanel: View {
     @ObservedObject var model: WallpaperModel
     let path: String
@@ -16,11 +17,16 @@ struct SceneWorldPanel: View {
                         },
                         set: { color in
                             guard let rgb = NSColor(color).usingColorSpace(.sRGB) else { return }
-                            update { $0.backgroundColor = [Double(rgb.redComponent), Double(rgb.greenComponent), Double(rgb.blueComponent)] }
+                            update { $0.backgroundColor = [
+                                Double(rgb.redComponent),
+                                Double(rgb.greenComponent),
+                                Double(rgb.blueComponent)
+                            ] }
                         }
                     ), supportsOpacity: false)
                     Toggle(model.localizedString("明るさの幅を広げる(HDR)"), isOn: Binding(
-                        get: { document.highDynamicRange }, set: { on in update { $0.highDynamicRange = on } }
+                        get: { document.highDynamicRange },
+                        set: { on in update { $0.highDynamicRange = on } }
                     ))
                     note("白より明るい色を最後まで保ちます。使う作品は、描画の負荷が少し上がります。")
                     bloom(document)
@@ -52,9 +58,15 @@ struct SceneWorldPanel: View {
                 note("この作品は、取り込み時の仕上げ処理を使っています。")
             }
             if let bloom = document.bloom {
-                slider("強さ", bloom.strength, SceneBloom.strengthRange) { value in setBloom { $0.strength = value } }
-                slider("しきい値", bloom.threshold, SceneBloom.thresholdRange) { value in setBloom { $0.threshold = value } }
-                slider("広がり", bloom.radius, SceneBloom.radiusRange) { value in setBloom { $0.radius = value } }
+                slider("強さ", bloom.strength, SceneBloom.strengthRange) { value in
+                    setBloom { $0.strength = value }
+                }
+                slider("しきい値", bloom.threshold, SceneBloom.thresholdRange) { value in
+                    setBloom { $0.threshold = value }
+                }
+                slider("広がり", bloom.radius, SceneBloom.radiusRange) { value in
+                    setBloom { $0.radius = value }
+                }
             }
         }
     }
@@ -63,12 +75,22 @@ struct SceneWorldPanel: View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle(model.localizedString("カメラの揺れ"), isOn: Binding(
                 get: { document.cameraShake != nil },
-                set: { on in update { $0.cameraShake = on ? SceneCameraShake(speed: 1, amplitude: 0.5, roughness: 1) : nil } }
+                set: { on in update { $0.cameraShake = on ? SceneCameraShake(
+                    speed: 1,
+                    amplitude: 0.5,
+                    roughness: 1
+                ) : nil } }
             ))
             if let shake = document.cameraShake {
-                slider("揺れの速さ", shake.speed, 0 ... 5) { value in update { $0.cameraShake?.speed = value } }
-                slider("揺れの大きさ", shake.amplitude, 0 ... 5) { value in update { $0.cameraShake?.amplitude = value } }
-                slider("揺れの荒さ", shake.roughness, 0 ... 3) { value in update { $0.cameraShake?.roughness = value } }
+                slider("揺れの速さ", shake.speed, 0 ... 5) { value in
+                    update { $0.cameraShake?.speed = value }
+                }
+                slider("揺れの大きさ", shake.amplitude, 0 ... 5) { value in
+                    update { $0.cameraShake?.amplitude = value }
+                }
+                slider("揺れの荒さ", shake.roughness, 0 ... 3) { value in
+                    update { $0.cameraShake?.roughness = value }
+                }
             }
         }
     }
@@ -85,8 +107,12 @@ struct SceneWorldPanel: View {
                 }
             ))
             if document.parallaxTravel != nil || document.parallaxResponse != nil {
-                slider("視差の移動量", document.parallaxTravel ?? 0.05, 0 ... 0.3) { value in update { $0.parallaxTravel = value } }
-                slider("視差の追従の速さ", document.parallaxResponse ?? 8.3, 0.5 ... 30) { value in update { $0.parallaxResponse = value } }
+                slider("視差の移動量", document.parallaxTravel ?? 0.05, 0 ... 0.3) { value in
+                    update { $0.parallaxTravel = value }
+                }
+                slider("視差の追従の速さ", document.parallaxResponse ?? 8.3, 0.5 ... 30) { value in
+                    update { $0.parallaxResponse = value }
+                }
             }
         }
     }
@@ -95,13 +121,30 @@ struct SceneWorldPanel: View {
         SceneHintText(text: model.localizedString(key))
     }
 
-    private func slider(_ key: String, _ value: Double, _ range: ClosedRange<Double>, set: @escaping (Double) -> Void) -> some View {
+    private func slider(
+        _ key: String,
+        _ value: Double,
+        _ range: ClosedRange<Double>,
+        set: @escaping (Double) -> Void
+    ) -> some View {
         HStack(spacing: 12) {
-            Text(model.localizedString(key)).frame(width: SceneInspectorMetrics.labelWidth, alignment: .leading)
-            Slider(value: Binding(get: { min(max(value, range.lowerBound), range.upperBound) }, set: set), in: range)
-                .accessibilityLabel(model.localizedString(key))
+            Text(model.localizedString(key)).frame(
+                width: SceneInspectorMetrics.labelWidth,
+                alignment: .leading
+            )
+            Slider(
+                value: Binding(
+                    get: { min(max(value, range.lowerBound), range.upperBound) },
+                    set: set
+                ),
+                in: range
+            )
+            .accessibilityLabel(model.localizedString(key))
             Text(String(format: "%.2f", locale: model.appLocale, value))
-                .font(.caption.monospacedDigit()).foregroundColor(.secondary).frame(width: 44, alignment: .trailing)
+                .font(.caption.monospacedDigit()).foregroundColor(.secondary).frame(
+                    width: 44,
+                    alignment: .trailing
+                )
         }
     }
 

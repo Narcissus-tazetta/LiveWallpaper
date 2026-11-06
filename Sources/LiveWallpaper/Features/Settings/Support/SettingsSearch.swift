@@ -59,7 +59,9 @@ extension SettingsView {
 
     /// 一致したかどうかに加え、どのキーワードで一致したかも返す。一致理由をUIに出すことで、
     /// セクション丸ごと表示という粗い粒度でも「なぜこのセクションが出てきたか」が分かるようにする。
-    func settingsSectionMatch(_ section: SettingsSection) -> (matches: Bool, matchedKeyword: String?) {
+    func settingsSectionMatch(_ section: SettingsSection)
+        -> (matches: Bool, matchedKeyword: String?)
+    {
         let query = trimmedSettingsSearchQuery
         guard !query.isEmpty else {
             return (true, nil)
@@ -142,7 +144,10 @@ extension SettingsView {
                             RoundedRectangle(cornerRadius: 7, style: .continuous)
                                 .strokeBorder(Color.accentColor.opacity(0.28), lineWidth: 1)
                         )
-                        .matchedGeometryEffect(id: "selectedSettingsCategory", in: tabSelectionNamespace)
+                        .matchedGeometryEffect(
+                            id: "selectedSettingsCategory",
+                            in: tabSelectionNamespace
+                        )
                 } else if isHovered {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .fill(Color.primary.opacity(0.05))
@@ -227,15 +232,15 @@ extension SettingsView {
 }
 
 #if DEBUG
-extension SettingsView {
-    /// 新セクション追加時にキーワード登録を丸ごと忘れるケースを検出する軽量チェック。
-    static func assertAllSettingsSectionsHaveSearchKeywords() {
-        for section in SettingsSection.allCases {
-            assert(
-                !searchKeywords(for: section).isEmpty,
-                "SettingsSection.\(section) has no search keywords registered"
-            )
+    extension SettingsView {
+        /// 新セクション追加時にキーワード登録を丸ごと忘れるケースを検出する軽量チェック。
+        static func assertAllSettingsSectionsHaveSearchKeywords() {
+            for section in SettingsSection.allCases {
+                assert(
+                    !searchKeywords(for: section).isEmpty,
+                    "SettingsSection.\(section) has no search keywords registered"
+                )
+            }
         }
     }
-}
 #endif

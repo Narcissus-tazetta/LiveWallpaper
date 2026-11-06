@@ -141,12 +141,12 @@ final class FitEditorController: ObservableObject {
     func resolvedVideoPath() -> String? {
         let allPaths = model.allRegisteredVideoPaths
         if let selected = selectedVideoPath,
-            allPaths.contains(selected)
+           allPaths.contains(selected)
         {
             return selected
         }
         if let current = model.currentVideoPath,
-            allPaths.contains(current)
+           allPaths.contains(current)
         {
             return current
         }

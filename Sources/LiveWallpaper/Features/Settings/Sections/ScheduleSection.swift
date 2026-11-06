@@ -14,7 +14,7 @@ extension SettingsView {
         "適用中",
         "複製",
         "日の出",
-        "日の入り",
+        "日の入り"
     ]
 
     /// 壁紙タブの一覧ペインの下に置く折りたたみカード。スケジュールはルール自身が
@@ -58,7 +58,11 @@ extension SettingsView {
             let name = model.scheduleRuleDisplayName(active.name)
             return String(format: model.localizedString("適用中: %@"), name)
         }
-        return String(format: model.localizedString("%d件のルールが有効"), locale: model.appLocale, enabledRules.count)
+        return String(
+            format: model.localizedString("%d件のルールが有効"),
+            locale: model.appLocale,
+            enabledRules.count
+        )
     }
 
     /// 設定タブの検索でスケジュール関連のキーワードにヒットしたときの案内行。
@@ -486,8 +490,12 @@ extension SettingsView {
 
     // MARK: - 日の出・日の入り
 
-    private func scheduleTimeEndpoint(_ ruleBinding: Binding<ScheduleRule>, isStart: Bool) -> some View {
-        let time = isStart ? ruleBinding.wrappedValue.timeRange?.start : ruleBinding.wrappedValue.timeRange?.end
+    private func scheduleTimeEndpoint(
+        _ ruleBinding: Binding<ScheduleRule>,
+        isStart: Bool
+    ) -> some View {
+        let time = isStart ? ruleBinding.wrappedValue.timeRange?.start : ruleBinding.wrappedValue
+            .timeRange?.end
         return HStack(spacing: 4) {
             Picker("", selection: scheduleSolarEventBinding(ruleBinding, isStart: isStart)) {
                 Text(model.localizedString("時刻")).tag(ScheduleSolarEvent?.none)
@@ -544,7 +552,6 @@ extension SettingsView {
         )
     }
 
-    @ViewBuilder
     private var scheduleSunLocationRow: some View {
         HStack(spacing: 8) {
             Image(systemName: "sun.horizon")
@@ -941,12 +948,12 @@ private struct ScheduleRuleNameField: View {
                 commit(newValue)
             }
         ), prompt: Text(placeholder))
-        .textFieldStyle(.roundedBorder)
-        .controlSize(.small)
-        .multilineTextAlignment(.leading)
-        .labelsHidden()
-        .frame(maxWidth: 220)
-        .id(ruleID)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+            .multilineTextAlignment(.leading)
+            .labelsHidden()
+            .frame(maxWidth: 220)
+            .id(ruleID)
     }
 }
 
@@ -1007,14 +1014,19 @@ private struct ScheduleLocationEditor: View {
                 if let error {
                     let notFound = (error as? CLError)?.code == .geocodeFoundNoResult
                     if !notFound {
-                        AppLog.schedule.error("geocoding failed error=\(error.localizedDescription, privacy: .public)")
+                        AppLog.schedule
+                            .error(
+                                "geocoding failed error=\(error.localizedDescription, privacy: .public)"
+                            )
                     }
                     message = model.localizedString(
                         notFound ? "見つかりませんでした" : "検索に失敗しました。ネットワーク接続を確認してください"
                     )
                     return
                 }
-                guard let placemark = placemarks?.first, let coordinate = placemark.location?.coordinate else {
+                guard let placemark = placemarks?.first,
+                      let coordinate = placemark.location?.coordinate
+                else {
                     message = model.localizedString("見つかりませんでした")
                     return
                 }

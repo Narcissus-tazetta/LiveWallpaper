@@ -10,10 +10,16 @@ struct IntegrationFailureNote: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(model.localizedString("連携を利用できません") + ": " + message).font(.caption).foregroundColor(.red)
+            Text(model.localizedString("連携を利用できません") + ": " + message).font(.caption)
+                .foregroundColor(.red)
             HStack {
                 Button(model.localizedString("システム設定を開く")) {
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(privacy)")!)
+                    NSWorkspace.shared
+                        .open(
+                            URL(
+                                string: "x-apple.systempreferences:com.apple.preference.security?\(privacy)"
+                            )!
+                        )
                 }
                 Button(model.localizedString("再試行")) { LocalWebIntegration.shared.retry() }
             }
@@ -38,7 +44,7 @@ struct PermissionRepairHelp: View {
         "一覧の LiveWallpaper のスイッチをオフにする",
         "LiveWallpaper を選び、一覧の下の「−」を押して削除する(パスワードか Touch ID が必要)",
         "「+」を押し、アプリケーションから LiveWallpaper を選んで追加し、スイッチをオンにする",
-        "LiveWallpaper を再起動する",
+        "LiveWallpaper を再起動する"
     ]
 
     var body: some View {
@@ -70,7 +76,11 @@ struct SceneSoundReactionToggle: View {
             Text(model.localizedString("システム音の取得には、画面収録の許可が必要です。音声は保存しません。"))
                 .font(.caption).foregroundColor(.secondary)
             if isEnabled, let error = integration.audioError {
-                IntegrationFailureNote(model: model, message: error, privacy: "Privacy_ScreenCapture")
+                IntegrationFailureNote(
+                    model: model,
+                    message: error,
+                    privacy: "Privacy_ScreenCapture"
+                )
             }
         }
         .onAppear { isEnabled = SceneSoundReaction.isEnabled(videoPath: path) }

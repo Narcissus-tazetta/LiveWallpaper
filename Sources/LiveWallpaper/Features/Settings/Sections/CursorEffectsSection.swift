@@ -2,221 +2,253 @@ import SwiftUI
 
 /// Which settings the cursor effect rows edit.
 enum CursorEffectsTarget: Equatable {
-  case appWide
-  case wallpaper(String)
+    case appWide
+    case wallpaper(String)
 }
 
 extension SettingsView {
-  var cursorEffectsSection: some View {
-    Section(header: SettingsSectionHeader(title: model.localizedString("カーソルのエフェクト"))) {
-      settingsFootnote(
-        model.localizedString("動画の壁紙に、マウスカーソルの動きに合わせたエフェクトを重ねます。Web壁紙では使えません。")
-      )
+    var cursorEffectsSection: some View {
+        Section(header: SettingsSectionHeader(title: model.localizedString("カーソルのエフェクト"))) {
+            settingsFootnote(
+                model.localizedString("動画の壁紙に、マウスカーソルの動きに合わせたエフェクトを重ねます。Web壁紙では使えません。")
+            )
 
-      cursorEffectControls(.appWide)
+            cursorEffectControls(.appWide)
 
-      if model.cursorEffects.anyEnabled || model.cursorEffectsByPath.values.contains(where: \.anyEnabled) {
+            if model.cursorEffects.anyEnabled || model.cursorEffectsByPath.values
+                .contains(where: \.anyEnabled)
+            {
+                toggleWithHelp(
+                    model.localizedString("デスクトップを使っているときだけ動かす"),
+                    isOn: cursorEffectBinding(\.onlyWhileDesktopActive, .appWide),
+                    helpTopic: .cursorOnlyOnDesktop,
+                    helpText: model.localizedString(
+                        "ほかのアプリを使っている間は、マウスの監視ごとエフェクトを止めて負荷をなくします。デスクトップ（Finder）かこのアプリが前面にあるときだけ動きます。"
+                    )
+                )
+                .transition(Motion.reveal)
+            }
+        }
+    }
+
+    /// The effect rows, editing either the app-wide settings or one wallpaper's own.
+    @ViewBuilder
+    func cursorEffectControls(_ target: CursorEffectsTarget) -> some View {
+        let settings = cursorEffectSettings(target)
         toggleWithHelp(
-          model.localizedString("デスクトップを使っているときだけ動かす"),
-          isOn: cursorEffectBinding(\.onlyWhileDesktopActive, .appWide),
-          helpTopic: .cursorOnlyOnDesktop,
-          helpText: model.localizedString(
-            "ほかのアプリを使っている間は、マウスの監視ごとエフェクトを止めて負荷をなくします。デスクトップ（Finder）かこのアプリが前面にあるときだけ動きます。"
-          )
+            model.localizedString("マウスに合わせて動かす（視差効果）"),
+            isOn: cursorEffectBinding(\.parallaxEnabled, target),
+            helpTopic: .cursorParallax,
+            helpText: model.localizedString(
+                "マウスカーソルと逆の方向へ壁紙を少しずらして、奥行きがあるように見せます。ずらしても端が見えないよう、オンの間は壁紙を少し拡大して表示します。"
+            )
         )
+        if settings.parallaxEnabled {
+            cursorEffectSubRows {
+                cursorLevelRow(
+                    title: model.localizedString("強さ"),
+                    keyPath: \.parallaxStrength,
+                    labels: ("弱", "中", "強"),
+                    target: target
+                )
+                cursorEffectBlockedNote(model.cursorMotionBlockReason)
+            }
+        }
+
+        toggleWithHelp(
+            model.localizedString("スポットライト"),
+            isOn: cursorEffectBinding(\.spotlightEnabled, target),
+            helpTopic: .cursorSpotlight,
+            helpText: model.localizedString(
+                "カーソルの周りだけを元の明るさで表示し、それ以外を暗くします。カーソルがない画面は暗くしません。"
+            )
+        )
+        if settings.spotlightEnabled {
+            cursorEffectSubRows {
+                cursorLevelRow(
+                    title: model.localizedString("大きさ"),
+                    keyPath: \.spotlightSize,
+                    labels: ("小", "中", "大"),
+                    target: target
+                )
+                cursorLevelRow(
+                    title: model.localizedString("暗さ"),
+                    keyPath: \.spotlightDarkness,
+                    labels: ("弱", "中", "強"),
+                    target: target
+                )
+                cursorEffectBlockedNote(model.cursorSpotlightBlockReason)
+            }
+        }
+
+        toggleWithHelp(
+            model.localizedString("カーソルの軌跡"),
+            isOn: cursorEffectBinding(\.trailEnabled, target),
+            helpTopic: .cursorTrail,
+            helpText: model.localizedString(
+                "カーソルを動かすと、その後ろに光の粒が流れて消えます。デスクトップが見えている場所でだけ表示されます。"
+            )
+        )
+        if settings.trailEnabled {
+            cursorEffectSubRows {
+                Picker(
+                    model.localizedString("形"),
+                    selection: cursorEffectBinding(\.trailShape, target)
+                ) {
+                    Text(model.localizedString("光")).tag(CursorTrailShape.glow)
+                    Text(model.localizedString("キラキラ")).tag(CursorTrailShape.sparkle)
+                    Text(model.localizedString("泡")).tag(CursorTrailShape.bubble)
+                    Text(model.localizedString("雪")).tag(CursorTrailShape.snow)
+                }
+                .pickerStyle(.menu)
+                cursorColorRows(color: \.trailColor, custom: \.trailCustomColor, target: target)
+                cursorLevelRow(
+                    title: model.localizedString("量"),
+                    keyPath: \.trailAmount,
+                    labels: ("少", "中", "多"),
+                    target: target
+                )
+                cursorEffectBlockedNote(model.cursorMotionBlockReason)
+            }
+        }
+
+        toggleWithHelp(
+            model.localizedString("クリックの演出"),
+            isOn: cursorEffectBinding(\.clickEnabled, target),
+            helpTopic: .cursorClick,
+            helpText: model.localizedString(
+                "デスクトップをクリックした場所に、波紋が広がるか光の粒がはじけます。ほかのアプリやメニューバーでのクリックには反応しません。"
+            )
+        )
+        if settings.clickEnabled {
+            cursorEffectSubRows {
+                Picker(
+                    model.localizedString("種類"),
+                    selection: cursorEffectBinding(\.clickStyle, target)
+                ) {
+                    Text(model.localizedString("波紋")).tag(CursorClickStyle.ripple)
+                    Text(model.localizedString("はじける")).tag(CursorClickStyle.burst)
+                }
+                .pickerStyle(.menu)
+                cursorColorRows(color: \.clickColor, custom: \.clickCustomColor, target: target)
+                cursorEffectBlockedNote(model.cursorMotionBlockReason)
+            }
+        }
+    }
+
+    private func cursorEffectSubRows(@ViewBuilder _ content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            content()
+        }
+        .padding(.leading, 20)
         .transition(Motion.reveal)
-      }
-    }
-  }
-
-  /// The effect rows, editing either the app-wide settings or one wallpaper's own.
-  @ViewBuilder
-  func cursorEffectControls(_ target: CursorEffectsTarget) -> some View {
-    let settings = cursorEffectSettings(target)
-    toggleWithHelp(
-      model.localizedString("マウスに合わせて動かす（視差効果）"),
-      isOn: cursorEffectBinding(\.parallaxEnabled, target),
-      helpTopic: .cursorParallax,
-      helpText: model.localizedString(
-        "マウスカーソルと逆の方向へ壁紙を少しずらして、奥行きがあるように見せます。ずらしても端が見えないよう、オンの間は壁紙を少し拡大して表示します。"
-      )
-    )
-    if settings.parallaxEnabled {
-      cursorEffectSubRows {
-        cursorLevelRow(title: model.localizedString("強さ"), keyPath: \.parallaxStrength, labels: ("弱", "中", "強"), target: target)
-        cursorEffectBlockedNote(model.cursorMotionBlockReason)
-      }
     }
 
-    toggleWithHelp(
-      model.localizedString("スポットライト"),
-      isOn: cursorEffectBinding(\.spotlightEnabled, target),
-      helpTopic: .cursorSpotlight,
-      helpText: model.localizedString(
-        "カーソルの周りだけを元の明るさで表示し、それ以外を暗くします。カーソルがない画面は暗くしません。"
-      )
-    )
-    if settings.spotlightEnabled {
-      cursorEffectSubRows {
-        cursorLevelRow(title: model.localizedString("大きさ"), keyPath: \.spotlightSize, labels: ("小", "中", "大"), target: target)
-        cursorLevelRow(title: model.localizedString("暗さ"), keyPath: \.spotlightDarkness, labels: ("弱", "中", "強"), target: target)
-        cursorEffectBlockedNote(model.cursorSpotlightBlockReason)
-      }
+    private func cursorLevelRow(
+        title: String,
+        keyPath: WritableKeyPath<CursorEffectsSettings, CursorEffectLevel>,
+        labels: (String, String, String),
+        target: CursorEffectsTarget
+    ) -> some View {
+        settingsMenuRow(
+            title: title,
+            options: [
+                (model.localizedString(labels.0), CursorEffectLevel.low),
+                (model.localizedString(labels.1), CursorEffectLevel.medium),
+                (model.localizedString(labels.2), CursorEffectLevel.high)
+            ],
+            selection: cursorEffectBinding(keyPath, target)
+        )
     }
 
-    toggleWithHelp(
-      model.localizedString("カーソルの軌跡"),
-      isOn: cursorEffectBinding(\.trailEnabled, target),
-      helpTopic: .cursorTrail,
-      helpText: model.localizedString(
-        "カーソルを動かすと、その後ろに光の粒が流れて消えます。デスクトップが見えている場所でだけ表示されます。"
-      )
-    )
-    if settings.trailEnabled {
-      cursorEffectSubRows {
-        Picker(model.localizedString("形"), selection: cursorEffectBinding(\.trailShape, target)) {
-          Text(model.localizedString("光")).tag(CursorTrailShape.glow)
-          Text(model.localizedString("キラキラ")).tag(CursorTrailShape.sparkle)
-          Text(model.localizedString("泡")).tag(CursorTrailShape.bubble)
-          Text(model.localizedString("雪")).tag(CursorTrailShape.snow)
+    @ViewBuilder
+    private func cursorEffectBlockedNote(_ reason: CursorEffectBlockReason?) -> some View {
+        switch reason {
+        case .webWallpaper:
+            settingsFootnote(model.localizedString("Web壁紙の表示中は使えません。"), color: .orange)
+        case .reduceMotion:
+            settingsFootnote(
+                model.localizedString("システムの「視差効果を減らす」が有効なため、オフになっています。"), color: .orange
+            )
+        case .battery:
+            settingsFootnote(
+                model.localizedString("バッテリー駆動中で再生の負荷を下げているため、オフになっています。"), color: .orange
+            )
+        case .lowPowerMode:
+            settingsFootnote(model.localizedString("低電力モードのため、オフになっています。"), color: .orange)
+        case .thermal:
+            settingsFootnote(model.localizedString("Macの温度が高いため、オフになっています。"), color: .orange)
+        case nil:
+            EmptyView()
+        }
+    }
+
+    private func cursorEffectSettings(_ target: CursorEffectsTarget) -> CursorEffectsSettings {
+        switch target {
+        case .appWide:
+            model.cursorEffects
+        case let .wallpaper(path):
+            model.cursorEffectsOverride(path: path) ?? model.cursorEffects
+        }
+    }
+
+    /// `field` names what changed, so dragging one value is one undo step.
+    private func updateCursorEffects(
+        _ target: CursorEffectsTarget, field: String,
+        _ change: (inout CursorEffectsSettings) -> Void
+    ) {
+        var settings = cursorEffectSettings(target)
+        change(&settings)
+        switch target {
+        case .appWide:
+            model.setCursorEffects(settings)
+        case let .wallpaper(path):
+            model.editCursorEffectsOverride(settings, path: path, coalescingKey: field)
+        }
+    }
+
+    private func cursorEffectBinding<T>(
+        _ keyPath: WritableKeyPath<CursorEffectsSettings, T>, _ target: CursorEffectsTarget
+    ) -> Binding<T> {
+        Binding(
+            get: { cursorEffectSettings(target)[keyPath: keyPath] },
+            set: { newValue in
+                withMotion(Motion.quick) {
+                    updateCursorEffects(target, field: "\(keyPath)") {
+                        $0[keyPath: keyPath] = newValue
+                    }
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func cursorColorRows(
+        color: WritableKeyPath<CursorEffectsSettings, CursorEffectColor>,
+        custom: WritableKeyPath<CursorEffectsSettings, RGBAColor>,
+        target: CursorEffectsTarget
+    ) -> some View {
+        Picker(model.localizedString("色"), selection: cursorEffectBinding(color, target)) {
+            Text(model.localizedString("白")).tag(CursorEffectColor.white)
+            Text(model.localizedString("アクセントカラー")).tag(CursorEffectColor.accent)
+            Text(model.localizedString("虹色")).tag(CursorEffectColor.rainbow)
+            Text(model.localizedString("カスタム")).tag(CursorEffectColor.custom)
         }
         .pickerStyle(.menu)
-        cursorColorRows(color: \.trailColor, custom: \.trailCustomColor, target: target)
-        cursorLevelRow(title: model.localizedString("量"), keyPath: \.trailAmount, labels: ("少", "中", "多"), target: target)
-        cursorEffectBlockedNote(model.cursorMotionBlockReason)
-      }
-    }
-
-    toggleWithHelp(
-      model.localizedString("クリックの演出"),
-      isOn: cursorEffectBinding(\.clickEnabled, target),
-      helpTopic: .cursorClick,
-      helpText: model.localizedString(
-        "デスクトップをクリックした場所に、波紋が広がるか光の粒がはじけます。ほかのアプリやメニューバーでのクリックには反応しません。"
-      )
-    )
-    if settings.clickEnabled {
-      cursorEffectSubRows {
-        Picker(model.localizedString("種類"), selection: cursorEffectBinding(\.clickStyle, target)) {
-          Text(model.localizedString("波紋")).tag(CursorClickStyle.ripple)
-          Text(model.localizedString("はじける")).tag(CursorClickStyle.burst)
+        if cursorEffectSettings(target)[keyPath: color] == .custom {
+            ColorPicker(
+                model.localizedString("カスタムの色"),
+                selection: Binding(
+                    get: { Color(nsColor: cursorEffectSettings(target)[keyPath: custom].nsColor) },
+                    set: { newValue in
+                        updateCursorEffects(target, field: "\(custom)") {
+                            $0[keyPath: custom] = RGBAColor(NSColor(newValue))
+                        }
+                    }
+                ),
+                supportsOpacity: false
+            )
+            .transition(Motion.reveal)
         }
-        .pickerStyle(.menu)
-        cursorColorRows(color: \.clickColor, custom: \.clickCustomColor, target: target)
-        cursorEffectBlockedNote(model.cursorMotionBlockReason)
-      }
     }
-
-  }
-
-  private func cursorEffectSubRows<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-      content()
-    }
-    .padding(.leading, 20)
-    .transition(Motion.reveal)
-  }
-
-  private func cursorLevelRow(
-    title: String,
-    keyPath: WritableKeyPath<CursorEffectsSettings, CursorEffectLevel>,
-    labels: (String, String, String),
-    target: CursorEffectsTarget
-  ) -> some View {
-    settingsMenuRow(
-      title: title,
-      options: [
-        (model.localizedString(labels.0), CursorEffectLevel.low),
-        (model.localizedString(labels.1), CursorEffectLevel.medium),
-        (model.localizedString(labels.2), CursorEffectLevel.high)
-      ],
-      selection: cursorEffectBinding(keyPath, target)
-    )
-  }
-
-  @ViewBuilder
-  private func cursorEffectBlockedNote(_ reason: CursorEffectBlockReason?) -> some View {
-    switch reason {
-    case .webWallpaper:
-      settingsFootnote(model.localizedString("Web壁紙の表示中は使えません。"), color: .orange)
-    case .reduceMotion:
-      settingsFootnote(
-        model.localizedString("システムの「視差効果を減らす」が有効なため、オフになっています。"), color: .orange
-      )
-    case .battery:
-      settingsFootnote(
-        model.localizedString("バッテリー駆動中で再生の負荷を下げているため、オフになっています。"), color: .orange
-      )
-    case .lowPowerMode:
-      settingsFootnote(model.localizedString("低電力モードのため、オフになっています。"), color: .orange)
-    case .thermal:
-      settingsFootnote(model.localizedString("Macの温度が高いため、オフになっています。"), color: .orange)
-    case nil:
-      EmptyView()
-    }
-  }
-
-  private func cursorEffectSettings(_ target: CursorEffectsTarget) -> CursorEffectsSettings {
-    switch target {
-    case .appWide:
-      model.cursorEffects
-    case let .wallpaper(path):
-      model.cursorEffectsOverride(path: path) ?? model.cursorEffects
-    }
-  }
-
-  /// `field` names what changed, so dragging one value is one undo step.
-  private func updateCursorEffects(
-    _ target: CursorEffectsTarget, field: String, _ change: (inout CursorEffectsSettings) -> Void
-  ) {
-    var settings = cursorEffectSettings(target)
-    change(&settings)
-    switch target {
-    case .appWide:
-      model.setCursorEffects(settings)
-    case let .wallpaper(path):
-      model.editCursorEffectsOverride(settings, path: path, coalescingKey: field)
-    }
-  }
-
-  private func cursorEffectBinding<T>(
-    _ keyPath: WritableKeyPath<CursorEffectsSettings, T>, _ target: CursorEffectsTarget
-  ) -> Binding<T> {
-    Binding(
-      get: { cursorEffectSettings(target)[keyPath: keyPath] },
-      set: { newValue in
-        withMotion(Motion.quick) {
-          updateCursorEffects(target, field: "\(keyPath)") { $0[keyPath: keyPath] = newValue }
-        }
-      }
-    )
-  }
-
-  @ViewBuilder
-  private func cursorColorRows(
-    color: WritableKeyPath<CursorEffectsSettings, CursorEffectColor>,
-    custom: WritableKeyPath<CursorEffectsSettings, RGBAColor>,
-    target: CursorEffectsTarget
-  ) -> some View {
-    Picker(model.localizedString("色"), selection: cursorEffectBinding(color, target)) {
-      Text(model.localizedString("白")).tag(CursorEffectColor.white)
-      Text(model.localizedString("アクセントカラー")).tag(CursorEffectColor.accent)
-      Text(model.localizedString("虹色")).tag(CursorEffectColor.rainbow)
-      Text(model.localizedString("カスタム")).tag(CursorEffectColor.custom)
-    }
-    .pickerStyle(.menu)
-    if cursorEffectSettings(target)[keyPath: color] == .custom {
-      ColorPicker(
-        model.localizedString("カスタムの色"),
-        selection: Binding(
-          get: { Color(nsColor: cursorEffectSettings(target)[keyPath: custom].nsColor) },
-          set: { newValue in
-            updateCursorEffects(target, field: "\(custom)") { $0[keyPath: custom] = RGBAColor(NSColor(newValue)) }
-          }
-        ),
-        supportsOpacity: false
-      )
-      .transition(Motion.reveal)
-    }
-  }
 }

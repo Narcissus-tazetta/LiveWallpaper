@@ -7,9 +7,9 @@ private enum WallpaperListEntry: Identifiable {
 
     var id: String {
         switch self {
-        case .video(let path):
+        case let .video(path):
             return "video:\(path)"
-        case .web(let source):
+        case let .web(source):
             return "web:\(source.id.uuidString)"
         }
     }
@@ -140,12 +140,16 @@ extension SettingsView {
         HStack(spacing: 10) {
             playlistFilterControl
 
-            Text(String(format: model.localizedString("%d本"), locale: model.appLocale, displayedItemCount))
-                .font(.callout)
-                .foregroundColor(.secondary)
-                .fixedSize()
-                .contentTransition(.numericText())
-                .motionAnimation(Motion.quick, value: displayedItemCount)
+            Text(String(
+                format: model.localizedString("%d本"),
+                locale: model.appLocale,
+                displayedItemCount
+            ))
+            .font(.callout)
+            .foregroundColor(.secondary)
+            .fixedSize()
+            .contentTransition(.numericText())
+            .motionAnimation(Motion.quick, value: displayedItemCount)
 
             if model.isWebWallpaperActive {
                 HStack(spacing: 4) {
@@ -450,7 +454,6 @@ extension SettingsView {
                 }
                 .transition(Motion.pop)
             }
-
         }
         .motionAnimation(Motion.quick, value: model.isImportingMedia)
     }
@@ -528,7 +531,7 @@ extension SettingsView {
                 ) {
                     ForEach(entries) { entry in
                         switch entry {
-                        case .video(let path):
+                        case let .video(path):
                             if let screenID = activeDisplayOverrideScreenID {
                                 wallpaperCard(
                                     path: path,
@@ -557,11 +560,12 @@ extension SettingsView {
                                     playlistEditingID: model.selectedPlaylistID
                                 )
                             }
-                        case .web(let source):
+                        case let .web(source):
                             webWallpaperCard(
                                 source: source,
                                 cardWidth: layout.1,
-                                playlistEditingID: activeDisplayOverrideScreenID == nil ? model.selectedPlaylistID : nil,
+                                playlistEditingID: activeDisplayOverrideScreenID == nil ? model
+                                    .selectedPlaylistID : nil,
                                 assignmentTarget: selectedAssignmentTarget,
                                 displayScreenID: activeDisplayOverrideScreenID
                             )
@@ -745,7 +749,7 @@ extension SettingsView {
     }
 
     @ViewBuilder
-    private func playlistToggleLeading(registeredCount: Int) -> some View {
+    private func playlistToggleLeading(registeredCount _: Int) -> some View {
         HStack(spacing: 4) {
             Toggle(
                 model.localizedString("ループ再生"),

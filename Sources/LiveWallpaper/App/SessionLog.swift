@@ -17,7 +17,10 @@ enum SessionLog {
 
     /// Failures of the file itself go only to the unified log; going through `AppLog` would
     /// come back here.
-    fileprivate static let failureLogger = Logger(subsystem: AppLog.subsystem, category: "sessionLog")
+    fileprivate static let failureLogger = Logger(
+        subsystem: AppLog.subsystem,
+        category: "sessionLog"
+    )
     private static let launchMarker = "=== launch"
     private static let quitMarker = "=== quit"
     fileprivate static let maxFileSize = 1_048_576
@@ -43,14 +46,19 @@ enum SessionLog {
     }
 
     static func append(level: String, category: String, message: String) {
-        sink.writeLine("[\(level)] [\(category)] \(message.replacingOccurrences(of: "\n", with: " ⏎ "))")
+        sink
+            .writeLine(
+                "[\(level)] [\(category)] \(message.replacingOccurrences(of: "\n", with: " ⏎ "))"
+            )
     }
 
     /// Both files oldest first, as one text. A launch marker that no quit marker follows is a
     /// run that ended in a crash, a force quit or a power loss; the line after it says so.
     static func recentText() throws -> String {
         var lines: [String] = []
-        for url in [previousFileURL, fileURL] where FileManager.default.fileExists(atPath: url.path) {
+        for url in [previousFileURL, fileURL]
+            where FileManager.default.fileExists(atPath: url.path)
+        {
             lines += try String(contentsOf: url, encoding: .utf8)
                 .split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
         }
@@ -63,7 +71,10 @@ enum SessionLog {
         for line in lines {
             if line.contains(launchMarker) {
                 if runOpen {
-                    result.append("--- the run above ended without quitting (crash, force quit or power loss) ---")
+                    result
+                        .append(
+                            "--- the run above ended without quitting (crash, force quit or power loss) ---"
+                        )
                 }
                 runOpen = true
             } else if line.contains(quitMarker) {
@@ -86,8 +97,16 @@ enum SessionLog {
         let named: [(NotificationCenter, Notification.Name, String)] = [
             (distributed, Notification.Name("com.apple.screenIsLocked"), "screen locked"),
             (distributed, Notification.Name("com.apple.screenIsUnlocked"), "screen unlocked"),
-            (distributed, Notification.Name("com.apple.screensaver.didstart"), "screen saver started"),
-            (distributed, Notification.Name("com.apple.screensaver.didstop"), "screen saver stopped"),
+            (
+                distributed,
+                Notification.Name("com.apple.screensaver.didstart"),
+                "screen saver started"
+            ),
+            (
+                distributed,
+                Notification.Name("com.apple.screensaver.didstop"),
+                "screen saver stopped"
+            ),
             (workspace, NSWorkspace.willSleepNotification, "system will sleep"),
             (workspace, NSWorkspace.didWakeNotification, "system woke"),
             (workspace, NSWorkspace.screensDidSleepNotification, "displays slept"),
@@ -102,7 +121,8 @@ enum SessionLog {
         }
         observers.append(
             NotificationCenter.default.addObserver(
-                forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+                forName: NSApplication.didChangeScreenParametersNotification, object: nil,
+                queue: .main
             ) { _ in
                 MainActor.assumeIsolated {
                     AppLog.events.notice("displays changed: \(describeScreens(), privacy: .public)")
@@ -111,7 +131,10 @@ enum SessionLog {
         )
         AppLog.events.notice("displays: \(describeScreens(), privacy: .public)")
 
-        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .global())
+        let source = DispatchSource.makeMemoryPressureSource(
+            eventMask: [.warning, .critical],
+            queue: .global()
+        )
         source.setEventHandler { [weak source] in
             guard let source else { return }
             let level = source.data.contains(.critical) ? "critical" : "warning"
@@ -126,7 +149,8 @@ enum SessionLog {
     @MainActor
     private static func describeScreens() -> String {
         let screens = NSScreen.screens.map { screen in
-            let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+            let number = screen
+                .deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
             let frame = screen.frame
             return "\(number?.stringValue ?? "?") \(Int(frame.width))x\(Int(frame.height))@\(screen.backingScaleFactor)x"
         }
@@ -135,7 +159,8 @@ enum SessionLog {
 
     private static func footprintMegabytes() -> String {
         var info = task_vm_info_data_t()
-        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>
+            .size / MemoryLayout<natural_t>.size)
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
                 task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
@@ -160,11 +185,17 @@ enum SessionLog {
         func open() {
             lock.withLock {
                 do {
-                    try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+                    try FileManager.default.createDirectory(
+                        at: directoryURL,
+                        withIntermediateDirectories: true
+                    )
                     try openLocked()
                 } catch {
                     // Diagnostics must never stop the app; the export notes the missing file.
-                    failureLogger.error("session log unavailable: \(error.localizedDescription, privacy: .public)")
+                    failureLogger
+                        .error(
+                            "session log unavailable: \(error.localizedDescription, privacy: .public)"
+                        )
                 }
             }
         }
@@ -181,7 +212,10 @@ enum SessionLog {
                     }
                 } catch {
                     self.handle = nil
-                    failureLogger.error("session log write failed: \(error.localizedDescription, privacy: .public)")
+                    failureLogger
+                        .error(
+                            "session log write failed: \(error.localizedDescription, privacy: .public)"
+                        )
                 }
             }
         }
@@ -192,7 +226,8 @@ enum SessionLog {
             try handle?.close()
             handle = nil
             if FileManager.default.fileExists(atPath: fileURL.path),
-               let size = try FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int,
+               let size = try FileManager.default
+               .attributesOfItem(atPath: fileURL.path)[.size] as? Int,
                size > maxFileSize
             {
                 if FileManager.default.fileExists(atPath: previousFileURL.path) {
@@ -200,12 +235,17 @@ enum SessionLog {
                 }
                 try FileManager.default.moveItem(at: fileURL, to: previousFileURL)
             }
-            let descriptor = Darwin.open(fileURL.path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0o644)
+            let descriptor = Darwin.open(
+                fileURL.path,
+                O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC,
+                0o644
+            )
             guard descriptor >= 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
             handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-            fileSize = try FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int ?? 0
+            fileSize = try FileManager.default
+                .attributesOfItem(atPath: fileURL.path)[.size] as? Int ?? 0
         }
     }
 }

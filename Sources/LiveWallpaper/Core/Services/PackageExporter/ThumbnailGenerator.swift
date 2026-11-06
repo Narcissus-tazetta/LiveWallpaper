@@ -20,9 +20,13 @@ final class ThumbnailGenerator {
             var bestScore: Double = -1
 
             for ratio in candidateRatios {
-                let seconds = min(max(usableDuration * ratio, 0.15), max(usableDuration - 0.15, 0.15))
+                let seconds = min(
+                    max(usableDuration * ratio, 0.15),
+                    max(usableDuration - 0.15, 0.15)
+                )
                 let targetTime = CMTime(seconds: seconds, preferredTimescale: 600)
-                guard let cgImage = try? generator.copyCGImage(at: targetTime, actualTime: nil) else {
+                guard let cgImage = try? generator.copyCGImage(at: targetTime, actualTime: nil)
+                else {
                     continue
                 }
                 let score = ThumbnailImageScorer.score(cgImage)

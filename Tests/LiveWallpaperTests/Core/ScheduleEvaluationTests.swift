@@ -1,13 +1,13 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class ScheduleEvaluationTests: XCTestCase {
-    // WallpaperModel はスケジュールルールだけでなく videoOverrideByScreenID 等も
-    // UserDefaults.standard(swift test では xctest プロセスのドメイン)へ同期的に
-    // 永続化する。キー単位の掃除では追随漏れが出る(実際に videoOverrideByScreenID の
-    // 残骸が次回実行の WallpaperModel() 復元へ漏れ、testUnresolvableTargetIsNotRecorded-
-    // AndRetries が落ちた)ため、テストプロセスの永続ドメインごと前後で消す。
+    /// WallpaperModel はスケジュールルールだけでなく videoOverrideByScreenID 等も
+    /// UserDefaults.standard(swift test では xctest プロセスのドメイン)へ同期的に
+    /// 永続化する。キー単位の掃除では追随漏れが出る(実際に videoOverrideByScreenID の
+    /// 残骸が次回実行の WallpaperModel() 復元へ漏れ、testUnresolvableTargetIsNotRecorded-
+    /// AndRetries が落ちた)ため、テストプロセスの永続ドメインごと前後で消す。
     override func setUp() {
         super.setUp()
         Self.wipePersistentDefaults()
@@ -23,7 +23,7 @@ final class ScheduleEvaluationTests: XCTestCase {
         UserDefaults.standard.removePersistentDomain(forName: domain)
     }
 
-    // 決定的なテストのため、UTC固定のグレゴリオ暦を使う。
+    /// 決定的なテストのため、UTC固定のグレゴリオ暦を使う。
     private let calendar: Calendar = {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
@@ -64,9 +64,9 @@ final class ScheduleEvaluationTests: XCTestCase {
         )
     }
 
-    func testDisplayScopedRuleCanPinAWebWallpaperAndReleasesIt() {
+    func testDisplayScopedRuleCanPinAWebWallpaperAndReleasesIt() throws {
         let model = WallpaperModel()
-        let source = WebWallpaperSource(url: URL(string: "https://example.com/a")!)
+        let source = try WebWallpaperSource(url: XCTUnwrap(URL(string: "https://example.com/a")))
         model.webWallpaperFeatureEnabled = true
         model.webWallpaperSources = [source]
         model.scheduleAppearanceProvider = { .light }
@@ -98,9 +98,9 @@ final class ScheduleEvaluationTests: XCTestCase {
 
     func testTimeRangeContainsNormal() {
         let r = range(9, 0, 18, 0)
-        XCTAssertTrue(r.contains(ScheduleTimeOfDay(hour: 9, minute: 0)))    // 開始は含む
+        XCTAssertTrue(r.contains(ScheduleTimeOfDay(hour: 9, minute: 0))) // 開始は含む
         XCTAssertTrue(r.contains(ScheduleTimeOfDay(hour: 12, minute: 30)))
-        XCTAssertFalse(r.contains(ScheduleTimeOfDay(hour: 18, minute: 0)))  // 終了は含まない
+        XCTAssertFalse(r.contains(ScheduleTimeOfDay(hour: 18, minute: 0))) // 終了は含まない
         XCTAssertFalse(r.contains(ScheduleTimeOfDay(hour: 8, minute: 59)))
     }
 
@@ -108,9 +108,9 @@ final class ScheduleEvaluationTests: XCTestCase {
         let r = range(22, 0, 6, 0)
         XCTAssertTrue(r.contains(ScheduleTimeOfDay(hour: 22, minute: 0)))
         XCTAssertTrue(r.contains(ScheduleTimeOfDay(hour: 23, minute: 30)))
-        XCTAssertTrue(r.contains(ScheduleTimeOfDay(hour: 0, minute: 0)))    // 深夜0時
+        XCTAssertTrue(r.contains(ScheduleTimeOfDay(hour: 0, minute: 0))) // 深夜0時
         XCTAssertTrue(r.contains(ScheduleTimeOfDay(hour: 5, minute: 59)))
-        XCTAssertFalse(r.contains(ScheduleTimeOfDay(hour: 6, minute: 0)))   // 終了は含まない
+        XCTAssertFalse(r.contains(ScheduleTimeOfDay(hour: 6, minute: 0))) // 終了は含まない
         XCTAssertFalse(r.contains(ScheduleTimeOfDay(hour: 12, minute: 0)))
     }
 
@@ -338,7 +338,8 @@ final class ScheduleEvaluationTests: XCTestCase {
 
     func testDecodingRuleMissingNewFieldsUsesDefaults() throws {
         let json = """
-        {"id":"\(UUID().uuidString)","name":"legacy","target":{"kind":"video","videoPath":"/tmp/a.mov"}}
+        {"id":"\(UUID()
+            .uuidString)","name":"legacy","target":{"kind":"video","videoPath":"/tmp/a.mov"}}
         """
         let rule = try JSONDecoder().decode(ScheduleRule.self, from: Data(json.utf8))
         XCTAssertTrue(rule.isEnabled)

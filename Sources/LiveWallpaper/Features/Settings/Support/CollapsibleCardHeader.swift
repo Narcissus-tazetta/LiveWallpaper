@@ -5,13 +5,12 @@ extension SettingsView {
     /// 共通ヘッダー。アイコン付きタイトル・1行サマリー・開閉シェブロンを持ち、
     /// 行全体のタップで開閉する。`trailing` には集中モードのマスタースイッチの
     /// ように、閉じたままでも操作したい追加コントロールを渡せる。
-    @ViewBuilder
-    func collapsibleCardHeader<Trailing: View>(
+    func collapsibleCardHeader(
         title: String,
         systemImage: String,
         summary: String,
         isExpanded: Binding<Bool>,
-        @ViewBuilder trailing: () -> Trailing
+        @ViewBuilder trailing: () -> some View
     ) -> some View {
         HStack(spacing: 8) {
             // Labelling the whole row would hand the label to each child (three identical

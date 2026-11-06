@@ -176,7 +176,10 @@ final class StoreCatalogController: ObservableObject {
                 throw StoreClientError.invalidResponse
             }
             if response.expectedContentLength > maxBytes {
-                throw StoreClientError.fileTooLarge(sizeBytes: Int(response.expectedContentLength), maxBytes: StoreClient.maxUploadBytes)
+                throw StoreClientError.fileTooLarge(
+                    sizeBytes: Int(response.expectedContentLength),
+                    maxBytes: StoreClient.maxUploadBytes
+                )
             }
             fileManager.createFile(atPath: tempFile.path, contents: nil)
             defer { try? fileManager.removeItem(at: tempFile) }
@@ -190,7 +193,10 @@ final class StoreCatalogController: ObservableObject {
                 if buffer.count >= 1 << 20 {
                     written += Int64(buffer.count)
                     guard written <= maxBytes else {
-                        throw StoreClientError.fileTooLarge(sizeBytes: Int(written), maxBytes: StoreClient.maxUploadBytes)
+                        throw StoreClientError.fileTooLarge(
+                            sizeBytes: Int(written),
+                            maxBytes: StoreClient.maxUploadBytes
+                        )
                     }
                     try handle.write(contentsOf: buffer)
                     buffer.removeAll(keepingCapacity: true)
@@ -198,7 +204,10 @@ final class StoreCatalogController: ObservableObject {
             }
             written += Int64(buffer.count)
             guard written <= maxBytes else {
-                throw StoreClientError.fileTooLarge(sizeBytes: Int(written), maxBytes: StoreClient.maxUploadBytes)
+                throw StoreClientError.fileTooLarge(
+                    sizeBytes: Int(written),
+                    maxBytes: StoreClient.maxUploadBytes
+                )
             }
             try handle.write(contentsOf: buffer)
             try handle.close()
@@ -238,7 +247,10 @@ final class StoreCatalogController: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         do {
-            request.httpBody = try JSONEncoder().encode(ReportBody(entryId: entry.id, reason: reason))
+            request.httpBody = try JSONEncoder().encode(ReportBody(
+                entryId: entry.id,
+                reason: reason
+            ))
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse,
                   (200 ..< 300).contains(http.statusCode)
@@ -249,7 +261,8 @@ final class StoreCatalogController: ObservableObject {
             reportedEntryIDs.insert(entry.id)
             reportResultMessage = Self.localized("通報しました。ご協力ありがとうございます")
         } catch {
-            AppLog.store.error("report failed error=\(error.localizedDescription, privacy: .public)")
+            AppLog.store
+                .error("report failed error=\(error.localizedDescription, privacy: .public)")
             reportResultMessage = Self.localized("通報に失敗しました。もう一度お試しください")
         }
     }

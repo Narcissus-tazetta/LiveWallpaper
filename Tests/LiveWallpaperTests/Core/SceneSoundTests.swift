@@ -1,13 +1,14 @@
 import AVFoundation
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class SceneSoundTests: XCTestCase {
     private var folder: URL!
 
     override func setUpWithError() throws {
-        folder = FileManager.default.temporaryDirectory.appendingPathComponent("SceneSound-\(UUID())")
+        folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SceneSound-\(UUID())")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     }
 
@@ -18,10 +19,17 @@ final class SceneSoundTests: XCTestCase {
     /// A one second mono tone. Every test plays it at master volume 0, so nothing is heard.
     private func writeTone(_ name: String) throws {
         let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 8000, channels: 1))
-        let file = try AVAudioFile(forWriting: folder.appendingPathComponent(name), settings: format.settings)
+        let file = try AVAudioFile(
+            forWriting: folder.appendingPathComponent(name),
+            settings: format.settings
+        )
         let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 8000))
         buffer.frameLength = 8000
-        for index in 0 ..< 8000 { buffer.floatChannelData![0][index] = sin(Float(index) / 10) * 0.2 }
+        for index in 0 ..<
+            8000
+        {
+            buffer.floatChannelData![0][index] = sin(Float(index) / 10) * 0.2
+        }
         try file.write(from: buffer)
     }
 
@@ -42,24 +50,35 @@ final class SceneSoundTests: XCTestCase {
         sound.startsSilent = true
         var document = SceneDocument(canvasWidth: 10, canvasHeight: 10, layers: [])
         document.sounds = [sound]
-        let decoded = try JSONDecoder().decode(SceneDocument.self, from: JSONEncoder().encode(document))
+        let decoded = try JSONDecoder().decode(
+            SceneDocument.self,
+            from: JSONEncoder().encode(document)
+        )
         XCTAssertEqual(decoded.sounds, [sound])
         XCTAssertEqual(SceneStore.referencedFiles(of: decoded), ["sound-1.mp3"])
     }
 
     func testScenesSavedWithoutSoundsStillLoad() throws {
         let document = SceneDocument(canvasWidth: 10, canvasHeight: 10, layers: [])
-        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(document)) as? [String: Any])
+        var json = try XCTUnwrap(JSONSerialization
+            .jsonObject(with: JSONEncoder().encode(document)) as? [String: Any])
         json.removeValue(forKey: "sounds")
-        let decoded = try JSONDecoder().decode(SceneDocument.self, from: JSONSerialization.data(withJSONObject: json))
+        let decoded = try JSONDecoder().decode(
+            SceneDocument.self,
+            from: JSONSerialization.data(withJSONObject: json)
+        )
         XCTAssertEqual(decoded.sounds, [])
     }
 
     func testSoundFilesCannotLeaveTheSceneFolder() throws {
         let document = SceneDocument(canvasWidth: 10, canvasHeight: 10, layers: [])
-        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(document)) as? [String: Any])
+        var json = try XCTUnwrap(JSONSerialization
+            .jsonObject(with: JSONEncoder().encode(document)) as? [String: Any])
         json["sounds"] = [["id": UUID().uuidString, "name": "x", "files": ["../../secret.mp3"]]]
-        XCTAssertThrowsError(try JSONDecoder().decode(SceneDocument.self, from: JSONSerialization.data(withJSONObject: json)))
+        XCTAssertThrowsError(try JSONDecoder().decode(
+            SceneDocument.self,
+            from: JSONSerialization.data(withJSONObject: json)
+        ))
     }
 
     func testLoopPlaysOnlyWhileActiveAndPausesInBetween() throws {
@@ -97,7 +116,11 @@ final class SceneSoundTests: XCTestCase {
         player.configure(key: "a", folder: folder, sounds: [sound])
         player.isActive = true
         wait(1.4)
-        XCTAssertEqual(player.playingSoundIDs, [sound.id], "The second file takes over when the first ends")
+        XCTAssertEqual(
+            player.playingSoundIDs,
+            [sound.id],
+            "The second file takes over when the first ends"
+        )
     }
 
     func testReconfiguringTheSameSceneKeepsPlaying() throws {
@@ -128,8 +151,17 @@ final class SceneSoundTests: XCTestCase {
         wait(0.5)
         XCTAssertEqual(player.playingSoundIDs, [])
         XCTAssertEqual(player.waitingSoundIDs, [])
-        player.setScriptedSounds([sound.id: SceneScriptedSound(volume: 1, playing: true, plays: 1, stops: 0)])
-        XCTAssertEqual(player.playingSoundIDs, [sound.id], "The first play comes without a random wait")
+        player.setScriptedSounds([sound.id: SceneScriptedSound(
+            volume: 1,
+            playing: true,
+            plays: 1,
+            stops: 0
+        )])
+        XCTAssertEqual(
+            player.playingSoundIDs,
+            [sound.id],
+            "The first play comes without a random wait"
+        )
     }
 
     func testRandomSoundThatDoesNotStartSilentPlaysAtOnceAndThenWaitsItsPause() throws {
@@ -167,7 +199,12 @@ final class SceneSoundTests: XCTestCase {
         player.configure(key: "a", folder: folder, sounds: [sound])
         player.isActive = true
         XCTAssertEqual(player.playingSoundIDs, [])
-        player.setScriptedSounds([sound.id: SceneScriptedSound(volume: 0.7, playing: true, plays: 0, stops: 0)])
+        player.setScriptedSounds([sound.id: SceneScriptedSound(
+            volume: 0.7,
+            playing: true,
+            plays: 0,
+            stops: 0
+        )])
         XCTAssertEqual(player.playingSoundIDs, [sound.id])
     }
 
@@ -181,7 +218,12 @@ final class SceneSoundTests: XCTestCase {
         wait(0.2)
         XCTAssertEqual(player.playingSoundIDs, [], "A loop that starts silent waits for its script")
         func report(playing: Bool, plays: Int, stops: Int) {
-            player.setScriptedSounds([sound.id: SceneScriptedSound(volume: 1, playing: playing, plays: plays, stops: stops)])
+            player.setScriptedSounds([sound.id: SceneScriptedSound(
+                volume: 1,
+                playing: playing,
+                plays: plays,
+                stops: stops
+            )])
         }
         report(playing: false, plays: 0, stops: 0)
         XCTAssertEqual(player.playingSoundIDs, [])
@@ -202,7 +244,12 @@ final class SceneSoundTests: XCTestCase {
         player.configure(key: "a", folder: folder, sounds: [sound])
         player.isActive = true
         func report(playing: Bool, plays: Int) {
-            player.setScriptedSounds([sound.id: SceneScriptedSound(volume: 1, playing: playing, plays: plays, stops: 0)])
+            player.setScriptedSounds([sound.id: SceneScriptedSound(
+                volume: 1,
+                playing: playing,
+                plays: plays,
+                stops: 0
+            )])
         }
         report(playing: true, plays: 1)
         XCTAssertEqual(player.playingSoundIDs, [sound.id])
@@ -219,11 +266,33 @@ final class SceneSoundTests: XCTestCase {
 
     func testSoundOutputOfScriptsIsValidated() throws {
         let id = UUID()
-        let good: [Any] = [["id": id.uuidString, "volume": 0.5, "playing": true, "plays": 2, "stops": 1]]
-        XCTAssertEqual(try SceneScriptRuntime.readSounds(good), [id: SceneScriptedSound(volume: 0.5, playing: true, plays: 2, stops: 1)])
-        let tooLoud: [Any] = [["id": id.uuidString, "volume": 4, "playing": true, "plays": 0, "stops": 0]]
+        let good: [Any] = [[
+            "id": id.uuidString,
+            "volume": 0.5,
+            "playing": true,
+            "plays": 2,
+            "stops": 1
+        ]]
+        XCTAssertEqual(
+            try SceneScriptRuntime.readSounds(good),
+            [id: SceneScriptedSound(volume: 0.5, playing: true, plays: 2, stops: 1)]
+        )
+        let tooLoud: [Any] = [[
+            "id": id.uuidString,
+            "volume": 4,
+            "playing": true,
+            "plays": 0,
+            "stops": 0
+        ]]
         XCTAssertThrowsError(try SceneScriptRuntime.readSounds(tooLoud))
-        let unknownField: [Any] = [["id": id.uuidString, "volume": 1, "playing": true, "plays": 0, "stops": 0, "file": "x"]]
+        let unknownField: [Any] = [[
+            "id": id.uuidString,
+            "volume": 1,
+            "playing": true,
+            "plays": 0,
+            "stops": 0,
+            "file": "x"
+        ]]
         XCTAssertThrowsError(try SceneScriptRuntime.readSounds(unknownField))
         let twice: [Any] = good + good
         XCTAssertThrowsError(try SceneScriptRuntime.readSounds(twice))
@@ -256,14 +325,25 @@ final class SceneSoundTests: XCTestCase {
 
     func testAudioSettingOffNeverAllowsSound() {
         let screens = ["1"]
-        XCTAssertFalse(WallpaperModel.sceneSoundIsAllowed(audioEnabled: false, blockers: [], sharedDisplayIDs: screens, suspendedDisplayIDs: []))
-        XCTAssertTrue(WallpaperModel.sceneSoundIsAllowed(audioEnabled: true, blockers: [], sharedDisplayIDs: screens, suspendedDisplayIDs: []))
+        XCTAssertFalse(WallpaperModel.sceneSoundIsAllowed(
+            audioEnabled: false,
+            blockers: [],
+            sharedDisplayIDs: screens,
+            suspendedDisplayIDs: []
+        ))
+        XCTAssertTrue(WallpaperModel.sceneSoundIsAllowed(
+            audioEnabled: true,
+            blockers: [],
+            sharedDisplayIDs: screens,
+            suspendedDisplayIDs: []
+        ))
     }
 
     func testCoveredLockedAndSaverStatesStopSound() {
         func allowed(_ blockers: Set<SceneSoundBlocker> = [], suspended: Set<String> = []) -> Bool {
             WallpaperModel.sceneSoundIsAllowed(
-                audioEnabled: true, blockers: blockers, sharedDisplayIDs: ["1", "2"], suspendedDisplayIDs: suspended
+                audioEnabled: true, blockers: blockers, sharedDisplayIDs: ["1", "2"],
+                suspendedDisplayIDs: suspended
             )
         }
         XCTAssertTrue(allowed())
@@ -272,7 +352,12 @@ final class SceneSoundTests: XCTestCase {
         XCTAssertFalse(allowed([.locked]))
         XCTAssertFalse(allowed([.screenSaver]))
         XCTAssertFalse(allowed([.displayAsleep]))
-        XCTAssertFalse(WallpaperModel.sceneSoundIsAllowed(audioEnabled: true, blockers: [], sharedDisplayIDs: [], suspendedDisplayIDs: []))
+        XCTAssertFalse(WallpaperModel.sceneSoundIsAllowed(
+            audioEnabled: true,
+            blockers: [],
+            sharedDisplayIDs: [],
+            suspendedDisplayIDs: []
+        ))
     }
 
     func testModelStaysSilentWhileTheAudioSettingIsOff() throws {

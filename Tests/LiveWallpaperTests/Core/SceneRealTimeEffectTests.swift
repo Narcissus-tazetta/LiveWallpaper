@@ -21,7 +21,10 @@ final class SceneRealTimeEffectTests: XCTestCase {
         try FileManager.default.removeItem(at: directory)
     }
 
-    private func writeImage(prefix: String, _ pixel: (Int, Int) -> (UInt8, UInt8, UInt8)) throws -> String {
+    private func writeImage(
+        prefix: String,
+        _ pixel: (Int, Int) -> (UInt8, UInt8, UInt8)
+    ) throws -> String {
         var pixels = [UInt8](repeating: 255, count: size * size * 4)
         for y in 0 ..< size {
             for x in 0 ..< size {
@@ -49,7 +52,8 @@ final class SceneRealTimeEffectTests: XCTestCase {
 
     /// BGRA.
     private func frame(
-        _ effect: SceneEffect?, file: String, time: Double, realTime: Bool, shake: SceneCameraShake? = nil
+        _ effect: SceneEffect?, file: String, time: Double, realTime: Bool,
+        shake: SceneCameraShake? = nil
     ) throws -> [UInt8] {
         var layer = SceneLayer(name: "picture", imageFile: file)
         layer.effects = effect.map { [$0] } ?? []
@@ -70,7 +74,12 @@ final class SceneRealTimeEffectTests: XCTestCase {
         command.commit()
         command.waitUntilCompleted()
         var pixels = [UInt8](repeating: 0, count: size * size * 4)
-        texture.getBytes(&pixels, bytesPerRow: size * 4, from: MTLRegionMake2D(0, 0, size, size), mipmapLevel: 0)
+        texture.getBytes(
+            &pixels,
+            bytesPerRow: size * 4,
+            from: MTLRegionMake2D(0, 0, size, size),
+            mipmapLevel: 0
+        )
         return pixels
     }
 
@@ -84,14 +93,21 @@ final class SceneRealTimeEffectTests: XCTestCase {
 
     /// Largest difference from the expected red/green over the inner pixels (the
     /// outer ring also depends on how far the clamp reaches).
-    private func worstError(_ pixels: [UInt8], expected: (SIMD2<Double>) -> SIMD2<Double>) -> Double {
+    private func worstError(
+        _ pixels: [UInt8],
+        expected: (SIMD2<Double>) -> SIMD2<Double>
+    ) -> Double {
         var worst = 0.0
         for y in 2 ..< size - 2 {
             for x in 2 ..< size - 2 {
                 let uv = SIMD2((Double(x) + 0.5) / Double(size), (Double(y) + 0.5) / Double(size))
                 let colour = gradient(at: expected(uv))
                 let index = (y * size + x) * 4
-                worst = max(worst, abs(Double(pixels[index + 2]) - colour.red), abs(Double(pixels[index + 1]) - colour.green))
+                worst = max(
+                    worst,
+                    abs(Double(pixels[index + 2]) - colour.red),
+                    abs(Double(pixels[index + 1]) - colour.green)
+                )
             }
         }
         return worst
@@ -107,7 +123,11 @@ final class SceneRealTimeEffectTests: XCTestCase {
         for (x, expected) in [(16, [0, 0, 0]), (48, [13, 25, 50])] {
             let offset = (32 * size + x) * 4
             for channel in 0 ..< 3 {
-                XCTAssertEqual(Double(masked[offset + channel]), Double(expected[channel]), accuracy: 1)
+                XCTAssertEqual(
+                    Double(masked[offset + channel]),
+                    Double(expected[channel]),
+                    accuracy: 1
+                )
             }
         }
         let offset = (32 * size + 48) * 4
@@ -121,8 +141,14 @@ final class SceneRealTimeEffectTests: XCTestCase {
             var layer = SceneLayer(name: "picture", imageFile: "layer.png")
             layer.effects = [SceneEffect(kind: kind)]
             let scene = SceneDocument(canvasWidth: size, canvasHeight: size, layers: [layer])
-            XCTAssertTrue(scene.requiresRealTimePlayback, "\(kind) must retain its speed after baking")
-            let restored = try JSONDecoder().decode(SceneDocument.self, from: JSONEncoder().encode(scene))
+            XCTAssertTrue(
+                scene.requiresRealTimePlayback,
+                "\(kind) must retain its speed after baking"
+            )
+            let restored = try JSONDecoder().decode(
+                SceneDocument.self,
+                from: JSONEncoder().encode(scene)
+            )
             XCTAssertTrue(restored.requiresRealTimePlayback)
         }
     }
@@ -178,7 +204,13 @@ final class SceneRealTimeEffectTests: XCTestCase {
         let file = try writeGradient()
         var effect = SceneEffect(kind: .travelingWaves)
         typealias Key = SceneEffect.WaveKey
-        effect.values = [Key.speed: 2, Key.scale: 8, Key.amplitude: 0.3, Key.exponent: 1, Key.angle: 1.1]
+        effect.values = [
+            Key.speed: 2,
+            Key.scale: 8,
+            Key.amplitude: 0.3,
+            Key.exponent: 1,
+            Key.angle: 1.1
+        ]
         let time = 0.7
         let pixels = try frame(effect, file: file, time: time, realTime: true)
 
@@ -213,14 +245,21 @@ final class SceneRealTimeEffectTests: XCTestCase {
 
     /// Largest colour difference from `expected` (0...255 red, green, blue) over the
     /// inner pixels; nil from `expected` skips a pixel.
-    private func worstColourError(_ pixels: [UInt8], expected: (Int, Int) -> SIMD3<Double>?) -> Double {
+    private func worstColourError(
+        _ pixels: [UInt8],
+        expected: (Int, Int) -> SIMD3<Double>?
+    ) -> Double {
         var worst = 0.0
         for y in 2 ..< size - 2 {
             for x in 2 ..< size - 2 {
                 guard let colour = expected(x, y) else { continue }
                 let index = (y * size + x) * 4
-                worst = max(worst, abs(Double(pixels[index + 2]) - colour.x), abs(Double(pixels[index + 1]) - colour.y),
-                            abs(Double(pixels[index]) - colour.z))
+                worst = max(
+                    worst,
+                    abs(Double(pixels[index + 2]) - colour.x),
+                    abs(Double(pixels[index + 1]) - colour.y),
+                    abs(Double(pixels[index]) - colour.z)
+                )
             }
         }
         return worst
@@ -297,7 +336,14 @@ final class SceneRealTimeEffectTests: XCTestCase {
         let file = try writeGradient()
         var effect = SceneEffect(kind: .noiseSway)
         typealias Key = SceneEffect.NoiseSwayKey
-        effect.values = [Key.speed: 2, Key.strength: 1.5, Key.phase: 0.5, Key.power: 1, Key.ratio: 0.3, Key.angle: 0.4]
+        effect.values = [
+            Key.speed: 2,
+            Key.strength: 1.5,
+            Key.phase: 0.5,
+            Key.power: 1,
+            Key.ratio: 0.3,
+            Key.angle: 0.4
+        ]
         effect.patternFile = try solid("noise", 0, 153, 0)
         let time = 0.9
         let pixels = try frame(effect, file: file, time: time, realTime: true)
@@ -325,49 +371,74 @@ final class SceneRealTimeEffectTests: XCTestCase {
     private func loopingEffects() throws -> [SceneEffect] {
         var waves = SceneEffect(kind: .travelingWaves)
         waves.values = [
-            SceneEffect.WaveKey.speed: 2.07, SceneEffect.WaveKey.scale: 8, SceneEffect.WaveKey.amplitude: 0.3,
-            SceneEffect.WaveKey.angle: 0.4, SceneEffect.WaveKey.dual: 1, SceneEffect.WaveKey.speed2: 0.03,
+            SceneEffect.WaveKey.speed: 2.07, SceneEffect.WaveKey.scale: 8,
+            SceneEffect.WaveKey.amplitude: 0.3,
+            SceneEffect.WaveKey.angle: 0.4, SceneEffect.WaveKey.dual: 1,
+            SceneEffect.WaveKey.speed2: 0.03,
             SceneEffect.WaveKey.scale2: 5, SceneEffect.WaveKey.offset2: 3
         ]
         var sway = SceneEffect(kind: .noiseSway)
         sway.values = [
-            SceneEffect.NoiseSwayKey.speed: 0.85, SceneEffect.NoiseSwayKey.strength: 3, SceneEffect.NoiseSwayKey.phase: 0.5,
+            SceneEffect.NoiseSwayKey.speed: 0.85, SceneEffect.NoiseSwayKey.strength: 3,
+            SceneEffect.NoiseSwayKey.phase: 0.5,
             SceneEffect.NoiseSwayKey.power: 1, SceneEffect.NoiseSwayKey.ratio: 1
         ]
         sway.patternFile = try solid("noise", 0, 153, 0)
         var shake = SceneEffect(kind: .flowShake)
         // The irregular swing sums four sines in 0...2; the default bounds clip most of it.
         shake.values = [
-            SceneEffect.FlowShakeKey.speed: 0.85, SceneEffect.FlowShakeKey.amplitude: 0.5, SceneEffect.FlowShakeKey.irregular: 1,
+            SceneEffect.FlowShakeKey.speed: 0.85, SceneEffect.FlowShakeKey.amplitude: 0.5,
+            SceneEffect.FlowShakeKey.irregular: 1,
             SceneEffect.FlowShakeKey.boundsMax: 2
         ]
         shake.flowFile = try solid("flow", 191, 128, 0)
         var steadyShake = shake
         steadyShake.values[SceneEffect.FlowShakeKey.irregular] = 0
         var flow = SceneEffect(kind: .flowMap)
-        flow.values = [SceneEffect.FlowMapKey.speed: 0.007, SceneEffect.FlowMapKey.strength: 4, SceneEffect.FlowMapKey.feather: 0.4]
+        flow.values = [
+            SceneEffect.FlowMapKey.speed: 0.007,
+            SceneEffect.FlowMapKey.strength: 4,
+            SceneEffect.FlowMapKey.feather: 0.4
+        ]
         flow.flowFile = try solid("flow", 191, 128, 0)
         flow.patternFile = try writeImage(prefix: "phase") { x, _ in (UInt8(x * 4), 0, 0) }
         var drift = SceneEffect(kind: .noiseDrift)
-        drift.values = [SceneEffect.NoiseDriftKey.amount: 0.08, SceneEffect.NoiseDriftKey.angle: 0.7, SceneEffect.NoiseDriftKey.speed: 0.013]
-        drift.patternFile = try writeImage(prefix: "drift") { x, y in (UInt8((x * 7 + y * 3) % 64 * 4), 0, 0) }
+        drift.values = [
+            SceneEffect.NoiseDriftKey.amount: 0.08,
+            SceneEffect.NoiseDriftKey.angle: 0.7,
+            SceneEffect.NoiseDriftKey.speed: 0.013
+        ]
+        drift.patternFile = try writeImage(prefix: "drift") { x, y in (
+            UInt8((x * 7 + y * 3) % 64 * 4),
+            0,
+            0
+        ) }
         var pulse = SceneEffect(kind: .pulseBlend)
         pulse.values = [
-            SceneEffect.PulseKey.speed: 0.05, SceneEffect.PulseKey.amount: 0.8, SceneEffect.PulseKey.blendMode: 9,
-            SceneEffect.PulseKey.highRed: 0.5, SceneEffect.PulseKey.highGreen: 0.2, SceneEffect.PulseKey.highBlue: 1
+            SceneEffect.PulseKey.speed: 0.05, SceneEffect.PulseKey.amount: 0.8,
+            SceneEffect.PulseKey.blendMode: 9,
+            SceneEffect.PulseKey.highRed: 0.5, SceneEffect.PulseKey.highGreen: 0.2,
+            SceneEffect.PulseKey.highBlue: 1
         ]
         var scroll = SceneEffect(kind: .uvScroll)
         scroll.values = [SceneEffect.ScrollKey.speedX: -0.11, SceneEffect.ScrollKey.speedY: 0.07]
         var swing = SceneEffect(kind: .axisSwing)
         swing.values = [
-            SceneEffect.AxisSwingKey.speed: 0.07, SceneEffect.AxisSwingKey.amount: 0.6, SceneEffect.AxisSwingKey.x0: 0.2,
-            SceneEffect.AxisSwingKey.y0: 0.3, SceneEffect.AxisSwingKey.x1: 0.8, SceneEffect.AxisSwingKey.y1: 0.4,
+            SceneEffect.AxisSwingKey.speed: 0.07, SceneEffect.AxisSwingKey.amount: 0.6,
+            SceneEffect.AxisSwingKey.x0: 0.2,
+            SceneEffect.AxisSwingKey.y0: 0.3, SceneEffect.AxisSwingKey.x1: 0.8,
+            SceneEffect.AxisSwingKey.y1: 0.4,
             SceneEffect.AxisSwingKey.size: 0.5, SceneEffect.AxisSwingKey.feather: 0.05
         ]
-        let bumps = try writeImage(prefix: "bumps") { x, y in (UInt8(128 + (x * 5 + y * 2) % 60), UInt8(128 + (x * 3 + y * 7) % 60), 255) }
+        let bumps = try writeImage(prefix: "bumps") { x, y in (
+            UInt8(128 + (x * 5 + y * 2) % 60),
+            UInt8(128 + (x * 3 + y * 7) % 60),
+            255
+        ) }
         var ripples = SceneEffect(kind: .normalRipples)
         ripples.values = [
-            SceneEffect.RipplesKey.strength: 0.5, SceneEffect.RipplesKey.animationSpeed: 0.17, SceneEffect.RipplesKey.scale: 1.3,
+            SceneEffect.RipplesKey.strength: 0.5, SceneEffect.RipplesKey.animationSpeed: 0.17,
+            SceneEffect.RipplesKey.scale: 1.3,
             SceneEffect.RipplesKey.scrollSpeed: 0.13, SceneEffect.RipplesKey.scrollAngle: 0.6
         ]
         ripples.patternFile = bumps
@@ -381,7 +452,20 @@ final class SceneRealTimeEffectTests: XCTestCase {
         noisySwing.values[SceneEffect.AxisSwingKey.noiseSpeed] = 0.37
         noisySwing.values[SceneEffect.AxisSwingKey.noiseAmount] = 1
         noisySwing.patternFile = bumps
-        return [waves, sway, shake, steadyShake, flow, drift, pulse, scroll, swing, ripples, noisyPulse, noisySwing]
+        return [
+            waves,
+            sway,
+            shake,
+            steadyShake,
+            flow,
+            drift,
+            pulse,
+            scroll,
+            swing,
+            ripples,
+            noisyPulse,
+            noisySwing
+        ]
     }
 
     func testBakedLoopKeepsTheRealRatesThroughItsFirstHalfAndCloses() throws {
@@ -389,8 +473,16 @@ final class SceneRealTimeEffectTests: XCTestCase {
         for effect in try loopingEffects() {
             let live = try frame(effect, file: file, time: 25, realTime: true)
             let baked = try frame(effect, file: file, time: 25, realTime: false)
-            XCTAssertEqual(baked, live, "\(effect.kind): the first half of a baked loop moves as on real time")
-            XCTAssertNotEqual(baked, try frame(effect, file: file, time: 0, realTime: false), "\(effect.kind) moves")
+            XCTAssertEqual(
+                baked,
+                live,
+                "\(effect.kind): the first half of a baked loop moves as on real time"
+            )
+            XCTAssertNotEqual(
+                baked,
+                try frame(effect, file: file, time: 0, realTime: false),
+                "\(effect.kind) moves"
+            )
 
             let start = try frame(effect, file: file, time: 0, realTime: false)
             let end = try frame(effect, file: file, time: 59.98, realTime: false)
@@ -418,13 +510,22 @@ final class SceneRealTimeEffectTests: XCTestCase {
             #include <metal_stdlib>
             using namespace metal;
             fragment float4 fragmentMain(constant float& time [[buffer(0)]]) { return float4(fract(time * 0.37), 0, 0, 1); }
-            """, entryPoint: "fragmentMain", uniforms: Data(repeating: 0, count: 16), updates: [.init(offset: 0, value: .time)]),
+            """, entryPoint: "fragmentMain", uniforms: Data(repeating: 0, count: 16), updates: [
+                .init(
+                    offset: 0,
+                    value: .time
+                )
+            ]),
             vertices: Data(repeating: 0, count: 12), vertexStride: 4, vertexCount: 3,
             attributes: [], textures: [.init(index: 0, source: "input")]
         )
         var effect = SceneEffect(kind: .shader)
         effect.renderGraph = SceneRenderGraph(
-            targets: [.init(name: "work")], passes: [.init(operation: .draw, target: "work", draw: draw)], output: "work"
+            targets: [.init(name: "work")], passes: [.init(
+                operation: .draw,
+                target: "work",
+                draw: draw
+            )], output: "work"
         )
         return effect
     }
@@ -432,11 +533,26 @@ final class SceneRealTimeEffectTests: XCTestCase {
     func testABakedLoopFadesAConvertedShaderIntoItsStart() throws {
         let file = try writeGradient()
         let shader = sawtoothShader()
-        func red(_ time: Double, live: Bool) throws -> Int { Int(try frame(shader, file: file, time: time, realTime: live)[2]) }
-        XCTAssertEqual(try red(25, live: false), try red(25, live: true), "past the fade the shader runs on its own time")
+        func red(_ time: Double, live: Bool) throws -> Int {
+            try Int(frame(
+                shader,
+                file: file,
+                time: time,
+                realTime: live
+            )[2])
+        }
+        XCTAssertEqual(
+            try red(25, live: false),
+            try red(25, live: true),
+            "past the fade the shader runs on its own time"
+        )
         // fract(0.37 × 60) = 0.2 is where the loop's end left it; drawn as it is, the start is 0.
         XCTAssertEqual(try red(0, live: false), try red(60, live: true))
-        XCTAssertLessThanOrEqual(abs(try red(0, live: false) - red(59.98, live: false)), 2, "the baked loop closes")
+        XCTAssertLessThanOrEqual(
+            try abs(red(0, live: false) - red(59.98, live: false)),
+            2,
+            "the baked loop closes"
+        )
         XCTAssertEqual(try red(0, live: true), 0)
     }
 
@@ -447,20 +563,36 @@ final class SceneRealTimeEffectTests: XCTestCase {
         XCTAssertEqual(try frame(nil, file: file, time: 25, realTime: false, shake: shake), live)
         let start = try frame(nil, file: file, time: 0, realTime: false, shake: shake)
         let end = try frame(nil, file: file, time: 59.98, realTime: false, shake: shake)
-        XCTAssertLessThanOrEqual(zip(start, end).map { abs(Int($0) - Int($1)) }.max() ?? 0, 3, "the baked loop closes")
-        XCTAssertNotEqual(end, try frame(nil, file: file, time: 59.98, realTime: true, shake: shake))
+        XCTAssertLessThanOrEqual(
+            zip(start, end).map { abs(Int($0) - Int($1)) }.max() ?? 0,
+            3,
+            "the baked loop closes"
+        )
+        XCTAssertNotEqual(
+            end,
+            try frame(nil, file: file, time: 59.98, realTime: true, shake: shake)
+        )
     }
 
     func testAClampedPatternDriftsOffWithoutWrappingRound() throws {
         let file = try writeGradient()
         var drift = SceneEffect(kind: .noiseDrift)
-        drift.values = [SceneEffect.NoiseDriftKey.amount: 0.08, SceneEffect.NoiseDriftKey.speed: 0.05]
+        drift.values = [
+            SceneEffect.NoiseDriftKey.amount: 0.08,
+            SceneEffect.NoiseDriftKey.speed: 0.05
+        ]
         drift.patternFile = try writeImage(prefix: "drift") { x, _ in (UInt8(x * 4), 0, 0) }
         // 5 s and 25 s are a whole repeat apart: the same on a repeating pattern, past
         // the edge on a clamped one.
-        XCTAssertEqual(try frame(drift, file: file, time: 5, realTime: true), try frame(drift, file: file, time: 25, realTime: true))
+        XCTAssertEqual(
+            try frame(drift, file: file, time: 5, realTime: true),
+            try frame(drift, file: file, time: 25, realTime: true)
+        )
         drift.values[SceneEffect.patternClampsKey] = 1
-        XCTAssertNotEqual(try frame(drift, file: file, time: 5, realTime: true), try frame(drift, file: file, time: 25, realTime: true))
+        XCTAssertNotEqual(
+            try frame(drift, file: file, time: 5, realTime: true),
+            try frame(drift, file: file, time: 25, realTime: true)
+        )
     }
 
     func testPulseBlendTintsAsTheFormulaSays() throws {
@@ -515,7 +647,8 @@ final class SceneRealTimeEffectTests: XCTestCase {
         var effect = SceneEffect(kind: .axisSwing)
         typealias Key = SceneEffect.AxisSwingKey
         effect.values = [
-            Key.speed: 2, Key.amount: 0.6, Key.x0: 0.2, Key.y0: 0.3, Key.x1: 0.8, Key.y1: 0.4, Key.size: 0.5,
+            Key.speed: 2, Key.amount: 0.6, Key.x0: 0.2, Key.y0: 0.3, Key.x1: 0.8, Key.y1: 0.4,
+            Key.size: 0.5,
             Key.feather: 0.05
         ]
         let time = 0.6
@@ -535,7 +668,11 @@ final class SceneRealTimeEffectTests: XCTestCase {
             let delta = uv - centre
             let along = (axis * delta).sum(), side = (across * delta).sum()
             let bent = uv + axis * swing * side * along + across * swing * swing * side
-            var weight = smooth(0.05, 0, ((bent - p1) * axis).sum()) * smooth(-0.05, 0, ((bent - p0) * axis).sum())
+            var weight = smooth(0.05, 0, ((bent - p1) * axis).sum()) * smooth(
+                -0.05,
+                0,
+                ((bent - p0) * axis).sum()
+            )
             let reach = 0.5 * (1 - abs(swing) * 0.6 * 0.5)
             weight *= smooth(reach + 0.05, reach - 0.05, side) * (side >= 0 ? 1 : 0)
             return uv + (bent - uv) * weight

@@ -246,7 +246,8 @@ extension WallpaperModel {
 
     private func suspendSharedPlayerViews(displayIDs: [String]) {
         for index in playerViews.indices {
-            let displayID = index < displayIDs.count ? displayIDs[index] : displayIDForWindow(at: index)
+            let displayID = index < displayIDs
+                .count ? displayIDs[index] : displayIDForWindow(at: index)
             if isSharedPlayerDisplay(displayID) {
                 playerViews[index].setSuspended(true)
             }

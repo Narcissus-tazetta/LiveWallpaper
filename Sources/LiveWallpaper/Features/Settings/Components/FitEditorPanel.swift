@@ -216,7 +216,10 @@ extension SettingsView {
                 .transition(Motion.reveal)
         }
 
-        Text(model.localizedString("ドラッグまたは矢印キーで位置を調整できます（Shift 併用で速く移動）。ピンチまたは Option+スクロールでカーソル位置を中心にズームします"))
+        Text(model
+            .localizedString(
+                "ドラッグまたは矢印キーで位置を調整できます（Shift 併用で速く移動）。ピンチまたは Option+スクロールでカーソル位置を中心にズームします"
+            ))
             .font(.caption)
             .foregroundColor(.secondary)
         Text(

@@ -143,7 +143,8 @@ final class ScenePlacementTests: XCTestCase {
             document.layers[0].transform.scaleY = original.scale
             try renderer.update(document: document)
             let collapsed = try draw(time: 1)
-            XCTAssertFalse(stride(from: 1, to: collapsed.count, by: 4).contains { collapsed[$0] != 0 })
+            XCTAssertFalse(stride(from: 1, to: collapsed.count, by: 4)
+                .contains { collapsed[$0] != 0 })
             if let point = renderer.layerUV(canvasUV: SIMD2(0.5, 0.5), layerID: layer.id) {
                 XCTAssertTrue(point.x.isFinite && point.y.isFinite)
             }

@@ -59,7 +59,8 @@ extension WallpaperModel {
 
     /// 接続中の画面のどれかが Web 壁紙を表示するか(共有でも固定でも)。
     var hasWebDisplay: Bool {
-        isWebWallpaperActive || targetScreens().contains { hasWebOverride(forScreenID: displayIDString(for: $0)) }
+        isWebWallpaperActive || targetScreens()
+            .contains { hasWebOverride(forScreenID: displayIDString(for: $0)) }
     }
 
     func setWebOverride(id: UUID?, forScreenID screenID: String) {
@@ -151,7 +152,9 @@ extension WallpaperModel {
                 continue
             }
             let audio = audioEnabled && !hasWebOverride(forScreenID: entry.displayID)
-            if let index = groups.firstIndex(where: { $0.source.id == source.id && $0.audio == audio }) {
+            if let index = groups
+                .firstIndex(where: { $0.source.id == source.id && $0.audio == audio })
+            {
                 groups[index].entries.append(entry)
             } else {
                 groups.append(Group(source: source, audio: audio, entries: [entry]))
@@ -160,7 +163,8 @@ extension WallpaperModel {
 
         localWebLoadTask?.cancel()
         // 読み込み状態の表示は、共有の壁紙(なければ最初の画面)のビューに限る。
-        let stateReporter = (groups.first { $0.audio || isWebWallpaperActive } ?? groups.first)?.entries.first?.view
+        let stateReporter = (groups.first { $0.audio || isWebWallpaperActive } ?? groups.first)?
+            .entries.first?.view
         for entry in entries {
             entry.view.onLoadStateChanged = entry.view === stateReporter
                 ? { [weak self] state in self?.webWallpaperLoadState = state }
@@ -171,13 +175,19 @@ extension WallpaperModel {
             guard let self else { return }
             for group in groups {
                 let pending = group.entries.filter {
-                    force || $0.view.loadedSourceID != group.source.id || $0.view.loadedWithAudio != group.audio
+                    force || $0.view.loadedSourceID != group.source.id || $0.view
+                        .loadedWithAudio != group.audio
                 }
                 guard !pending.isEmpty else { continue }
                 do {
-                    let request = try await webPlaybackRequest(for: group.source, audio: group.audio)
+                    let request = try await webPlaybackRequest(
+                        for: group.source,
+                        audio: group.audio
+                    )
                     try Task.checkCancellation()
-                    for entry in pending where webSource(forScreenID: entry.displayID)?.id == group.source.id {
+                    for entry in pending
+                        where webSource(forScreenID: entry.displayID)?.id == group.source.id
+                    {
                         configureLocalWebEnvironment(entry.view)
                         entry.view.loadedSourceID = group.source.id
                         entry.view.loadedWithAudio = group.audio
@@ -189,13 +199,19 @@ extension WallpaperModel {
                     guard !Task.isCancelled else { return }
                     webWallpaperLoadState = .failed
                     webWallpaperErrorMessage = error.localizedDescription
-                    AppLog.externalWallpapers.error("local web load failed: \(error.localizedDescription, privacy: .public)")
+                    AppLog.externalWallpapers
+                        .error(
+                            "local web load failed: \(error.localizedDescription, privacy: .public)"
+                        )
                 }
             }
         }
     }
 
-    private func webPlaybackRequest(for source: WebWallpaperSource, audio: Bool) async throws -> WebWallpaperPlaybackRequest {
+    private func webPlaybackRequest(
+        for source: WebWallpaperSource,
+        audio: Bool
+    ) async throws -> WebWallpaperPlaybackRequest {
         if let folder = source.localFolderPath {
             let url = try await localWebWallpaperServer.url(folder: URL(fileURLWithPath: folder))
             return WebWallpaperPlaybackRequest(

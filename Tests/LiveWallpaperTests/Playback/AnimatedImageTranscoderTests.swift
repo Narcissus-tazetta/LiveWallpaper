@@ -1,10 +1,9 @@
 import AVFoundation
 import CoreGraphics
 import ImageIO
+@testable import LiveWallpaper
 import UniformTypeIdentifiers
 import XCTest
-
-@testable import LiveWallpaper
 
 final class AnimatedImageTranscoderTests: XCTestCase {
     private var workingDirectory: URL!
@@ -57,7 +56,7 @@ final class AnimatedImageTranscoderTests: XCTestCase {
             kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]
         ] as CFDictionary
         CGImageDestinationSetProperties(destination, fileProperties)
-        for index in 0..<frameCount {
+        for index in 0 ..< frameCount {
             let frameProperties = [
                 kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: delay]
             ] as CFDictionary
@@ -89,7 +88,7 @@ final class AnimatedImageTranscoderTests: XCTestCase {
             kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGLoopCount: 0]
         ] as CFDictionary
         CGImageDestinationSetProperties(destination, fileProperties)
-        for index in 0..<frameCount {
+        for index in 0 ..< frameCount {
             let frameProperties = [
                 kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGDelayTime: delay]
             ] as CFDictionary
@@ -108,14 +107,16 @@ final class AnimatedImageTranscoderTests: XCTestCase {
         workingDirectory.appendingPathComponent(name)
     }
 
-    private func loadVideoInfo(_ url: URL) async throws -> (duration: Double, size: CGSize, codec: FourCharCode) {
+    private func loadVideoInfo(_ url: URL) async throws
+        -> (duration: Double, size: CGSize, codec: FourCharCode)
+    {
         let asset = AVURLAsset(url: url)
         let duration = try await asset.load(.duration)
         let tracks = try await asset.loadTracks(withMediaType: .video)
         let track = try XCTUnwrap(tracks.first)
         let size = try await track.load(.naturalSize)
         let descriptions = try await track.load(.formatDescriptions)
-        let codec = CMFormatDescriptionGetMediaSubType(try XCTUnwrap(descriptions.first))
+        let codec = try CMFormatDescriptionGetMediaSubType(XCTUnwrap(descriptions.first))
         return (duration.seconds, size, codec)
     }
 
@@ -148,7 +149,8 @@ final class AnimatedImageTranscoderTests: XCTestCase {
         XCTAssertEqual(info.duration, 2.0, accuracy: 0.05)
         XCTAssertEqual(info.size.width, 64)
         XCTAssertEqual(info.size.height, 64, "奇数の高さ63は64へ偶数化される")
-        let codecString = String(describing: UTCreateStringForOSType(info.codec).takeRetainedValue())
+        let codecString = String(describing: UTCreateStringForOSType(info.codec)
+            .takeRetainedValue())
         XCTAssertTrue(["hvc1", "avc1"].contains(codecString), "unexpected codec: \(codecString)")
     }
 

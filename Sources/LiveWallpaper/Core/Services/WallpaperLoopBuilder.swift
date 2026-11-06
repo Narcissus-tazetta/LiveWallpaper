@@ -122,8 +122,8 @@ enum WallpaperLoopBuilder {
     ) {
         let pollInterval: TimeInterval = 0.05
         let giveUpAfter: TimeInterval = 5
-        /// ループ開始位置からこれ以上進んでいたら、もう巻き戻さない。
-        let maxRewind: Double = 0.5
+        // ループ開始位置からこれ以上進んでいたら、もう巻き戻さない。
+        let maxRewind = 0.5
 
         func retry() {
             guard elapsed + pollInterval < giveUpAfter else {

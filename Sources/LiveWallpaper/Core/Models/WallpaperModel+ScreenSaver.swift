@@ -16,7 +16,10 @@ extension WallpaperModel {
             refreshScreenSaverInstallState()
             writeScreenSaverConfigIfInstalled(force: true)
         } catch {
-            AppLog.appDelegate.error("screensaver install failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.appDelegate
+                .error(
+                    "screensaver install failed: \(error.localizedDescription, privacy: .public)"
+                )
             screenSaverErrorMessage = error.localizedDescription
         }
         refreshScreenSaverInstallState()
@@ -29,7 +32,10 @@ extension WallpaperModel {
             screenSaverErrorMessage = nil
             lastWrittenScreenSaverConfig = nil
         } catch {
-            AppLog.appDelegate.error("screensaver uninstall failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.appDelegate
+                .error(
+                    "screensaver uninstall failed: \(error.localizedDescription, privacy: .public)"
+                )
             screenSaverErrorMessage = error.localizedDescription
         }
         refreshScreenSaverInstallState()
@@ -38,7 +44,8 @@ extension WallpaperModel {
     /// Call once at launch. Puts the saver back (removed at the last quit) and keeps its
     /// config following whatever the desktop shows.
     func configureScreenSaverSync() {
-        screenSaverVideoPath = Self.validatedVideoPath(UserDefaults.standard.string(forKey: PrefsKey.screenSaverVideoPath))
+        screenSaverVideoPath = Self
+            .validatedVideoPath(UserDefaults.standard.string(forKey: PrefsKey.screenSaverVideoPath))
         refreshScreenSaverInstallState()
         // Installs made before the preference existed count as enabled.
         let enabled = UserDefaults.standard.object(forKey: PrefsKey.screenSaverEnabled) as? Bool
@@ -59,7 +66,7 @@ extension WallpaperModel {
             $fitMode.map { _ in () }.eraseToAnyPublisher(),
             $displayScreens.map { _ in () }.eraseToAnyPublisher(),
             $videoAspectRatioByPath.map { _ in () }.eraseToAnyPublisher(),
-            $screenSaverVideoPath.map { _ in () }.eraseToAnyPublisher(),
+            $screenSaverVideoPath.map { _ in () }.eraseToAnyPublisher()
         ]
         // @Published emits on willSet; the debounce also lets the value settle and
         // coalesces bursts such as a schedule switch touching several properties.
@@ -81,7 +88,10 @@ extension WallpaperModel {
         do {
             try screenSaverInstaller.uninstall()
         } catch {
-            AppLog.appDelegate.error("screensaver removal before exit failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.appDelegate
+                .error(
+                    "screensaver removal before exit failed: \(error.localizedDescription, privacy: .public)"
+                )
         }
     }
 
@@ -101,7 +111,10 @@ extension WallpaperModel {
             try screenSaverInstaller.writeConfig(config)
             lastWrittenScreenSaverConfig = config
         } catch {
-            AppLog.appDelegate.error("screensaver config write failed: \(error.localizedDescription, privacy: .public)")
+            AppLog.appDelegate
+                .error(
+                    "screensaver config write failed: \(error.localizedDescription, privacy: .public)"
+                )
             screenSaverErrorMessage = error.localizedDescription
         }
     }
@@ -135,7 +148,10 @@ extension WallpaperModel {
             for screen in displayScreens {
                 displays[screen.id] = screenSaverDisplay(path: chosen, screenID: screen.id)
             }
-            let fallback = screenSaverDisplay(path: chosen, screenID: displayScreens.first?.id ?? "main")
+            let fallback = screenSaverDisplay(
+                path: chosen,
+                screenID: displayScreens.first?.id ?? "main"
+            )
             return ScreenSaverConfig(displays: displays, fallback: fallback)
         }
         guard !isWebWallpaperActive else {

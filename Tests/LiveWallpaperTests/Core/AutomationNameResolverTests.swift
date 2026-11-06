@@ -1,12 +1,12 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class AutomationNameResolverTests: XCTestCase {
     private let candidates: [(id: Int, name: String)] = [
         (id: 1, name: "Ocean.mp4"),
         (id: 2, name: "Ocean Night.mp4"),
         (id: 3, name: "Forest.mov"),
-        (id: 4, name: "ＴＯＫＹＯ"),
+        (id: 4, name: "ＴＯＫＹＯ")
     ]
 
     func testExactMatchWinsOverPrefixMatches() {
@@ -45,7 +45,7 @@ final class AutomationNameResolverTests: XCTestCase {
         let aliased: [(id: Int?, name: String)] = [
             (id: nil, name: "all"),
             (id: nil, name: "All Wallpapers"),
-            (id: 7, name: "Work"),
+            (id: 7, name: "Work")
         ]
         XCTAssertEqual(AutomationNameResolver.resolve("al", among: aliased), .unique(nil))
     }

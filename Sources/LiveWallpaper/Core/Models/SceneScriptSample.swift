@@ -1,16 +1,53 @@
 import Foundation
 
 enum SceneScriptSample: String, CaseIterable, Identifiable {
-    case blank, master, motion, orbit, figureEight, breathing, stagger, bounce, noiseDrift, spin, curveMotion, crossfade
+    // swiftlint:disable:next inclusive_language
+    case blank, master, motion, orbit, figureEight, breathing, stagger, bounce, noiseDrift, spin,
+         curveMotion, crossfade
     case cursor, cursorTilt, cursorDistance, cursorMask
     case timeOfDay, dayVisibility, dayParticles
-    case effects, effectOrbit, effectKinds, particles, palette, particleWind, particleCursor, depthPulse, blendCycle
+    case effects, effectOrbit, effectKinds, particles, palette, particleWind, particleCursor,
+         depthPulse, blendCycle
     case audioPulse, audioColor
-    var id: String { rawValue }
-    var usesTime: Bool { ![.blank, .audioPulse, .audioColor, .cursor, .cursorTilt, .cursorDistance, .cursorMask, .timeOfDay, .dayVisibility, .dayParticles, .particleCursor].contains(self) }
-    var usesCursor: Bool { [.master, .cursor, .cursorTilt, .cursorDistance, .cursorMask, .particleCursor].contains(self) }
-    var readsAudio: Bool { [.audioPulse, .audioColor].contains(self) }
-    var usesTimeOfDay: Bool { [.master, .timeOfDay, .dayVisibility, .dayParticles].contains(self) }
+    var id: String {
+        rawValue
+    }
+
+    var usesTime: Bool {
+        ![
+            .blank,
+            .audioPulse,
+            .audioColor,
+            .cursor,
+            .cursorTilt,
+            .cursorDistance,
+            .cursorMask,
+            .timeOfDay,
+            .dayVisibility,
+            .dayParticles,
+            .particleCursor
+        ].contains(self)
+    }
+
+    var usesCursor: Bool {
+        [
+            .master,
+            .cursor,
+            .cursorTilt,
+            .cursorDistance,
+            .cursorMask,
+            .particleCursor
+        ].contains(self)
+    }
+
+    var readsAudio: Bool {
+        [.audioPulse, .audioColor].contains(self)
+    }
+
+    var usesTimeOfDay: Bool {
+        [.master, .timeOfDay, .dayVisibility, .dayParticles].contains(self)
+    }
+
     var title: String {
         switch self {
         case .blank: "空白のスクリプト"
@@ -45,6 +82,7 @@ enum SceneScriptSample: String, CaseIterable, Identifiable {
         case .audioColor: "音に合わせて粒子の色を変更"
         }
     }
+
     var source: String {
         switch self {
         case .master:
@@ -82,41 +120,83 @@ enum SceneScriptSample: String, CaseIterable, Identifiable {
             }
             """
         case .orbit:
-            mapped("const p = path.ellipse(ctx.phase, ctx.params.amount, ctx.params.amount * 0.6);", "values: { offsetX: p.x, offsetY: p.y }")
+            mapped(
+                "const p = path.ellipse(ctx.phase, ctx.params.amount, ctx.params.amount * 0.6);",
+                "values: { offsetX: p.x, offsetY: p.y }"
+            )
         case .figureEight:
-            mapped("const p = vec.mul(path.lissajous(ctx.phase, 1, 2, 0), ctx.params.amount);", "values: { offsetX: p.x, offsetY: p.y }")
+            mapped(
+                "const p = vec.mul(path.lissajous(ctx.phase, 1, 2, 0), ctx.params.amount);",
+                "values: { offsetX: p.x, offsetY: p.y }"
+            )
         case .breathing:
-            mapped("const t = (wave(ctx.phase) + 1) / 2;", "values: { scale: 1 + ease(t, 'inOutSine') * ctx.params.amount }")
+            mapped(
+                "const t = (wave(ctx.phase) + 1) / 2;",
+                "values: { scale: 1 + ease(t, 'inOutSine') * ctx.params.amount }"
+            )
         case .stagger:
             mapped("", "values: { offsetY: wave(ctx.phase, 1, i * 0.1) * ctx.params.amount }")
         case .bounce:
-            mapped("const t = ease(pingPong(ctx.phase * 2), 'outBounce');", "values: { offsetY: -t * ctx.params.amount }")
+            mapped(
+                "const t = ease(pingPong(ctx.phase * 2), 'outBounce');",
+                "values: { offsetY: -t * ctx.params.amount }"
+            )
         case .noiseDrift:
-            mapped("const p = path.circle(ctx.phase);", "values: { offsetX: (fbm2(p.x, p.y, hash(layer.id)) - 0.5) * ctx.params.amount }")
+            mapped(
+                "const p = path.circle(ctx.phase);",
+                "values: { offsetX: (fbm2(p.x, p.y, hash(layer.id)) - 0.5) * ctx.params.amount }"
+            )
         case .spin:
             mapped("", "values: { rotation: ctx.phase * 360 }")
         case .curveMotion:
-            mapped("const t = curve(ctx.phase, [{time:0,value:0,ease:'inOutCubic'}, {time:0.5,value:1,ease:'smooth'}, {time:1,value:0}]);", "values: { offsetX: t * ctx.params.amount }")
+            mapped(
+                "const t = curve(ctx.phase, [{time:0,value:0,ease:'inOutCubic'}, {time:0.5,value:1,ease:'smooth'}, {time:1,value:0}]);",
+                "values: { offsetX: t * ctx.params.amount }"
+            )
         case .crossfade:
             mapped("", "values: { opacity: (wave(ctx.phase, 1, i * 0.5) + 1) / 2 }")
         case .cursorTilt:
-            mapped("", "values: { rotation: ctx.cursor.x * 12, offsetY: ctx.cursor.y * ctx.params.amount }")
+            mapped(
+                "",
+                "values: { rotation: ctx.cursor.x * 12, offsetY: ctx.cursor.y * ctx.params.amount }"
+            )
         case .cursorDistance:
-            mapped("const distance = vec.distance(ctx.cursor, vec.of());", "values: { scale: 1 + (1 - clamp(distance, 0, 1)) * ctx.params.amount }")
+            mapped(
+                "const distance = vec.distance(ctx.cursor, vec.of());",
+                "values: { scale: 1 + (1 - clamp(distance, 0, 1)) * ctx.params.amount }"
+            )
         case .cursorMask:
             mapped("", "appearance: { cursorMask: { mode: 'hide', radius: 0.15, softness: 0.5 } }")
         case .dayVisibility:
             mapped("", "appearance: { isVisible: ctx.timeOfDay === 'night' }")
         case .dayParticles:
-            mapped("const night = ctx.timeOfDay === 'night';", "appearance: { blendMode: night ? 'add' : 'normal' }, particles: { preset: night ? 'stars' : 'snow', opacity: night ? 0.8 : 0.4 }", particlesOnly: true)
+            mapped(
+                "const night = ctx.timeOfDay === 'night';",
+                "appearance: { blendMode: night ? 'add' : 'normal' }, particles: { preset: night ? 'stars' : 'snow', opacity: night ? 0.8 : 0.4 }",
+                particlesOnly: true
+            )
         case .effectOrbit:
-            mapped("const p = path.circle(ctx.phase, 0.2);", "effects: layer.effects.map(e => ({ id:e.id, centerX:0.5+p.x, centerY:0.5+p.y }))")
+            mapped(
+                "const p = path.circle(ctx.phase, 0.2);",
+                "effects: layer.effects.map(e => ({ id:e.id, centerX:0.5+p.x, centerY:0.5+p.y }))"
+            )
         case .effectKinds:
-            mapped("const kind = ['waves','ripple','twirl','sway'][Math.floor(ctx.phase * 4)];", "effects: layer.effects.map(e => ({ id:e.id, kind, strength:0.25 }))")
+            mapped(
+                "const kind = ['waves','ripple','twirl','sway'][Math.floor(ctx.phase * 4)];",
+                "effects: layer.effects.map(e => ({ id:e.id, kind, strength:0.25 }))"
+            )
         case .palette:
-            mapped("const t = (wave(ctx.phase) + 1) / 2;", "particles: { color: color.mix(color.hex('#FFAA44'), color.hex('#4488FF'), t) }", particlesOnly: true)
+            mapped(
+                "const t = (wave(ctx.phase) + 1) / 2;",
+                "particles: { color: color.mix(color.hex('#FFAA44'), color.hex('#4488FF'), t) }",
+                particlesOnly: true
+            )
         case .particleWind:
-            mapped("", "particles: { direction: 270 + wave(ctx.phase) * 45, sway: 0.6, seed: hash(layer.id) % 10000 }", particlesOnly: true)
+            mapped(
+                "",
+                "particles: { direction: 270 + wave(ctx.phase) * 45, sway: 0.6, seed: hash(layer.id) % 10000 }",
+                particlesOnly: true
+            )
         case .particleCursor:
             mapped("", "particles: { cursorMode: 'attract' }", particlesOnly: true)
         case .depthPulse:
@@ -150,7 +230,10 @@ enum SceneScriptSample: String, CaseIterable, Identifiable {
             }
             """
         case .blendCycle:
-            mapped("const blendMode = ['normal','screen','add'][Math.floor(ctx.phase * 3)];", "appearance: { blendMode }")
+            mapped(
+                "const blendMode = ['normal','screen','add'][Math.floor(ctx.phase * 3)];",
+                "appearance: { blendMode }"
+            )
         case .motion:
             """
             function update(ctx) {
@@ -220,7 +303,8 @@ enum SceneScriptSample: String, CaseIterable, Identifiable {
         """
         function update(ctx) {
           \(setup)
-          return ctx.targets\(particlesOnly ? ".filter(layer => layer.particles)" : "").map((layer, i) => ({
+          return ctx.targets\(particlesOnly ? ".filter(layer => layer.particles)" :
+            "").map((layer, i) => ({
             id: layer.id,
             \(output)
           }));
