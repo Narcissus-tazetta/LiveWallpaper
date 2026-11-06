@@ -6,6 +6,10 @@ struct PackageManifest: Codable {
     var videos: [PackageVideo]
     let playlists: [PackagePlaylist]
     let packaging: PackagingInfo
+    /// Version 1.2. A package carrying either is written as 1.2 so older versions refuse
+    /// it instead of importing only its videos.
+    var webWallpapers: [PackageWebWallpaper]?
+    var scenePresets: [PackageScenePreset]?
 
     struct PackageInfo: Codable {
         let name: String
@@ -67,6 +71,27 @@ struct PackageManifest: Codable {
         let name: String
         let videoIds: [String]
         let shuffle: Bool
+        var webWallpaperIds: [String]?
+    }
+
+    struct PackageWebWallpaper: Codable {
+        let id: String
+        let displayName: String
+        /// Set for a page on the web; `folder` is set instead for a page packaged with it.
+        var url: String?
+        /// `web/<id>`, holding the page as it sits in the library.
+        var folder: String?
+        var thumbnail: String?
+        /// The sender's choices for the page's own properties, without those naming files
+        /// or folders on the sender's Mac.
+        var settings: LocalWebSettings?
+    }
+
+    struct PackageScenePreset: Codable {
+        let id: String
+        let name: String
+        /// `presets/<id>`, holding preset.json and the painted files it names.
+        let folder: String
     }
 
     struct PackagingInfo: Codable {

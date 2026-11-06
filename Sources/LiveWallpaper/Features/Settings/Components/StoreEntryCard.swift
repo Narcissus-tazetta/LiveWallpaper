@@ -58,8 +58,9 @@ extension SettingsView {
             .foregroundColor(.secondary)
 
             if isDownloading {
-                ProgressView()
+                ProgressView(value: storeCatalog.downloadProgress ?? 0)
                     .controlSize(.small)
+                    .accessibilityLabel(model.localizedString("ダウンロード中"))
                     .transition(Motion.pop)
             } else {
                 Button(model.localizedString("追加")) {
@@ -89,6 +90,14 @@ extension SettingsView {
         // 右クリックしたカードと違うentryが通報される不具合につながる。
         .id(entry.id)
         .contextMenu {
+            Button(model.localizedString("リンクをコピー")) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(
+                    StoreCatalogController.shareLink(for: entry).absoluteString,
+                    forType: .string
+                )
+            }
+            Divider()
             if storeCatalog.reportedEntryIDs.contains(entry.id) {
                 Text(model.localizedString("通報済み"))
             } else {

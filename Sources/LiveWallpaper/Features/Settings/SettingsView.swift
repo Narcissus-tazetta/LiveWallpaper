@@ -218,6 +218,14 @@ struct SettingsView: View {
             .onReceive(NotificationCenter.default.publisher(for: .openWallpaperFitTab)) { _ in
                 selectedTab = .wallpaperFit
             }
+            .onReceive(StoreLinkRouter.shared.$requestedEntryID.compactMap { $0 }) { id in
+                StoreLinkRouter.shared.requestedEntryID = nil
+                selectedTab = .store
+                storeTabMode = .browse
+                Task {
+                    await storeCatalog.openLinkedEntry(id: id)
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .openWallpaperShareSheet)) { _ in
                 selectedTab = .wallpaper
                 isWallpaperShareSheetPresented = true

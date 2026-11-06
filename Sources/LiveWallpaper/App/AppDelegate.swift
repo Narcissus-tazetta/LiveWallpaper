@@ -60,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_: Notification) {
         SessionLog.start()
+        ShareExportController.removeExpiredShareFolders()
         NSApp.setActivationPolicy(.accessory)
         wallpaperModel.startFocusModeMonitoring()
         wallpaperModel.startExternalWallpaperMonitoring()

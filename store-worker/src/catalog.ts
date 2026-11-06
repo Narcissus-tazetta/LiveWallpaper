@@ -8,6 +8,64 @@ function escapeLikePattern(s: string): string {
 	return s.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }
 
+export interface PublicEntryRow {
+	id: string;
+	title: string;
+	author: string;
+	description: string | null;
+	sha256: string;
+	size_bytes: number;
+	duration_seconds: number | null;
+	has_audio: number | null;
+	license: string | null;
+	created_at: string;
+	download_count: number;
+	thumbnail_key: string | null;
+}
+
+const PUBLIC_ENTRY_COLUMNS = `id, title, author, description, sha256, size_bytes,
+			duration_seconds, has_audio, license, created_at, download_count, thumbnail_key`;
+
+export type PublicEntry = ReturnType<typeof toPublicEntry>;
+
+function toPublicEntry(r: PublicEntryRow, origin: string) {
+	return {
+		id: r.id,
+		title: r.title,
+		author: r.author,
+		description: r.description,
+		sha256: r.sha256,
+		sizeBytes: r.size_bytes,
+		durationSeconds: r.duration_seconds,
+		hasAudio: r.has_audio === null ? null : r.has_audio === 1,
+		license: r.license,
+		createdAt: r.created_at,
+		downloadCount: r.download_count,
+		downloadURL: new URL(`/download/${r.id}`, origin).toString(),
+		thumbnailURL: r.thumbnail_key ? new URL(`/thumbnail/${r.id}`, origin).toString() : null,
+	};
+}
+
+export async function findPublishedEntry(env: Env, id: string, origin: string): Promise<PublicEntry | null> {
+	const row = await env.STORE_DB.prepare(
+		`SELECT ${PUBLIC_ENTRY_COLUMNS} FROM store_entries WHERE id = ? AND status = 'published'`,
+	)
+		.bind(id)
+		.first<PublicEntryRow>();
+	return row ? toPublicEntry(row, origin) : null;
+}
+
+export async function handleEntry(request: Request, env: Env, id: string): Promise<Response> {
+	const entry = await findPublishedEntry(env, id, new URL(request.url).origin);
+	if (!entry) {
+		return errorResponse("entry not found", 404);
+	}
+	const response = jsonResponse(entry);
+	// Kept short because a withdrawn or rejected entry must disappear from shared links quickly.
+	response.headers.set("cache-control", "public, max-age=60");
+	return response;
+}
+
 export async function handleCatalog(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
 	const limit = Math.min(Math.max(Number.parseInt(url.searchParams.get("limit") ?? "20", 10) || 20, 1), 50);
@@ -47,15 +105,14 @@ export async function handleCatalog(request: Request, env: Env): Promise<Respons
 		}
 	}
 
-	const query = `SELECT id, title, author, description, sha256, size_bytes,
-			duration_seconds, has_audio, license, created_at, download_count, thumbnail_key
+	const query = `SELECT ${PUBLIC_ENTRY_COLUMNS}
 		FROM store_entries WHERE ${conditions.join(" AND ")}
 		ORDER BY ${orderClause} LIMIT ?`;
 	bindings.push(limit + 1);
 
 	const { results } = await env.STORE_DB.prepare(query)
 		.bind(...bindings)
-		.all();
+		.all<PublicEntryRow>();
 
 	const hasMore = results.length > limit;
 	const page = hasMore ? results.slice(0, limit) : results;
@@ -69,25 +126,8 @@ export async function handleCatalog(request: Request, env: Env): Promise<Respons
 				}`
 		: null;
 
-	const entries = page.map((row) => {
-		const r = row as Record<string, unknown>;
-		const origin = new URL(request.url).origin;
-		return {
-			id: r.id,
-			title: r.title,
-			author: r.author,
-			description: r.description,
-			sha256: r.sha256,
-			sizeBytes: r.size_bytes,
-			durationSeconds: r.duration_seconds,
-			hasAudio: r.has_audio === null ? null : r.has_audio === 1,
-			license: r.license,
-			createdAt: r.created_at,
-			downloadCount: r.download_count,
-			downloadURL: new URL(`/download/${r.id}`, origin).toString(),
-			thumbnailURL: r.thumbnail_key ? new URL(`/thumbnail/${r.id}`, origin).toString() : null,
-		};
-	});
+	const origin = new URL(request.url).origin;
+	const entries = page.map((row) => toPublicEntry(row, origin));
 
 	return jsonResponse({ entries, nextCursor });
 }

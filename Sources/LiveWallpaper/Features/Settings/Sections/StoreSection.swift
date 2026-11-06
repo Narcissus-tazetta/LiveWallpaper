@@ -147,6 +147,28 @@ extension SettingsView {
                     .foregroundColor(.red)
             }
 
+            if let linked = storeCatalog.linkedEntry {
+                HStack(alignment: .top, spacing: 12) {
+                    storeEntryCard(entry: linked, cardWidth: 200)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(model.localizedString("リンクから開いた作品"))
+                            .font(.headline)
+                        Button(model.localizedString("閉じる")) {
+                            storeCatalog.linkedEntry = nil
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.accentColor.opacity(0.08))
+                )
+                .transition(.opacity)
+            }
+
             if storeCatalog.entries.isEmpty {
                 if storeCatalog.isLoading {
                     ProgressView()
@@ -187,5 +209,6 @@ extension SettingsView {
             }
         }
         .motionAnimation(Motion.quick, value: storeCatalog.entries.isEmpty)
+        .motionAnimation(Motion.quick, value: storeCatalog.linkedEntry?.id)
     }
 }

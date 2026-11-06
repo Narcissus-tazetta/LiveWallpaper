@@ -6,7 +6,7 @@ import {
 	handleAdminRequests,
 	handleAdminResendReview,
 } from "./admin";
-import { handleCatalog, handleDownload, handleEntryStatus, handleThumbnail } from "./catalog";
+import { handleCatalog, handleDownload, handleEntry, handleEntryStatus, handleThumbnail } from "./catalog";
 import type { Env } from "./env";
 import { errorResponse } from "./http";
 import { handleReport } from "./report";
@@ -18,6 +18,7 @@ import {
 	handleAdminReviewVideo,
 } from "./review";
 import { handleScheduled } from "./scheduled";
+import { handleSharePage } from "./share-page";
 import { handleSubmit, handleUploadUrl } from "./upload";
 import { handleWithdraw } from "./withdraw";
 
@@ -45,6 +46,14 @@ export default {
 		const thumbnailMatch = pathname.match(/^\/thumbnail\/([\w-]+)$/);
 		if (method === "GET" && thumbnailMatch) {
 			return handleThumbnail(request, env, thumbnailMatch[1]);
+		}
+		const entryMatch = pathname.match(/^\/entries\/([\w-]+)$/);
+		if (method === "GET" && entryMatch) {
+			return handleEntry(request, env, entryMatch[1]);
+		}
+		const sharePageMatch = pathname.match(/^\/w\/([\w-]+)$/);
+		if (method === "GET" && sharePageMatch) {
+			return handleSharePage(request, env, sharePageMatch[1]);
 		}
 		const entryStatusMatch = pathname.match(/^\/entries\/([\w-]+)\/status$/);
 		if (method === "GET" && entryStatusMatch) {

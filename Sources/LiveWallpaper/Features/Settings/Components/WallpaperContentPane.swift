@@ -222,6 +222,12 @@ extension SettingsView {
 
                 if let selectedID = model.selectedPlaylistID {
                     Divider()
+                    if let playlist = model.playlists.first(where: { $0.id == selectedID }) {
+                        Button(model.localizedString("このプレイリストを共有…")) {
+                            sharePackage(.playlist(playlist))
+                        }
+                        .disabled(playlist.videoPaths.isEmpty && playlist.webWallpaperIDs.isEmpty)
+                    }
                     Button(model.localizedString("名前を編集")) {
                         startPlaylistNameEdit(playlistID: selectedID)
                     }

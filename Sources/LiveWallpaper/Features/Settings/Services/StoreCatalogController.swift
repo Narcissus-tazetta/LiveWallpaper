@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// issue #20 のStoreブラウズ/ダウンロードフロー。カタログはWorkerの GET /catalog から
@@ -10,6 +9,10 @@ final class StoreCatalogController: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var downloadingEntryID: String?
+    /// 0...1 while `downloadingEntryID` downloads.
+    @Published var downloadProgress: Double?
+    /// The entry a shared Store link asked to show, above the catalog.
+    @Published var linkedEntry: StoreEntry?
     @Published var downloadResultMessage: String?
     @Published var reportResultMessage: String?
     @Published var reportedEntryIDs: Set<String> = []
@@ -153,85 +156,83 @@ final class StoreCatalogController: ObservableObject {
 
     func download(entry: StoreEntry, into model: WallpaperModel) async {
         downloadingEntryID = entry.id
+        downloadProgress = 0
         downloadResultMessage = nil
-        defer { downloadingEntryID = nil }
+        defer {
+            downloadingEntryID = nil
+            downloadProgress = nil
+        }
 
         guard let url = URL(string: entry.downloadURL) else {
             downloadResultMessage = Self.localized("ダウンロードURLが不正です")
             return
         }
 
-        let tempFile = fileManager.temporaryDirectory
-            .appendingPathComponent("\(UUID().uuidString).lwpkg")
-
+        let packageURL: URL
         do {
-            // download(from:) only returns after the whole body is on disk, so an oversized
-            // response would fill the disk before any size check could run. Stream instead and
-            // stop as soon as the cap is crossed.
-            let maxBytes = Int64(StoreClient.maxUploadBytes)
-            let (bytes, response) = try await session.bytes(from: url)
-            guard let http = response as? HTTPURLResponse,
-                  (200 ..< 300).contains(http.statusCode)
-            else {
-                throw StoreClientError.invalidResponse
-            }
-            if response.expectedContentLength > maxBytes {
-                throw StoreClientError.fileTooLarge(
-                    sizeBytes: Int(response.expectedContentLength),
-                    maxBytes: StoreClient.maxUploadBytes
-                )
-            }
-            fileManager.createFile(atPath: tempFile.path, contents: nil)
-            defer { try? fileManager.removeItem(at: tempFile) }
-            let handle = try FileHandle(forWritingTo: tempFile)
-            defer { try? handle.close() }
-            var buffer = Data()
-            buffer.reserveCapacity(1 << 20)
-            var written: Int64 = 0
-            for try await byte in bytes {
-                buffer.append(byte)
-                if buffer.count >= 1 << 20 {
-                    written += Int64(buffer.count)
-                    guard written <= maxBytes else {
-                        throw StoreClientError.fileTooLarge(
-                            sizeBytes: Int(written),
-                            maxBytes: StoreClient.maxUploadBytes
-                        )
-                    }
-                    try handle.write(contentsOf: buffer)
-                    buffer.removeAll(keepingCapacity: true)
+            packageURL = try await StoreDownloader.download(
+                from: url,
+                session: session,
+                maxBytes: Int64(StoreClient.maxUploadBytes),
+                expectedSHA256: entry.sha256
+            ) { [weak self] fraction in
+                Task { @MainActor in
+                    guard self?.downloadingEntryID == entry.id else { return }
+                    self?.downloadProgress = fraction
                 }
             }
-            written += Int64(buffer.count)
-            guard written <= maxBytes else {
-                throw StoreClientError.fileTooLarge(
-                    sizeBytes: Int(written),
-                    maxBytes: StoreClient.maxUploadBytes
-                )
-            }
-            try handle.write(contentsOf: buffer)
-            try handle.close()
-
-            let actualSHA256 = try Self.sha256Hex(ofFileAt: tempFile)
-            guard actualSHA256.caseInsensitiveCompare(entry.sha256) == .orderedSame else {
-                throw StoreClientError.checksumMismatch
-            }
-
-            try await packageImporter.importPackage(from: tempFile, into: model)
-            downloadResultMessage = model.localizedString("追加しました")
         } catch {
+            AppLog.store.error(
+                "download failed id=\(entry.id, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+            downloadResultMessage = error.localizedDescription
+            return
+        }
+        defer { BlockingWork.removeInBackground(packageURL) }
+
+        switch await PackageImportFlow.importPackage(
+            at: packageURL,
+            model: model,
+            importer: packageImporter,
+            confirmsContents: false
+        ) {
+        case .imported:
+            downloadResultMessage = model.localizedString("追加しました")
+        case .cancelled:
+            break
+        case let .failed(message):
+            downloadResultMessage = message
+        }
+    }
+
+    func openLinkedEntry(id: String) async {
+        downloadResultMessage = nil
+        let url = endpointURL.appendingPathComponent("entries").appendingPathComponent(id)
+        do {
+            let (data, response) = try await session.data(from: url)
+            guard let http = response as? HTTPURLResponse else {
+                throw StoreClientError.invalidResponse
+            }
+            guard http.statusCode != 404 else {
+                linkedEntry = nil
+                downloadResultMessage = Self
+                    .localized("この作品は見つかりませんでした。取り下げられた可能性があります")
+                return
+            }
+            guard (200 ..< 300).contains(http.statusCode) else {
+                throw StoreClientError.serverError(status: http.statusCode, message: nil)
+            }
+            linkedEntry = try JSONDecoder().decode(StoreEntry.self, from: data)
+        } catch {
+            AppLog.store.error(
+                "linked entry failed id=\(id, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
             downloadResultMessage = error.localizedDescription
         }
     }
 
-    private static func sha256Hex(ofFileAt url: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-        var hasher = SHA256()
-        while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
-            hasher.update(data: chunk)
-        }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    static func shareLink(for entry: StoreEntry) -> URL {
+        StoreClient.baseURL.appendingPathComponent("w").appendingPathComponent(entry.id)
     }
 
     func report(entry: StoreEntry, reason: String) async {
