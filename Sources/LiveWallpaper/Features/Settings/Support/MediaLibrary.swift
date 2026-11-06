@@ -74,6 +74,10 @@ extension SettingsView {
         guard fileURL.isFileURL else {
             return
         }
+        if PackageImportFlow.isPackage(fileURL) {
+            PackageImportFlow.run(urls: [fileURL], model: model)
+            return
+        }
         let ext = fileURL.pathExtension
         let type = UTType(filenameExtension: ext)
         let isMovie = type?.conforms(to: .movie) ?? false

@@ -123,13 +123,52 @@ final class PackageExporter {
             )
             outputURLs.append(packageURL)
         }
-        let videoURL = try await copyOriginalVideo(
-            from: URL(fileURLWithPath: videoPath),
+        let videoURL = try await copyCurrentVideo(
+            model: model,
+            videoPath: videoPath,
             to: outputFolderURL,
             baseFileName: baseFileName
         )
         outputURLs.append(videoURL)
         return outputURLs
+    }
+
+    /// The package re-bakes a scene whose video predates its edits; the loose video has to
+    /// show the same picture instead of the stale file.
+    private func copyCurrentVideo(
+        model: WallpaperModel,
+        videoPath: String,
+        to outputFolderURL: URL,
+        baseFileName: String
+    ) async throws -> URL {
+        model.flushSceneSave(path: videoPath)
+        let isStale = model.scenesBaking.contains(videoPath)
+            || SceneStore.isNewerThanVideo(videoPath: videoPath)
+        guard isStale, let loaded = try SceneStore.load(videoPath: videoPath) else {
+            return try await copyOriginalVideo(
+                from: URL(fileURLWithPath: videoPath),
+                to: outputFolderURL,
+                baseFileName: baseFileName
+            )
+        }
+        let document = SceneScriptPermissions.restored(loaded, path: videoPath)
+        // Baking would run scripts nobody allowed, so the old video is all there is to share.
+        guard !document.hasUnapprovedScripts else {
+            return try await copyOriginalVideo(
+                from: URL(fileURLWithPath: videoPath),
+                to: outputFolderURL,
+                baseFileName: baseFileName
+            )
+        }
+        let outputURL = outputFolderURL.appendingPathComponent("\(baseFileName).mp4")
+        if fileManager.fileExists(atPath: outputURL.path) {
+            try fileManager.removeItem(at: outputURL)
+        }
+        try await SceneVideoBaker.bake(
+            document: document, videoPath: videoPath,
+            quality: BakeQuality.maximum.compressionQuality, to: outputURL
+        ) { _ in }
+        return outputURL
     }
 
     /// Store共有(StoreClient)からも、パッケージ本体だけを作りたい場合に直接呼べるよう

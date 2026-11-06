@@ -85,6 +85,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupSparkleUpdater()
     }
 
+    func application(_: NSApplication, open urls: [URL]) {
+        let packages = urls.filter(PackageImportFlow.isPackage)
+        guard !packages.isEmpty else { return }
+        PackageImportFlow.run(urls: packages, model: wallpaperModel)
+    }
+
     func localized(_ key: String) -> String {
         wallpaperModel.localizedString(key)
     }

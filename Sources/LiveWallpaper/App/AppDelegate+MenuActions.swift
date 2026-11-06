@@ -114,54 +114,7 @@ extension AppDelegate {
 
         guard panel.runModal() == .OK, let url = panel.urls.first else { return }
 
-        let importer = PackageImporter()
-
-        func showImportSucceededAlert() {
-            let alert = NSAlert()
-            alert.messageText = localized("インポート完了")
-            alert.informativeText = localized("パッケージが正常にインポートされました。")
-            alert.alertStyle = .informational
-            alert.runModal()
-        }
-
-        func showImportFailedAlert(_ message: String) {
-            let alert = NSAlert()
-            alert.messageText = localized("インポートに失敗")
-            alert.informativeText = message
-            alert.alertStyle = .critical
-            alert.runModal()
-        }
-
-        func importWithResolution(_ resolution: PackageImporter.DuplicateResolution) {
-            Task {
-                do {
-                    try await importer.importPackage(
-                        from: url,
-                        into: wallpaperModel,
-                        duplicateResolution: resolution
-                    )
-                    showImportSucceededAlert()
-                } catch let PackageImporter.ImportError.duplicateVideo(name) {
-                    let duplicateAlert = NSAlert()
-                    duplicateAlert.messageText = localized("重複するビデオが見つかりました")
-                    duplicateAlert.informativeText = String(
-                        format: localized("%@ は既に存在します。置き換えますか？"),
-                        name
-                    )
-                    duplicateAlert.alertStyle = .warning
-                    duplicateAlert.addButton(withTitle: localized("中止"))
-                    duplicateAlert.addButton(withTitle: localized("置き換える"))
-
-                    if duplicateAlert.runModal() == .alertSecondButtonReturn {
-                        importWithResolution(.replace)
-                    }
-                } catch {
-                    showImportFailedAlert(error.localizedDescription)
-                }
-            }
-        }
-
-        importWithResolution(.abort)
+        PackageImportFlow.run(urls: [url], model: wallpaperModel)
     }
 
     @objc func openReleasePage() {

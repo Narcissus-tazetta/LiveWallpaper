@@ -235,6 +235,42 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
   <string>Display track information and artwork from Music and Spotify in your wallpaper.</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>${BUNDLE_ID}.package</string>
+      <key>UTTypeDescription</key>
+      <string>LiveWallpaper Package</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+        <string>public.archive</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>lwpkg</string>
+        </array>
+      </dict>
+    </dict>
+  </array>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>LiveWallpaper Package</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSHandlerRank</key>
+      <string>Owner</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>${BUNDLE_ID}.package</string>
+      </array>
+    </dict>
+  </array>
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
