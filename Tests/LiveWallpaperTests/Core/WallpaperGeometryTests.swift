@@ -1,6 +1,6 @@
 import CoreGraphics
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class WallpaperGeometryTests: XCTestCase {
     private let container = CGSize(width: 1600, height: 900)
@@ -147,7 +147,8 @@ final class WallpaperGeometryTests: XCTestCase {
 
     func testVisibleVideoRectCropsTopAndBottomInFillMode() {
         let geometry = WallpaperGeometry.resolve(
-            containerSize: container, videoAspectRatio: 1, fitMode: .fill, zoom: 1, offsetX: 0, offsetY: 0
+            containerSize: container, videoAspectRatio: 1, fitMode: .fill, zoom: 1, offsetX: 0,
+            offsetY: 0
         )
         let rect = WallpaperGeometry.visibleVideoRect(containerSize: container, geometry: geometry)
 
@@ -160,7 +161,8 @@ final class WallpaperGeometryTests: XCTestCase {
     func testVisibleVideoRectFollowsPanOnUpwardYAxis() {
         // Panning up lifts the video, so the screen shows its bottom (UV y near 1).
         let geometry = WallpaperGeometry.resolve(
-            containerSize: container, videoAspectRatio: 1, fitMode: .fill, zoom: 1, offsetX: 0, offsetY: 1
+            containerSize: container, videoAspectRatio: 1, fitMode: .fill, zoom: 1, offsetX: 0,
+            offsetY: 1
         )
         let rect = WallpaperGeometry.visibleVideoRect(containerSize: container, geometry: geometry)
 
@@ -170,7 +172,8 @@ final class WallpaperGeometryTests: XCTestCase {
 
     func testVisibleVideoRectIsWholeVideoInFitMode() {
         let geometry = WallpaperGeometry.resolve(
-            containerSize: container, videoAspectRatio: 1, fitMode: .fit, zoom: 1, offsetX: 0, offsetY: 0
+            containerSize: container, videoAspectRatio: 1, fitMode: .fit, zoom: 1, offsetX: 0,
+            offsetY: 0
         )
         let rect = WallpaperGeometry.visibleVideoRect(containerSize: container, geometry: geometry)
 

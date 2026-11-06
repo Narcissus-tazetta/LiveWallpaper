@@ -54,5 +54,4 @@ final class LocalWebSettingsTests: XCTestCase {
         try settings.save(id: id)
         XCTAssertEqual(try LocalWebSettings.load(id: id), settings)
     }
-
 }

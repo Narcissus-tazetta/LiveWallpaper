@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class PinCurrentVideoPersistenceTests: XCTestCase {
@@ -15,7 +14,7 @@ final class PinCurrentVideoPersistenceTests: XCTestCase {
         PrefsKey.libraryVideoPaths,
         PrefsKey.selectedPlaylistID,
         PrefsKey.webWallpaperFeatureEnabled,
-        PrefsKey.webWallpaperSourcesData,
+        PrefsKey.webWallpaperSourcesData
     ]
     private var previousValues: [String: Any] = [:]
 
@@ -64,9 +63,9 @@ final class PinCurrentVideoPersistenceTests: XCTestCase {
         UserDefaults.standard.set(["/a.mp4"], forKey: PrefsKey.libraryVideoPaths)
         UserDefaults.standard.set(true, forKey: PrefsKey.playlistPlaybackEnabled)
         UserDefaults.standard.set(true, forKey: PrefsKey.webWallpaperFeatureEnabled)
-        let source = WebWallpaperSource(url: URL(string: "https://example.com")!)
-        UserDefaults.standard.set(
-            try JSONEncoder().encode([source]), forKey: PrefsKey.webWallpaperSourcesData
+        let source = try WebWallpaperSource(url: XCTUnwrap(URL(string: "https://example.com")))
+        try UserDefaults.standard.set(
+            JSONEncoder().encode([source]), forKey: PrefsKey.webWallpaperSourcesData
         )
         let model = WallpaperModel()
         XCTAssertTrue(model.canPinCurrentVideo)
@@ -90,9 +89,12 @@ final class PinCurrentVideoPersistenceTests: XCTestCase {
     }
 
     func testWebWallpaperCanBePinnedWithoutContinuousPlaybackAndSurvivesRelaunch() throws {
-        let source = WebWallpaperSource(url: URL(string: "https://example.com")!)
+        let source = try WebWallpaperSource(url: XCTUnwrap(URL(string: "https://example.com")))
         UserDefaults.standard.set(true, forKey: PrefsKey.webWallpaperFeatureEnabled)
-        UserDefaults.standard.set(try JSONEncoder().encode([source]), forKey: PrefsKey.webWallpaperSourcesData)
+        try UserDefaults.standard.set(
+            JSONEncoder().encode([source]),
+            forKey: PrefsKey.webWallpaperSourcesData
+        )
         UserDefaults.standard.set(WallpaperKind.web.rawValue, forKey: PrefsKey.wallpaperKind)
         UserDefaults.standard.set(source.id.uuidString, forKey: PrefsKey.currentWebWallpaperID)
         let model = WallpaperModel()
@@ -115,7 +117,10 @@ final class PinCurrentVideoPersistenceTests: XCTestCase {
             WebWallpaperSource(url: URL(string: $0)!)
         }
         UserDefaults.standard.set(true, forKey: PrefsKey.webWallpaperFeatureEnabled)
-        UserDefaults.standard.set(try JSONEncoder().encode(sources), forKey: PrefsKey.webWallpaperSourcesData)
+        try UserDefaults.standard.set(
+            JSONEncoder().encode(sources),
+            forKey: PrefsKey.webWallpaperSourcesData
+        )
         UserDefaults.standard.set(WallpaperKind.web.rawValue, forKey: PrefsKey.wallpaperKind)
         UserDefaults.standard.set(sources[0].id.uuidString, forKey: PrefsKey.currentWebWallpaperID)
         UserDefaults.standard.set(0, forKey: PrefsKey.wallpaperTransitionDuration)
@@ -135,7 +140,10 @@ final class PinCurrentVideoPersistenceTests: XCTestCase {
             WebWallpaperSource(url: URL(string: $0)!)
         }
         UserDefaults.standard.set(true, forKey: PrefsKey.webWallpaperFeatureEnabled)
-        UserDefaults.standard.set(try JSONEncoder().encode(sources), forKey: PrefsKey.webWallpaperSourcesData)
+        try UserDefaults.standard.set(
+            JSONEncoder().encode(sources),
+            forKey: PrefsKey.webWallpaperSourcesData
+        )
         UserDefaults.standard.set(WallpaperKind.web.rawValue, forKey: PrefsKey.wallpaperKind)
         UserDefaults.standard.set(sources[0].id.uuidString, forKey: PrefsKey.currentWebWallpaperID)
         UserDefaults.standard.set(0, forKey: PrefsKey.wallpaperTransitionDuration)
@@ -154,5 +162,4 @@ final class PinCurrentVideoPersistenceTests: XCTestCase {
         timer.fire()
         XCTAssertEqual(model.currentPlaybackEntry, .web(sources[1].id))
     }
-
 }

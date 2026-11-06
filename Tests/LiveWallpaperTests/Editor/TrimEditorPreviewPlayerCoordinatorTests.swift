@@ -147,13 +147,13 @@ final class TrimEditorPreviewPlayerCoordinatorTests: XCTestCase {
         )
         let initialPlayer = try XCTUnwrap(layer.player)
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { object, _ in
-            (object as! AVPlayer).currentItem?.status == .readyToPlay
+            (object as? AVPlayer)?.currentItem?.status == .readyToPlay
         }, object: initialPlayer)
         wait(for: [ready], timeout: 3)
         coordinator.applySeekIfNeeded(SeekToken(time: 4))
         // 初期ロード中の0秒からの再生を、再構築後のシーク待ちと混同しない。
         let positioned = XCTNSPredicateExpectation(predicate: NSPredicate { object, _ in
-            let player = object as! AVPlayer
+            guard let player = object as? AVPlayer else { return false }
             return abs(player.currentTime().seconds - 4) < 0.05
         }, object: initialPlayer)
         wait(for: [positioned], timeout: 3)

@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 final class WallpaperEditMetadataTests: XCTestCase {
     func testDefaultIsNoOp() {
@@ -87,7 +86,7 @@ final class WallpaperEditMetadataTests: XCTestCase {
     func testCodableRoundTrip() throws {
         let original: [String: WallpaperEditMetadata] = [
             "/a.mp4": WallpaperEditMetadata(trimStart: 1.5, trimEnd: 9.25, loopStart: 4),
-            "/b.mp4": WallpaperEditMetadata(trimStart: 0, trimEnd: nil),
+            "/b.mp4": WallpaperEditMetadata(trimStart: 0, trimEnd: nil)
         ]
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode([String: WallpaperEditMetadata].self, from: data)

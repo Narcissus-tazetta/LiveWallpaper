@@ -122,45 +122,97 @@ final class SceneRenderGraphTests: XCTestCase {
     fragment float4 meshFragment(O v [[stage_in]]) { return v.color; }
     """
 
-    private func meshPass(clears: Bool?, blend: SceneRenderGraph.Draw.Blend, parent: String = "layer") -> SceneRenderGraph.Pass {
+    private func meshPass(
+        clears: Bool?,
+        blend: SceneRenderGraph.Draw.Blend,
+        parent: String = "layer"
+    ) -> SceneRenderGraph.Pass {
         .init(operation: .draw, target: "work", draw: .init(
             vertex: .init(source: meshShader, entryPoint: "meshVertex"),
             fragment: .init(source: meshShader, entryPoint: "meshFragment"),
             vertices: Data(), vertexStride: SceneMeshFrame.vertexStride, vertexCount: 0,
-            attributes: [.init(location: 0, offset: 0, format: .float3), .init(location: 1, offset: 12, format: .float2),
-                         .init(location: 2, offset: 20, format: .float4)],
+            attributes: [
+                .init(location: 0, offset: 0, format: .float3),
+                .init(location: 1, offset: 12, format: .float2),
+                .init(location: 2, offset: 20, format: .float4)
+            ],
             textures: [], blend: blend,
             dynamic: .init(parent: parent, capacity: 8, materials: ["soft": []]), clears: clears
         ))
     }
 
-    private func quad(_ rect: SIMD4<Float>, color: SIMD4<Float>, parent: String = "layer", material: String = "soft") -> SceneMeshFrame {
-        let corners: [(Float, Float)] = [(rect.x, rect.w), (rect.x, rect.y), (rect.z, rect.y), (rect.z, rect.w)]
-        let vertices: [Float] = corners.flatMap { (corner: (Float, Float)) -> [Float] in [corner.0, corner.1, 0, 0, 0, color.x, color.y, color.z, color.w] }
+    private func quad(
+        _ rect: SIMD4<Float>,
+        color: SIMD4<Float>,
+        parent: String = "layer",
+        material: String = "soft"
+    ) -> SceneMeshFrame {
+        let corners: [(Float, Float)] = [
+            (rect.x, rect.w),
+            (rect.x, rect.y),
+            (rect.z, rect.y),
+            (rect.z, rect.w)
+        ]
+        let vertices: [Float] = corners.flatMap { (corner: (Float, Float)) -> [Float] in [
+            corner.0,
+            corner.1,
+            0,
+            0,
+            0,
+            color.x,
+            color.y,
+            color.z,
+            color.w
+        ] }
         return SceneMeshFrame(parent: parent, material: material, vertices: vertices)
     }
 
-    private func renderMeshes(_ graph: SceneRenderGraph, meshes: [SceneMeshFrame]) throws -> [UInt8] {
+    private func renderMeshes(
+        _ graph: SceneRenderGraph,
+        meshes: [SceneMeshFrame]
+    ) throws -> [UInt8] {
         let device = try device()
         let renderer = try SceneRenderGraphRenderer(graph: graph, device: device)
         let queue = try XCTUnwrap(device.makeCommandQueue())
         let command = try XCTUnwrap(queue.makeCommandBuffer())
-        let result = try renderer.encode(input: input(device), images: [:], time: 0, cursor: nil, meshes: meshes, commandBuffer: command)
+        let result = try renderer.encode(
+            input: input(device),
+            images: [:],
+            time: 0,
+            cursor: nil,
+            meshes: meshes,
+            commandBuffer: command
+        )
         let length = result.width * result.height * 4
         let buffer = try XCTUnwrap(device.makeBuffer(length: length, options: .storageModeShared))
         let blit = try XCTUnwrap(command.makeBlitCommandEncoder())
-        blit.copy(from: result, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(),
-                  sourceSize: MTLSize(width: result.width, height: result.height, depth: 1),
-                  to: buffer, destinationOffset: 0, destinationBytesPerRow: result.width * 4, destinationBytesPerImage: length)
+        blit.copy(
+            from: result,
+            sourceSlice: 0,
+            sourceLevel: 0,
+            sourceOrigin: MTLOrigin(),
+            sourceSize: MTLSize(width: result.width, height: result.height, depth: 1),
+            to: buffer,
+            destinationOffset: 0,
+            destinationBytesPerRow: result.width * 4,
+            destinationBytesPerImage: length
+        )
         blit.endEncoding()
         command.commit()
         command.waitUntilCompleted()
         if let error = command.error { throw error }
-        return Array(UnsafeBufferPointer(start: buffer.contents().assumingMemoryBound(to: UInt8.self), count: length))
+        return Array(UnsafeBufferPointer(
+            start: buffer.contents().assumingMemoryBound(to: UInt8.self),
+            count: length
+        ))
     }
 
     func testDynamicMeshDrawsOnlyItsParentsQuadsWithAlphaWeightedAddition() throws {
-        let graph = SceneRenderGraph(targets: [.init(name: "work")], passes: [meshPass(clears: nil, blend: .alphaAdditive)], output: "work")
+        let graph = SceneRenderGraph(
+            targets: [.init(name: "work")],
+            passes: [meshPass(clears: nil, blend: .alphaAdditive)],
+            output: "work"
+        )
         let full = SIMD4<Float>(-1, -1, 1, 1)
         let pixels = try renderMeshes(graph, meshes: [
             quad(full, color: SIMD4(1, 0.5, 0, 0.5)),
@@ -181,7 +233,11 @@ final class SceneRenderGraphTests: XCTestCase {
         ], output: "work")
         let full = SIMD4<Float>(-1, -1, 1, 1)
         let pixels = try renderMeshes(graph, meshes: [
-            quad(full, color: SIMD4(0.25, 0, 0, 1), parent: "a"), quad(full, color: SIMD4(0, 0.25, 0, 1), parent: "b")
+            quad(full, color: SIMD4(0.25, 0, 0, 1), parent: "a"), quad(
+                full,
+                color: SIMD4(0, 0.25, 0, 1),
+                parent: "b"
+            )
         ])
         XCTAssertEqual(Int(pixels[0]), 64, accuracy: 2)
         XCTAssertEqual(Int(pixels[1]), 64, accuracy: 2)
@@ -202,7 +258,11 @@ final class SceneRenderGraphTests: XCTestCase {
     }
 
     func testDynamicMeshAboveItsCapacityIsRejected() throws {
-        let graph = SceneRenderGraph(targets: [.init(name: "work")], passes: [meshPass(clears: nil, blend: .alphaOver)], output: "work")
+        let graph = SceneRenderGraph(
+            targets: [.init(name: "work")],
+            passes: [meshPass(clears: nil, blend: .alphaOver)],
+            output: "work"
+        )
         let many = (0 ..< 9).map { _ in quad(SIMD4(-1, -1, 1, 1), color: SIMD4(1, 1, 1, 1)) }
         XCTAssertThrowsError(try renderMeshes(graph, meshes: many))
     }
@@ -264,7 +324,11 @@ final class SceneRenderGraphTests: XCTestCase {
             let expected = try render(plain, device: device, input: texture)
             // The other renderer borrows and dirties the same pooled texture between frames.
             _ = try render(other, device: device, input: texture)
-            XCTAssertEqual(try render(pooled, device: device, input: texture), expected, "frame \(frame)")
+            XCTAssertEqual(
+                try render(pooled, device: device, input: texture),
+                expected,
+                "frame \(frame)"
+            )
             pool.endFrame()
         }
     }
@@ -321,8 +385,15 @@ final class SceneRenderGraphTests: XCTestCase {
         left[0 ..< 4] = [0.2, 0.2, 0.2, 0.2]
         left[4 ..< 8] = [0, 0, 1, 1]
         left[60 ..< 64] = [1, 1, 1, 1]
-        let loud = try render(renderer, device: device, input: input(device),
-                              audio: SceneAudioSpectrum(left: left, right: Array(repeating: 0, count: 64)))
+        let loud = try render(
+            renderer,
+            device: device,
+            input: input(device),
+            audio: SceneAudioSpectrum(
+                left: left,
+                right: Array(repeating: 0, count: 64)
+            )
+        )
         XCTAssertEqual(Array(loud[0 ..< 3]), [51, 255, 255])
         let silent = try render(renderer, device: device, input: input(device))
         XCTAssertEqual(Array(silent[0 ..< 3]), [0, 0, 0])
@@ -413,7 +484,10 @@ final class SceneRenderGraphTests: XCTestCase {
             let document = SceneDocument(canvasWidth: 16, canvasHeight: 16, layers: [layer])
             try SceneStore.save(document, videoPath: video.path)
             let restored = try XCTUnwrap(SceneStore.load(videoPath: video.path))
-            XCTAssertEqual(restored.layers[0].effects.first { $0.kind == .shader }?.renderGraph, shader.renderGraph)
+            XCTAssertEqual(
+                restored.layers[0].effects.first { $0.kind == .shader }?.renderGraph,
+                shader.renderGraph
+            )
             let renderer = try SceneRenderer(document: restored, videoPath: video.path)
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(
                 pixelFormat: .bgra8Unorm, width: 16, height: 16, mipmapped: false
@@ -422,22 +496,31 @@ final class SceneRenderGraphTests: XCTestCase {
             descriptor.usage = [.renderTarget, .shaderRead]
             let target = try XCTUnwrap(renderer.device.makeTexture(descriptor: descriptor))
             let command = try XCTUnwrap(renderer.commandQueue.makeCommandBuffer())
-            try renderer.encode(into: target, commandBuffer: command, input: SceneFrameInput(time: 0, isRealTime: true))
+            try renderer.encode(
+                into: target,
+                commandBuffer: command,
+                input: SceneFrameInput(time: 0, isRealTime: true)
+            )
             command.commit()
             command.waitUntilCompleted()
             if let error = command.error { throw error }
             var pixels = [UInt8](repeating: 0, count: 4)
             pixels.withUnsafeMutableBytes {
-                target.getBytes($0.baseAddress!, bytesPerRow: 64, from: MTLRegionMake2D(8, 8, 1, 1), mipmapLevel: 0)
+                target.getBytes(
+                    $0.baseAddress!,
+                    bytesPerRow: 64,
+                    from: MTLRegionMake2D(8, 8, 1, 1),
+                    mipmapLevel: 0
+                )
             }
             return pixels
         }
         // BGRA over the black canvas: the mask halves what the shader drew...
-        XCTAssertEqual(Double(try render([shader, mask])[1]), 128, accuracy: 1)
+        XCTAssertEqual(try Double(render([shader, mask])[1]), 128, accuracy: 1)
         // ...and the shader replaces what the mask left.
         XCTAssertEqual(try render([mask, shader]), [0, 255, 0, 255])
         shader.isEnabled = false
-        XCTAssertEqual(Double(try render([shader, mask])[2]), 32, accuracy: 1)
+        XCTAssertEqual(try Double(render([shader, mask])[2]), 32, accuracy: 1)
     }
 
     func testSceneRendererAppliesSavedGraph() throws {
@@ -599,7 +682,14 @@ final class SceneRenderGraphTests: XCTestCase {
         let g = graph(
             fragment: fragment,
             uniforms: initial,
-            updates: [SceneRenderGraph.UniformUpdate(offset: 0, value: .effectValue, texture: nil, stride: nil, key: "alpha", components: 1)]
+            updates: [SceneRenderGraph.UniformUpdate(
+                offset: 0,
+                value: .effectValue,
+                texture: nil,
+                stride: nil,
+                key: "alpha",
+                components: 1
+            )]
         )
         let renderer = try SceneRenderGraphRenderer(graph: g, device: device)
         let texture = try input(device, size: 4)
@@ -666,7 +756,10 @@ final class SceneRenderGraphTests: XCTestCase {
         XCTAssertFalse(hiddenDoc.usesCursor)
 
         var directLayer = SceneLayer(name: "direct", imageFile: "image.png")
-        directLayer.renderGraph = graph(fragment: "", updates: [.init(offset: 0, value: .previousPointer)])
+        directLayer.renderGraph = graph(
+            fragment: "",
+            updates: [.init(offset: 0, value: .previousPointer)]
+        )
         let directDoc = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [directLayer])
         XCTAssertTrue(directLayer.usesCursor)
         XCTAssertTrue(directDoc.usesCursor)
@@ -676,13 +769,21 @@ final class SceneRenderGraphTests: XCTestCase {
             passes: [
                 .init(operation: .draw, target: "first", draw: .init(
                     vertex: .init(source: vertex, entryPoint: "vertexMain"),
-                    fragment: .init(source: "", entryPoint: "fragmentMain", updates: [.init(offset: 0, value: .time)]),
+                    fragment: .init(
+                        source: "",
+                        entryPoint: "fragmentMain",
+                        updates: [.init(offset: 0, value: .time)]
+                    ),
                     vertices: Data(), vertexStride: 0, vertexCount: 0, attributes: [], textures: []
                 )),
                 .init(operation: .copy, target: "second", source: "first"),
                 .init(operation: .draw, target: "out", draw: .init(
                     vertex: .init(source: vertex, entryPoint: "vertexMain"),
-                    fragment: .init(source: "", entryPoint: "fragmentMain", updates: [.init(offset: 0, value: .pointerState)]),
+                    fragment: .init(
+                        source: "",
+                        entryPoint: "fragmentMain",
+                        updates: [.init(offset: 0, value: .pointerState)]
+                    ),
                     vertices: Data(), vertexStride: 0, vertexCount: 0, attributes: [], textures: []
                 ))
             ],

@@ -1,5 +1,5 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class SceneLoopTimingTests: XCTestCase {
     /// A camera path or a video of 23 s plays 2.6 times a minute: a baked loop plays it at
@@ -9,7 +9,11 @@ final class SceneLoopTimingTests: XCTestCase {
             SceneLoopTiming.phase(rate: 1, cycle: 23, keepsDirection: true, time: time, loop: 60)
         }
         XCTAssertEqual(played(25), 2, accuracy: 1e-9)
-        XCTAssertEqual(SceneLoopTiming.phase(rate: 1, cycle: 23, keepsDirection: true, time: 25, loop: nil), 2, accuracy: 1e-9)
+        XCTAssertEqual(
+            SceneLoopTiming.phase(rate: 1, cycle: 23, keepsDirection: true, time: 25, loop: nil),
+            2,
+            accuracy: 1e-9
+        )
         let end = played(59.999)
         XCTAssertTrue(end < 0.01 || end > 22.99, "the loop ends where a play starts, not at \(end)")
         var previous = 0.0, unwrapped = 0.0

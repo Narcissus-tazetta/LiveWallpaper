@@ -22,7 +22,10 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
     override func setUp() async throws {
         fixtureDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("WallpaperLoopIntroPlaybackTests-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: fixtureDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: fixtureDirectory,
+            withIntermediateDirectories: true
+        )
         videoURL = fixtureDirectory.appendingPathComponent("fixture.mp4")
         try await Self.writeFixtureVideo(to: videoURL, seconds: 6, fps: 30)
     }
@@ -40,7 +43,7 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
                 AVVideoCodecKey: AVVideoCodecType.h264,
                 AVVideoWidthKey: size,
                 AVVideoHeightKey: size,
-                AVVideoCompressionPropertiesKey: [AVVideoMaxKeyFrameIntervalKey: Int(fps)],
+                AVVideoCompressionPropertiesKey: [AVVideoMaxKeyFrameIntervalKey: Int(fps)]
             ]
         )
         input.expectsMediaDataInRealTime = false
@@ -49,7 +52,7 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
             sourcePixelBufferAttributes: [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
                 kCVPixelBufferWidthKey as String: size,
-                kCVPixelBufferHeightKey as String: size,
+                kCVPixelBufferHeightKey as String: size
             ]
         )
         writer.add(input)
@@ -57,7 +60,7 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
         writer.startSession(atSourceTime: .zero)
 
         let frameCount = seconds * Int(fps)
-        for frame in 0..<frameCount {
+        for frame in 0 ..< frameCount {
             while !input.isReadyForMoreMediaData {
                 try await Task.sleep(nanoseconds: 5_000_000)
             }
@@ -69,11 +72,18 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
             let base = try XCTUnwrap(CVPixelBufferGetBaseAddress(pixelBuffer))
             memset(base, Int32(frame % 256), CVPixelBufferGetDataSize(pixelBuffer))
             CVPixelBufferUnlockBaseAddress(pixelBuffer, [])
-            XCTAssertTrue(adaptor.append(pixelBuffer, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: fps)))
+            XCTAssertTrue(adaptor.append(
+                pixelBuffer,
+                withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: fps)
+            ))
         }
         input.markAsFinished()
         await writer.finishWriting()
-        XCTAssertEqual(writer.status, .completed, "writer failed: \(String(describing: writer.error))")
+        XCTAssertEqual(
+            writer.status,
+            .completed,
+            "writer failed: \(String(describing: writer.error))"
+        )
     }
 
     /// 壁時計で `seconds` だけ待つ(その間メインループは回り続けるので、
@@ -84,7 +94,7 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
         wait(for: [done], timeout: seconds + 2)
     }
 
-    func testIntroPlaysFromTheCutStartThenKeepsLooping() throws {
+    func testIntroPlaysFromTheCutStartThenKeepsLooping() {
         let asset = AVURLAsset(url: videoURL)
 
         let trimStart = 0.5
@@ -140,7 +150,7 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
 
     /// ループ開始位置なし(= イントロなし)のときは、従来どおりカット開始位置から
     /// 素直にループする。イントロ経路を足したことで通常経路が壊れていないことの確認。
-    func testPlainCutRangeStillLoopsWithoutAnIntro() throws {
+    func testPlainCutRangeStillLoopsWithoutAnIntro() {
         let asset = AVURLAsset(url: videoURL)
 
         let player = AVQueuePlayer()

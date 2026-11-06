@@ -1,10 +1,11 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class LockScreenVideoSelectionTests: XCTestCase {
     func testValidatedVideoPathReturnsNilForMissingFile() {
-        XCTAssertNil(WallpaperModel.validatedVideoPath("/tmp/does-not-exist-\(UUID().uuidString).mov"))
+        XCTAssertNil(WallpaperModel
+            .validatedVideoPath("/tmp/does-not-exist-\(UUID().uuidString).mov"))
     }
 
     func testValidatedVideoPathReturnsNilForEmptyString() {

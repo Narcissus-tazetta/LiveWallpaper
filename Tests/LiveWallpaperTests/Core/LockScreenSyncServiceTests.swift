@@ -40,7 +40,8 @@ final class LockScreenSyncServiceTests: XCTestCase {
         try assertAllWallpaperStatesShowTheAerial(in: store, assetID: tahoeID)
         let backupName = try XCTUnwrap(service.activeLease?.storeBackupFileName)
         XCTAssertTrue(FileManager.default.fileExists(
-            atPath: fixture.storeURL.deletingLastPathComponent().appendingPathComponent(backupName).path
+            atPath: fixture.storeURL.deletingLastPathComponent().appendingPathComponent(backupName)
+                .path
         ))
     }
 
@@ -48,7 +49,10 @@ final class LockScreenSyncServiceTests: XCTestCase {
         let fixture = try makeFixture(downloadedIDs: [tahoeID], storeType: "linked")
         let service = makeService(fixture)
 
-        _ = try await service.sync(videoURL: try writeFakeVideo(named: "source.mov", contents: "live-video"))
+        _ = try await service.sync(videoURL: writeFakeVideo(
+            named: "source.mov",
+            contents: "live-video"
+        ))
 
         let store = try wallpaperStore(at: fixture.storeURL)
         XCTAssertEqual((store["SystemDefault"] as? [String: Any])?["Type"] as? String, "linked")
@@ -179,7 +183,11 @@ final class LockScreenSyncServiceTests: XCTestCase {
 
         var changed = try wallpaperStore(at: fixture.storeURL)
         changed["ChangedByUserLater"] = true
-        let changedData = try PropertyListSerialization.data(fromPropertyList: changed, format: .binary, options: 0)
+        let changedData = try PropertyListSerialization.data(
+            fromPropertyList: changed,
+            format: .binary,
+            options: 0
+        )
         try changedData.write(to: fixture.storeURL)
 
         _ = try await service.sync(videoURL: sourceVideoURL)
@@ -225,7 +233,10 @@ final class LockScreenSyncServiceTests: XCTestCase {
             try await Task.sleep(nanoseconds: 1_050_000_000)
         }
         let videosURL = fixture.rootURL.appendingPathComponent("videos", isDirectory: true)
-        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: videosURL.path)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o555],
+            ofItemAtPath: videosURL.path
+        )
         XCTAssertThrowsError(try service.restoreOriginalAerialAndWallpaperStore())
         XCTAssertTrue(service.hasActiveLease)
 
@@ -235,7 +246,10 @@ final class LockScreenSyncServiceTests: XCTestCase {
         try PropertyListSerialization.data(fromPropertyList: patched, format: .binary, options: 0)
             .write(to: fixture.storeURL)
 
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: videosURL.path)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: videosURL.path
+        )
         try service.restoreOriginalAerialAndWallpaperStore()
 
         XCTAssertFalse(service.hasActiveLease)
@@ -393,8 +407,8 @@ final class LockScreenSyncServiceTests: XCTestCase {
                 ]
             ]
         ]
-        // As the Store has them: one Linked surface, or a Desktop surface beside the
-        // screen saver's Idle one.
+        /// As the Store has them: one Linked surface, or a Desktop surface beside the
+        /// screen saver's Idle one.
         func state(_ desktop: [String: Any]) -> [String: Any] {
             type == "linked"
                 ? ["Type": type, "Linked": desktop]

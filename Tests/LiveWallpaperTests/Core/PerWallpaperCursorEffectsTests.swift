@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class PerWallpaperCursorEffectsTests: XCTestCase {
@@ -90,7 +89,8 @@ final class PerWallpaperCursorEffectsTests: XCTestCase {
     func testPackagesWithoutTheSettingsStillDecode() throws {
         let data = try JSONEncoder().encode(video(cursorEffects: nil))
         XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("cursorEffects"))
-        XCTAssertNil(try JSONDecoder().decode(PackageManifest.PackageVideo.self, from: data).cursorEffects)
+        XCTAssertNil(try JSONDecoder().decode(PackageManifest.PackageVideo.self, from: data)
+            .cursorEffects)
     }
 
     /// A package from a newer version may use a shape this one does not know; only that

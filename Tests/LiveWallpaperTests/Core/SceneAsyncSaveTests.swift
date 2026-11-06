@@ -13,9 +13,9 @@ final class SceneAsyncSaveTests: XCTestCase {
             .appendingPathComponent("SceneAsyncSaveTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         video = directory.appendingPathComponent("scene.mp4")
-        let scene = SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: [
-            SceneLayer(name: "bottom", imageFile: try writeImage()),
-            SceneLayer(name: "top", imageFile: try writeImage())
+        let scene = try SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: [
+            SceneLayer(name: "bottom", imageFile: writeImage()),
+            SceneLayer(name: "top", imageFile: writeImage())
         ])
         try SceneStore.save(scene, videoPath: video.path)
         model = WallpaperModel()
@@ -33,7 +33,8 @@ final class SceneAsyncSaveTests: XCTestCase {
             width: 8, height: 8, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 32,
             space: CGColorSpace(name: CGColorSpace.sRGB)!,
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-            provider: CGDataProvider(data: Data(repeating: 200, count: 8 * 8 * 4) as CFData)!, decode: nil,
+            provider: CGDataProvider(data: Data(repeating: 200, count: 8 * 8 * 4) as CFData)!,
+            decode: nil,
             shouldInterpolate: false, intent: .defaultIntent
         )!
         return try SceneStore.writeImage(image, prefix: "layer", videoPath: video.path)
@@ -119,12 +120,18 @@ final class SceneAsyncSaveTests: XCTestCase {
 
         model.pruneSceneFiles(scene, path: video.path)
 
-        XCTAssertFalse(FileManager.default.fileExists(atPath: unreferenced.path), "unreferenced file should be removed")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: sidecar.path), "properties sidecar should be kept")
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: unreferenced.path),
+            "unreferenced file should be removed"
+        )
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: sidecar.path),
+            "properties sidecar should be kept"
+        )
         XCTAssertTrue(fileExists(scene.layers[0].imageFile), "scene layers should be kept")
     }
 
-    func testPruningPreservesComparisonAndHistorySnapshots() throws {
+    func testPruningPreservesComparisonAndHistorySnapshots() {
         model.recordSceneComparison(path: video.path)
         let removed = scene.layers[1]
         model.removeSceneLayer(id: removed.id, path: video.path)
@@ -134,7 +141,10 @@ final class SceneAsyncSaveTests: XCTestCase {
 
         model.pruneSceneFiles(scene, path: video.path)
 
-        XCTAssertTrue(fileExists(removed.imageFile), "comparison snapshot protects removed layer image")
+        XCTAssertTrue(
+            fileExists(removed.imageFile),
+            "comparison snapshot protects removed layer image"
+        )
     }
 
     func testRetainedFileSurvivesPruningUntilReleased() throws {
@@ -144,17 +154,29 @@ final class SceneAsyncSaveTests: XCTestCase {
 
         model.retainSceneFile(trialFile)
         model.pruneSceneFiles(scene, path: video.path)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: trialFile.path), "retained file survives pruning")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: trialFile.path),
+            "retained file survives pruning"
+        )
 
         model.releaseSceneFile(trialFile)
         model.pruneSceneFiles(scene, path: video.path)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: trialFile.path), "released file is pruned")
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: trialFile.path),
+            "released file is pruned"
+        )
     }
 
     func testQuantitativeMeasurementReal3662790108() throws {
-        let realPath = ("~/Library/Application Support/we-import/Wallpapers/we-3662790108/wallpaper.mp4" as NSString).expandingTildeInPath
+        let realPath =
+            (
+                "~/Library/Application Support/we-import/Wallpapers/we-3662790108/wallpaper.mp4" as NSString
+            )
+            .expandingTildeInPath
         let folder = SceneStore.folderURL(forVideoPath: realPath)
-        guard FileManager.default.fileExists(atPath: folder.appendingPathComponent("scene.json").path) else {
+        guard FileManager.default
+            .fileExists(atPath: folder.appendingPathComponent("scene.json").path)
+        else {
             return
         }
 
@@ -202,9 +224,15 @@ final class SceneAsyncSaveTests: XCTestCase {
         Files in directory: \(names.count)
         Old MainActor Blocking Time (Encode): \(String(format: "%.2f", encodeDurationMs)) ms
         Old MainActor Blocking Time (Prune):  \(String(format: "%.2f", pruneDurationMs)) ms
-        Old Total MainActor Freeze:           \(String(format: "%.2f", encodeDurationMs + pruneDurationMs)) ms
+        Old Total MainActor Freeze:           \(String(
+            format: "%.2f",
+            encodeDurationMs + pruneDurationMs
+        )) ms
         New MainActor Blocking Time:          \(String(format: "%.2f", mainThreadDurationMs)) ms
-        MainActor Freeze Reduction:           \(String(format: "%.1f", (encodeDurationMs + pruneDurationMs) / max(mainThreadDurationMs, 0.01)))x
+        MainActor Freeze Reduction:           \(String(
+            format: "%.1f",
+            (encodeDurationMs + pruneDurationMs) / max(mainThreadDurationMs, 0.01)
+        ))x
         """)
     }
 }

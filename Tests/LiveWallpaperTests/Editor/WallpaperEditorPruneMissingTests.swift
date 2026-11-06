@@ -1,13 +1,12 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 /// pruneMissing が、選択中の動画がライブラリから消えたときに draft も破棄することを
 /// 確認する。以前は selectedVideoPath だけ nil にして draft を放置していたため、
 /// トリムパネルのヘッダー/プレビューは新しく解決された動画を指す一方、スクラバーは
 /// 削除済みの動画の古い尺・トリム範囲を表示し続けてしまっていた。
 @MainActor
-final class WallpaperEditorControllerPruneMissingTests: XCTestCase {
+final class WallpaperEditorPruneMissingTests: XCTestCase {
     func testPruneMissingResyncsDraftAwayFromDeletedVideo() {
         let model = WallpaperModel()
         model.libraryVideoPaths = ["/a.mp4", "/b.mp4"]

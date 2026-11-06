@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class CursorEffectsTests: XCTestCase {
@@ -75,7 +74,10 @@ final class CursorEffectsTests: XCTestCase {
         settings.trailEnabled = true
         settings.trailColor = .custom
         settings.trailCustomColor = RGBAColor(red: 0.2, green: 0.4, blue: 0.6, alpha: 1)
-        let decoded = try JSONDecoder().decode(CursorEffectsSettings.self, from: JSONEncoder().encode(settings))
+        let decoded = try JSONDecoder().decode(
+            CursorEffectsSettings.self,
+            from: JSONEncoder().encode(settings)
+        )
         XCTAssertEqual(decoded, settings)
     }
 
@@ -143,7 +145,10 @@ final class CursorEffectsTests: XCTestCase {
     }
 
     func testOnlyWhileDesktopActiveDefaultsOnForOldSettings() throws {
-        let settings = try JSONDecoder().decode(CursorEffectsSettings.self, from: Data(#"{"trailEnabled":true}"#.utf8))
+        let settings = try JSONDecoder().decode(
+            CursorEffectsSettings.self,
+            from: Data(#"{"trailEnabled":true}"#.utf8)
+        )
         XCTAssertTrue(settings.onlyWhileDesktopActive)
     }
 }

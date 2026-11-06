@@ -1,6 +1,6 @@
 import AVFoundation
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class FreezeCaptureTimeTests: XCTestCase {
@@ -16,12 +16,18 @@ final class FreezeCaptureTimeTests: XCTestCase {
     }
 
     func testTimeInsideTrimmedAwayHeadIsMovedToTrimStart() {
-        let time = WallpaperModel.freezeCaptureTime(CMTime(seconds: 0.5, preferredTimescale: 600), trimStart: 2)
+        let time = WallpaperModel.freezeCaptureTime(
+            CMTime(seconds: 0.5, preferredTimescale: 600),
+            trimStart: 2
+        )
         XCTAssertEqual(time.seconds, 2, accuracy: 0.001)
     }
 
     func testPlaybackPositionIsKeptWhenValid() {
-        let time = WallpaperModel.freezeCaptureTime(CMTime(seconds: 5, preferredTimescale: 600), trimStart: 2)
+        let time = WallpaperModel.freezeCaptureTime(
+            CMTime(seconds: 5, preferredTimescale: 600),
+            trimStart: 2
+        )
         XCTAssertEqual(time.seconds, 5, accuracy: 0.001)
     }
 }

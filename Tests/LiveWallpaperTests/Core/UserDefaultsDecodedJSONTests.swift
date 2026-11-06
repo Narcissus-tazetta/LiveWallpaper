@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 final class UserDefaultsDecodedJSONTests: XCTestCase {
     private let suiteName = "UserDefaultsDecodedJSONTests"
@@ -16,7 +15,7 @@ final class UserDefaultsDecodedJSONTests: XCTestCase {
     }
 
     func testDecodesStoredValue() throws {
-        defaults.set(try JSONEncoder().encode(["a": 1]), forKey: "k")
+        try defaults.set(JSONEncoder().encode(["a": 1]), forKey: "k")
 
         XCTAssertEqual(defaults.decodedJSON([String: Int].self, forKey: "k"), ["a": 1])
         XCTAssertNil(defaults.data(forKey: "k.unreadable"))

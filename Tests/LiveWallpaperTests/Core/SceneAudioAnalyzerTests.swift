@@ -1,5 +1,5 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 /// Expected values come from recordings of the original player playing the same tones.
 final class SceneAudioAnalyzerTests: XCTestCase {
@@ -18,7 +18,8 @@ final class SceneAudioAnalyzerTests: XCTestCase {
         func tone(_ level: Double?) -> [Float] {
             (0 ..< count).map { index in
                 guard let frequency, let level else { return 0 }
-                return Float(pow(10, level / 20) * sin(2 * .pi * frequency * Double(index) / sampleRate))
+                return Float(pow(10, level / 20) *
+                    sin(2 * .pi * frequency * Double(index) / sampleRate))
             }
         }
         let left = tone(dBFS)
@@ -28,7 +29,12 @@ final class SceneAudioAnalyzerTests: XCTestCase {
             right.withUnsafeBufferPointer { right in
                 for start in stride(from: 0, to: count, by: 960) {
                     let length = min(960, count - start)
-                    if let values = analyzer.append(left: left.baseAddress! + start, right: right.baseAddress! + start, frames: length, stride: 1) {
+                    if let values = analyzer.append(
+                        left: left.baseAddress! + start,
+                        right: right.baseAddress! + start,
+                        frames: length,
+                        stride: 1
+                    ) {
                         frames.append(values)
                     }
                 }
@@ -37,14 +43,27 @@ final class SceneAudioAnalyzerTests: XCTestCase {
         return frames
     }
 
-    private func play(_ analyzer: SceneAudioAnalyzer, frequency: Double?, dBFS: Double = -20, seconds: Double) -> [[Float]] {
+    private func play(
+        _ analyzer: SceneAudioAnalyzer,
+        frequency: Double?,
+        dBFS: Double = -20,
+        seconds: Double
+    ) -> [[Float]] {
         output(analyzer, frequency: frequency, dBFS: dBFS, seconds: seconds).map(\.scene)
     }
 
-    func testTonesLandInTheRecordedBands() {
-        for (frequency, band) in [(105.0, 4), (483.0, 20), (1001.0, 32), (4290.0, 47), (8315.0, 55), (14118.0, 63), (21000.0, 63)] {
+    func testTonesLandInTheRecordedBands() throws {
+        for (frequency, band) in [
+            (105.0, 4),
+            (483.0, 20),
+            (1001.0, 32),
+            (4290.0, 47),
+            (8315.0, 55),
+            (14118.0, 63),
+            (21000.0, 63)
+        ] {
             let analyzer = SceneAudioAnalyzer(sampleRate: sampleRate)
-            let last = play(analyzer, frequency: frequency, seconds: 3).last!
+            let last = try XCTUnwrap(play(analyzer, frequency: frequency, seconds: 3).last)
             XCTAssertEqual(last[..<64].indices.max { last[$0] < last[$1] }, band, "\(frequency) Hz")
             XCTAssertEqual(last[band], 1, accuracy: 0.02, "\(frequency) Hz")
         }
@@ -61,34 +80,36 @@ final class SceneAudioAnalyzerTests: XCTestCase {
         XCTAssertGreaterThan(frames[60], 0.98)
     }
 
-    func testShortSilenceKeepsTheGainAndLongerSilenceResetsIt() {
+    func testShortSilenceKeepsTheGainAndLongerSilenceResetsIt() throws {
         for (gap, resets) in [(0.1, false), (0.4, true)] {
             let analyzer = SceneAudioAnalyzer(sampleRate: sampleRate)
             _ = play(analyzer, frequency: 1000, seconds: 3)
             _ = play(analyzer, frequency: nil, seconds: gap)
-            let resumed = play(analyzer, frequency: 1000, seconds: 0.3).last![32]
+            let resumed = try XCTUnwrap(play(analyzer, frequency: 1000, seconds: 0.3).last?[32])
             XCTAssertEqual(resumed < 0.5, resets, "\(gap) s of silence")
         }
     }
 
-    func testWebBandsFollowTheAmplitudeWithoutGain() {
+    func testWebBandsFollowTheAmplitudeWithoutGain() throws {
         // Recorded at bin 32 for 1 kHz: -50 dBFS 0.0018, -30 dBFS 0.0180, 0 dBFS 0.563.
         for (dBFS, recorded) in [(-50.0, 0.0018), (-30.0, 0.0180), (0.0, 0.563)] {
             let analyzer = SceneAudioAnalyzer(sampleRate: sampleRate)
-            let web = output(analyzer, frequency: 1000, dBFS: dBFS, seconds: 1).last!.web
+            let web = try XCTUnwrap(output(analyzer, frequency: 1000, dBFS: dBFS, seconds: 1).last?
+                .web)
             XCTAssertEqual(Double(web[32]), recorded, accuracy: recorded * 0.03, "\(dBFS) dBFS")
         }
         // 4 kHz at -20 dBFS was recorded at bin 46 as 0.240.
         let analyzer = SceneAudioAnalyzer(sampleRate: sampleRate)
-        let web = output(analyzer, frequency: 4000, seconds: 1).last!.web
+        let web = try XCTUnwrap(output(analyzer, frequency: 4000, seconds: 1).last?.web)
         XCTAssertEqual(web[..<64].indices.max { web[$0] < web[$1] }, 46)
         XCTAssertEqual(web[46], 0.240, accuracy: 0.01)
     }
 
-    func testWebBandsKeepLeftThenRight() {
+    func testWebBandsKeepLeftThenRight() throws {
         let analyzer = SceneAudioAnalyzer(sampleRate: sampleRate)
-        let web = output(analyzer, frequency: 1000, right: .some(nil), seconds: 1).last!.web
+        let web = try XCTUnwrap(output(analyzer, frequency: 1000, right: .some(nil), seconds: 1)
+            .last?.web)
         XCTAssertEqual(web[32], 0.0566, accuracy: 0.002)
-        XCTAssertEqual(web[64...].max()!, 0)
+        XCTAssertEqual(web[64...].max(), 0)
     }
 }

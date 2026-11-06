@@ -27,7 +27,13 @@ final class SceneLinkTests: XCTestCase {
     }
 
     private func date(_ hour: Int, _ minute: Int, day: Int = 13) -> Date {
-        calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))!
+        calendar.date(from: DateComponents(
+            year: 2026,
+            month: 10,
+            day: day,
+            hour: hour,
+            minute: minute
+        ))!
     }
 
     private func writeImage() throws -> String {
@@ -51,20 +57,35 @@ final class SceneLinkTests: XCTestCase {
 
     /// BGRA.
     private func frame(
-        _ scene: SceneDocument, timeOfDay: SceneTimeOfDay = .day, parallax: SIMD2<Float> = .zero, time: Double = 0
+        _ scene: SceneDocument, timeOfDay: SceneTimeOfDay = .day, parallax: SIMD2<Float> = .zero,
+        time: Double = 0
     ) throws -> [UInt8] {
         let renderer = try SceneRenderer(document: scene, videoPath: video.path)
         renderer.timeOfDay = timeOfDay
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 64, height: 64, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm,
+            width: 64,
+            height: 64,
+            mipmapped: false
+        )
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .shared
         let texture = try XCTUnwrap(renderer.device.makeTexture(descriptor: descriptor))
         let command = try XCTUnwrap(renderer.commandQueue.makeCommandBuffer())
-        try renderer.encode(into: texture, commandBuffer: command, input: SceneFrameInput(parallax: parallax, time: time))
+        try renderer.encode(
+            into: texture,
+            commandBuffer: command,
+            input: SceneFrameInput(parallax: parallax, time: time)
+        )
         command.commit()
         command.waitUntilCompleted()
         var pixels = [UInt8](repeating: 0, count: 64 * 64 * 4)
-        texture.getBytes(&pixels, bytesPerRow: 256, from: MTLRegionMake2D(0, 0, 64, 64), mipmapLevel: 0)
+        texture.getBytes(
+            &pixels,
+            bytesPerRow: 256,
+            from: MTLRegionMake2D(0, 0, 64, 64),
+            mipmapLevel: 0
+        )
         return pixels
     }
 
@@ -81,7 +102,11 @@ final class SceneLinkTests: XCTestCase {
             (16, 59, .day), (17, 0, .evening), (18, 59, .evening), (19, 0, .night), (23, 59, .night)
         ]
         for (hour, minute, expected) in cases {
-            XCTAssertEqual(scene.timeOfDay(at: date(hour, minute), calendar: calendar), expected, "\(hour):\(minute)")
+            XCTAssertEqual(
+                scene.timeOfDay(at: date(hour, minute), calendar: calendar),
+                expected,
+                "\(hour):\(minute)"
+            )
         }
     }
 
@@ -89,15 +114,28 @@ final class SceneLinkTests: XCTestCase {
         var scene = SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: [])
         scene.timeBands[3].startMinute = 2 * 60 // night from 2:00, after midnight
         XCTAssertEqual(scene.timeOfDay(at: date(23, 0), calendar: calendar), .evening)
-        XCTAssertEqual(scene.timeOfDay(at: date(1, 0), calendar: calendar), .evening, "yesterday's evening lasts")
+        XCTAssertEqual(
+            scene.timeOfDay(at: date(1, 0), calendar: calendar),
+            .evening,
+            "yesterday's evening lasts"
+        )
         XCTAssertEqual(scene.timeOfDay(at: date(3, 0), calendar: calendar), .night)
     }
 
     func testNextChangeIsTheNextStart() {
         let scene = SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: [])
-        XCTAssertEqual(scene.nextTimeOfDayChange(after: date(5, 30), calendar: calendar), date(6, 0))
-        XCTAssertEqual(scene.nextTimeOfDayChange(after: date(10, 0), calendar: calendar), date(17, 0))
-        XCTAssertEqual(scene.nextTimeOfDayChange(after: date(19, 30), calendar: calendar), date(6, 0, day: 14))
+        XCTAssertEqual(
+            scene.nextTimeOfDayChange(after: date(5, 30), calendar: calendar),
+            date(6, 0)
+        )
+        XCTAssertEqual(
+            scene.nextTimeOfDayChange(after: date(10, 0), calendar: calendar),
+            date(17, 0)
+        )
+        XCTAssertEqual(
+            scene.nextTimeOfDayChange(after: date(19, 30), calendar: calendar),
+            date(6, 0, day: 14)
+        )
     }
 
     // MARK: - Saving
@@ -111,13 +149,22 @@ final class SceneLinkTests: XCTestCase {
 
     func testBrokenStartTimesFallBackAndLinksSurviveARoundTrip() throws {
         var scene = SceneDocument(canvasWidth: 8, canvasHeight: 8, layers: [])
-        scene.timeBands = [SceneTimeBand(timeOfDay: .day, startMinute: 600), SceneTimeBand(timeOfDay: .day, startMinute: 700)]
+        scene.timeBands = [
+            SceneTimeBand(timeOfDay: .day, startMinute: 600),
+            SceneTimeBand(timeOfDay: .day, startMinute: 700)
+        ]
         var link = SceneLink(input: .timeOfDay, layerIDs: [UUID()])
-        link.timeValues[.evening] = { var values = SceneLinkValues(); values.warmth = 0.5; return values }()
+        link
+            .timeValues[.evening] = {
+                var values = SceneLinkValues(); values.warmth = 0.5; return values
+            }()
         scene.links = [link]
 
         let data = try SceneStore.encode(scene, folder: nil)
-        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("\"evening\""), "keyed by name")
+        XCTAssertTrue(
+            String(decoding: data, as: UTF8.self).contains("\"evening\""),
+            "keyed by name"
+        )
         let decoded = try JSONDecoder().decode(SceneDocument.self, from: data)
         XCTAssertEqual(decoded.timeBands, SceneTimeBand.defaults)
         XCTAssertEqual(decoded.links, [link])
@@ -131,21 +178,33 @@ final class SceneLinkTests: XCTestCase {
         link.end.offsetX = 0.2
         link.end.scale = 4
         XCTAssertEqual(link.values(timeOfDay: .day, cursor: .zero), .identity)
-        XCTAssertEqual(link.values(timeOfDay: .day, cursor: SIMD2(-1, 0)).offsetX, -0.2, accuracy: 1e-9)
+        XCTAssertEqual(
+            link.values(timeOfDay: .day, cursor: SIMD2(-1, 0)).offsetX,
+            -0.2,
+            accuracy: 1e-9
+        )
         let half = link.values(timeOfDay: .day, cursor: SIMD2(0.5, 0))
         XCTAssertEqual(half.offsetX, 0.1, accuracy: 1e-9)
         XCTAssertEqual(half.scale, 2, accuracy: 1e-9, "zoom is even in log space")
 
         var distance = SceneLink(input: .cursorDistance, layerIDs: [UUID()])
         distance.end.opacity = 0
-        XCTAssertEqual(distance.values(timeOfDay: .day, cursor: SIMD2(0.6, 0.8)).opacity, 0, accuracy: 1e-9)
+        XCTAssertEqual(
+            distance.values(timeOfDay: .day, cursor: SIMD2(0.6, 0.8)).opacity,
+            0,
+            accuracy: 1e-9
+        )
     }
 
     func testLinksOnOneLayerAddUpAndOneLinkMovesAllItsLayers() {
         let first = UUID()
         let second = UUID()
         var time = SceneLink(input: .timeOfDay, layerIDs: [first, second])
-        time.timeValues[.night] = { var values = SceneLinkValues(); values.offsetX = 0.1; values.scale = 2; return values }()
+        time
+            .timeValues[.night] = {
+                var values = SceneLinkValues(); values.offsetX = 0.1; values
+                    .scale = 2; return values
+            }()
         var cursor = SceneLink(input: .cursorY, layerIDs: [first])
         cursor.end.offsetX = 0.3
         cursor.end.scale = 3
@@ -169,25 +228,38 @@ final class SceneLinkTests: XCTestCase {
         // A link that changes nothing draws exactly the same.
         var unchanged = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [plain])
         unchanged.links = [SceneLink(input: .timeOfDay, layerIDs: [plain.id])]
-        XCTAssertEqual(maxDifference(before, try frame(unchanged)), 0)
+        XCTAssertEqual(try maxDifference(before, frame(unchanged)), 0)
 
         // Keyframes at rest, the link moving the whole pose = keyframes already moved.
         var keyframed = plain
         keyframed.keyframes = [
-            SceneKeyframe(time: 0, transform: plain.transform), SceneKeyframe(time: 0.5, transform: plain.transform)
+            SceneKeyframe(time: 0, transform: plain.transform), SceneKeyframe(
+                time: 0.5,
+                transform: plain.transform
+            )
         ]
         var linked = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [keyframed])
         var link = SceneLink(input: .timeOfDay, layerIDs: [keyframed.id])
-        link.timeValues[.evening] = { var values = SceneLinkValues(); values.offsetX = 0.15; values.rotation = 20; return values }()
+        link
+            .timeValues[.evening] = {
+                var values = SceneLinkValues(); values.offsetX = 0.15; values
+                    .rotation = 20; return values
+            }()
         linked.links = [link]
         var moved = keyframed
         for index in moved.keyframes.indices {
             moved.keyframes[index].transform.offsetX += 0.15
             moved.keyframes[index].transform.rotation += 20
         }
-        let expected = try frame(SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [moved]), time: 3)
-        XCTAssertLessThanOrEqual(maxDifference(try frame(linked, timeOfDay: .evening, time: 3), expected), 1)
-        XCTAssertEqual(maxDifference(try frame(linked, timeOfDay: .day, time: 3), try frame(
+        let expected = try frame(
+            SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [moved]),
+            time: 3
+        )
+        XCTAssertLessThanOrEqual(
+            try maxDifference(frame(linked, timeOfDay: .evening, time: 3), expected),
+            1
+        )
+        XCTAssertEqual(try maxDifference(frame(linked, timeOfDay: .day, time: 3), frame(
             SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [keyframed]), time: 3
         )), 0, "other parts of the day are untouched")
     }
@@ -204,9 +276,20 @@ final class SceneLinkTests: XCTestCase {
         shifted.transform.offsetY = 0.2
 
         let rest = try frame(SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [layer]))
-        XCTAssertEqual(maxDifference(try frame(scene), rest), 0, "the lock screen sees the cursor at the centre")
+        XCTAssertEqual(
+            try maxDifference(frame(scene), rest),
+            0,
+            "the lock screen sees the cursor at the centre"
+        )
         let atRight = try frame(scene, parallax: SIMD2(1, 0))
-        XCTAssertEqual(maxDifference(atRight, try frame(SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [shifted]))), 0)
+        XCTAssertEqual(
+            try maxDifference(atRight, frame(SceneDocument(
+                canvasWidth: 64,
+                canvasHeight: 64,
+                layers: [shifted]
+            ))),
+            0
+        )
         XCTAssertTrue(scene.usesCursor, "the desktop draws it live and tracks the cursor")
     }
 
@@ -215,8 +298,14 @@ final class SceneLinkTests: XCTestCase {
         let layer = SceneLayer(name: "picture", imageFile: file)
         var scene = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [layer])
         var link = SceneLink(input: .timeOfDay, layerIDs: [layer.id])
-        link.timeValues[.night] = { var values = SceneLinkValues(); values.brightness = -1; return values }()
-        link.timeValues[.evening] = { var values = SceneLinkValues(); values.saturation = 0; return values }()
+        link
+            .timeValues[.night] = {
+                var values = SceneLinkValues(); values.brightness = -1; return values
+            }()
+        link
+            .timeValues[.evening] = {
+                var values = SceneLinkValues(); values.saturation = 0; return values
+            }()
         scene.links = [link]
 
         let night = try frame(scene, timeOfDay: .night)
@@ -241,21 +330,35 @@ final class SceneLinkTests: XCTestCase {
         let layer = SceneLayer(name: "picture", imageFile: file)
         var scene = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [layer])
         var link = SceneLink(input: .timeOfDay, layerIDs: [layer.id])
-        link.timeValues[.night] = { var values = SceneLinkValues(); values.brightness = -1; return values }()
+        link
+            .timeValues[.night] = {
+                var values = SceneLinkValues(); values.brightness = -1; return values
+            }()
         scene.links = [link]
 
         func brightest(_ timeOfDay: SceneTimeOfDay) async throws -> Int {
             let output = directory.appendingPathComponent("\(timeOfDay.rawValue).mp4")
-            try await SceneVideoBaker.bake(document: scene, videoPath: video.path, timeOfDay: timeOfDay, to: output) { _ in }
+            try await SceneVideoBaker.bake(
+                document: scene,
+                videoPath: video.path,
+                timeOfDay: timeOfDay,
+                to: output
+            ) { _ in }
             let generator = AVAssetImageGenerator(asset: AVURLAsset(url: output))
             let image = try await generator.image(at: .zero).image
             var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
-            let context = try XCTUnwrap(CGContext(
-                data: &bytes, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
-                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            let context = try XCTUnwrap(try CGContext(
+                data: &bytes, width: image.width, height: image.height, bitsPerComponent: 8,
+                bytesPerRow: image.width * 4,
+                space: XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB)),
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
             ))
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-            return stride(from: 0, to: bytes.count, by: 4).map { max(bytes[$0], bytes[$0 + 1], bytes[$0 + 2]) }.map(Int.init).max() ?? 0
+            return stride(from: 0, to: bytes.count, by: 4).map { max(
+                bytes[$0],
+                bytes[$0 + 1],
+                bytes[$0 + 2]
+            ) }.map(Int.init).max() ?? 0
         }
         let night = try await brightest(.night)
         let day = try await brightest(.day)
@@ -271,7 +374,11 @@ final class SceneLinkTests: XCTestCase {
         var scene = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [layer])
         var link = SceneLink(input: .timeOfDay, layerIDs: [layer.id])
         for (index, timeOfDay) in SceneTimeOfDay.allCases.enumerated() {
-            link.timeValues[timeOfDay] = { var values = SceneLinkValues(); values.warmth = Double(index) * 0.2; return values }()
+            link
+                .timeValues[timeOfDay] = {
+                    var values = SceneLinkValues(); values
+                        .warmth = Double(index) * 0.2; return values
+                }()
         }
         scene.links = [link]
         try SceneStore.save(scene, videoPath: video.path)
@@ -287,21 +394,30 @@ final class SceneLinkTests: XCTestCase {
         model.sceneBakedTimesOfDay[video.path] = now
         model.updateSceneTimesOfDay()
         XCTAssertFalse(model.scenesBaking.contains(video.path))
-        let fire = try XCTUnwrap(model.sceneTimeOfDayTimer?.fireDate, "waits for the next part of the day")
+        let fire = try XCTUnwrap(
+            model.sceneTimeOfDayTimer?.fireDate,
+            "waits for the next part of the day"
+        )
         let next = try XCTUnwrap(scene.nextTimeOfDayChange(after: Date()))
         XCTAssertEqual(fire.timeIntervalSince(next), 1, accuracy: 1)
 
         let other = SceneTimeOfDay.allCases.first { $0 != now }
         model.sceneBakedTimesOfDay[video.path] = other
         model.updateSceneTimesOfDay()
-        XCTAssertFalse(model.scenesBaking.contains(video.path), "no video wanted: drawn live instead")
+        XCTAssertFalse(
+            model.scenesBaking.contains(video.path),
+            "no video wanted: drawn live instead"
+        )
         XCTAssertTrue(model.sceneStaleVideoPaths.contains(video.path))
 
         model.lockScreenVideoPath = video.path
         model.cancelSceneBake(path: video.path)
         model.sceneBakedTimesOfDay[video.path] = other
         model.updateSceneTimesOfDay()
-        XCTAssertTrue(model.scenesBakeRunning.contains(video.path), "bakes at once, not after edits pause")
+        XCTAssertTrue(
+            model.scenesBakeRunning.contains(video.path),
+            "bakes at once, not after edits pause"
+        )
         XCTAssertEqual(model.sceneBakingTimesOfDay[video.path], now)
     }
 
@@ -311,9 +427,12 @@ final class SceneLinkTests: XCTestCase {
         var scene = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [layer])
         var link = SceneLink(input: .timeOfDay, layerIDs: [layer.id])
         let now = scene.timeOfDay(at: Date())
-        let other = SceneTimeOfDay.allCases.first { $0 != now }!
-        let third = SceneTimeOfDay.allCases.first { $0 != now && $0 != other }!
-        link.timeValues[third] = { var values = SceneLinkValues(); values.brightness = -0.5; return values }()
+        let other = try XCTUnwrap(SceneTimeOfDay.allCases.first { $0 != now })
+        let third = try XCTUnwrap(SceneTimeOfDay.allCases.first { $0 != now && $0 != other })
+        link
+            .timeValues[third] = {
+                var values = SceneLinkValues(); values.brightness = -0.5; return values
+            }()
         scene.links = [link]
         XCTAssertTrue(scene.looksSame(at: other, as: now))
         XCTAssertFalse(scene.looksSame(at: third, as: now))
@@ -345,6 +464,9 @@ final class SceneLinkTests: XCTestCase {
             model.discardSceneSave(path: video.path)
         }
         let copy = try XCTUnwrap(model.duplicateSceneLayer(id: layer.id, path: video.path))
-        XCTAssertEqual(model.sceneDocumentsByPath[video.path]?.links.first?.layerIDs, [layer.id, copy])
+        XCTAssertEqual(
+            model.sceneDocumentsByPath[video.path]?.links.first?.layerIDs,
+            [layer.id, copy]
+        )
     }
 }

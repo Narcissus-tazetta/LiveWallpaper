@@ -4,7 +4,7 @@ import simd
 import XCTest
 
 final class SceneStaticModelTests: XCTestCase {
-    private func data<T>(_ values: [T]) -> Data {
+    private func data(_ values: [some Any]) -> Data {
         values.withUnsafeBytes { Data($0) }
     }
 
@@ -12,7 +12,12 @@ final class SceneStaticModelTests: XCTestCase {
     private func model(indices: [UInt32]) -> SceneStaticModel {
         let components: UInt32 = 0b00011
         let vertices: [Float] = [0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1]
-        return SceneStaticModel(material: 0, components: components, vertices: data(vertices), indices: data(indices))
+        return SceneStaticModel(
+            material: 0,
+            components: components,
+            vertices: data(vertices),
+            indices: data(indices)
+        )
     }
 
     private func layer(_ model: SceneStaticModel) -> SceneLayer {
@@ -24,7 +29,10 @@ final class SceneStaticModelTests: XCTestCase {
 
     func testAModelLayerSurvivesEncodingAndGivesItsShape() throws {
         let original = layer(model(indices: [0, 1, 2]))
-        let decoded = try JSONDecoder().decode(SceneLayer.self, from: JSONEncoder().encode(original))
+        let decoded = try JSONDecoder().decode(
+            SceneLayer.self,
+            from: JSONEncoder().encode(original)
+        )
         XCTAssertEqual(decoded.kind, .model)
         let shape = try XCTUnwrap(decoded.model).shape
         XCTAssertEqual(shape.vertices.count, 18)
@@ -43,9 +51,19 @@ final class SceneStaticModelTests: XCTestCase {
         XCTAssertThrowsError(try JSONDecoder().decode(SceneLayer.self, from: encoded))
     }
 
-    func testShapeEquatableIgnoresBuffers() throws {
-        var s1 = SceneModelLayerFrame.Shape(material: 0, components: 1, vertices: [1, 2, 3], indices: [0])
-        let s2 = SceneModelLayerFrame.Shape(material: 0, components: 1, vertices: [1, 2, 3], indices: [0])
+    func testShapeEquatableIgnoresBuffers() {
+        var s1 = SceneModelLayerFrame.Shape(
+            material: 0,
+            components: 1,
+            vertices: [1, 2, 3],
+            indices: [0]
+        )
+        let s2 = SceneModelLayerFrame.Shape(
+            material: 0,
+            components: 1,
+            vertices: [1, 2, 3],
+            indices: [0]
+        )
         XCTAssertEqual(s1, s2)
         let device = MTLCreateSystemDefaultDevice()
         s1.vertexBuffer = device?.makeBuffer(length: 16, options: .storageModeShared)
@@ -74,7 +92,12 @@ final class SceneStaticModelTests: XCTestCase {
         XCTAssertTrue(cachedAfterUpdate.shape.indexBuffer === indexBuffer)
 
         // Encoding a frame does not allocate new buffers or mutate cache
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 100, height: 100, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm,
+            width: 100,
+            height: 100,
+            mipmapped: false
+        )
         descriptor.usage = [.renderTarget, .shaderRead]
         let target = try XCTUnwrap(renderer.device.makeTexture(descriptor: descriptor))
         let command = try XCTUnwrap(renderer.commandQueue.makeCommandBuffer())
@@ -98,7 +121,12 @@ final class SceneStaticModelTests: XCTestCase {
 
         // Update model vertices
         let updatedVertices: [Float] = [2, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1]
-        let m2 = SceneStaticModel(material: m1.material, components: m1.components, vertices: data(updatedVertices), indices: m1.indices)
+        let m2 = SceneStaticModel(
+            material: m1.material,
+            components: m1.components,
+            vertices: data(updatedVertices),
+            indices: m1.indices
+        )
         var lUpdated = l
         lUpdated.model = m2
         let docUpdated = SceneDocument(canvasWidth: 100, canvasHeight: 100, layers: [lUpdated])
@@ -141,7 +169,12 @@ final class SceneStaticModelTests: XCTestCase {
         XCTAssertNil(doc.meshMaterials)
 
         let renderer = try SceneRenderer(document: doc, videoPath: "/tmp/fake.mp4")
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 100, height: 100, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm,
+            width: 100,
+            height: 100,
+            mipmapped: false
+        )
         descriptor.usage = [.renderTarget, .shaderRead]
         let target = try XCTUnwrap(renderer.device.makeTexture(descriptor: descriptor))
         let command = try XCTUnwrap(renderer.commandQueue.makeCommandBuffer())
@@ -155,16 +188,44 @@ final class SceneStaticModelTests: XCTestCase {
         guard let device = MTLCreateSystemDefaultDevice(),
               let queue = device.makeCommandQueue() else { return }
         let modelRenderer = try SceneModelRenderer(materials: [], device: device)
-        let light1 = SceneShadowLight(kind: .spot, origin: [0, 0, 100], axis: [0, 0, -1], outerCone: 30, cascadeDistance: 100)
-        let light2 = SceneShadowLight(kind: .spot, origin: [0, 0, 200], axis: [0, 0, -1], outerCone: 30, cascadeDistance: 100)
+        let light1 = SceneShadowLight(
+            kind: .spot,
+            origin: [0, 0, 100],
+            axis: [0, 0, -1],
+            outerCone: 30,
+            cascadeDistance: 100
+        )
+        let light2 = SceneShadowLight(
+            kind: .spot,
+            origin: [0, 0, 200],
+            axis: [0, 0, -1],
+            outerCone: 30,
+            cascadeDistance: 100
+        )
 
         var shape = model(indices: [0, 1, 2]).shape
-        let vertexBuffer = device.makeBuffer(bytes: shape.vertices, length: shape.vertices.count * 4, options: .storageModeShared)
+        let vertexBuffer = device.makeBuffer(
+            bytes: shape.vertices,
+            length: shape.vertices.count * 4,
+            options: .storageModeShared
+        )
         shape.vertexBuffer = vertexBuffer
-        let frame = SceneModelLayerFrame(serial: 0, order: 0, alpha: 1, color: .one, world: matrix_identity_float4x4, perspective: false, shapes: [shape])
+        let frame = SceneModelLayerFrame(
+            serial: 0,
+            order: 0,
+            alpha: 1,
+            color: .one,
+            world: matrix_identity_float4x4,
+            perspective: false,
+            shapes: [shape]
+        )
 
         let cmd1 = try XCTUnwrap(queue.makeCommandBuffer())
-        _ = try modelRenderer.renderShadows(lights: [light1, light2], casters: [frame], commandBuffer: cmd1)
+        _ = try modelRenderer.renderShadows(
+            lights: [light1, light2],
+            casters: [frame],
+            commandBuffer: cmd1
+        )
         XCTAssertEqual(modelRenderer.shadowState.targets.count, 2)
 
         // Pruning when lights count drops to 1
@@ -183,23 +244,54 @@ final class SceneStaticModelTests: XCTestCase {
     func testNonCastingModelDoesNotChangeDirectionalShadow() throws {
         let device = try XCTUnwrap(MTLCreateSystemDefaultDevice())
         let queue = try XCTUnwrap(device.makeCommandQueue())
-        let light = SceneShadowLight(kind: .directional, origin: [0, 0, 100], axis: [0, 0, -1], outerCone: 30, cascadeDistance: 100)
-        let caster = SceneModelLayerFrame(serial: 0, order: 0, alpha: 1, color: .one,
-            world: matrix_identity_float4x4, perspective: false, shapes: [model(indices: [0, 1, 2]).shape])
+        let light = SceneShadowLight(
+            kind: .directional,
+            origin: [0, 0, 100],
+            axis: [0, 0, -1],
+            outerCone: 30,
+            cascadeDistance: 100
+        )
+        let caster = SceneModelLayerFrame(
+            serial: 0,
+            order: 0,
+            alpha: 1,
+            color: .one,
+            world: matrix_identity_float4x4,
+            perspective: false,
+            shapes: [model(indices: [
+                0,
+                1,
+                2
+            ]).shape]
+        )
         var background = caster
         background.world.columns.3 = SIMD4(10000, 10000, 10000, 1)
         background.castsShadow = false
         func snapshot(_ layers: [SceneModelLayerFrame]) throws -> (simd_float4x4, Data) {
             let renderer = try SceneModelRenderer(materials: [], device: device)
             let command = try XCTUnwrap(queue.makeCommandBuffer())
-            let result = try renderer.renderShadows(lights: [light], casters: layers, commandBuffer: command)
+            let result = try renderer.renderShadows(
+                lights: [light],
+                casters: layers,
+                commandBuffer: command
+            )
             let texture = try XCTUnwrap(result.textures.first)
-            let buffer = try XCTUnwrap(device.makeBuffer(length: texture.width * texture.height * 4, options: .storageModeShared))
+            let buffer = try XCTUnwrap(device.makeBuffer(
+                length: texture.width * texture.height * 4,
+                options: .storageModeShared
+            ))
             let blit = try XCTUnwrap(command.makeBlitCommandEncoder())
-            blit.copy(from: texture, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(),
+            blit.copy(
+                from: texture,
+                sourceSlice: 0,
+                sourceLevel: 0,
+                sourceOrigin: MTLOrigin(),
                 sourceSize: MTLSize(width: texture.width, height: texture.height, depth: 1),
-                to: buffer, destinationOffset: 0, destinationBytesPerRow: texture.width * 4,
-                destinationBytesPerImage: texture.width * texture.height * 4)
+                to: buffer,
+                destinationOffset: 0,
+                destinationBytesPerRow: texture.width * 4,
+                destinationBytesPerImage: texture.width * texture.height * 4
+            )
             blit.endEncoding()
             command.commit()
             command.waitUntilCompleted()
@@ -214,7 +306,10 @@ final class SceneStaticModelTests: XCTestCase {
         XCTAssertNotEqual(try snapshot([caster, background]).0, baseline.0)
         var encodedLayer = layer(model(indices: [0, 1, 2]))
         encodedLayer.castsShadow = false
-        let decoded = try JSONDecoder().decode(SceneLayer.self, from: JSONEncoder().encode(encodedLayer))
+        let decoded = try JSONDecoder().decode(
+            SceneLayer.self,
+            from: JSONEncoder().encode(encodedLayer)
+        )
         XCTAssertEqual(decoded.castsShadow, false)
     }
 
@@ -248,19 +343,41 @@ final class SceneStaticModelTests: XCTestCase {
             instances: [copyID: l.id],
             input: .rest,
             layers: [
-                l.id: SceneEvaluatedFrame.Layer(layer: l, transform: SceneTransform(), opacity: 1, color: SceneLinkValues(), world: nil),
-                copyID: SceneEvaluatedFrame.Layer(layer: copyLayer, transform: SceneTransform(), opacity: 1, color: SceneLinkValues(), world: nil)
+                l.id: SceneEvaluatedFrame.Layer(
+                    layer: l,
+                    transform: SceneTransform(),
+                    opacity: 1,
+                    color: SceneLinkValues(),
+                    world: nil
+                ),
+                copyID: SceneEvaluatedFrame.Layer(
+                    layer: copyLayer,
+                    transform: SceneTransform(),
+                    opacity: 1,
+                    color: SceneLinkValues(),
+                    world: nil
+                )
             ],
             issues: [],
             logs: [:]
         )
 
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 100, height: 100, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm,
+            width: 100,
+            height: 100,
+            mipmapped: false
+        )
         descriptor.usage = [.renderTarget, .shaderRead]
         let target = try XCTUnwrap(renderer.device.makeTexture(descriptor: descriptor))
         let command = try XCTUnwrap(renderer.commandQueue.makeCommandBuffer())
 
-        XCTAssertNoThrow(try renderer.encode(into: target, commandBuffer: command, input: .rest, frame: evaluated))
+        XCTAssertNoThrow(try renderer.encode(
+            into: target,
+            commandBuffer: command,
+            input: .rest,
+            frame: evaluated
+        ))
         command.commit()
         command.waitUntilCompleted()
     }
@@ -270,26 +387,81 @@ final class SceneStaticModelTests: XCTestCase {
         let modelRenderer = try SceneModelRenderer(materials: [], device: device)
 
         // Empty vertices
-        let shapeEmpty = SceneModelLayerFrame.Shape(material: 0, components: 1, vertices: [], indices: nil)
-        let frameEmpty = SceneModelLayerFrame(serial: 0, order: 0, alpha: 1, color: .one, world: matrix_identity_float4x4, perspective: false, shapes: [shapeEmpty])
+        let shapeEmpty = SceneModelLayerFrame.Shape(
+            material: 0,
+            components: 1,
+            vertices: [],
+            indices: nil
+        )
+        let frameEmpty = SceneModelLayerFrame(
+            serial: 0,
+            order: 0,
+            alpha: 1,
+            color: .one,
+            world: matrix_identity_float4x4,
+            perspective: false,
+            shapes: [shapeEmpty]
+        )
         // Fewer than 3 indices
-        let shapeFewIndices = SceneModelLayerFrame.Shape(material: 0, components: 1, vertices: [1, 2, 3], indices: [0, 1])
-        let frameFewIndices = SceneModelLayerFrame(serial: 0, order: 0, alpha: 1, color: .one, world: matrix_identity_float4x4, perspective: false, shapes: [shapeFewIndices])
+        let shapeFewIndices = SceneModelLayerFrame.Shape(
+            material: 0,
+            components: 1,
+            vertices: [1, 2, 3],
+            indices: [0, 1]
+        )
+        let frameFewIndices = SceneModelLayerFrame(
+            serial: 0,
+            order: 0,
+            alpha: 1,
+            color: .one,
+            world: matrix_identity_float4x4,
+            perspective: false,
+            shapes: [shapeFewIndices]
+        )
         // Stride 0 (components: 0)
-        let shapeStrideZero = SceneModelLayerFrame.Shape(material: 0, components: 0, vertices: [1, 2, 3], indices: nil)
-        let frameStrideZero = SceneModelLayerFrame(serial: 0, order: 0, alpha: 1, color: .one, world: matrix_identity_float4x4, perspective: false, shapes: [shapeStrideZero])
+        let shapeStrideZero = SceneModelLayerFrame.Shape(
+            material: 0,
+            components: 0,
+            vertices: [1, 2, 3],
+            indices: nil
+        )
+        let frameStrideZero = SceneModelLayerFrame(
+            serial: 0,
+            order: 0,
+            alpha: 1,
+            color: .one,
+            world: matrix_identity_float4x4,
+            perspective: false,
+            shapes: [shapeStrideZero]
+        )
 
-        let light = SceneShadowLight(kind: .spot, origin: [0, 0, 100], axis: [0, 0, -1], outerCone: 30, cascadeDistance: 100)
+        let light = SceneShadowLight(
+            kind: .spot,
+            origin: [0, 0, 100],
+            axis: [0, 0, -1],
+            outerCone: 30,
+            cascadeDistance: 100
+        )
         let queue = try XCTUnwrap(device.makeCommandQueue())
         let cmd = try XCTUnwrap(queue.makeCommandBuffer())
 
-        XCTAssertNoThrow(try modelRenderer.renderShadows(lights: [light], casters: [frameEmpty, frameFewIndices, frameStrideZero], commandBuffer: cmd))
+        XCTAssertNoThrow(try modelRenderer.renderShadows(
+            lights: [light],
+            casters: [frameEmpty, frameFewIndices, frameStrideZero],
+            commandBuffer: cmd
+        ))
     }
 
     func testPerspectiveCompositePrunesShadowTargetsWhenLightsRemoved() throws {
         let m = model(indices: [0, 1, 2])
         let l = layer(m)
-        let light = SceneShadowLight(kind: .spot, origin: [0, 0, 100], axis: [0, 0, -1], outerCone: 30, cascadeDistance: 100)
+        let light = SceneShadowLight(
+            kind: .spot,
+            origin: [0, 0, 100],
+            axis: [0, 0, -1],
+            outerCone: 30,
+            cascadeDistance: 100
+        )
         let camera = SceneCamera(
             perspective: true,
             eye: [0, 0, 100],
@@ -306,7 +478,12 @@ final class SceneStaticModelTests: XCTestCase {
         doc.camera = camera
         let renderer = try SceneRenderer(document: doc, videoPath: "/tmp/fake.mp4")
 
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 100, height: 100, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm,
+            width: 100,
+            height: 100,
+            mipmapped: false
+        )
         descriptor.usage = [.renderTarget, .shaderRead]
         let target = try XCTUnwrap(renderer.device.makeTexture(descriptor: descriptor))
 
@@ -331,14 +508,24 @@ final class SceneStaticModelTests: XCTestCase {
     func testCapturingLayerInASceneSeenThroughItsCameraKeepsWhatWasDrawnBefore() throws {
         var capture = SceneLayer(name: "Post", imageFile: "")
         capture.capturesCanvas = true
-        var doc = SceneDocument(canvasWidth: 64, canvasHeight: 64, layers: [layer(model(indices: [0, 1, 2])), capture])
+        var doc = SceneDocument(
+            canvasWidth: 64,
+            canvasHeight: 64,
+            layers: [layer(model(indices: [0, 1, 2])), capture]
+        )
         doc.backgroundColor = [0.2, 0.4, 0.6]
         doc.camera = SceneCamera(
-            perspective: true, eye: [0, 0, 100], center: [0, 0, 0], up: [0, 1, 0], fov: 60, nearZ: 0.1, farZ: 1000,
+            perspective: true, eye: [0, 0, 100], center: [0, 0, 0], up: [0, 1, 0], fov: 60,
+            nearZ: 0.1, farZ: 1000,
             ambientColor: [0.1, 0.1, 0.1], skylightColor: [0.2, 0.2, 0.2]
         )
         let renderer = try SceneRenderer(document: doc, videoPath: "/tmp/fake.mp4")
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 64, height: 64, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm,
+            width: 64,
+            height: 64,
+            mipmapped: false
+        )
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .shared
         let target = try XCTUnwrap(renderer.device.makeTexture(descriptor: descriptor))

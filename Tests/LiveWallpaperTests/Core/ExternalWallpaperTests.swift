@@ -161,18 +161,25 @@ final class ExternalWallpaperTests: XCTestCase {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let context = try XCTUnwrap(CGContext(
             data: nil, width: 16, height: 9, bitsPerComponent: 8, bytesPerRow: 0,
-            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ))
         context.setFillColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1)
         context.fill(CGRect(x: 0, y: 0, width: 16, height: 9))
         let image = try XCTUnwrap(context.makeImage())
         let destination = try XCTUnwrap(CGImageDestinationCreateWithURL(
-            folder.appendingPathComponent("layer.png") as CFURL, UTType.png.identifier as CFString, 1, nil
+            folder.appendingPathComponent("layer.png") as CFURL, UTType.png.identifier as CFString,
+            1, nil
         ))
         CGImageDestinationAddImage(destination, image, nil)
         XCTAssertTrue(CGImageDestinationFinalize(destination))
-        let document = SceneDocument(canvasWidth: 16, canvasHeight: 9, layers: [SceneLayer(name: "Sky", imageFile: "layer.png")])
-        try SceneStore.encode(document, folder: nil).write(to: folder.appendingPathComponent("scene.json"))
+        let document = SceneDocument(
+            canvasWidth: 16,
+            canvasHeight: 9,
+            layers: [SceneLayer(name: "Sky", imageFile: "layer.png")]
+        )
+        try SceneStore.encode(document, folder: nil)
+            .write(to: folder.appendingPathComponent("scene.json"))
         return folder
     }
 
@@ -187,12 +194,17 @@ final class ExternalWallpaperTests: XCTestCase {
                 ["id": "scene", "name": "Sky", "scene": scene.path],
                 ["id": "both", "name": "Both", "scene": scene.path, "path": videoURL.path],
                 ["id": "neither", "name": "Neither"],
-                ["id": "missing", "name": "Missing", "scene": directory.appendingPathComponent("none").path]
+                [
+                    "id": "missing",
+                    "name": "Missing",
+                    "scene": directory.appendingPathComponent("none").path
+                ]
             ]
         ]
         let providers = directory.appendingPathComponent("Providers", isDirectory: true)
         try FileManager.default.createDirectory(at: providers, withIntermediateDirectories: true)
-        try JSONSerialization.data(withJSONObject: json).write(to: providers.appendingPathComponent("p.json"))
+        try JSONSerialization.data(withJSONObject: json)
+            .write(to: providers.appendingPathComponent("p.json"))
 
         var report: [ExternalWallpaper] = []
         let monitor = ExternalWallpaperProviderMonitor(directoryURL: providers) { report = $0 }
@@ -200,7 +212,10 @@ final class ExternalWallpaperTests: XCTestCase {
 
         XCTAssertEqual(report.map(\.id), ["p.json/scene"])
         XCTAssertEqual(report.first?.sceneFolderPath, scene.path)
-        XCTAssertEqual(report.first?.path, ExternalWallpaperProviderMonitor.bakedScenePath(forID: "p.json/scene"))
+        XCTAssertEqual(
+            report.first?.path,
+            ExternalWallpaperProviderMonitor.bakedScenePath(forID: "p.json/scene")
+        )
         XCTAssertNotNil(report.first?.sceneRevision)
     }
 
@@ -217,16 +232,19 @@ final class ExternalWallpaperTests: XCTestCase {
             }
             if let copiedPath {
                 try? FileManager.default.removeItem(atPath: copiedPath)
-                try? FileManager.default.removeItem(at: SceneStore.folderURL(forVideoPath: copiedPath))
+                try? FileManager.default
+                    .removeItem(at: SceneStore.folderURL(forVideoPath: copiedPath))
             }
         }
         let folder = try writeSceneFolder()
         let id = "test-\(UUID().uuidString).json/a"
         let bakedPath = ExternalWallpaperProviderMonitor.bakedScenePath(forID: id)
-        let wallpaper = ExternalWallpaper(
+        let wallpaper = try ExternalWallpaper(
             id: id, providerName: "P", name: "Sky", path: bakedPath, sceneFolderPath: folder.path,
-            sceneRevision: try XCTUnwrap(
-                FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent("scene.json").path)[.modificationDate] as? Date
+            sceneRevision: XCTUnwrap(
+                FileManager.default
+                    .attributesOfItem(atPath: folder.appendingPathComponent("scene.json")
+                        .path)[.modificationDate] as? Date
             )
         )
 
@@ -237,7 +255,9 @@ final class ExternalWallpaperTests: XCTestCase {
         XCTAssertNil(model.activeExternalWallpaperID, "a scene is not shown before it is baked")
 
         let deadline = Date().addingTimeInterval(60)
-        while !model.isExternalWallpaperReady(wallpaper), !model.didFailToPrepareExternalScene(wallpaper), Date() < deadline {
+        while !model.isExternalWallpaperReady(wallpaper),
+              !model.didFailToPrepareExternalScene(wallpaper), Date() < deadline
+        {
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         XCTAssertTrue(model.isExternalWallpaperReady(wallpaper))
@@ -255,7 +275,8 @@ final class ExternalWallpaperTests: XCTestCase {
         XCTAssertTrue(model.isScene(path: path))
 
         model.updateExternalWallpapers([])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: URL(fileURLWithPath: bakedPath).deletingLastPathComponent().path))
+        XCTAssertFalse(FileManager.default
+            .fileExists(atPath: URL(fileURLWithPath: bakedPath).deletingLastPathComponent().path))
         XCTAssertFalse(model.isScene(path: bakedPath))
         XCTAssertTrue(model.isScene(path: path))
     }
@@ -265,14 +286,17 @@ final class ExternalWallpaperTests: XCTestCase {
         let id = "test-cached-\(UUID().uuidString).json/a"
         let bakedPath = ExternalWallpaperProviderMonitor.bakedScenePath(forID: id)
         let revision = try XCTUnwrap(
-            FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent("scene.json").path)[.modificationDate] as? Date
+            FileManager.default
+                .attributesOfItem(atPath: folder.appendingPathComponent("scene.json")
+                    .path)[.modificationDate] as? Date
         )
         let wallpaper = ExternalWallpaper(
             id: id, providerName: "P", name: "Sky", path: bakedPath, sceneFolderPath: folder.path,
             sceneRevision: revision
         )
         defer {
-            try? FileManager.default.removeItem(at: URL(fileURLWithPath: bakedPath).deletingLastPathComponent())
+            try? FileManager.default
+                .removeItem(at: URL(fileURLWithPath: bakedPath).deletingLastPathComponent())
         }
 
         let firstModel = WallpaperModel()
@@ -284,19 +308,26 @@ final class ExternalWallpaperTests: XCTestCase {
         XCTAssertTrue(firstModel.isExternalWallpaperReady(wallpaper))
         XCTAssertTrue(FileManager.default.fileExists(atPath: bakedPath))
 
-        // On a simulated app restart with unchanged scene and app, the baked scene is ready immediately.
+        // On a simulated app restart with unchanged scene and app, the baked scene is ready
+        // immediately.
         let secondModel = WallpaperModel()
         secondModel.updateExternalWallpapers([wallpaper])
         XCTAssertTrue(secondModel.isExternalWallpaperReady(wallpaper))
 
         // If the app signature changes, the cache is invalidated and must be rebaked.
         let metaURL = ExternalWallpaperProviderMonitor.bakedSceneMetaURL(forID: id)
-        let oldMeta = ExternalWallpaperProviderMonitor.BakedSceneMeta(sceneRevision: revision, appSignature: "outdated-app-version")
+        let oldMeta = ExternalWallpaperProviderMonitor.BakedSceneMeta(
+            sceneRevision: revision,
+            appSignature: "outdated-app-version"
+        )
         try JSONEncoder().encode(oldMeta).write(to: metaURL)
 
         let thirdModel = WallpaperModel()
         thirdModel.updateExternalWallpapers([wallpaper])
-        XCTAssertFalse(thirdModel.isExternalWallpaperReady(wallpaper), "rebake required when app signature changes")
+        XCTAssertFalse(
+            thirdModel.isExternalWallpaperReady(wallpaper),
+            "rebake required when app signature changes"
+        )
     }
 
     func testExternalWallpaperCannotBeSharedToStore() async throws {

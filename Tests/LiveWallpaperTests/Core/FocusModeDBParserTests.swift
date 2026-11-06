@@ -1,6 +1,5 @@
-import XCTest
-
 @testable import LiveWallpaper
+import XCTest
 
 /// DoNotDisturb DBのJSONパース(FocusModeDBParser)のテスト。fixtureは実機の
 /// スキーマ(Monterey以降)を必要最小限に再現したもの。
@@ -8,7 +7,7 @@ final class FocusModeDBParserTests: XCTestCase {
     private func configurationsJSON(
         workTrigger: String = ""
     ) -> Data {
-        """
+        Data("""
         {
           "data": [
             {
@@ -38,7 +37,7 @@ final class FocusModeDBParserTests: XCTestCase {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """.utf8)
     }
 
     /// 9:30〜18:00 の時刻トリガー(有効)を仕事モードへ付けるfixture断片。
@@ -61,9 +60,9 @@ final class FocusModeDBParserTests: XCTestCase {
 
     private func assertionsJSON(modeIdentifier: String?) -> Data {
         guard let modeIdentifier else {
-            return #"{"data": [{"storeAssertionRecords": []}]}"#.data(using: .utf8)!
+            return Data(#"{"data": [{"storeAssertionRecords": []}]}"#.utf8)
         }
-        return """
+        return Data("""
         {
           "data": [
             {
@@ -77,7 +76,7 @@ final class FocusModeDBParserTests: XCTestCase {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """.utf8)
     }
 
     private func date(hour: Int, minute: Int) -> Date {
@@ -95,7 +94,7 @@ final class FocusModeDBParserTests: XCTestCase {
         XCTAssertEqual(modes.map(\.id), [
             "com.apple.donotdisturb.mode.default",
             "com.apple.focus.personal-time",
-            "com.apple.focus.work",
+            "com.apple.focus.work"
         ])
         XCTAssertEqual(modes[2].name, "仕事")
         XCTAssertEqual(modes[2].symbolName, "briefcase.fill")
@@ -208,7 +207,7 @@ final class FocusModeDBParserTests: XCTestCase {
             }
             """
         }
-        let config = """
+        let config = Data("""
         {
           "data": [
             {
@@ -225,7 +224,7 @@ final class FocusModeDBParserTests: XCTestCase {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """.utf8)
         for _ in 0 ..< 10 {
             XCTAssertEqual(
                 FocusModeDBParser.parseActiveModeID(
@@ -239,7 +238,7 @@ final class FocusModeDBParserTests: XCTestCase {
 
     /// スキーマが想定外でもクラッシュせず空を返すこと(非公開DBの将来変化への保険)。
     func testMalformedJSONReturnsEmpty() {
-        let garbage = #"{"data": "unexpected"}"#.data(using: .utf8)!
+        let garbage = Data(#"{"data": "unexpected"}"#.utf8)
         XCTAssertTrue(FocusModeDBParser.parseModes(configurationsJSON: garbage).isEmpty)
         XCTAssertNil(FocusModeDBParser.parseActiveModeID(
             assertionsJSON: garbage, configurationsJSON: garbage

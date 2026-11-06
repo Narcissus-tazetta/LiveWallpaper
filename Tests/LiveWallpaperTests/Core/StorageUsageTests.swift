@@ -1,6 +1,6 @@
 import Foundation
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class StorageUsageTests: XCTestCase {
     private let fileManager = FileManager.default
@@ -11,9 +11,24 @@ final class StorageUsageTests: XCTestCase {
         let h = 2160
         let s = 60
 
-        let maxEst = StorageUsage.estimatedBakeBytes(width: w, height: h, loopSeconds: s, quality: .maximum)
-        let highEst = StorageUsage.estimatedBakeBytes(width: w, height: h, loopSeconds: s, quality: .high)
-        let stdEst = StorageUsage.estimatedBakeBytes(width: w, height: h, loopSeconds: s, quality: .standard)
+        let maxEst = StorageUsage.estimatedBakeBytes(
+            width: w,
+            height: h,
+            loopSeconds: s,
+            quality: .maximum
+        )
+        let highEst = StorageUsage.estimatedBakeBytes(
+            width: w,
+            height: h,
+            loopSeconds: s,
+            quality: .high
+        )
+        let stdEst = StorageUsage.estimatedBakeBytes(
+            width: w,
+            height: h,
+            loopSeconds: s,
+            quality: .standard
+        )
 
         // Measured actuals:
         // 1.0: 4,503,686,704 bytes
@@ -27,9 +42,21 @@ final class StorageUsageTests: XCTestCase {
         let highError = abs(Double(highEst) - actualHigh) / actualHigh
         let stdError = abs(Double(stdEst) - actualStd) / actualStd
 
-        XCTAssertLessThan(maxError, 0.05, "Estimate for maximum quality must be within 5% (got \(maxError * 100)%)")
-        XCTAssertLessThan(highError, 0.05, "Estimate for high quality must be within 5% (got \(highError * 100)%)")
-        XCTAssertLessThan(stdError, 0.05, "Estimate for standard quality must be within 5% (got \(stdError * 100)%)")
+        XCTAssertLessThan(
+            maxError,
+            0.05,
+            "Estimate for maximum quality must be within 5% (got \(maxError * 100)%)"
+        )
+        XCTAssertLessThan(
+            highError,
+            0.05,
+            "Estimate for high quality must be within 5% (got \(highError * 100)%)"
+        )
+        XCTAssertLessThan(
+            stdError,
+            0.05,
+            "Estimate for standard quality must be within 5% (got \(stdError * 100)%)"
+        )
     }
 
     func testCheckBakeCapacity() {
@@ -40,7 +67,11 @@ final class StorageUsageTests: XCTestCase {
         var doc = SceneDocument(canvasWidth: 1920, canvasHeight: 1080, layers: [])
         doc.loopSeconds = 10
 
-        let result = StorageUsage.checkBakeCapacity(outputURL: tempDir, document: doc, quality: .high)
+        let result = StorageUsage.checkBakeCapacity(
+            outputURL: tempDir,
+            document: doc,
+            quality: .high
+        )
         XCTAssertGreaterThan(result.requiredBytes, StorageUsage.bakeHeadroomBytes)
         // System disk should normally have capacity in test environment
         XCTAssertGreaterThan(result.availableBytes, 0)
@@ -57,12 +88,22 @@ final class StorageUsageTests: XCTestCase {
 
     func testEstimatedBakeBytesOverflowSafety() {
         // Int.max loop seconds must not trap / fatalError
-        let bytes = StorageUsage.estimatedBakeBytes(width: 3840, height: 2160, loopSeconds: Int.max, quality: .maximum)
+        let bytes = StorageUsage.estimatedBakeBytes(
+            width: 3840,
+            height: 2160,
+            loopSeconds: Int.max,
+            quality: .maximum
+        )
         XCTAssertGreaterThan(bytes, 0)
         XCTAssertLessThanOrEqual(bytes, Int64.max - StorageUsage.bakeHeadroomBytes)
 
         // Negative dimensions or loopSeconds must clamp safely without crashing
-        let zeroBytes = StorageUsage.estimatedBakeBytes(width: -100, height: -100, loopSeconds: -50, quality: .standard)
+        let zeroBytes = StorageUsage.estimatedBakeBytes(
+            width: -100,
+            height: -100,
+            loopSeconds: -50,
+            quality: .standard
+        )
         XCTAssertGreaterThanOrEqual(zeroBytes, 0)
     }
 

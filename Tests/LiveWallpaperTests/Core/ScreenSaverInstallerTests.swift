@@ -174,7 +174,7 @@ final class ScreenSaverInstallerTests: XCTestCase {
         }
 
         try installer.uninstall()
-        XCTAssertEqual(idleProvider(try readStore(installer), ["SystemDefault"]), "default")
+        XCTAssertEqual(try idleProvider(readStore(installer), ["SystemDefault"]), "default")
     }
 
     func testReinstallAfterAQuitThatNeverRestoredKeepsTheRealOriginals() throws {

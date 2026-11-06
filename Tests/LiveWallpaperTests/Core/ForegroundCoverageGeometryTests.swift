@@ -1,6 +1,6 @@
 import CoreGraphics
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class ForegroundCoverageGeometryTests: XCTestCase {
     func testFullScreenWindowCoversOnlyIntersectingDisplay() {

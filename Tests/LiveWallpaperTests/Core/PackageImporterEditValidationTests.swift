@@ -166,7 +166,8 @@ final class PackageImporterEditValidationTests: XCTestCase {
         } catch PackageImporter.ImportError.unsafeFileReference {
             // expected
         } catch PackageImporter.ImportError.extractionFailed {
-            // Newer macOS unzip refuses a symlink that leaves the extraction root before our own check runs.
+            // Newer macOS unzip refuses a symlink that leaves the extraction root before our own
+            // check runs.
         }
     }
 

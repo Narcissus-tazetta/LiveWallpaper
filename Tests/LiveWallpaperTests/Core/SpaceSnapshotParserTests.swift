@@ -1,12 +1,12 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class SpaceSnapshotParserTests: XCTestCase {
     private func space(uuid: String, fullscreen: Bool = false) -> [String: Any] {
         var dict: [String: Any] = [
-            "ManagedSpaceID": Int.random(in: 1...9999),
+            "ManagedSpaceID": Int.random(in: 1 ... 9999),
             "uuid": uuid,
-            "type": 0,
+            "type": 0
         ]
         if fullscreen {
             dict["TileLayoutManager"] = ["kind": "tile"] as [String: Any]
@@ -22,7 +22,7 @@ final class SpaceSnapshotParserTests: XCTestCase {
         [
             "Display Identifier": identifier,
             "Spaces": spaces,
-            "Current Space": current,
+            "Current Space": current
         ]
     }
 
@@ -39,7 +39,7 @@ final class SpaceSnapshotParserTests: XCTestCase {
                 spaces: [
                     space(uuid: ""),
                     space(uuid: "S2"),
-                    space(uuid: "S3"),
+                    space(uuid: "S3")
                 ],
                 current: space(uuid: "S2")
             )
@@ -64,7 +64,7 @@ final class SpaceSnapshotParserTests: XCTestCase {
                 spaces: [
                     space(uuid: "S1"),
                     space(uuid: "F1", fullscreen: true),
-                    space(uuid: "S2"),
+                    space(uuid: "S2")
                 ],
                 current: space(uuid: "F1", fullscreen: true)
             )
@@ -86,10 +86,10 @@ final class SpaceSnapshotParserTests: XCTestCase {
                 identifier: "UUID-B",
                 spaces: [
                     space(uuid: "F1", fullscreen: true),
-                    space(uuid: "B1"),
+                    space(uuid: "B1")
                 ],
                 current: space(uuid: "B1")
-            ),
+            )
         ]
         let snapshots = SpaceSnapshotParser.parse(raw)
         XCTAssertEqual(snapshots?.count, 2)
@@ -105,7 +105,7 @@ final class SpaceSnapshotParserTests: XCTestCase {
             SpaceSnapshotParser.parse([
                 [
                     "Display Identifier": "Main",
-                    "Spaces": [["uuid": "S1"]],
+                    "Spaces": [["uuid": "S1"]]
                     // "Current Space" 欠落
                 ]
             ])
@@ -115,7 +115,7 @@ final class SpaceSnapshotParserTests: XCTestCase {
                 [
                     "Display Identifier": "Main",
                     "Spaces": "not-an-array",
-                    "Current Space": ["uuid": "S1"],
+                    "Current Space": ["uuid": "S1"]
                 ]
             ])
         )

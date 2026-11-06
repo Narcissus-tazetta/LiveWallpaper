@@ -1,5 +1,5 @@
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 @MainActor
 final class WindowRefreshPolicyTests: XCTestCase {

@@ -67,13 +67,34 @@ final class FitEditorHistoryTests: XCTestCase {
         // Zoomed in, so both axes have room to pan and offsets are kept.
         editor.setDraftZoom(3, path: path, screenID: "A")
         let near = CGSize(width: 0.05, height: 0.05)
-        editor.dragDraftOffset(dx: 0.5, dy: 0, snapDistance: near, snaps: true, path: path, screenID: "A")
+        editor.dragDraftOffset(
+            dx: 0.5,
+            dy: 0,
+            snapDistance: near,
+            snaps: true,
+            path: path,
+            screenID: "A"
+        )
         editor.endDraftDrag()
-        editor.dragDraftOffset(dx: -0.47, dy: 0, snapDistance: near, snaps: true, path: path, screenID: "A")
+        editor.dragDraftOffset(
+            dx: -0.47,
+            dy: 0,
+            snapDistance: near,
+            snaps: true,
+            path: path,
+            screenID: "A"
+        )
         XCTAssertEqual(editor.offsetX(path: path, screenID: "A"), 0)
         XCTAssertTrue(editor.snappedAxes.x)
         // The pointer keeps its own place: 0.03 - 0.1 is past the centre's pull.
-        editor.dragDraftOffset(dx: -0.1, dy: 0, snapDistance: near, snaps: true, path: path, screenID: "A")
+        editor.dragDraftOffset(
+            dx: -0.1,
+            dy: 0,
+            snapDistance: near,
+            snaps: true,
+            path: path,
+            screenID: "A"
+        )
         XCTAssertEqual(editor.offsetX(path: path, screenID: "A"), -0.07, accuracy: 1e-9)
         XCTAssertFalse(editor.snappedAxes.x)
         editor.endDraftDrag()
@@ -83,7 +104,8 @@ final class FitEditorHistoryTests: XCTestCase {
     func testADragWithSnappingOffStopsWhereThePointerIs() {
         editor.setDraftZoom(3, path: path, screenID: "A")
         editor.dragDraftOffset(
-            dx: 0.02, dy: 0, snapDistance: CGSize(width: 0.05, height: 0.05), snaps: false, path: path, screenID: "A"
+            dx: 0.02, dy: 0, snapDistance: CGSize(width: 0.05, height: 0.05), snaps: false,
+            path: path, screenID: "A"
         )
         XCTAssertEqual(editor.offsetX(path: path, screenID: "A"), 0.02, accuracy: 1e-9)
         XCTAssertFalse(editor.snappedAxes.x)

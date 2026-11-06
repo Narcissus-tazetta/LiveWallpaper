@@ -1,22 +1,25 @@
 import CoreVideo
-import XCTest
 @testable import LiveWallpaper
+import XCTest
 
 final class SceneAIBufferTests: XCTestCase {
     func testFloat16AndFloat32PlanesResampleToTheSameDepthValues() throws {
         let bits: [UInt16] = [0x0000, 0x8000, 0x3C00, 0xBC00, 0x3800, 0x0400, 0x0001, 0x7BFF]
-        let values: [Float] = [0, -0.0, 1, -1, 0.5, 1 / 16384, 1 / 16777216, 65504]
+        let values: [Float] = [0, -0.0, 1, -1, 0.5, 1 / 16384, 1 / 16_777_216, 65504]
         var results: [[Float]] = []
-        for format in [kCVPixelFormatType_OneComponent16Half, kCVPixelFormatType_OneComponent32Float] {
+        for format in [
+            kCVPixelFormatType_OneComponent16Half,
+            kCVPixelFormatType_OneComponent32Float
+        ] {
             var buffer: CVPixelBuffer?
             XCTAssertEqual(CVPixelBufferCreate(nil, 4, 2, format, nil, &buffer), kCVReturnSuccess)
             let plane = try XCTUnwrap(buffer)
             CVPixelBufferLockBaseAddress(plane, [])
             let base = try XCTUnwrap(CVPixelBufferGetBaseAddress(plane))
             let stride = CVPixelBufferGetBytesPerRow(plane)
-            for y in 0..<2 {
+            for y in 0 ..< 2 {
                 let row = base.advanced(by: y * stride)
-                for x in 0..<4 {
+                for x in 0 ..< 4 {
                     if format == kCVPixelFormatType_OneComponent16Half {
                         row.assumingMemoryBound(to: UInt16.self)[x] = bits[y * 4 + x]
                     } else {
