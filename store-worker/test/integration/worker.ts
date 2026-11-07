@@ -1,4 +1,5 @@
 import { AwsClient } from "aws4fetch";
+import { UPLOAD_WINDOW_MS } from "../../src/constants";
 import worker, { type Env } from "../../src/index";
 
 interface UploadSlot {
@@ -52,6 +53,19 @@ export default {
 			slots.delete(url.pathname);
 			uploads++;
 			return new Response(null, { status: 200 });
+		}
+		const closeWindow = url.pathname.match(/^\/__test\/close-upload-window\/([\w-]+)$/);
+		if (request.method === "POST" && closeWindow) {
+			// Stands in for waiting out the presigned URL lifetime before approval.
+			const row = await env.STORE_DB.prepare("SELECT created_at FROM store_entries WHERE id = ?")
+				.bind(closeWindow[1])
+				.first<{ created_at: string }>();
+			if (!row) return new Response("Unknown entry", { status: 404 });
+			const backdated = new Date(new Date(row.created_at).getTime() - UPLOAD_WINDOW_MS).toISOString();
+			await env.STORE_DB.prepare("UPDATE store_entries SET created_at = ? WHERE id = ?")
+				.bind(backdated, closeWindow[1])
+				.run();
+			return new Response(null, { status: 204 });
 		}
 		if (request.method === "GET" && url.pathname === "/__test/stats") {
 			return Response.json({ uploads, pendingUploads: slots.size });

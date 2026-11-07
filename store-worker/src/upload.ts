@@ -2,6 +2,8 @@ import { AwsClient } from "aws4fetch";
 import {
 	ALLOWED_CONTENT_TYPES,
 	ALLOWED_THUMBNAIL_CONTENT_TYPES,
+	MAX_DESCRIPTION_LENGTH,
+	MAX_LICENSE_LENGTH,
 	MAX_THUMBNAIL_BYTES,
 	MAX_UPLOAD_BYTES,
 	PRESIGNED_URL_TTL_SECONDS,
@@ -188,11 +190,19 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 	if (!/^[0-9a-f]{64}$/i.test(sha256)) {
 		return errorResponse("invalid sha256");
 	}
-	if (body.description !== undefined && body.description !== null && typeof body.description !== "string") {
-		return errorResponse("invalid description");
+	if (
+		body.description !== undefined &&
+		body.description !== null &&
+		(typeof body.description !== "string" || body.description.length > MAX_DESCRIPTION_LENGTH)
+	) {
+		return errorResponse(`description must be a string of at most ${MAX_DESCRIPTION_LENGTH} characters`);
 	}
-	if (body.license !== undefined && body.license !== null && typeof body.license !== "string") {
-		return errorResponse("invalid license");
+	if (
+		body.license !== undefined &&
+		body.license !== null &&
+		(typeof body.license !== "string" || body.license.length > MAX_LICENSE_LENGTH)
+	) {
+		return errorResponse(`license must be a string of at most ${MAX_LICENSE_LENGTH} characters`);
 	}
 	if (
 		body.durationSeconds !== undefined &&

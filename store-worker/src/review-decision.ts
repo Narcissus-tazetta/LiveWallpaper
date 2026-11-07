@@ -1,5 +1,16 @@
+import { UPLOAD_WINDOW_MS } from "./constants";
 import type { Env } from "./env";
 import { deleteEntryObjects } from "./storage";
+
+/// How long the entry's presigned upload URLs may still overwrite its objects (0 once closed).
+/// See UPLOAD_WINDOW_MS.
+export function uploadWindowRemainingMs(createdAt: string, now = Date.now()): number {
+	return Math.max(0, new Date(createdAt).getTime() + UPLOAD_WINDOW_MS - now);
+}
+
+export function uploadWindowOpenMessage(remainingMs: number): string {
+	return `upload window still open; review is possible in ${Math.ceil(remainingMs / 60_000)} min`;
+}
 
 /// requested → published/rejected の状態遷移をこの1関数に集約する。トークン経由の
 /// decide とADMIN_KEY直叩きのapprove/rejectの両方がここだけを呼ぶことで、二重承認や

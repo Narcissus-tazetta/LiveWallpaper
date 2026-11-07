@@ -1,4 +1,4 @@
-import { ADMIN_NOTIFY_EMAIL, REVIEW_TOKEN_TTL_MS } from "./constants";
+import { ADMIN_NOTIFY_EMAIL, REVIEW_TOKEN_TTL_MS, STORE_EMAIL_FROM } from "./constants";
 import type { Env } from "./env";
 import { escapeHtml } from "./html";
 
@@ -20,7 +20,7 @@ export async function notifyReport(
 				authorization: `Bearer ${env.RESEND_API_KEY}`,
 			},
 			body: JSON.stringify({
-				from: "LiveWallpaper Store <onboarding@resend.dev>",
+				from: STORE_EMAIL_FROM,
 				to: [ADMIN_NOTIFY_EMAIL],
 				subject: hidden ? `[Store] 通報により非公開化: ${title}` : `[Store] 新しい通報: ${title}`,
 				text: [
@@ -68,7 +68,7 @@ export async function sendReviewRequestEmail(
 				authorization: `Bearer ${env.RESEND_API_KEY}`,
 			},
 			body: JSON.stringify({
-				from: "LiveWallpaper Store <onboarding@resend.dev>",
+				from: STORE_EMAIL_FROM,
 				to: [ADMIN_NOTIFY_EMAIL],
 				subject: `[LiveWallpaper Store] 審査依頼: ${entry.title}`,
 				html: [

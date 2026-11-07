@@ -3,7 +3,7 @@ import { sendReviewRequestEmail } from "./email";
 import type { Env } from "./env";
 import { errorResponse, jsonResponse } from "./http";
 import { requireAdmin } from "./admin-auth";
-import { applyReviewDecision } from "./review-decision";
+import { applyReviewDecision, uploadWindowOpenMessage, uploadWindowRemainingMs } from "./review-decision";
 import { deleteEntryObjects } from "./storage";
 import { generateRawToken, hashToken } from "./tokens";
 
@@ -156,6 +156,16 @@ export async function handleAdminDecision(
 	const denied = await requireAdmin(request, env);
 	if (denied) {
 		return denied;
+	}
+
+	if (action === "approve") {
+		const entry = await env.STORE_DB.prepare("SELECT created_at FROM store_entries WHERE id = ?")
+			.bind(id)
+			.first<{ created_at: string }>();
+		const remaining = entry ? uploadWindowRemainingMs(entry.created_at) : 0;
+		if (remaining > 0) {
+			return errorResponse(uploadWindowOpenMessage(remaining), 409);
+		}
 	}
 
 	const { changed, status } = await applyReviewDecision(env, id, action);

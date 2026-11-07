@@ -1,4 +1,4 @@
-import { REPORT_THRESHOLD } from "./constants";
+import { MAX_REPORT_REASON_LENGTH, REPORT_THRESHOLD } from "./constants";
 import { notifyReport } from "./email";
 import type { Env } from "./env";
 import { clientIP, errorResponse, jsonResponse } from "./http";
@@ -23,6 +23,13 @@ export async function handleReport(request: Request, env: Env): Promise<Response
 	const { entryId, reason } = body;
 	if (!entryId) {
 		return errorResponse("missing entryId");
+	}
+	if (
+		reason !== undefined &&
+		reason !== null &&
+		(typeof reason !== "string" || reason.length > MAX_REPORT_REASON_LENGTH)
+	) {
+		return errorResponse(`reason must be a string of at most ${MAX_REPORT_REASON_LENGTH} characters`);
 	}
 
 	const entry = await env.STORE_DB.prepare(

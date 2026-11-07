@@ -3,7 +3,7 @@ import type { Env } from "./env";
 import { escapeHtml } from "./html";
 import { errorResponse } from "./http";
 import { checkRateLimit } from "./rate-limit";
-import { applyReviewDecision } from "./review-decision";
+import { applyReviewDecision, uploadWindowOpenMessage, uploadWindowRemainingMs } from "./review-decision";
 import { getCachedExtractedVideo, parseRangeHeader } from "./review-video";
 import { hashToken } from "./tokens";
 
@@ -21,20 +21,42 @@ interface ReviewPageEntry {
 /// 文字列は必ずescapeHtmlを通す(stored XSS対策)。表示は常にDB上の最新
 /// entry.status を見る(トークン自身のconsumed_at/actionではなく) —
 /// ADMIN_KEY直叩きで先に決定された場合でも、このページが古い状態を誤表示しないため。
-function renderReviewPage(opts: { token: string; entry: ReviewPageEntry; tokenExpired: boolean }): string {
-	const { token, entry, tokenExpired } = opts;
-	const style = `body{font-family:-apple-system,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
+const REVIEW_PAGE_STYLE = `body{font-family:-apple-system,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
 img,video{max-width:100%;border-radius:8px;margin:1rem 0}
 button{font-size:1rem;padding:0.6rem 1.2rem;border-radius:6px;border:none;cursor:pointer;margin-right:0.5rem}
 .approve{background:#2e7d32;color:#fff}
 .reject{background:#c62828;color:#fff}
 .notice{color:#666;font-size:0.9em}`;
 
+// The page embeds submitter-provided strings and its URL carries the review token, so it gets
+// the same lockdown as the share page plus no-referrer.
+let reviewStyleHashPromise: Promise<string> | null = null;
+function reviewStyleHash(): Promise<string> {
+	reviewStyleHashPromise ??= crypto.subtle
+		.digest("SHA-256", new TextEncoder().encode(REVIEW_PAGE_STYLE))
+		.then((digest) => {
+			let binary = "";
+			for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
+			return `'sha256-${btoa(binary)}'`;
+		});
+	return reviewStyleHashPromise;
+}
+
+function renderReviewPage(opts: {
+	token: string;
+	entry: ReviewPageEntry;
+	tokenExpired: boolean;
+	uploadWindowRemainingMs: number;
+}): string {
+	const { token, entry, tokenExpired, uploadWindowRemainingMs: remaining } = opts;
+
 	let body: string;
 	if (entry.status !== "requested") {
 		body = `<p>審査済みです。現在のステータス: <strong>${escapeHtml(entry.status)}</strong></p>`;
 	} else if (tokenExpired) {
 		body = `<p class="notice">このリンクは失効しました。admin.sh または /admin/requests から直接操作してください。</p>`;
+	} else if (remaining > 0) {
+		body = `<p class="notice">投稿者がまだファイルを差し替えられる時間帯のため、審査できません。約${Math.ceil(remaining / 60_000)}分後にこのページを再読み込みしてください。</p>`;
 	} else {
 		// サムネイルをposterにしておくと、動画本体の展開(ZIP解凍)を待たずに
 		// まず静止画が出るので体感が速い。再生ボタンを押すと初めて/videoを叩く。
@@ -53,7 +75,7 @@ button{font-size:1rem;padding:0.6rem 1.2rem;border-radius:6px;border:none;cursor
 </form>`;
 	}
 
-	return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>審査: ${escapeHtml(entry.title)}</title><style>${style}</style></head><body>
+	return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>審査: ${escapeHtml(entry.title)}</title><style>${REVIEW_PAGE_STYLE}</style></head><body>
 <h1>${escapeHtml(entry.title)}</h1>
 <p>作者: ${escapeHtml(entry.author)} / 投稿ID: ${escapeHtml(entry.id)} / 申請日時: ${escapeHtml(entry.createdAt)}</p>
 ${entry.description ? `<p>${escapeHtml(entry.description)}</p>` : ""}
@@ -96,6 +118,7 @@ export async function handleAdminReviewPage(request: Request, env: Env, token: s
 	const html = renderReviewPage({
 		token,
 		tokenExpired,
+		uploadWindowRemainingMs: uploadWindowRemainingMs(row.created_at),
 		entry: {
 			id: row.id,
 			title: row.title,
@@ -106,7 +129,15 @@ export async function handleAdminReviewPage(request: Request, env: Env, token: s
 			sizeBytes: row.size_bytes,
 		},
 	});
-	return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+	return new Response(html, {
+		headers: {
+			"content-type": "text/html; charset=utf-8",
+			"content-security-policy": `default-src 'none'; img-src 'self'; media-src 'self'; style-src ${await reviewStyleHash()}; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
+			"x-content-type-options": "nosniff",
+			"referrer-policy": "no-referrer",
+			"cache-control": "no-store",
+		},
+	});
 }
 
 /// レビューページ/メールに埋め込むサムネイル画像。トークンの有効期限のみで判定し
@@ -120,14 +151,18 @@ export async function handleAdminReviewThumbnail(request: Request, env: Env, tok
 
 	const tokenHash = await hashToken(token);
 	const row = await env.STORE_DB.prepare(
-		`SELECT srt.expires_at as expires_at, se.thumbnail_key as thumbnail_key
+		`SELECT srt.expires_at as expires_at, se.thumbnail_key as thumbnail_key, se.created_at as created_at
 		 FROM store_review_tokens srt JOIN store_entries se ON se.id = srt.entry_id
 		 WHERE srt.token_hash = ?`,
 	)
 		.bind(tokenHash)
-		.first<{ expires_at: string; thumbnail_key: string | null }>();
+		.first<{ expires_at: string; thumbnail_key: string | null; created_at: string }>();
 	if (!row || !row.thumbnail_key || new Date(row.expires_at).getTime() <= Date.now()) {
 		return errorResponse("thumbnail not found", 404);
+	}
+	const remaining = uploadWindowRemainingMs(row.created_at);
+	if (remaining > 0) {
+		return errorResponse(uploadWindowOpenMessage(remaining), 409);
 	}
 
 	const object = await env.STORE_BUCKET.get(row.thumbnail_key);
@@ -151,14 +186,20 @@ export async function handleAdminReviewVideo(request: Request, env: Env, token: 
 
 	const tokenHash = await hashToken(token);
 	const row = await env.STORE_DB.prepare(
-		`SELECT srt.expires_at as expires_at, se.object_key as object_key, se.size_bytes as size_bytes
+		`SELECT srt.expires_at as expires_at, se.object_key as object_key, se.size_bytes as size_bytes,
+			se.created_at as created_at
 		 FROM store_review_tokens srt JOIN store_entries se ON se.id = srt.entry_id
 		 WHERE srt.token_hash = ?`,
 	)
 		.bind(tokenHash)
-		.first<{ expires_at: string; object_key: string; size_bytes: number }>();
+		.first<{ expires_at: string; object_key: string; size_bytes: number; created_at: string }>();
 	if (!row || new Date(row.expires_at).getTime() <= Date.now()) {
 		return errorResponse("video not found", 404);
+	}
+	// Also keeps getCachedExtractedVideo from caching bytes that could still be replaced.
+	const remaining = uploadWindowRemainingMs(row.created_at);
+	if (remaining > 0) {
+		return errorResponse(uploadWindowOpenMessage(remaining), 409);
 	}
 	if (row.size_bytes > MAX_PREVIEW_ARCHIVE_BYTES) {
 		return errorResponse(`package too large to preview inline; use /admin/review/${token}/download instead`, 413);
@@ -204,14 +245,18 @@ export async function handleAdminReviewDownload(request: Request, env: Env, toke
 
 	const tokenHash = await hashToken(token);
 	const row = await env.STORE_DB.prepare(
-		`SELECT srt.expires_at as expires_at, se.object_key as object_key
+		`SELECT srt.expires_at as expires_at, se.object_key as object_key, se.created_at as created_at
 		 FROM store_review_tokens srt JOIN store_entries se ON se.id = srt.entry_id
 		 WHERE srt.token_hash = ?`,
 	)
 		.bind(tokenHash)
-		.first<{ expires_at: string; object_key: string }>();
+		.first<{ expires_at: string; object_key: string; created_at: string }>();
 	if (!row || new Date(row.expires_at).getTime() <= Date.now()) {
 		return errorResponse("package not found", 404);
+	}
+	const remaining = uploadWindowRemainingMs(row.created_at);
+	if (remaining > 0) {
+		return errorResponse(uploadWindowOpenMessage(remaining), 409);
 	}
 
 	const object = await env.STORE_BUCKET.get(row.object_key);
@@ -239,6 +284,20 @@ export async function handleAdminReviewDecide(request: Request, env: Env, token:
 
 	const tokenHash = await hashToken(token);
 	const nowISO = new Date().toISOString();
+
+	if (action === "approve") {
+		const entry = await env.STORE_DB.prepare(
+			`SELECT se.created_at as created_at
+			 FROM store_review_tokens srt JOIN store_entries se ON se.id = srt.entry_id
+			 WHERE srt.token_hash = ?`,
+		)
+			.bind(tokenHash)
+			.first<{ created_at: string }>();
+		const remaining = entry ? uploadWindowRemainingMs(entry.created_at) : 0;
+		if (remaining > 0) {
+			return errorResponse(uploadWindowOpenMessage(remaining), 409);
+		}
+	}
 
 	// トークンの一回限り消費をこの1文のUPDATEで保証する。meta.changes===1なら
 	// このリクエストが「勝った」ことが分かる(GETは消費しない。メールセキュリティ

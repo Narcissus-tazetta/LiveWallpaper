@@ -145,6 +145,13 @@ final class StoreIntegrationTests: XCTestCase {
         let (_, unauthorized) = try await session.data(for: approve)
         XCTAssertEqual((unauthorized as? HTTPURLResponse)?.statusCode, 401)
         approve.setValue("integration-admin", forHTTPHeaderField: "x-admin-key")
+        let (_, tooEarly) = try await session.data(for: approve)
+        XCTAssertEqual((tooEarly as? HTTPURLResponse)?.statusCode, 409)
+        var closeWindow = URLRequest(url: endpoint
+            .appendingPathComponent("__test/close-upload-window/\(result.id)"))
+        closeWindow.httpMethod = "POST"
+        let (_, closed) = try await session.data(for: closeWindow)
+        XCTAssertEqual((closed as? HTTPURLResponse)?.statusCode, 204)
         let (_, approved) = try await session.data(for: approve)
         XCTAssertEqual((approved as? HTTPURLResponse)?.statusCode, 200)
         await catalog.reload()

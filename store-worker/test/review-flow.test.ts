@@ -1,6 +1,7 @@
 import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from "cloudflare:test";
 import { zipSync } from "fflate";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { UPLOAD_WINDOW_MS } from "../src/constants";
 import worker from "../src/index";
 // Workers環境にはnode:fsが無いため、Viteの?raw importでビルド時にschema.sqlの
 // 内容を文字列として取り込む(本番のスキーマ管理方法=schema.sqlはそのまま)。
@@ -63,7 +64,20 @@ function mockResendEmail() {
 	};
 }
 
-async function submitEntry(overrides: { title?: string; author?: string } = {}) {
+/// Most tests review right after submitting; move the entry past the window in which its
+/// presigned upload URLs could still replace the stored bytes.
+async function closeUploadWindow(id: string) {
+	const row = await env.STORE_DB.prepare("SELECT created_at FROM store_entries WHERE id = ?")
+		.bind(id)
+		.first<{ created_at: string }>();
+	if (!row) return;
+	const backdated = new Date(new Date(row.created_at).getTime() - UPLOAD_WINDOW_MS).toISOString();
+	await env.STORE_DB.prepare("UPDATE store_entries SET created_at = ? WHERE id = ?").bind(backdated, id).run();
+}
+
+async function submitEntry(
+	overrides: { title?: string; author?: string; description?: string; uploadWindowOpen?: boolean } = {},
+) {
 	const id = crypto.randomUUID();
 	const objectKey = `packages/${id}.lwpkg`;
 	const bytes = new TextEncoder().encode("fake package bytes");
@@ -77,12 +91,14 @@ async function submitEntry(overrides: { title?: string; author?: string } = {}) 
 				id,
 				title: overrides.title ?? "Test Title",
 				author: overrides.author ?? "Test Author",
+				description: overrides.description,
 				sha256: "d".repeat(64),
 				sizeBytes: bytes.byteLength,
 				objectKey,
 			}),
 		}),
 	);
+	if (!overrides.uploadWindowOpen) await closeUploadWindow(id);
 	return { res, id };
 }
 
@@ -114,6 +130,7 @@ async function submitEntryForWithdraw(): Promise<{
 		}),
 	);
 	const json = (await res.json()) as { withdrawToken: string };
+	await closeUploadWindow(id);
 	return { id, objectKey, withdrawToken: json.withdrawToken };
 }
 
@@ -143,6 +160,7 @@ async function submitEntryWithVideo(videoBytes: Uint8Array): Promise<{ res: Resp
 			}),
 		}),
 	);
+	await closeUploadWindow(id);
 	return { res, id };
 }
 
@@ -740,5 +758,60 @@ describe("store submission review flow", () => {
 
 		expect(await entryStatus(staleId)).toBe("rejected");
 		expect(await entryStatus(freshId)).toBe("requested");
+	});
+	it("holds review previews and approval until the submitter's upload URLs have expired", async () => {
+		const mock = mockResendEmail();
+		const { id } = await submitEntry({ uploadWindowOpen: true });
+		const token = mock.getToken();
+
+		const page = await callWorker(new Request(`https://store.example.com/admin/review/${token}`));
+		const html = await page.text();
+		expect(html).toContain("審査できません");
+		expect(html).not.toContain("/decide");
+		for (const path of ["video", "download"]) {
+			const res = await callWorker(new Request(`https://store.example.com/admin/review/${token}/${path}`));
+			expect(res.status).toBe(409);
+		}
+
+		expect((await callWorker(decideRequest(token, "approve"))).status).toBe(409);
+		const direct = await callWorker(
+			new Request(`https://store.example.com/admin/entries/${id}/approve`, {
+				method: "POST",
+				// The admin rate-limit bucket is shared with earlier tests in this file.
+				headers: { "x-admin-key": ADMIN_KEY, "cf-connecting-ip": "203.0.113.9" },
+			}),
+		);
+		expect(direct.status).toBe(409);
+		expect(await entryStatus(id)).toBe("requested");
+
+		await closeUploadWindow(id);
+		expect((await callWorker(decideRequest(token, "approve"))).status).toBe(303);
+		expect(await entryStatus(id)).toBe("published");
+	});
+
+	it("allows rejecting while the upload window is still open", async () => {
+		const mock = mockResendEmail();
+		const { id } = await submitEntry({ uploadWindowOpen: true });
+		expect((await callWorker(decideRequest(mock.getToken(), "reject"))).status).toBe(303);
+		expect(await entryStatus(id)).toBe("rejected");
+	});
+
+	it("rejects an over-long description at submit", async () => {
+		const { res } = await submitEntry({ description: "x".repeat(2001) });
+		expect(res.status).toBe(400);
+	});
+
+	it("serves the review page with a CSP whose style hash matches and no referrer", async () => {
+		const mock = mockResendEmail();
+		await submitEntry();
+		const res = await callWorker(new Request(`https://store.example.com/admin/review/${mock.getToken()}`));
+		const csp = res.headers.get("content-security-policy") ?? "";
+		expect(csp).toContain("frame-ancestors 'none'");
+		expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+		expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+		const style = (await res.text()).match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
+		const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(style));
+		const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));
+		expect(csp).toContain(`'sha256-${hash}'`);
 	});
 });
