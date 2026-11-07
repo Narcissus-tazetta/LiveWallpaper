@@ -70,6 +70,7 @@ extension SettingsView {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .disabled(storeCatalog.downloadingEntryID != nil)
                 // Every card has an "Add" button; naming the wallpaper tells them apart.
                 .accessibilityLabel("\(model.localizedString("追加")) \(entry.title)")
                 .transition(Motion.pop)

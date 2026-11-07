@@ -8,11 +8,13 @@ import Foundation
 @MainActor
 final class StoreMySubmissionsController: ObservableObject {
     @Published private(set) var submissions: [StoreMySubmission] = []
-    @Published var isRefreshing: Bool = false
+    @Published private(set) var isRefreshing: Bool = false
     @Published var errorMessage: String?
 
     private let defaults: UserDefaults
     private let session: URLSession
+    private var isRefreshingStatuses = false
+    private var withdrawingIDs: Set<String> = []
     private static let storageKey = "store.mySubmissions"
 
     init(defaults: UserDefaults = .standard, session: URLSession = .shared) {
@@ -55,9 +57,13 @@ final class StoreMySubmissionsController: ObservableObject {
             errorMessage = Self.localized("この投稿は取り下げに対応していません。リストから削除のみ行えます")
             return
         }
+        guard withdrawingIDs.insert(id).inserted else { return }
         isRefreshing = true
         errorMessage = nil
-        defer { isRefreshing = false }
+        defer {
+            withdrawingIDs.remove(id)
+            isRefreshing = isRefreshingStatuses || !withdrawingIDs.isEmpty
+        }
         do {
             try await performWithdraw(id: id, token: token)
             remove(id: id)
@@ -70,27 +76,36 @@ final class StoreMySubmissionsController: ObservableObject {
     /// 想定のため、並列化はせず単純に直列で行う。1件が404(運営がpurgeした等)でも
     /// 他の問い合わせは継続する。
     func refreshAll() async {
-        guard !submissions.isEmpty else {
+        guard !submissions.isEmpty, !isRefreshingStatuses else {
             return
         }
+        isRefreshingStatuses = true
         isRefreshing = true
         errorMessage = nil
-        defer { isRefreshing = false }
+        defer {
+            isRefreshingStatuses = false
+            isRefreshing = !withdrawingIDs.isEmpty
+        }
 
-        var anySucceeded = false
-        for index in submissions.indices {
+        var anyFailed = false
+        // Posting and withdrawing remain available while the network is suspended.
+        // An array index captured before await can then refer to a different submission.
+        for id in submissions.map(\.id) {
+            guard submissions.contains(where: { $0.id == id }) else { continue }
             do {
-                submissions[index]
-                    .lastKnownStatus = try await fetchStatus(id: submissions[index].id)
-                anySucceeded = true
+                let status = try await fetchStatus(id: id)
+                if let index = submissions.firstIndex(where: { $0.id == id }) {
+                    submissions[index].lastKnownStatus = status
+                }
             } catch {
+                anyFailed = true
                 AppLog.store
                     .error(
                         "status refresh failed error=\(error.localizedDescription, privacy: .public)"
                     )
             }
         }
-        if !anySucceeded {
+        if anyFailed {
             errorMessage = Self.localized("ステータスの取得に失敗しました。しばらくしてから再度お試しください")
         }
         persist()

@@ -8,7 +8,7 @@ final class StoreCatalogController: ObservableObject {
     @Published var entries: [StoreEntry] = []
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
-    @Published var downloadingEntryID: String?
+    @Published private(set) var downloadingEntryID: String?
     /// 0...1 while `downloadingEntryID` downloads.
     @Published var downloadProgress: Double?
     /// The entry a shared Store link asked to show, above the catalog.
@@ -28,6 +28,7 @@ final class StoreCatalogController: ObservableObject {
     private var hasLoadedOnce: Bool = false
     private var searchDebounceTask: Task<Void, Never>?
     private var requestGeneration: UInt64 = 0
+    private var downloadGeneration: UUID?
     private let session: URLSession
     private let fileManager: FileManager
     private let endpointURL: URL
@@ -155,10 +156,14 @@ final class StoreCatalogController: ObservableObject {
     }
 
     func download(entry: StoreEntry, into model: WallpaperModel) async {
+        guard downloadingEntryID == nil else { return }
+        let generation = UUID()
+        downloadGeneration = generation
         downloadingEntryID = entry.id
         downloadProgress = 0
         downloadResultMessage = nil
         defer {
+            downloadGeneration = nil
             downloadingEntryID = nil
             downloadProgress = nil
         }
@@ -177,7 +182,7 @@ final class StoreCatalogController: ObservableObject {
                 expectedSHA256: entry.sha256
             ) { [weak self] fraction in
                 Task { @MainActor in
-                    guard self?.downloadingEntryID == entry.id else { return }
+                    guard self?.downloadGeneration == generation else { return }
                     self?.downloadProgress = fraction
                 }
             }

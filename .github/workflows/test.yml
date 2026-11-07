@@ -36,6 +36,18 @@ jobs:
             - name: Test
               run: swift test
 
+            - name: Test release behavior
+              run: swift test -c release -Xswiftc -enable-testing
+
+            - uses: oven-sh/setup-bun@v2.2.0
+
+            - name: Install Store integration dependencies
+              working-directory: store-worker
+              run: bun install --frozen-lockfile
+
+            - name: Test app and Store integration
+              run: bun run --cwd store-worker test:integration
+
     swift-lint:
         runs-on: macos-26
         env:
