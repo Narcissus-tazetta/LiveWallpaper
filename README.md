@@ -3,12 +3,29 @@
 [![macOS](https://img.shields.io/badge/macOS-13.0+-000000.svg?logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Japanese README: [README.ja.md](README.ja.md)
+**English** · [日本語](README.ja.md)
 
-LiveWallpaper lets you set your favorite videos as your Mac desktop wallpaper.
-It is designed to reduce system load (battery and CPU usage) while you are working.
+Turn videos and photos into live wallpapers for your Mac. LiveWallpaper is a free, open-source macOS app for playing video wallpapers and bringing photos to life with a scene editor.
+Playback pauses while other windows cover your wallpaper to reduce the load while you work.
 
-## Install And Launch
+[Install](#install) · [Screenshots](#screenshots) · [User guide](docs/USER_GUIDE.md)
+
+<video src="https://github.com/user-attachments/assets/b5f19e23-928b-4f37-a03b-d229949b905a" width="720" controls loop muted playsinline></video>
+
+[Watch the demo](https://github.com/user-attachments/assets/b5f19e23-928b-4f37-a03b-d229949b905a)
+
+## Highlights
+
+- **Videos and images as wallpapers** — Import videos such as mp4 and mov, GIF / APNG / animated WebP, and photos.
+- **Bring photos to life** — Combine layers, effects, particles, and animation in the scene editor to create your own wallpaper.
+- **Assign by display or desktop** — Choose wallpapers for individual displays and Mission Control Spaces, with video sync for the lock screen on macOS 26 or later.
+- **Switch with your day** — Use playlists, light/dark appearance, weekday and time rules, sunrise/sunset, or Focus modes.
+- **Discover and share** — Download wallpapers from the Store, submit your own, or share them as `.lwpkg` files.
+- **Reduce load when idle** — Automatically pause when covered, use lightweight playback, and choose how wallpapers behave on battery power.
+
+Web wallpapers are available as an experimental feature. See the [user guide](docs/USER_GUIDE.md) for screen saver support, shortcuts, cursor effects, and detailed behavior.
+
+## Install
 
 ### Homebrew (recommended)
 
@@ -16,137 +33,63 @@ It is designed to reduce system load (battery and CPU usage) while you are worki
 brew install --cask narcissus-tazetta/tap/livewallpaper
 ```
 
-To update:
+### Manual installation
 
-```bash
-brew update
-brew upgrade --cask livewallpaper
-```
+1. Download the latest `LiveWallpaper-macos-vX.Y.Z.dmg` from [Releases](https://github.com/Narcissus-tazetta/LiveWallpaper/releases).
+2. Open the DMG and move `LiveWallpaper.app` to **Applications**, replacing the existing app if installed.
+3. Launch LiveWallpaper from Applications. Keep it there so automatic updates work correctly.
 
-### Manual install
+### First-launch warning
 
-1. Download the latest `LiveWallpaper-macos-vX.Y.Z.dmg` from the [Releases](../../releases) page.
-2. Open the DMG and move `LiveWallpaper.app` to your **Applications** folder.
-3. If it is already installed, replace the existing app.
+The app is distributed without Apple notarization, so macOS may show a security warning.
+After attempting to launch it, open **System Settings → Privacy & Security → Security**, choose **Open Anyway** for LiveWallpaper, and follow the prompts.
 
-Always launch from the Applications folder so auto-update and related features work correctly.
+## Set your first wallpaper
 
-If an update fails, use **Manual Download** in Settings to open Releases and reinstall the latest version.
+1. Open **Settings** from the LiveWallpaper menu bar icon.
+2. In the **Wallpaper** tab, drag in a video, GIF, or image, or add one using **＋**.
+3. Set the **assignment target** to **Desktop** and select the wallpaper you want.
+4. Use the **Edit** tab to adjust position, zoom, or a video's playback range.
 
-### First Launch
+Need a wallpaper? Browse the Store to download one. See the [user guide](docs/USER_GUIDE.md) for per-display assignments and lock screen sync.
 
-This app is distributed without Apple notarization. macOS may show a security warning on first launch.
+## Screenshots
 
-If that happens:
+### Wallpaper library
 
-1. Open **System Settings**
-2. Go to **Privacy & Security** → **Security**
-3. Click **Open Anyway** and confirm with your password
-4. If needed, open the app again from Applications
+Browse your videos and images, then assign wallpapers to their destinations.
 
-### If a permission stops working after an update
+![Wallpaper library showing wallpapers and assignment controls](site/static/screens/en-library.webp)
 
-Only needed once, when updating from a version before 1.4.1. Those versions used a different code signature, so macOS keeps showing LiveWallpaper as allowed while it actually refuses it. Typical signs: "Screen & System Audio Recording" is on but the system-audio wallpaper reports that capture was denied, or clicking buttons in a web wallpaper does nothing. Later updates keep your permissions.
+### Fit and trim editor
 
-Do this for **Screen & System Audio Recording** and for **Accessibility** (and **Full Disk Access** if you use Focus mode switching):
+Adjust position and zoom for your screen, choose a video's playback range, and set its loop start.
 
-1. Open **System Settings** → **Privacy & Security** and open the permission in question.
-2. Find **LiveWallpaper** in the list and switch it **off**.
-3. Select **LiveWallpaper** and click **−** below the list to remove it. Confirm with your password or Touch ID.
-4. Click **+**, pick LiveWallpaper from Applications to add it, and switch it **on**.
-5. Restart LiveWallpaper.
+![Edit tab showing wallpaper placement and video trim controls](site/static/screens/en-edit.webp)
 
-The same steps are shown in the app, under **If allowing it changes nothing**, wherever a permission problem is reported.
+### Scene editor
 
-## Features
+Add layers, particles, and effects to turn a photo into a live wallpaper.
 
-- **Video wallpaper**: Use local video files such as mp4 and mov as your wallpaper.
-- **Animated images**: Import GIF / APNG / animated WebP files; they are converted to video and played like any other wallpaper.
-- **Web wallpaper (experimental)**: Register a web page or a YouTube / Vimeo URL and run it as your wallpaper. Turn it on in Settings to make the section appear.
-- **Separate desktop and lock screen videos**: Assign different videos for desktop live wallpaper and lock screen sync (lock screen sync requires macOS 26 or later).
-- **Multi-display support**: Main display only or all connected displays, with per-display assignments.
-- **Per-desktop (Space) wallpapers**: Assign a different wallpaper to each Mission Control desktop, and optionally show the desktop number in the menu bar.
-- **Automatic switching**: Switch wallpapers by macOS light/dark appearance, by weekday and time-of-day rules (including sunrise and sunset), or by Focus mode.
-- **Playlists**: Register multiple videos and play them in sequence, with shuffle and previous/next.
-- **Screen saver**: Install a LiveWallpaper screen saver from Settings that plays the video wallpaper on your desktop, with per-display wallpapers, trimming, and placement. It is selected as the screen saver while the app runs, and your previous screen saver comes back when you quit or uninstall. Web wallpapers are not supported.
-- **Switch effects**: Wallpapers change with a cross-fade or a fade through black (off / 0.5 / 1 / 2 seconds). No effect when switching desktops or while Reduce Motion is on.
-- **Trim / loop editor**: Cut a video down to the part you want, set a separate loop start point (the first pass plays as an intro), snap to keyframes, zoom the timeline, and undo/redo.
-- **Fit editor**: Edit per-display fit mode, zoom, and offset, then save the layout per screen.
-- **Store**: Browse wallpapers shared by other users and download them, or submit your own for review.
-- **Audio controls**: Adjust wallpaper audio volume from within the app.
-- **Desktop icon visibility**: Show or hide desktop icons, similar to macOS System Settings.
-- **Readability options**: Dim the wallpaper so desktop icons stay readable, and make the menu bar opaque.
-- **Cursor effects**: On video wallpapers, add a parallax that shifts the wallpaper slightly with the mouse, a spotlight that keeps only the area around the pointer bright, a trail behind the pointer (glow, sparkles, bubbles or snow), and a ripple or burst where you click the desktop, in any colour from the palette. Each wallpaper can have its own settings in the Edit tab's Effects, and they travel with exported packages and Store posts. No permission is needed. To keep the load down, by default everything (mouse monitoring included) stops while you use another app; Low Power Mode and a hot Mac turn the effects off too, and parallax, the trail and the click effect also stop for Reduce Motion and while playback load is reduced on battery. Not available for web wallpapers.
-- **Global shortcuts & automation**: System-wide hotkeys and a `livewallpaper://` URL scheme for Shortcuts, Raycast, or `open`.
-- **Mac-focused optimization**:
-    - Automatically pauses playback when another app heavily covers the screen.
-    - Supports exclusion rules for apps and displays that should not trigger pause.
-    - Quality preset, work profile, frame rate limits (30fps / 60fps / unlimited), and decode mode settings.
-    - Lowers playback load automatically when the battery drops to 10% or less.
-    - Choose what happens on battery power: play as usual, play the smaller Lightweight version, or freeze the wallpaper. It switches back the moment you plug in.
-    - Freezes the wallpaper when the system's **Reduce Motion** accessibility setting is on.
-- **Localization**: Full UI translation (menus, Settings, notifications) in Japanese, English, Simplified Chinese, Traditional Chinese, Korean, Spanish, French, German, Brazilian Portuguese, Vietnamese, and Turkish. Follows your macOS language automatically, or can be set manually in Settings.
-- **Auto updates**: Integrated with Sparkle for in-app updates.
+![Scene editor showing layers and effect controls](site/static/screens/en-scene.webp)
 
-<video src="https://github.com/user-attachments/assets/b5f19e23-928b-4f37-a03b-d229949b905a" width="60%" controls autoplay loop muted></video>
+## Guides
 
-## Other Features
+- [User guide](docs/USER_GUIDE.md): assignments, editing, playlists, sharing, automatic switching, shortcuts, and URL commands
+- [Wallpaper script API](docs/SCENE_SCRIPT_API.md): JavaScript animation and input reactions (Japanese)
+- [3D models](docs/SCENE_3D_MODELS.md): glTF / GLB import and supported features (Japanese)
+- [Web wallpaper API](docs/WEB_WALLPAPER_API.md): HTML folder import, audio, and media integration (Japanese)
 
-- **Wallpaper export & sharing**: Export a registered wallpaper as a `.lwpkg` package with the original video, thumbnails, and metadata.
-- **Package import**: Import `.lwpkg` files and restore presentation settings and playlists. Duplicate handling (replace or abort) is supported.
-- **Store submissions**: Sharing to the Store uploads the video together with its saved trim and fit settings, and publishes only after review. The **My Submissions** tab shows the review status of everything sent from this Mac, and lets you withdraw a submission or report someone else's.
-- **Thumbnail cache**: Fast library browsing with disk and memory thumbnail caching.
-- **Drag & drop**: Add videos by drag and drop, organize playlists, and rename entries.
-- **Search**: Filter the wallpaper library, playlists, web wallpapers, and the Store catalog from the search field at the top of each list.
-- **Problem reports**: Settings › Other › Support › **Export Diagnostics…** bundles app, macOS and display info, your settings and recent logs into one zip. **Report a Problem…** opens a GitHub issue to attach it to. Video files and web wallpaper URLs are left out, and your home folder path is written as `~`.
+## Requirements
 
-## Automatic Switching
-
-Three independent rules can pick the wallpaper for you. All of them are configured in the **Wallpaper** tab.
-
-- **Appearance**: Choose a light-mode wallpaper and a dark-mode wallpaper, and the shared wallpaper follows macOS Dark Mode.
-- **Weekly schedule**: Build rules from weekday + time range + appearance. Rules higher in the list win, and the first match applies. Overnight ranges such as 22:00–06:00 are supported. A range can also start or end at sunrise or sunset (for example, sunset–sunrise for nights only). The location defaults to your time zone's representative city (Tokyo for all of Japan); use "Change Location…" to search for a city instead. Location Services permission is not needed. If you pick a wallpaper manually while a rule is active, your choice stays until the next time boundary.
-- **Focus modes**: Assign a wallpaper per Focus mode. macOS does not expose Focus state to apps, so this reads the notification-center database directly and therefore needs **Full Disk Access**; the app walks you through granting it.
-
-## Automation
-
-### Global shortcuts
-
-Turn on **Global Shortcuts** in Settings to control the wallpaper without bringing the app forward. The defaults are:
-
-| Action | Default |
+| Item | Requirement |
 | --- | --- |
-| Next wallpaper | ⌃⌥⌘ ] |
-| Previous wallpaper | ⌃⌥⌘ [ |
-| Toggle audio | ⌃⌥⌘ M |
-| Show / hide desktop icons | ⌃⌥⌘ D |
-| Pause / resume wallpaper | ⌃⌥⌘ P |
+| macOS | 13.0 (Ventura) or later |
+| Mac | Apple Silicon / Intel |
+| Lock screen video sync | macOS 26 or later |
+| Focus-mode switching | Full Disk Access permission |
 
-Each shortcut can be re-recorded, and one that conflicts with the system or another app is flagged as inactive.
-
-### URL scheme
-
-The app handles `livewallpaper://` URLs, so it can be driven from Shortcuts.app ("Open URL"), Raycast, AppleScript, or the `open` command:
-
-```bash
-open "livewallpaper://next"
-```
-
-| URL | What it does |
-| --- | --- |
-| `livewallpaper://next` / `livewallpaper://previous` | Play the next / previous wallpaper |
-| `livewallpaper://pause` / `livewallpaper://resume` | Pause / resume the wallpaper (`toggle-pause` toggles) |
-| `livewallpaper://set?name=Ocean` | Switch to the wallpaper with this display name |
-| `livewallpaper://set-playlist?name=Work` | Switch to the playlist with this name (`name=all` for All Wallpapers) |
-| `livewallpaper://audio?on=1` | Turn audio on (omit `on` to toggle) |
-| `livewallpaper://volume?level=0.3` | Set volume (0.0–1.0) |
-| `livewallpaper://desktop-icons?visible=0` | Show / hide desktop icons (omit to toggle) |
-| `livewallpaper://playlist?on=1` | Turn playlist playback on / off (omit to toggle) |
-| `livewallpaper://shuffle?on=1` | Turn shuffle on / off (omit to toggle) |
-| `livewallpaper://refresh` | Re-evaluate playback state |
-| `livewallpaper://settings` / `livewallpaper://wallpaper` | Open Settings / the Wallpaper tab |
-
-Names are matched case- and width-insensitively: an exact match first, otherwise a unique prefix. If a name matches several items or nothing, or the command is unknown, nothing happens and the app beeps. Pausing is cleared when the app restarts.
+The UI, including menus, Settings, and notifications, supports English, Japanese, Simplified Chinese, Traditional Chinese, Korean, Spanish, French, German, Brazilian Portuguese, Vietnamese, and Turkish. It follows your macOS language automatically and can also be changed in Settings.
 
 ## Performance
 
@@ -154,7 +97,7 @@ Video wallpapers have a reputation for being heavy. LiveWallpaper is designed to
 the load low by auto-pausing and releasing resources whenever the wallpaper is covered,
 and by relying on hardware video decoding.
 
-**Rough measurements** (MacBook Air 13-inch, M5, 24 GB RAM / one 1080p 30fps video)
+**Video wallpaper measurements** (MacBook Air 13-inch, M5, 24 GB RAM / one 1080p 30fps video)
 
 | State | CPU | Memory | Energy Impact |
 | --- | --- | --- | --- |
@@ -167,34 +110,44 @@ and by relying on hardware video decoding.
 > the number and resolution of connected displays; and whatever else is running at the
 > time. 4K video, high frame rates, or multiple displays will use more than shown above.
 
-**How the load is kept low**
+This table measures a single video wallpaper, not scene or web wallpapers. See the [user guide](docs/USER_GUIDE.md) for lightweight playback and battery settings.
 
-- Playback auto-pauses when the wallpaper is fully covered by other windows.
-- If it stays covered, the heavy decoding resources are released to save memory
-  (it resumes smoothly from a still frame when shown again).
-- App Nap is supported, reducing CPU wakes while inactive.
-- A lightweight playback mode generates smaller proxy videos for power saving.
-- Quality preset, work profile, frame rate (30 / 60fps) and decode mode are configurable
-  to match your Mac's headroom, and quality is lowered automatically on a low battery.
+## Troubleshooting
 
-## Usage
+### Updating or recovering from a failed update
 
-After launch, an icon appears in the menu bar.
+Use the in-app automatic updater, or update a Homebrew installation with:
 
-1. Open **Settings** from the menu bar
-2. Add videos, animated images, or playlists from the **Wallpaper** tab
-3. Use the **assignment target** picker (Desktop / Lock Screen) to assign wallpapers
-4. Within the Desktop tab, switch scope to assign per display or per Mission Control desktop
-5. For lock screen, enable sync in the lock screen panel and tap **Apply Now**
-6. Use the **Edit** tab to adjust fit (position/zoom) and trim (cut range, loop start)
+```bash
+brew update
+brew upgrade --cask livewallpaper
+```
 
-The status bar shows the current desktop and lock screen wallpapers separately.
+If an update fails, use **Manual Download** in Settings or download the latest version from [Releases](https://github.com/Narcissus-tazetta/LiveWallpaper/releases), then replace the app in Applications.
 
-## System Requirements
+### A feature does not work even though permission is enabled
 
-- macOS 13.0 (Ventura) or later
-- Lock screen video sync: macOS 26 or later
-- Focus-mode switching: Full Disk Access permission
+If system audio capture fails, buttons in a web wallpaper do not respond, or Focus-mode switching does not work, check the relevant permission.
+
+| Feature | System Settings → Privacy & Security permission |
+| --- | --- |
+| System audio integration | Screen & System Audio Recording |
+| Clicking inside web wallpapers | Accessibility |
+| Focus-mode switching | Full Disk Access |
+
+If permission is already enabled but the feature still fails:
+
+1. Turn LiveWallpaper off in the relevant permission list.
+2. Select LiveWallpaper and remove it with **−**.
+3. Use **＋** to add LiveWallpaper from Applications, then turn it on.
+4. Restart LiveWallpaper.
+
+These steps are also available in the app under **If allowing it changes nothing**.
+
+### Reporting a problem
+
+Use **Settings → Other → Support → Export Diagnostics…** to save diagnostics, then attach the zip to the GitHub issue opened by **Report a Problem…**.
+It includes app, macOS, and display information, settings, and recent logs. Video files and web wallpaper URLs are excluded, and your home folder path is replaced with `~`.
 
 ## Development
 
@@ -232,4 +185,4 @@ The Store backend lives in [`store-worker/`](store-worker) — a Cloudflare Work
 
 ## License
 
-This project is released under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE).

@@ -1,0 +1,123 @@
+# User guide
+
+[Back to README](../README.md) · [日本語](USER_GUIDE.ja.md)
+
+Detailed controls for assigning, editing, sharing, switching, and automating wallpapers.
+
+## Assigning and editing wallpapers
+
+After launch, an icon appears in the menu bar.
+
+1. Open **Settings** from the menu bar
+2. Add videos, animated images, or playlists from the **Wallpaper** tab
+3. Use the **assignment target** picker (Desktop / Lock Screen) to assign wallpapers
+4. Within the Desktop tab, switch scope to assign per display or per Mission Control desktop
+5. For lock screen, enable sync in the lock screen panel and tap **Apply Now**
+6. Use the **Edit** tab to adjust fit (position/zoom) and trim (cut range, loop start)
+
+The status bar shows the current desktop and lock screen wallpapers separately.
+
+For an image wallpaper, open the scene editor from the Edit tab to work with layers, effects, and motion in a separate window. See the [script API](SCENE_SCRIPT_API.md) and [3D model guide](SCENE_3D_MODELS.md) for technical details (currently in Japanese).
+
+## Supported wallpapers
+
+- **Video wallpaper**: Use local video files such as mp4 and mov as your wallpaper.
+- **Animated images**: Import GIF / APNG / animated WebP files; they are converted to video and played like any other wallpaper.
+- **Web wallpaper (experimental)**: Register a web page or a YouTube / Vimeo URL and run it as your wallpaper. Turn it on in Settings to make the section appear.
+
+For HTML folder wallpapers, see the [web wallpaper API](WEB_WALLPAPER_API.md) (Japanese).
+
+## Displays and playlists
+
+- **Separate desktop and lock screen videos**: Assign different videos for desktop live wallpaper and lock screen sync (lock screen sync requires macOS 26 or later).
+- **Multi-display support**: Main display only or all connected displays, with per-display assignments.
+- **Per-desktop (Space) wallpapers**: Assign a different wallpaper to each Mission Control desktop, and optionally show the desktop number in the menu bar.
+- **Playlists**: Register multiple videos and play them in sequence, with shuffle and previous/next.
+- **Screen saver**: Install a LiveWallpaper screen saver from Settings that plays the video wallpaper on your desktop, with per-display wallpapers, trimming, and placement. It is selected as the screen saver while the app runs, and your previous screen saver comes back when you quit or uninstall. Web wallpapers are not supported.
+
+## Editing and readability
+
+- **Trim / loop editor**: Cut a video down to the part you want, set a separate loop start point (the first pass plays as an intro), snap to keyframes, zoom the timeline, and undo/redo.
+- **Fit editor**: Edit per-display fit mode, zoom, and offset, then save the layout per screen.
+- **Switch effects**: Wallpapers change with a cross-fade or a fade through black (off / 0.5 / 1 / 2 seconds). No effect when switching desktops or while Reduce Motion is on.
+- **Audio controls**: Adjust wallpaper audio volume from within the app.
+- **Desktop icon visibility**: Show or hide desktop icons, similar to macOS System Settings.
+- **Readability options**: Dim the wallpaper so desktop icons stay readable, and make the menu bar opaque.
+- **Cursor effects**: On video wallpapers, add a parallax that shifts the wallpaper slightly with the mouse, a spotlight that keeps only the area around the pointer bright, a trail behind the pointer (glow, sparkles, bubbles or snow), and a ripple or burst where you click the desktop, in any colour from the palette. Each wallpaper can have its own settings in the Edit tab's Effects, and they travel with exported packages and Store posts. No permission is needed. To keep the load down, by default everything (mouse monitoring included) stops while you use another app; Low Power Mode and a hot Mac turn the effects off too, and parallax, the trail and the click effect also stop for Reduce Motion and while playback load is reduced on battery. Not available for web wallpapers.
+
+## Playback load and power saving
+
+- **Mac-focused optimization**:
+    - Automatically pauses playback when another app heavily covers the screen.
+    - Supports exclusion rules for apps and displays that should not trigger pause.
+    - Quality preset, work profile, frame rate limits (30fps / 60fps / unlimited), and decode mode settings.
+    - Lowers playback load automatically when the battery drops to 10% or less.
+    - Choose what happens on battery power: play as usual, play the smaller Lightweight version, or freeze the wallpaper. It switches back the moment you plug in.
+    - Freezes the wallpaper when the system's **Reduce Motion** accessibility setting is on.
+
+- Playback auto-pauses when the wallpaper is fully covered by other windows.
+- If it stays covered, the heavy decoding resources are released to save memory
+  (it resumes smoothly from a still frame when shown again).
+- App Nap is supported, reducing CPU wakes while inactive.
+- A lightweight playback mode generates smaller proxy videos for power saving.
+- Quality preset, work profile, frame rate (30 / 60fps) and decode mode are configurable
+  to match your Mac's headroom, and quality is lowered automatically on a low battery.
+
+## Library and sharing
+
+- **Store**: Browse wallpapers shared by other users and download them, or submit your own for review.
+- **Wallpaper export & sharing**: Export a registered wallpaper as a `.lwpkg` package with the original video, thumbnails, and metadata.
+- **Package import**: Import `.lwpkg` files and restore presentation settings and playlists. Duplicate handling (replace or abort) is supported.
+- **Store submissions**: Sharing to the Store uploads the video together with its saved trim and fit settings, and publishes only after review. The **My Submissions** tab shows the review status of everything sent from this Mac, and lets you withdraw a submission or report someone else's.
+- **Thumbnail cache**: Fast library browsing with disk and memory thumbnail caching.
+- **Drag & drop**: Add videos by drag and drop, organize playlists, and rename entries.
+- **Search**: Filter the wallpaper library, playlists, web wallpapers, and the Store catalog from the search field at the top of each list.
+- **Problem reports**: Settings › Other › Support › **Export Diagnostics…** bundles app, macOS and display info, your settings and recent logs into one zip. **Report a Problem…** opens a GitHub issue to attach it to. Video files and web wallpaper URLs are left out, and your home folder path is written as `~`.
+
+## Automatic switching
+
+Three independent rules can pick the wallpaper for you. All of them are configured in the **Wallpaper** tab.
+
+- **Appearance**: Choose a light-mode wallpaper and a dark-mode wallpaper, and the shared wallpaper follows macOS Dark Mode.
+- **Weekly schedule**: Build rules from weekday + time range + appearance. Rules higher in the list win, and the first match applies. Overnight ranges such as 22:00–06:00 are supported. A range can also start or end at sunrise or sunset (for example, sunset–sunrise for nights only). The location defaults to your time zone's representative city (Tokyo for all of Japan); use "Change Location…" to search for a city instead. Location Services permission is not needed. If you pick a wallpaper manually while a rule is active, your choice stays until the next time boundary.
+- **Focus modes**: Assign a wallpaper per Focus mode. macOS does not expose Focus state to apps, so this reads the notification-center database directly and therefore needs **Full Disk Access**; the app walks you through granting it.
+
+## Automation
+
+### Global shortcuts
+
+Turn on **Global Shortcuts** in Settings to control the wallpaper without bringing the app forward. The defaults are:
+
+| Action | Default |
+| --- | --- |
+| Next wallpaper | ⌃⌥⌘ ] |
+| Previous wallpaper | ⌃⌥⌘ [ |
+| Toggle audio | ⌃⌥⌘ M |
+| Show / hide desktop icons | ⌃⌥⌘ D |
+| Pause / resume wallpaper | ⌃⌥⌘ P |
+
+Each shortcut can be re-recorded, and one that conflicts with the system or another app is flagged as inactive.
+
+### URL scheme
+
+The app handles `livewallpaper://` URLs, so it can be driven from Shortcuts.app ("Open URL"), Raycast, AppleScript, or the `open` command:
+
+```bash
+open "livewallpaper://next"
+```
+
+| URL | What it does |
+| --- | --- |
+| `livewallpaper://next` / `livewallpaper://previous` | Play the next / previous wallpaper |
+| `livewallpaper://pause` / `livewallpaper://resume` | Pause / resume the wallpaper (`toggle-pause` toggles) |
+| `livewallpaper://set?name=Ocean` | Switch to the wallpaper with this display name |
+| `livewallpaper://set-playlist?name=Work` | Switch to the playlist with this name (`name=all` for All Wallpapers) |
+| `livewallpaper://audio?on=1` | Turn audio on (omit `on` to toggle) |
+| `livewallpaper://volume?level=0.3` | Set volume (0.0–1.0) |
+| `livewallpaper://desktop-icons?visible=0` | Show / hide desktop icons (omit to toggle) |
+| `livewallpaper://playlist?on=1` | Turn playlist playback on / off (omit to toggle) |
+| `livewallpaper://shuffle?on=1` | Turn shuffle on / off (omit to toggle) |
+| `livewallpaper://refresh` | Re-evaluate playback state |
+| `livewallpaper://settings` / `livewallpaper://wallpaper` | Open Settings / the Wallpaper tab |
+
+Names are matched case- and width-insensitively: an exact match first, otherwise a unique prefix. If a name matches several items or nothing, or the command is unknown, nothing happens and the app beeps. Pausing is cleared when the app restarts.
