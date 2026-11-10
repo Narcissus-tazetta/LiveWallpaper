@@ -1452,7 +1452,7 @@ extension WallpaperModel {
     /// Every stored preference value as text, so a video named in any preference key counts as in
     /// use.
     func preferencesProtectedText() -> String {
-        UserDefaults.standard.dictionaryRepresentation().description
+        StorageUsage.preferencesProtectedText()
     }
 
     func autoCleanOrphansAndExpiredBackups(now: Date = Date()) {

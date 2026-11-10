@@ -270,6 +270,47 @@ final class StorageUsageTests: XCTestCase {
         XCTAssertEqual(orphans.map(\.stem), ["wallpaper-GONE"])
     }
 
+    func testCleanupPreservesVideosRegisteredInOtherPreferenceDomains() throws {
+        let directory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: directory) }
+        let domains = (0 ..< 2).map { "storage-review-\(UUID().uuidString)-\($0)" }
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "storage-review-\(UUID())"))
+        defer { for name in domains {
+            defaults.removePersistentDomain(forName: name)
+        } }
+        let old = Date().addingTimeInterval(-10 * 86400)
+        let names = ["installed", "development", "orphan"]
+        for name in names {
+            let file = directory.appendingPathComponent("\(name).mp4")
+            try Data(name.utf8).write(to: file)
+            try fileManager.setAttributes([.modificationDate: old], ofItemAtPath: file.path)
+        }
+        for (domain, name) in zip(domains, names) {
+            defaults.setPersistentDomain(
+                [PrefsKey
+                    .libraryVideoPaths: [directory.appendingPathComponent("\(name).mp4").path]],
+                forName: domain
+            )
+        }
+        let orphans = StorageUsage.findOrphanVideos(
+            in: directory,
+            referencedVideoPaths: [],
+            protectedText: StorageUsage.preferencesProtectedText(
+                defaults: defaults, domainNames: domains
+            ),
+            olderThanDays: 7
+        )
+        XCTAssertEqual(orphans.map(\.stem), ["orphan"])
+        try StorageUsage.deleteOrphans(orphans)
+        XCTAssertTrue(fileManager
+            .fileExists(atPath: directory.appendingPathComponent("installed.mp4").path))
+        XCTAssertTrue(fileManager
+            .fileExists(atPath: directory.appendingPathComponent("development.mp4").path))
+        XCTAssertFalse(fileManager
+            .fileExists(atPath: directory.appendingPathComponent("orphan.mp4").path))
+    }
+
     func testFindExpiredAuthorSettingsBackups() throws {
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let backupsDir = tempDir.appendingPathComponent("AuthorSettingsBackups")

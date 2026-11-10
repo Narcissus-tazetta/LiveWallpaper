@@ -1,6 +1,16 @@
 import Foundation
 
 enum StorageUsage {
+    static func preferencesProtectedText(
+        defaults: UserDefaults = .standard,
+        domainNames: [String] = ["com.sakana.livewallpaper", "LiveWallpaper"]
+    ) -> String {
+        // Installed and source builds share the video folder but have separate preferences.
+        let domains = domainNames.compactMap { defaults.persistentDomain(forName: $0) }
+            + [defaults.dictionaryRepresentation()]
+        return domains.map(\.description).joined(separator: "\n")
+    }
+
     /// 2 GiB headroom required in addition to estimated export size.
     static let bakeHeadroomBytes: Int64 = 2 * 1024 * 1024 * 1024
 
