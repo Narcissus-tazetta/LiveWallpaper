@@ -25,7 +25,7 @@ extension WallpaperModel {
         guard autoSwitchIntervalMinutes > 0 else {
             return
         }
-        let interval = TimeInterval(autoSwitchIntervalMinutes * 60)
+        let interval = TimeInterval(autoSwitchIntervalMinutes) * 60
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.autoSwitchTimerFired()
