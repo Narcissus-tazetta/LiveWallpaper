@@ -315,6 +315,8 @@ final class PackageExporter {
             return VideoSnapshot(url: videoURL, hasScene: false, wasBaked: false)
         }
         let document = SceneScriptPermissions.restored(loaded, path: videoPath)
+        let settings = try LocalWebSettings.loadScene(videoPath: videoPath)
+        let userProperties = settings.values.isEmpty ? nil : settings.values
         // Its video predates the edits, and baking would run scripts nobody allowed.
         if document.hasUnapprovedScripts, SceneStore.isNewerThanVideo(videoPath: videoPath) {
             throw ExportError.sceneAwaitingScriptApproval(String(
@@ -335,6 +337,7 @@ final class PackageExporter {
         if bakes {
             try await SceneVideoBaker.bake(
                 document: document, videoPath: videoURL.path,
+                userProperties: userProperties,
                 quality: BakeQuality.maximum.compressionQuality, to: videoURL,
                 progress: progress
             )
@@ -370,6 +373,8 @@ final class PackageExporter {
             )
         }
         let document = SceneScriptPermissions.restored(loaded, path: videoPath)
+        let settings = try LocalWebSettings.loadScene(videoPath: videoPath)
+        let userProperties = settings.values.isEmpty ? nil : settings.values
         // Baking would run scripts nobody allowed, so the old video is all there is to share.
         guard !document.hasUnapprovedScripts else {
             return try await copyOriginalVideo(
@@ -384,6 +389,7 @@ final class PackageExporter {
         }
         try await SceneVideoBaker.bake(
             document: document, videoPath: videoPath,
+            userProperties: userProperties,
             quality: BakeQuality.maximum.compressionQuality, to: outputURL,
             progress: progress
         )

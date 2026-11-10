@@ -286,15 +286,20 @@ extension GLTFAsset {
         ) throws -> (offset: Int, stride: Int) {
             let stride = views[viewIndex].byteStride ?? elementSize
             let offset = accessor.byteOffset ?? 0
-            // An accessor's count is its element count, not a collection's size.
-            // swiftlint:disable:next empty_count
-            let hasNoElements = accessor.count == 0
-            let lastElementEnd = offset + stride * (accessor.count - 1) + elementSize
             guard (elementSize ... 256).contains(stride), (0 ... bytes.count).contains(offset),
-                  accessor.count <= bytes.count,
-                  hasNoElements || lastElementEnd <= bytes.count
+                  accessor.count <= bytes.count
             else {
                 throw ReadError(detail: "accessor \(index) runs past its buffer view")
+            }
+            // Bound the multiplication by the available bytes before computing any element offsets.
+            // swiftlint:disable:next empty_count
+            if accessor.count > 0 {
+                let remaining = bytes.count - offset
+                guard elementSize <= remaining,
+                      accessor.count - 1 <= (remaining - elementSize) / stride
+                else {
+                    throw ReadError(detail: "accessor \(index) runs past its buffer view")
+                }
             }
             return (offset, stride)
         }

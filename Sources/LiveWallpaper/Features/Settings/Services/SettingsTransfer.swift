@@ -233,8 +233,36 @@ enum SettingsTransfer {
         _ snapshot: SettingsSnapshot,
         to model: WallpaperModel
     ) {
+        applyVideoAssignments(snapshot, to: model)
+        applyScreenOptions(snapshot, to: model)
+        guard let presentations = snapshot.wallpaperPresentationByPath else { return }
+        for (path, byScreen) in model.wallpaperPresentationByPath {
+            for screenID in byScreen.keys where presentations[path]?[screenID] == nil {
+                model.clearWallpaperPresentation(path: path, screenID: screenID)
+            }
+        }
+        for (path, byScreen) in presentations {
+            for (screenID, presentation) in byScreen {
+                model.setWallpaperPresentation(
+                    fitMode: presentation.fitMode,
+                    zoom: presentation.zoom,
+                    offsetX: presentation.offsetX,
+                    offsetY: presentation.offsetY,
+                    path: path,
+                    screenID: screenID
+                )
+            }
+        }
+    }
+
+    private static func applyVideoAssignments(
+        _ snapshot: SettingsSnapshot,
+        to model: WallpaperModel
+    ) {
         if let overrides = snapshot.videoOverrideByScreenID {
-            // setVideoOverride 側でファイルの存在確認と永続化が行われる。
+            for screenID in Set(model.videoOverrideByScreenID.keys).subtracting(overrides.keys) {
+                model.setVideoOverride(path: nil, forScreenID: screenID)
+            }
             for (screenID, path) in overrides {
                 model.setVideoOverride(path: path, forScreenID: screenID)
             }
@@ -243,8 +271,9 @@ enum SettingsTransfer {
             model.setSpaceWallpaperFeatureEnabled(value)
         }
         if let spaceVideos = snapshot.videoBySpaceUUID {
-            // setSpaceVideo 側でファイルの存在確認と永続化が行われる。
-            // 別Macからのインポートでは Space uuid が一致せず単に不発になる。
+            for uuid in Set(model.videoBySpaceUUID.keys).subtracting(spaceVideos.keys) {
+                model.setSpaceVideo(path: nil, forSpaceUUID: uuid)
+            }
             for (uuid, path) in spaceVideos {
                 model.setSpaceVideo(path: path, forSpaceUUID: uuid)
             }
@@ -252,12 +281,23 @@ enum SettingsTransfer {
         if let value = snapshot.menuBarSpaceNumberEnabled {
             model.setMenuBarSpaceNumberEnabled(value)
         }
+    }
+
+    private static func applyScreenOptions(_ snapshot: SettingsSnapshot, to model: WallpaperModel) {
         if let suspendDisabled = snapshot.suspendDisabledDisplayIDs {
+            for screenID in model.suspendDisabledDisplayIDs.subtracting(suspendDisabled) {
+                model.setSuspendDisabled(false, forScreenID: screenID)
+            }
             for screenID in suspendDisabled {
                 model.setSuspendDisabled(true, forScreenID: screenID)
             }
         }
         if let screenPlaylists = snapshot.screenPlaylistByScreenID {
+            for screenID in Set(model.screenPlaylistByScreenID.keys)
+                .subtracting(screenPlaylists.keys)
+            {
+                model.setScreenPlaylist(nil, forScreenID: screenID, autoAssignFirstVideo: false)
+            }
             for (screenID, rawUUID) in screenPlaylists {
                 if let playlistID = UUID(uuidString: rawUUID) {
                     // インポートは非対話的な適用なので、動画の割り当て(上の
@@ -269,22 +309,6 @@ enum SettingsTransfer {
                         autoAssignFirstVideo: false
                     )
                 }
-            }
-        }
-        guard let presentations = snapshot.wallpaperPresentationByPath else {
-            return
-        }
-        // setWallpaperPresentation を経由することで clamp と永続化を既存経路に任せる。
-        for (path, byScreen) in presentations {
-            for (screenID, presentation) in byScreen {
-                model.setWallpaperPresentation(
-                    fitMode: presentation.fitMode,
-                    zoom: presentation.zoom,
-                    offsetX: presentation.offsetX,
-                    offsetY: presentation.offsetY,
-                    path: path,
-                    screenID: screenID
-                )
             }
         }
     }

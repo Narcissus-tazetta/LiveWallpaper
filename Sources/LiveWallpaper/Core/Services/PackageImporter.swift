@@ -516,42 +516,16 @@ final class PackageImporter: @unchecked Sendable {
             throw ImportError.invalidPackageFormat
         }
 
-        var eocdOffsetInTail: Int?
-        let sig: [UInt8] = [0x50, 0x4B, 0x05, 0x06]
-        if tailData.count >= 22 {
-            for i in stride(from: tailData.count - 22, through: 0, by: -1) {
-                if tailData[i] == sig[0], tailData[i + 1] == sig[1], tailData[i + 2] == sig[2],
-                   tailData[i + 3] == sig[3]
-                {
-                    eocdOffsetInTail = i
-                    break
-                }
-            }
-        }
-        guard let eocdOffsetInTail else {
-            throw ImportError.invalidPackageFormat
-        }
+        let eocdOffsetInTail = try zipEndOffset(in: tailData)
 
         let eocd = tailData.subdata(in: eocdOffsetInTail ..< tailData.count)
         guard eocd.count >= 22 else { throw ImportError.invalidPackageFormat }
 
-        let totalEntries = Int(readUInt16(from: eocd, at: 10))
-        let cdSize = UInt64(readUInt32(from: eocd, at: 12))
-        let cdOffset = UInt64(readUInt32(from: eocd, at: 16))
-
-        guard totalEntries <= limits.maximumEntryCount else {
-            throw ImportError.excessiveEntryCount(totalEntries, max: limits.maximumEntryCount)
-        }
-        guard cdOffset + cdSize <= UInt64(archiveSize) else {
-            throw ImportError.invalidPackageFormat
-        }
-
-        try fileHandle.seek(toOffset: cdOffset)
-        guard let cdData = try fileHandle.read(upToCount: Int(cdSize)),
-              cdData.count == Int(cdSize)
-        else {
-            throw ImportError.invalidPackageFormat
-        }
+        let (cdData, totalEntries) = try readZipDirectory(
+            fileHandle: fileHandle, archiveSize: UInt64(archiveSize), eocd: eocd,
+            eocdOffset: UInt64(archiveSize) - searchSize + UInt64(eocdOffsetInTail),
+            limits: limits
+        )
 
         var offset = 0
         var totalUncompressed: Int64 = 0
@@ -561,7 +535,7 @@ final class PackageImporter: @unchecked Sendable {
             let headerSig = readUInt32(from: cdData, at: offset)
             guard headerSig == 0x0201_4B50 else { throw ImportError.invalidPackageFormat }
 
-            let uncompressedSize = UInt64(readUInt32(from: cdData, at: offset + 24))
+            let legacySize = readUInt32(from: cdData, at: offset + 24)
             let filenameLen = Int(readUInt16(from: cdData, at: offset + 28))
             let extraLen = Int(readUInt16(from: cdData, at: offset + 30))
             let commentLen = Int(readUInt16(from: cdData, at: offset + 32))
@@ -573,8 +547,13 @@ final class PackageImporter: @unchecked Sendable {
             }
 
             let nameStart = offset + 46
-            guard nameStart + filenameLen <= cdData.count
-            else { throw ImportError.invalidPackageFormat }
+            let extraStart = nameStart + filenameLen
+            let entryEnd = extraStart + extraLen + commentLen
+            guard entryEnd <= cdData.count else { throw ImportError.invalidPackageFormat }
+            let uncompressedSize = try zipUncompressedSize(
+                legacySize: legacySize,
+                extra: cdData.subdata(in: extraStart ..< extraStart + extraLen)
+            )
             let nameData = cdData
                 .subdata(in: (cdData.startIndex + nameStart) ..<
                     (cdData.startIndex + nameStart + filenameLen))
@@ -588,15 +567,17 @@ final class PackageImporter: @unchecked Sendable {
                 throw ImportError.unsafeFileReference(name)
             }
 
-            totalUncompressed += Int64(uncompressedSize)
-            guard totalUncompressed <= limits.maximumExtractedBytes else {
+            guard uncompressedSize <= UInt64(limits.maximumExtractedBytes - totalUncompressed)
+            else {
+                let total = totalUncompressed
+                    .addingReportingOverflow(Int64(clamping: uncompressedSize))
                 throw ImportError.extractedSizeTooLarge(
-                    totalUncompressed,
+                    total.overflow ? Int64.max : total.partialValue,
                     max: limits.maximumExtractedBytes
                 )
             }
-
-            offset = nameStart + filenameLen + extraLen + commentLen
+            totalUncompressed += Int64(uncompressedSize)
+            offset = entryEnd
         }
 
         guard offset == cdData.count else {
@@ -607,6 +588,92 @@ final class PackageImporter: @unchecked Sendable {
             totalEntries: totalEntries,
             totalUncompressedBytes: totalUncompressed
         )
+    }
+
+    private static func zipEndOffset(in tail: Data) throws -> Int {
+        guard tail.count >= 22 else { throw ImportError.invalidPackageFormat }
+        for offset in stride(from: tail.count - 22, through: 0, by: -1) {
+            if readUInt32(from: tail, at: offset) == 0x0605_4B50,
+               offset + 22 + Int(readUInt16(from: tail, at: offset + 20)) == tail.count
+            {
+                return offset
+            }
+        }
+        throw ImportError.invalidPackageFormat
+    }
+
+    private static func readZipDirectory(
+        fileHandle: FileHandle,
+        archiveSize: UInt64,
+        eocd: Data,
+        eocdOffset: UInt64,
+        limits: Limits
+    ) throws -> (Data, Int) {
+        func read(at offset: UInt64, count: Int) throws -> Data {
+            guard offset <= archiveSize, UInt64(count) <= archiveSize - offset else {
+                throw ImportError.invalidPackageFormat
+            }
+            try fileHandle.seek(toOffset: offset)
+            guard let data = try fileHandle.read(upToCount: count), data.count == count else {
+                throw ImportError.invalidPackageFormat
+            }
+            return data
+        }
+        guard readUInt16(from: eocd, at: 4) == 0, readUInt16(from: eocd, at: 6) == 0,
+              readUInt16(from: eocd, at: 8) == readUInt16(from: eocd, at: 10)
+        else { throw ImportError.invalidPackageFormat }
+        var count = UInt64(readUInt16(from: eocd, at: 10))
+        var size = UInt64(readUInt32(from: eocd, at: 12))
+        var offset = UInt64(readUInt32(from: eocd, at: 16))
+        if count == 0xFFFF || size == 0xFFFF_FFFF || offset == 0xFFFF_FFFF {
+            guard eocdOffset >= 20 else { throw ImportError.invalidPackageFormat }
+            let locator = try read(at: eocdOffset - 20, count: 20)
+            guard readUInt32(from: locator, at: 0) == 0x0706_4B50,
+                  readUInt32(from: locator, at: 4) == 0,
+                  readUInt32(from: locator, at: 16) == 1
+            else { throw ImportError.invalidPackageFormat }
+            let record = try read(at: readUInt64(from: locator, at: 8), count: 56)
+            guard readUInt32(from: record, at: 0) == 0x0606_4B50,
+                  readUInt64(from: record, at: 4) >= 44,
+                  readUInt32(from: record, at: 16) == 0,
+                  readUInt32(from: record, at: 20) == 0,
+                  readUInt64(from: record, at: 24) == readUInt64(from: record, at: 32)
+            else { throw ImportError.invalidPackageFormat }
+            count = readUInt64(from: record, at: 32)
+            size = readUInt64(from: record, at: 40)
+            offset = readUInt64(from: record, at: 48)
+        }
+        guard count <= UInt64(limits.maximumEntryCount) else {
+            throw ImportError.excessiveEntryCount(
+                Int(clamping: count),
+                max: limits.maximumEntryCount
+            )
+        }
+        // The exporter uses short generated names; a giant directory must not size an allocation.
+        guard size <= 32 * 1024 * 1024 else { throw ImportError.invalidPackageFormat }
+        return try (read(at: offset, count: Int(size)), Int(count))
+    }
+
+    private static func zipUncompressedSize(legacySize: UInt32, extra: Data) throws -> UInt64 {
+        guard legacySize == UInt32.max else { return UInt64(legacySize) }
+        var offset = 0
+        while offset + 4 <= extra.count {
+            let tag = readUInt16(from: extra, at: offset)
+            let length = Int(readUInt16(from: extra, at: offset + 2))
+            let start = offset + 4
+            guard length <= extra.count - start else { throw ImportError.invalidPackageFormat }
+            if tag == 1 {
+                guard length >= 8 else { throw ImportError.invalidPackageFormat }
+                return readUInt64(from: extra, at: start)
+            }
+            offset = start + length
+        }
+        throw ImportError.invalidPackageFormat
+    }
+
+    private static func readUInt64(from data: Data, at offset: Int) -> UInt64 {
+        UInt64(readUInt32(from: data, at: offset))
+            | (UInt64(readUInt32(from: data, at: offset + 4)) << 32)
     }
 
     private static func readUInt16(from data: Data, at offset: Int) -> UInt16 {

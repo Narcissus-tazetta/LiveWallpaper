@@ -58,6 +58,8 @@ extension WallpaperModel {
             $currentVideoPath.map { _ in () }.eraseToAnyPublisher(),
             $wallpaperKind.map { _ in () }.eraseToAnyPublisher(),
             $videoOverrideByScreenID.map { _ in () }.eraseToAnyPublisher(),
+            $webOverrideByScreenID.map { _ in () }.eraseToAnyPublisher(),
+            $webWallpaperFeatureEnabled.map { _ in () }.eraseToAnyPublisher(),
             $videoBySpaceUUID.map { _ in () }.eraseToAnyPublisher(),
             $currentSpaceUUIDByDisplayID.map { _ in () }.eraseToAnyPublisher(),
             $spaceWallpaperFeatureEnabled.map { _ in () }.eraseToAnyPublisher(),
@@ -139,9 +141,7 @@ extension WallpaperModel {
         }
     }
 
-    /// The chosen video on every display, or else what each display shows right now.
-    /// Web wallpapers cannot be played by the saver, so while one is active (and no
-    /// video is chosen) the config lists nothing and the saver says so.
+    /// Web displays have no saver video; a separately chosen saver video overrides every display.
     func makeScreenSaverConfig() -> ScreenSaverConfig {
         if let chosen = Self.validatedVideoPath(screenSaverVideoPath) {
             var displays: [String: ScreenSaverConfig.Display] = [:]
@@ -154,20 +154,26 @@ extension WallpaperModel {
             )
             return ScreenSaverConfig(displays: displays, fallback: fallback)
         }
-        guard !isWebWallpaperActive else {
-            return ScreenSaverConfig(displays: [:], fallback: nil)
-        }
         var displays: [String: ScreenSaverConfig.Display] = [:]
+        var excluded = Set<String>()
         for screen in displayScreens {
-            let path = resolvedSavedOverridePath(forScreenID: screen.id) ?? currentVideoPath
+            if hasWebOverride(forScreenID: screen.id) {
+                excluded.insert(screen.id)
+                continue
+            }
+            let path = resolvedSavedOverridePath(forScreenID: screen.id)
+                ?? (isWebWallpaperActive ? nil : currentVideoPath)
             if let path, let display = screenSaverDisplay(path: path, screenID: screen.id) {
                 displays[screen.id] = display
             }
         }
-        let fallback = currentVideoPath.flatMap { path in
+        let fallback = (isWebWallpaperActive ? nil : currentVideoPath).flatMap { path in
             screenSaverDisplay(path: path, screenID: displayScreens.first?.id ?? "main")
         }
-        return ScreenSaverConfig(displays: displays, fallback: fallback)
+        return ScreenSaverConfig(
+            displays: displays, fallback: fallback,
+            excludedDisplayIDs: excluded.isEmpty ? nil : excluded
+        )
     }
 
     private func screenSaverDisplay(path: String, screenID: String) -> ScreenSaverConfig.Display? {

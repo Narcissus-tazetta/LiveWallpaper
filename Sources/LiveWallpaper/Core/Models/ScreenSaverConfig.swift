@@ -22,13 +22,15 @@ struct ScreenSaverConfig: Codable, Equatable {
         var loopStart: Double?
     }
 
-    var formatVersion: Int = 1
+    var formatVersion: Int = 2
     /// Keyed by CGDirectDisplayID in decimal, the same key the app uses per screen.
     var displays: [String: Display]
     /// For screens that are not in `displays` (connected after the file was written).
     var fallback: Display?
+    /// A Web display must not inherit the fallback video intended for newly connected displays.
+    var excludedDisplayIDs: Set<String>?
 
-    static let currentFormatVersion = 1
+    static let currentFormatVersion = 2
 
     /// `home` must be the real user home: inside the screen saver sandbox
     /// NSHomeDirectory() points at the host's container instead.
@@ -41,6 +43,7 @@ struct ScreenSaverConfig: Codable, Equatable {
     }
 
     func display(forDisplayID displayID: String?) -> Display? {
-        displayID.flatMap { displays[$0] } ?? fallback
+        if let displayID, excludedDisplayIDs?.contains(displayID) == true { return nil }
+        return displayID.flatMap { displays[$0] } ?? fallback
     }
 }

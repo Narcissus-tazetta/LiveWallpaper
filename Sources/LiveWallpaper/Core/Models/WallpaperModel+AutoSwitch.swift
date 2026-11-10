@@ -25,7 +25,7 @@ extension WallpaperModel {
         guard autoSwitchIntervalMinutes > 0 else {
             return
         }
-        let interval = TimeInterval(autoSwitchIntervalMinutes * 60)
+        let interval = TimeInterval(autoSwitchIntervalMinutes) * 60
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.autoSwitchTimerFired()
@@ -60,7 +60,8 @@ extension WallpaperModel {
         // その選択と競合しないよう抑制する(ルール自体を無効化はしない)。
         guard Self.matchingScheduleRule(
             in: scheduleRules, scope: .shared, now: scheduleNowProvider(),
-            appearance: scheduleAppearanceProvider(), location: scheduleLocation
+            appearance: scheduleAppearanceProvider(),
+            focusFilterEnabled: focusFilterIntegrationEnabled, location: scheduleLocation
         ) == nil else {
             return
         }
