@@ -192,7 +192,9 @@ final class SceneScriptModuleTests: XCTestCase {
     }
 
     func testModuleStartMayTakeLongerThanAFrame() throws {
-        let work = "let x=0; for(let i=0;i<300000;i++) x+=i%7;"
+        // Sized to pass a frame's budget several times over on an optimized interpreter
+        // while staying far inside the module start's.
+        let work = "let x=0; for(let i=0;i<3000000;i++) x+=i%7;"
         let document = scene(source: "\(work) export function update(c){return [];}", modules: [:])
         let evaluator = SceneFrameEvaluator()
         let start = ProcessInfo.processInfo.systemUptime

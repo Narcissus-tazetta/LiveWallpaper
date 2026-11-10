@@ -88,8 +88,10 @@ let package = Package(
                 // 64-to-32-bit narrowing warnings would bury ours.
                 .unsafeFlags(["-Wno-shorten-64-to-32"]),
                 // SwiftPM's release default for C is -Os; the interpreter loop runs
-                // scene scripts about 7% faster at -O2, with identical results.
-                .unsafeFlags(["-O2"], .when(configuration: .release))
+                // scene scripts about 7% faster at -O2, with identical results. Debug
+                // builds get it too: at -O0 large scenes' scripts run out of their
+                // time budget, which the shipped app never does.
+                .unsafeFlags(["-O2"])
             ]
         ),
         .executableTarget(
