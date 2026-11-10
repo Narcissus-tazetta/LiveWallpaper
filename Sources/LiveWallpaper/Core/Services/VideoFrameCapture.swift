@@ -24,13 +24,11 @@ enum VideoFrameCapture {
     private static var entriesByPath: [String: Entry] = [:]
     private static var evictionWorkItem: DispatchWorkItem?
 
-    /// This runs synchronously on the main thread right as the wallpaper gets
-    /// covered, so it must stay cheap. A zero tolerance forces AVFoundation to
-    /// decode every frame from the preceding sync sample up to the exact
-    /// requested time, which can be a long stall on a long GOP. A ~1s window
-    /// lets it snap to the nearest sync sample instead — imperceptible here
-    /// since the frozen still is only shown while another app already covers
-    /// the screen.
+    /// The still replaces the live frame the user last saw, so it must be that exact
+    /// frame: any tolerance snaps to a nearby sync sample and the wallpaper visibly
+    /// jumps back (up to ~1s) when it is covered or uncovered. The cost is decoding
+    /// from the preceding sync sample on the main thread, measured at ~0.1s worst
+    /// case on ordinary GOPs.
     /// Building the generator means opening the file and parsing its container,
     /// which dwarfs the single-frame decode that follows. Captures come in
     /// bursts — one per display on a Space switch, and repeatedly as the user
@@ -75,9 +73,8 @@ enum VideoFrameCapture {
             // Earlier systems keep SDR: they have no per-layer switch to turn it back off.
             generator.dynamicRangePolicy = .matchSource
         }
-        let tolerance = CMTime(seconds: 1, preferredTimescale: 600)
-        generator.requestedTimeToleranceBefore = tolerance
-        generator.requestedTimeToleranceAfter = tolerance
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
 
         guard let image = try? generator.copyCGImage(at: time, actualTime: nil) else {
             // デコード失敗時はキャッシュに載せない(欠落パスの生成器で有効枠を潰さない)。
