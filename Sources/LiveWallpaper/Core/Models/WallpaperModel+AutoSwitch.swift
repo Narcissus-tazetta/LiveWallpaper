@@ -60,7 +60,8 @@ extension WallpaperModel {
         // その選択と競合しないよう抑制する(ルール自体を無効化はしない)。
         guard Self.matchingScheduleRule(
             in: scheduleRules, scope: .shared, now: scheduleNowProvider(),
-            appearance: scheduleAppearanceProvider(), location: scheduleLocation
+            appearance: scheduleAppearanceProvider(),
+            focusFilterEnabled: focusFilterIntegrationEnabled, location: scheduleLocation
         ) == nil else {
             return
         }
