@@ -95,6 +95,69 @@ final class LightweightProxyPlaybackTests: XCTestCase {
         (player.currentItem?.asset as? AVURLAsset)?.url
     }
 
+    func testWebSharedWallpaperKeepsDedicatedVideoQualitySwitchingIndependent() async throws {
+        let root = try directory()
+        let video = root.appendingPathComponent("dedicated.mp4")
+        try await fixture(video)
+        let cache = LightweightProxyCache(rootDirectory: root.appendingPathComponent("cache"))
+        let saved = [PrefsKey.lightweightMode, PrefsKey.batteryPlaybackPolicy]
+            .map { ($0, UserDefaults.standard.object(forKey: $0)) }
+        let model = WallpaperModel(lightweightProxyCache: cache)
+        defer {
+            model.stopAllPlayers()
+            model.stopAllDedicatedPlayers()
+            cache.cancelActiveGeneration()
+            cache.flushMetadataImmediately()
+            for (key, value) in saved {
+                if let value { UserDefaults.standard.set(value, forKey: key) }
+                else { UserDefaults.standard.removeObject(forKey: key) }
+            }
+        }
+        model.lightweightMode = false
+        model.isOnBatteryPower = false
+        model.dedicatedPlaybackContinuityEnabled = false
+        cache.initializationState = .loading
+        model.stopAllPlayers()
+        let web = try WebWallpaperSource(url: XCTUnwrap(URL(string: "https://example.invalid/")))
+        model.webWallpaperSources = [web]
+        model.currentWebWallpaperID = web.id
+        model.wallpaperKind = .web
+        model.currentVideoPath = video.path
+        let original = model.ensureDedicatedPlayer(forScreenID: "web-quality", path: video.path)
+        try await waitUntil { original.currentItem?.status == .readyToPlay }
+        XCTAssertEqual(assetURL(original), video)
+        func activeURL() -> URL? {
+            guard let player = model.dedicatedSlotsByScreenID["web-quality"]?[video.path]?.player,
+                  player.currentItem?.status == .readyToPlay else { return nil }
+            return assetURL(player)
+        }
+
+        model.setLightweightMode(true)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        let request = try XCTUnwrap(cache.pendingGenerationRequests.first)
+        XCTAssertEqual(request.path, video.path)
+        cache.initializationState = .idle
+        cache.ensureInitialized()
+        try await waitUntil(timeout: 40) { cache.cachedProxyURL(for: video.path) != nil }
+        let proxy = try XCTUnwrap(cache.cachedProxyURL(for: video.path))
+        try await waitUntil { activeURL() == proxy }
+        XCTAssertNil(
+            model.sharedPlayer?.currentItem,
+            "the video fallback must stay stopped behind Web"
+        )
+        XCTAssertTrue(model.isWebWallpaperActive)
+
+        model.setLightweightMode(false)
+        try await waitUntil { activeURL() == video }
+        model.isOnBatteryPower = true
+        model.setBatteryPlaybackPolicy(.reduceLoad)
+        try await waitUntil { activeURL() == proxy }
+        model.setBatteryPlaybackPolicy(.normal)
+        try await waitUntil { activeURL() == video }
+        XCTAssertNil(model.sharedPlayer?.currentItem)
+        XCTAssertTrue(model.isWebWallpaperActive)
+    }
+
     func testTwoDedicatedVideosGenerateAndSwapWhilePreservingPauseAndPlayback() async throws {
         let root = try directory()
         let first = root.appendingPathComponent("first.mp4"),

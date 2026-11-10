@@ -157,6 +157,64 @@ final class ScenePresetTests: XCTestCase {
 
     // MARK: - Trial and the model
 
+    func testCustomParticlePresetRetainsImagesAcrossReloadAndApplication() throws {
+        let texture = try writeImage(videoPath: video.path)
+        let childTexture = try writeImage(videoPath: video.path)
+        let normal = try writeImage(videoPath: video.path)
+        let pattern = try writeImage(videoPath: video.path)
+        let timeOffset = try writeImage(videoPath: video.path)
+        let graphImage = try writeImage(videoPath: video.path)
+        var system = SceneParticleSystem()
+        system.textureFile = texture
+        system.refraction = .init(normalFile: normal)
+        var child = SceneParticleSystem()
+        child.textureFile = childTexture
+        system.children = [.init(trigger: .start, system: .init(child))]
+        let particles = SceneLayer(name: "custom", particleSystem: system)
+        var image = scene.layers[0]
+        var effect = SceneEffect(kind: .waves)
+        effect.patternFile = pattern
+        effect.timeOffsetFile = timeOffset
+        effect.renderGraph = SceneRenderGraph(
+            targets: [], passes: [], output: "input", images: ["lookup": graphImage]
+        )
+        image.effects = [effect]
+        let captured = ScenePreset.capture(
+            name: "custom", layer: image, particleLayers: [particles], includingPaint: true
+        )
+        let store = try XCTUnwrap(model.scenePresetStore)
+        try store.save(captured, filesFrom: SceneStore.folderURL(forVideoPath: video.path))
+        let restored = try XCTUnwrap(store.loadAll().presets.first)
+        XCTAssertEqual(restored.particleLayers.count, 1)
+        let expected = Set([texture, childTexture, normal, pattern, timeOffset, graphImage])
+        XCTAssertEqual(restored.referencedFiles, expected)
+
+        let destination = directory.appendingPathComponent("destination.scene")
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        let names = try store.copyFiles(of: restored, into: destination)
+        let applied = try XCTUnwrap(restored.applied(
+            to: scene, layerID: image.id, fileNames: names
+        )).document
+        let appliedSystem = try XCTUnwrap(applied.layers.last?.particleSystem)
+        XCTAssertEqual(appliedSystem.textureFile, names[texture])
+        XCTAssertEqual(appliedSystem.refraction?.normalFile, names[normal])
+        XCTAssertEqual(appliedSystem.children.first?.system.value.textureFile, names[childTexture])
+        XCTAssertEqual(applied.layers[0].effects[0].patternFile, names[pattern])
+        XCTAssertEqual(applied.layers[0].effects[0].timeOffsetFile, names[timeOffset])
+        XCTAssertEqual(
+            applied.layers[0].effects[0].renderGraph?.images["lookup"],
+            names[graphImage]
+        )
+        for name in expected {
+            let copied = try XCTUnwrap(names[name])
+            XCTAssertNotEqual(copied, name)
+            XCTAssertEqual(
+                try Data(contentsOf: destination.appendingPathComponent(copied)),
+                try Data(contentsOf: store.folderURL(of: captured.id).appendingPathComponent(name))
+            )
+        }
+    }
+
     func testTrialLeavesTheSceneAndApplyIsOneUndoStep() {
         let before = scene
         let layerID = scene.layers[0].id

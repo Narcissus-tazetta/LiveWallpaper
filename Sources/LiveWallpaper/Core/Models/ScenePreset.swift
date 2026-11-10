@@ -70,20 +70,15 @@ struct ScenePreset: Codable, Equatable, Identifiable {
             default: []
         )
         .compactMap(\.value)
-        .filter { $0.kind == .particles && $0.particles != nil }
+        .filter { $0.kind == .particles && ($0.particles != nil || $0.particleSystem != nil) }
         includesPaint = container.decodeLenient(Bool.self, forKey: .includesPaint, default: false)
     }
 
     /// Files a stored preset keeps next to its preset.json.
     var referencedFiles: Set<String> {
-        var files = Set<String>()
+        var files = SceneStore.assetFiles(of: particleLayers)
         for item in effects {
-            files.formUnion([item.effect.maskFile, item.effect.flowFile].compactMap { $0 })
-        }
-        for layer in particleLayers {
-            if let maskFile = layer.particles?.maskFile {
-                files.insert(maskFile)
-            }
+            files.formUnion(item.effect.referencedFiles)
         }
         return files
     }
@@ -209,7 +204,7 @@ extension ScenePreset {
         var steps: [ScenePresetStep] = []
 
         layer.effects = effects.map { item in
-            var effect = item.effect
+            var effect = item.effect.remappingFiles(fileNames)
             // Fresh ids: the same preset can be applied to several layers, and the
             // editor finds effects and pins by id.
             effect.id = UUID()
@@ -218,8 +213,6 @@ extension ScenePreset {
                 copy.id = UUID()
                 return copy
             }
-            effect.maskFile = effect.maskFile.flatMap { fileNames[$0] }
-            effect.flowFile = effect.flowFile.flatMap { fileNames[$0] }
             if item.wantsMask, effect.maskFile == nil {
                 steps.append(.paintMask(effectID: effect.id, kind: effect.kind))
             }
@@ -248,6 +241,12 @@ extension ScenePreset {
         let added = particleLayers.map { template in
             var copy = template.duplicated(name: template.name)
             copy.particles?.maskFile = template.particles?.maskFile.flatMap { fileNames[$0] }
+            copy.particleSystem = template.particleSystem?.remappingFiles(fileNames)
+            copy.effects = copy.effects.map { $0.remappingFiles(fileNames) }
+            copy.renderGraph?.images = template.renderGraph?.images
+                .compactMapValues { fileNames[$0] } ?? [:]
+            copy.depthFile = template.depthFile.flatMap { fileNames[$0] }
+            copy.videoFile = template.videoFile.flatMap { fileNames[$0] }
             return copy
         }
         document.layers.insert(contentsOf: added, at: index + 1)

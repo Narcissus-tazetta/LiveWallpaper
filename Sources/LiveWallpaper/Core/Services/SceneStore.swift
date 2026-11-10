@@ -380,7 +380,8 @@ enum SceneStore {
     }
 
     private static func assetFiles(of document: SceneDocument) -> Set<String> {
-        var files = Set<String>()
+        var files = assetFiles(of: document.layers)
+        files.formUnion(document.finishing?.images.values.map { $0 } ?? [])
         for sound in document.sounds {
             files.formUnion(sound.files)
         }
@@ -389,7 +390,12 @@ enum SceneStore {
                 .formUnion(material.images.values
                     .filter { SceneModelRenderer.layerObjectID($0) == nil })
         }
-        for layer in document.layers {
+        return files
+    }
+
+    static func assetFiles(of layers: [SceneLayer]) -> Set<String> {
+        var files = Set<String>()
+        for layer in layers {
             if layer.kind == .image {
                 files.insert(layer.imageFile)
             }
@@ -405,13 +411,7 @@ enum SceneStore {
             if let graph = layer.renderGraph { files.formUnion(graph.images.values) }
             files.formUnion(layer.particleSystem?.textureFiles ?? [])
             for effect in layer.effects {
-                if let graph = effect.renderGraph { files.formUnion(graph.images.values) }
-                files.formUnion([
-                    effect.maskFile,
-                    effect.flowFile,
-                    effect.timeOffsetFile,
-                    effect.patternFile
-                ].compactMap { $0 })
+                files.formUnion(effect.referencedFiles)
             }
         }
         return files

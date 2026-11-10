@@ -47,7 +47,7 @@ extension WallpaperModel {
             switch result {
             case let .ready(proxyURL):
                 lightweightProxyStatesByPath[path] = .ready
-                if currentVideoPath == path, !isDeepSuspended {
+                if !isWebWallpaperActive, currentVideoPath == path, !isDeepSuspended {
                     let resumeTime = sharedPlayer?.currentTime() ?? .zero
                     reinstallPlayerItemContinuingPlayback(url: proxyURL, attach: true)
                     restorePlaybackPositionAfterProxySwap(resumeTime)

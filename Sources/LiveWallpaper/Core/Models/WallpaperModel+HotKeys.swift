@@ -6,13 +6,15 @@ import Foundation
 extension WallpaperModel {
     private static let hotKeysEnabledKey = "hotKeysEnabled"
     private static let hotKeyCombosKey = "hotKeyCombos"
+    private static let hotKeyDisabledActionsKey = "hotKeyDisabledActions"
 
-    /// 起動時の復元。保存済みの割り当てを読み込み、無い操作は既定値で埋める。
     func restoreHotKeysState() {
         hotKeysEnabled = UserDefaults.standard
             .object(forKey: Self.hotKeysEnabledKey) as? Bool ?? false
 
         var combos: [HotKeyAction: HotKeyCombo] = [:]
+        let disabledActions = Set(UserDefaults.standard
+            .stringArray(forKey: Self.hotKeyDisabledActionsKey) ?? [])
         if let decoded = UserDefaults.standard.decodedJSON(
             [String: HotKeyCombo].self, forKey: Self.hotKeyCombosKey
         ) {
@@ -25,6 +27,7 @@ extension WallpaperModel {
         // A newly added action does not take its default keys from an action the
         // user already assigned them to; it stays unassigned instead.
         for action in HotKeyAction.allCases where combos[action] == nil
+            && !disabledActions.contains(action.rawValue)
             && !combos.values.contains(action.defaultCombo)
         {
             combos[action] = action.defaultCombo
@@ -77,6 +80,11 @@ extension WallpaperModel {
             try UserDefaults.standard.set(
                 JSONEncoder().encode(encodable),
                 forKey: Self.hotKeyCombosKey
+            )
+            // Separate from the bindings JSON so older versions can still read assigned keys.
+            UserDefaults.standard.set(
+                HotKeyAction.allCases.filter { hotKeyCombos[$0] == nil }.map(\.rawValue),
+                forKey: Self.hotKeyDisabledActionsKey
             )
         } catch {
             recordPersistenceFailure(key: Self.hotKeyCombosKey, error: error)

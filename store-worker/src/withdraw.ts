@@ -1,7 +1,7 @@
 import type { Env } from "./env";
 import { errorResponse, jsonResponse } from "./http";
 import { checkRateLimit } from "./rate-limit";
-import { deleteEntryObjects } from "./storage";
+import { deleteEntryObjects, deleteEntryRecords } from "./storage";
 import { hashToken } from "./tokens";
 
 interface WithdrawRequest {
@@ -42,10 +42,7 @@ export async function handleWithdraw(request: Request, env: Env, id: string): Pr
 	// 認証済みの行を先に非公開化し、R2削除失敗時にも同じトークンで再試行可能にする。
 	await env.STORE_DB.prepare("UPDATE store_entries SET status = 'deletion_pending' WHERE id = ?").bind(id).run();
 	await deleteEntryObjects(env, row.object_key, row.thumbnail_key);
-	await env.STORE_DB.batch([
-		env.STORE_DB.prepare("DELETE FROM store_review_tokens WHERE entry_id = ?").bind(id),
-		env.STORE_DB.prepare("DELETE FROM store_entries WHERE id = ?").bind(id),
-	]);
+	await deleteEntryRecords(env, id);
 
 	return jsonResponse({ ok: true });
 }

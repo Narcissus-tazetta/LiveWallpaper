@@ -10,3 +10,11 @@ export async function deleteEntryObjects(env: Env, objectKey: string, thumbnailK
 		await env.STORE_BUCKET.delete(thumbnailKey);
 	}
 }
+
+export async function deleteEntryRecords(env: Env, id: string): Promise<void> {
+	await env.STORE_DB.batch([
+		env.STORE_DB.prepare("DELETE FROM store_reports WHERE entry_id = ?").bind(id),
+		env.STORE_DB.prepare("DELETE FROM store_review_tokens WHERE entry_id = ?").bind(id),
+		env.STORE_DB.prepare("DELETE FROM store_entries WHERE id = ?").bind(id),
+	]);
+}

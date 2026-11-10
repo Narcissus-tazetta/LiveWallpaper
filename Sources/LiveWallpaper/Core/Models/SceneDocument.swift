@@ -350,6 +350,21 @@ struct SceneEffect: Codable, Equatable, Identifiable {
 }
 
 extension SceneEffect {
+    var referencedFiles: Set<String> {
+        Set([maskFile, flowFile, timeOffsetFile, patternFile].compactMap { $0 })
+            .union(renderGraph?.images.values.map { $0 } ?? [])
+    }
+
+    func remappingFiles(_ names: [String: String]) -> SceneEffect {
+        var result = self
+        result.maskFile = maskFile.flatMap { names[$0] }
+        result.flowFile = flowFile.flatMap { names[$0] }
+        result.timeOffsetFile = timeOffsetFile.flatMap { names[$0] }
+        result.patternFile = patternFile.flatMap { names[$0] }
+        result.renderGraph?.images = renderGraph?.images.compactMapValues { names[$0] } ?? [:]
+        return result
+    }
+
     /// Travelling waves: phase = time × speed + (uv · direction) × scale, and the
     /// picture moves sideways by sin(phase)^exponent × amplitude².
     enum WaveKey {

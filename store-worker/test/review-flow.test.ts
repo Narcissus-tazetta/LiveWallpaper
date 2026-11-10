@@ -180,6 +180,85 @@ async function entryStatus(id: string): Promise<string | undefined> {
 }
 
 describe("store submission review flow", () => {
+	it("refuses a repeated submission without deleting the published package", async () => {
+		const id = crypto.randomUUID();
+		const objectKey = `packages/${id}.lwpkg`;
+		const bytes = new TextEncoder().encode("published package");
+		await env.STORE_BUCKET.put(objectKey, bytes);
+		await env.STORE_DB.prepare(
+			"INSERT INTO store_entries (id, title, author, object_key, sha256, size_bytes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		)
+			.bind(id, "Published", "Author", objectKey, "d".repeat(64), bytes.length, new Date().toISOString())
+			.run();
+		for (const sizeBytes of [1, bytes.length]) {
+			const response = await callWorker(
+				new Request("https://store.example.com/submit", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({
+						id,
+						title: "Replacement",
+						author: "Other",
+						objectKey,
+						sha256: "d".repeat(64),
+						sizeBytes,
+					}),
+				}),
+			);
+			expect(response.status).toBe(409);
+			expect(await entryStatus(id)).toBe("published");
+			expect(await (await env.STORE_BUCKET.get(objectKey))?.text()).toBe("published package");
+		}
+	});
+
+	it("leaves an unsubmitted upload intact when the submitted size is wrong", async () => {
+		const id = crypto.randomUUID();
+		const objectKey = `packages/${id}.lwpkg`;
+		await env.STORE_BUCKET.put(objectKey, "uploaded package");
+		const response = await callWorker(
+			new Request("https://store.example.com/submit", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ id, title: "Test", author: "Author", objectKey, sha256: "d".repeat(64), sizeBytes: 1 }),
+			}),
+		);
+		expect(response.status).toBe(409);
+		expect(await entryStatus(id)).toBeUndefined();
+		expect(await env.STORE_BUCKET.head(objectKey)).not.toBeNull();
+	});
+
+	it.each(["admin", "withdraw"])("%s deletes reported entries and their dependent records", async (mode) => {
+		mockResendEmail();
+		const { id, objectKey, withdrawToken } = await submitEntryForWithdraw();
+		await env.STORE_DB.prepare("UPDATE store_entries SET status = 'published' WHERE id = ?").bind(id).run();
+		await env.STORE_DB.prepare(
+			"INSERT INTO store_reports (entry_id, reason, reporter_ip, reported_at) VALUES (?, ?, ?, ?)",
+		)
+			.bind(id, "Report", "192.0.2.1", new Date().toISOString())
+			.run();
+		const thumbnailKey = `thumbnails/${id}.jpg`;
+		await env.STORE_BUCKET.put(thumbnailKey, "thumbnail");
+		await env.STORE_DB.prepare("UPDATE store_entries SET thumbnail_key = ? WHERE id = ?").bind(thumbnailKey, id).run();
+		const path = mode === "admin" ? `/admin/entries/${id}` : `/entries/${id}/withdraw`;
+		const response = await callWorker(
+			new Request(`https://store.example.com${path}`, {
+				method: "DELETE",
+				headers: { "x-admin-key": ADMIN_KEY, "content-type": "application/json", "cf-connecting-ip": id },
+				body: mode === "withdraw" ? JSON.stringify({ token: withdrawToken }) : undefined,
+			}),
+		);
+		expect(response.status).toBe(200);
+		expect(await entryStatus(id)).toBeUndefined();
+		expect(await env.STORE_BUCKET.head(objectKey)).toBeNull();
+		expect(await env.STORE_BUCKET.head(thumbnailKey)).toBeNull();
+		for (const table of ["store_reports", "store_review_tokens"]) {
+			const row = await env.STORE_DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE entry_id = ?`)
+				.bind(id)
+				.first<{ n: number }>();
+			expect(row?.n).toBe(0);
+		}
+	});
+
 	it("binds the upload size into the presigned request", async () => {
 		const response = await callWorker(
 			new Request("https://store.example.com/upload-url", {

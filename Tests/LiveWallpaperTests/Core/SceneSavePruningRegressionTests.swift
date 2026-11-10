@@ -41,6 +41,25 @@ final class SceneSavePruningRegressionTests: XCTestCase {
         return file
     }
 
+    func testSavingKeepsFinishingImagesAndRemovesUnreferencedFiles() throws {
+        let folder = SceneStore.folderURL(forVideoPath: video.path)
+        let finishingImage = folder.appendingPathComponent("finishing.png")
+        let unused = folder.appendingPathComponent("unused.png")
+        try Data([1, 2, 3]).write(to: finishingImage)
+        try Data([4, 5, 6]).write(to: unused)
+        var edited = try XCTUnwrap(document)
+        edited.finishing = SceneRenderGraph(
+            targets: [], passes: [], output: "input",
+            images: ["lookup": finishingImage.lastPathComponent]
+        )
+        model.updateScene(edited, path: video.path, coalescing: false)
+        model.flushSceneSave(path: video.path)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: finishingImage.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: unused.path))
+        XCTAssertEqual(try SceneStore.load(videoPath: video.path)?.finishing, edited.finishing)
+    }
+
     func testFlushPreservesFileRetainedAfterSaveStarted() throws {
         model.retrySceneSave(path: video.path)
         let trial = try writeTrialFile()

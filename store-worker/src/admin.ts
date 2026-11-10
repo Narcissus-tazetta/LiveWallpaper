@@ -4,7 +4,7 @@ import type { Env } from "./env";
 import { errorResponse, jsonResponse } from "./http";
 import { requireAdmin } from "./admin-auth";
 import { applyReviewDecision, uploadWindowOpenMessage, uploadWindowRemainingMs } from "./review-decision";
-import { deleteEntryObjects } from "./storage";
+import { deleteEntryObjects, deleteEntryRecords } from "./storage";
 import { generateRawToken, hashToken } from "./tokens";
 
 /// 運営がADMIN_KEYを使って(投稿者の同意なく)削除する管理者専用エンドポイント。
@@ -28,10 +28,7 @@ export async function handleAdminDelete(request: Request, env: Env, id: string):
 	// 先に公開経路から隠し、R2削除失敗時は行とキーを残して再試行可能にする。
 	await env.STORE_DB.prepare("UPDATE store_entries SET status = 'deletion_pending' WHERE id = ?").bind(id).run();
 	await deleteEntryObjects(env, row.object_key, row.thumbnail_key);
-	await env.STORE_DB.batch([
-		env.STORE_DB.prepare("DELETE FROM store_review_tokens WHERE entry_id = ?").bind(id),
-		env.STORE_DB.prepare("DELETE FROM store_entries WHERE id = ?").bind(id),
-	]);
+	await deleteEntryRecords(env, id);
 
 	return jsonResponse({ ok: true });
 }

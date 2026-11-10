@@ -428,10 +428,7 @@ extension WallpaperModel {
                 return
             }
             pendingPlaybackReconfiguration = false
-            if isWebWallpaperActive {
-                return
-            }
-            if let currentPath = currentVideoPath {
+            if !isWebWallpaperActive, let currentPath = currentVideoPath {
                 playRegisteredVideo(path: currentPath)
             }
             for entry in allDedicatedSlotEntries() where entry.isActive {

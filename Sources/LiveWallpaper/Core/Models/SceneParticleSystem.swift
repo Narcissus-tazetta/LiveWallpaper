@@ -478,6 +478,18 @@ struct SceneParticleSystem: Codable, Equatable {
             .flatMap(\.system.value.textureFiles)
     }
 
+    func remappingFiles(_ names: [String: String]) -> SceneParticleSystem {
+        var result = self
+        result.textureFile = textureFile.flatMap { names[$0] }
+        result.refraction?.normalFile = refraction?.normalFile.flatMap { names[$0] }
+        result.children = children.map { child in
+            var result = child
+            result.system = Box(child.system.value.remappingFiles(names))
+            return result
+        }
+        return result
+    }
+
     var normalFiles: [String] {
         [refraction?.normalFile].compactMap { $0 } + children.flatMap(\.system.value.normalFiles)
     }

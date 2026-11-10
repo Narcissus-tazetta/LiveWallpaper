@@ -223,13 +223,16 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 	if (!packageMatch || !UUID_RE.test(packageMatch[1]) || id !== packageMatch[1]) {
 		return errorResponse("id does not match objectKey");
 	}
+	const existing = await env.STORE_DB.prepare("SELECT 1 FROM store_entries WHERE id = ?").bind(id).first();
+	if (existing) {
+		return errorResponse("entry already exists", 409);
+	}
 
 	const head = await env.STORE_BUCKET.head(objectKey);
 	if (!head) {
 		return errorResponse("object not found in storage", 404);
 	}
 	if (head.size !== sizeBytes) {
-		await env.STORE_BUCKET.delete(objectKey);
 		return errorResponse("size mismatch between submitted metadata and stored object", 409);
 	}
 

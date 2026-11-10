@@ -1,6 +1,7 @@
 import CoreGraphics
 import ImageIO
 @testable import LiveWallpaper
+import Metal
 import XCTest
 
 /// Scenes travel inside packages from anyone, so the import only takes the plain
@@ -112,6 +113,60 @@ final class ScenePackageTests: XCTestCase {
             try Data(contentsOf: packaged.appendingPathComponent(image))
         )
         XCTAssertFalse(SceneStore.referencedFiles(of: restored).contains("layer:929"))
+    }
+
+    func testFinishingImagesSurvivePackageRoundTrip() throws {
+        let original = workingDirectory.appendingPathComponent("a.mp4").path
+        var document = try makeScene(at: original)
+        let folder = SceneStore.folderURL(forVideoPath: original)
+        let image = "finishing.png"
+        try FileManager.default.copyItem(
+            at: folder.appendingPathComponent(document.layers[0].imageFile),
+            to: folder.appendingPathComponent(image)
+        )
+        document.finishing = SceneRenderGraph(
+            targets: [], passes: [], output: "lookup", images: ["lookup": image]
+        )
+        try SceneStore.save(document, videoPath: original)
+        let packaged = workingDirectory.appendingPathComponent("package")
+        try SceneStore.copyScene(videoPath: original, to: packaged)
+        let imported = workingDirectory.appendingPathComponent("b.mp4").path
+        let restored = try SceneStore.importScene(from: packaged, videoPath: imported)
+
+        XCTAssertEqual(restored.finishing, document.finishing)
+        XCTAssertTrue(SceneStore.referencedFiles(of: restored).contains(image))
+        XCTAssertEqual(
+            try Data(contentsOf: SceneStore.folderURL(forVideoPath: imported)
+                .appendingPathComponent(image)),
+            try Data(contentsOf: folder.appendingPathComponent(image))
+        )
+        XCTAssertEqual(
+            try renderedPixels(restored, videoPath: imported),
+            try renderedPixels(document, videoPath: original)
+        )
+    }
+
+    private func renderedPixels(_ document: SceneDocument, videoPath: String) throws -> [UInt8] {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal unavailable") }
+        let renderer = try SceneRenderer(document: document, videoPath: videoPath)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: 64, height: 40, mipmapped: false
+        )
+        descriptor.storageMode = .shared
+        descriptor.usage = [.renderTarget, .shaderRead]
+        let texture = try XCTUnwrap(renderer.device.makeTexture(descriptor: descriptor))
+        let queue = try XCTUnwrap(renderer.device.makeCommandQueue())
+        let command = try XCTUnwrap(queue.makeCommandBuffer())
+        try renderer.encode(into: texture, commandBuffer: command, input: .rest)
+        command.commit()
+        command.waitUntilCompleted()
+        XCTAssertNil(command.error)
+        var pixels = [UInt8](repeating: 0, count: 64 * 40 * 4)
+        texture.getBytes(
+            &pixels, bytesPerRow: 64 * 4, from: MTLRegionMake2D(0, 0, 64, 40), mipmapLevel: 0
+        )
+        XCTAssertGreaterThan(pixels[2], 200)
+        return pixels
     }
 
     func testImportRejectsNamesOutsideTheSceneFolder() throws {
