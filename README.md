@@ -183,6 +183,10 @@ Distribution is signed with a self-signed certificate ("LiveWallpaper Release") 
 
 The Store backend lives in [`store-worker/`](store-worker) — a Cloudflare Worker (TypeScript) with its own `bun install` / `bun run test` / `bun run deploy` workflow.
 
+## Support
+
+LiveWallpaper is free and open source. If you find it useful, you can support development on [Ko-fi](https://ko-fi.com/prason).
+
 ## License
 
 Released under the [MIT License](LICENSE).

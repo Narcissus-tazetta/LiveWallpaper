@@ -143,6 +143,7 @@ const ja = {
         license: "MIT License",
         github: "GitHub",
         releases: "Releases",
+        donate: "支援する",
         unofficial: "Apple および macOS は Apple Inc. の商標です。",
         videoCredit: "ヒーロー動画: Chandresh Uike / Pexels",
         photoCredit: "湖の写真: bernardouploud / Pixabay",
@@ -298,6 +299,7 @@ const en: Dict = {
         license: "MIT License",
         github: "GitHub",
         releases: "Releases",
+        donate: "Support",
         unofficial: "Apple and macOS are trademarks of Apple Inc.",
         videoCredit: "Hero video: Chandresh Uike / Pexels",
         photoCredit: "Lake photo: bernardouploud / Pixabay",
@@ -309,6 +311,7 @@ export const dictionaries = { ja, en } as const;
 export type Lang = keyof typeof dictionaries;
 export type { Dict };
 
+export const donateUrl = "https://ko-fi.com/prason";
 export const repo = "https://github.com/Narcissus-tazetta/LiveWallpaper";
 export const repoApi = "https://api.github.com/repos/Narcissus-tazetta/LiveWallpaper";
 export const brewCommand = "brew install --cask narcissus-tazetta/tap/livewallpaper";

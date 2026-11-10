@@ -182,6 +182,10 @@ swift test
 
 Store のバックエンドは [`store-worker/`](store-worker) にあります（TypeScript製の Cloudflare Worker。`bun install` / `bun run test` / `bun run deploy` で扱います）。
 
+## 支援
+
+LiveWallpaper は無料のオープンソースです。気に入っていただけたら [Ko-fi](https://ko-fi.com/prason) から開発を支援できます。
+
 ## ライセンス
 
 [MIT License](LICENSE)

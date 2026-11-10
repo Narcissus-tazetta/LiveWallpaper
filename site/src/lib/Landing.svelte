@@ -5,7 +5,7 @@
     import Features from "./Features.svelte";
     import HeroVideo from "./HeroVideo.svelte";
     import Screenshots from "./Screenshots.svelte";
-    import { brewCommand, dictionaries, repo, repoApi, siteUrl, type Lang } from "./i18n";
+    import { brewCommand, dictionaries, donateUrl, repo, repoApi, siteUrl, type Lang } from "./i18n";
 
     let { lang, release }: { lang: Lang; release: { version: string; date: string } } = $props();
 
@@ -161,6 +161,7 @@
             <a href={repo}>{t.footer.github}</a>
             <a href="{repo}/releases">{t.footer.releases}</a>
             <a href="{repo}/blob/main/LICENSE">{t.footer.license}</a>
+            <a href={donateUrl}>{t.footer.donate}</a>
         </nav>
         <p>
             {t.footer.unofficial}
