@@ -48,4 +48,65 @@ final class ScreenSaverVideoTests: XCTestCase {
         XCTAssertNil(model.screenSaverVideoPath)
         XCTAssertNil(UserDefaults.standard.string(forKey: PrefsKey.screenSaverVideoPath))
     }
+
+    func testVideoPinnedToOneDisplaySurvivesSharedWebWallpaper() throws {
+        let model = WallpaperModel()
+        let pinned = try video("pinned.mp4")
+        let source = try WebWallpaperSource(url: XCTUnwrap(URL(string: "https://example.com")))
+        model.screenSaverVideoPath = nil
+        model.webWallpaperSources = [source]
+        model.webWallpaperFeatureEnabled = true
+        model.wallpaperKind = .web
+        model.currentWebWallpaperID = source.id
+        model.displayScreens = [
+            .init(id: "video", name: "Video", frame: .zero),
+            .init(id: "web", name: "Web", frame: .zero)
+        ]
+        model.videoOverrideByScreenID = ["video": pinned]
+
+        let config = model.makeScreenSaverConfig()
+
+        XCTAssertEqual(config.display(forDisplayID: "video")?.videoPath, pinned)
+        XCTAssertNil(config.display(forDisplayID: "web"))
+        XCTAssertNil(config.fallback)
+    }
+
+    func testWebPinnedDisplayDoesNotInheritTheSharedVideoFallback() throws {
+        let model = WallpaperModel()
+        let desktop = try video("desktop.mp4")
+        let source = try WebWallpaperSource(url: XCTUnwrap(URL(string: "https://example.com")))
+        model.screenSaverVideoPath = nil
+        model.webWallpaperSources = [source]
+        model.webWallpaperFeatureEnabled = true
+        model.wallpaperKind = .video
+        model.currentVideoPath = desktop
+        model.displayScreens = [
+            .init(id: "video", name: "Video", frame: .zero),
+            .init(id: "web", name: "Web", frame: .zero)
+        ]
+        model.webOverrideByScreenID = ["web": source.id]
+
+        let config = model.makeScreenSaverConfig()
+        let decoded = try JSONDecoder().decode(
+            ScreenSaverConfig.self,
+            from: JSONEncoder().encode(config)
+        )
+
+        XCTAssertEqual(decoded.display(forDisplayID: "video")?.videoPath, desktop)
+        XCTAssertNil(decoded.display(forDisplayID: "web"))
+        XCTAssertEqual(decoded.display(forDisplayID: "new-display")?.videoPath, desktop)
+
+        model.screenSaverVideoPath = desktop
+        XCTAssertEqual(
+            model.makeScreenSaverConfig().display(forDisplayID: "web")?.videoPath,
+            desktop
+        )
+    }
+
+    func testVersionOneConfigStillDecodesWithoutDisplayExclusions() throws {
+        let data = Data(#"{"formatVersion":1,"displays":{},"fallback":null}"#.utf8)
+        let config = try JSONDecoder().decode(ScreenSaverConfig.self, from: data)
+        XCTAssertNil(config.excludedDisplayIDs)
+        XCTAssertNil(config.display(forDisplayID: "any"))
+    }
 }
