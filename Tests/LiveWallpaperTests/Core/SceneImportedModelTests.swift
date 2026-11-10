@@ -85,6 +85,30 @@ final class SceneImportedModelTests: XCTestCase {
         return url
     }
 
+    func testExtremeAccessorStridesAndOffsetsAreRejectedForFloatsAndIntegers() throws {
+        for index in [0, 1] {
+            for value in [Int.max, Int.min] {
+                for field in ["byteStride", "byteOffset"] {
+                    let url = try writeSquare(animated: false)
+                    var json = try XCTUnwrap(
+                        JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+                    )
+                    let key = field == "byteStride" ? "bufferViews" : "accessors"
+                    var items = try XCTUnwrap(json[key] as? [[String: Any]])
+                    items[index][field] = value
+                    json[key] = items
+                    try JSONSerialization.data(withJSONObject: json).write(to: url)
+
+                    XCTAssertThrowsError(try SceneModelImporter.importModel(
+                        at: url, canvasWidth: 1000, canvasHeight: 500
+                    )) { error in
+                        XCTAssertTrue(error is GLTFAsset.ReadError, "Unexpected error: \(error)")
+                    }
+                }
+            }
+        }
+    }
+
     func testAStillSquareBecomesOneShadedPartCentredOnTheCanvas() throws {
         let result = try SceneModelImporter.importModel(
             at: writeSquare(animated: false),
