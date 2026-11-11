@@ -102,6 +102,21 @@ final class VideoFrameCaptureTests: XCTestCase {
         XCTAssertEqual(smallAgain.width, 32, "キャッシュが別動画のフレームを返してはいけない")
     }
 
+    /// 1回だけ再生する動画は終端より後ろの時刻でフリーズされるが、その場合も
+    /// 最後のフレームが取れる(取れないと一時停止中の壁紙が黒くなる)。
+    func testCaptureBeyondTheEndFallsBackToTheLastFrame() async throws {
+        let url = try await makeVideo(named: "past-end.gif", size: 64)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let pastEnd = CMTime(seconds: 60, preferredTimescale: 600)
+
+        let cold = try XCTUnwrap(VideoFrameCapture.capture(path: url.path, time: pastEnd))
+        // 2回目はキャッシュ済みの生成器を通る。
+        let cached = try XCTUnwrap(VideoFrameCapture.capture(path: url.path, time: pastEnd))
+
+        XCTAssertEqual(cold.width, 64)
+        XCTAssertEqual(cached.width, 64)
+    }
+
     func testMissingFileReturnsNilRatherThanThrowing() {
         let missing = workingDirectory.appendingPathComponent("nope.mp4").path
         XCTAssertNil(VideoFrameCapture.capture(path: missing, time: .zero))

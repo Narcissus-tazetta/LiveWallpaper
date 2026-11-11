@@ -51,10 +51,15 @@ enum VideoFrameCapture {
     /// display's still-valid, warm generator.
     static func capture(path: String, time: CMTime) -> CGImage? {
         if var entry = entriesByPath[path] {
-            guard let image = try? entry.generator.copyCGImage(at: time, actualTime: nil) else {
+            let requested = clampedToDuration(time, duration: entry.generator.asset.duration)
+            let image: CGImage
+            do {
+                image = try entry.generator.copyCGImage(at: requested, actualTime: nil)
+            } catch {
                 // キャッシュ済みでもファイル消失等でデコードが失敗しうる。壊れた
                 // 生成器は取り除き、有効な生成器の枠を守る。
                 entriesByPath.removeValue(forKey: path)
+                logFailure(path: path, time: requested, error: error)
                 return nil
             }
             entry.lastUsedAt = Date()
@@ -76,14 +81,36 @@ enum VideoFrameCapture {
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
 
-        guard let image = try? generator.copyCGImage(at: time, actualTime: nil) else {
+        let requested = clampedToDuration(time, duration: asset.duration)
+        let image: CGImage
+        do {
+            image = try generator.copyCGImage(at: requested, actualTime: nil)
+        } catch {
             // デコード失敗時はキャッシュに載せない(欠落パスの生成器で有効枠を潰さない)。
+            logFailure(path: path, time: requested, error: error)
             return nil
         }
         entriesByPath[path] = Entry(generator: generator, lastUsedAt: Date())
         evictLeastRecentlyUsedIfNeeded()
         scheduleEviction()
         return image
+    }
+
+    /// A play-once video leaves its player past the last frame (measured: timebase
+    /// 160s on a 144s file), and a zero-tolerance decode beyond the end throws
+    /// AVError -11832, which used to leave the paused wallpaper black.
+    /// A non-numeric duration (not yet known) leaves the time unchanged.
+    static func clampedToDuration(_ time: CMTime, duration: CMTime) -> CMTime {
+        guard time.isNumeric, duration.isNumeric, CMTimeCompare(time, duration) > 0 else {
+            return time
+        }
+        return duration
+    }
+
+    private static func logFailure(path: String, time: CMTime, error: Error) {
+        AppLog.suspend.warning(
+            "still capture failed file=\((path as NSString).lastPathComponent) t=\(time.seconds) error=\(error.localizedDescription)"
+        )
     }
 
     private static func evictLeastRecentlyUsedIfNeeded() {
