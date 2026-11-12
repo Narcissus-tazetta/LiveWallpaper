@@ -374,23 +374,24 @@ final class SceneModelRenderer {
                 ) ?? stage.uniforms
                 guard !data.isEmpty else { continue }
                 try data.withUnsafeBytes { bytes in
+                    let baseAddress = bytes.baseAddress!
                     if bytes.count <= 4096 {
                         if isVertex {
                             encoder.setVertexBytes(
-                                bytes.baseAddress!,
+                                baseAddress,
                                 length: bytes.count,
                                 index: 0
                             )
                         } else {
                             encoder.setFragmentBytes(
-                                bytes.baseAddress!,
+                                baseAddress,
                                 length: bytes.count,
                                 index: 0
                             )
                         }
                     } else {
                         guard let buffer = device.makeBuffer(
-                            bytes: bytes.baseAddress!,
+                            bytes: baseAddress,
                             length: bytes.count,
                             options: .storageModeShared
                         )
@@ -421,10 +422,11 @@ final class SceneModelRenderer {
             if let cached = shape.vertexBuffer {
                 vertexBuffer = cached
             } else {
-                guard let buffer = shape.vertices.withUnsafeBytes({
-                    device.makeBuffer(
-                        bytes: $0.baseAddress!,
-                        length: $0.count,
+                guard !shape.vertices.isEmpty, let buffer = shape.vertices.withUnsafeBytes({ bytes -> MTLBuffer? in
+                    let baseAddress = bytes.baseAddress!
+                    return device.makeBuffer(
+                        bytes: baseAddress,
+                        length: bytes.count,
                         options: .storageModeShared
                     )
                 }) else { throw ModelError(detail: "vertex allocation failed") }
@@ -432,15 +434,16 @@ final class SceneModelRenderer {
             }
             encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 1)
             encoder.setVertexBuffer(defaults, offset: 0, index: 2)
-            if let indices = shape.indices {
+            if let indices = shape.indices, !indices.isEmpty {
                 let indexBuffer: any MTLBuffer
                 if let cached = shape.indexBuffer {
                     indexBuffer = cached
                 } else {
-                    guard let buffer = indices.withUnsafeBytes({
-                        device.makeBuffer(
-                            bytes: $0.baseAddress!,
-                            length: $0.count,
+                    guard let buffer = indices.withUnsafeBytes({ bytes -> MTLBuffer? in
+                        let baseAddress = bytes.baseAddress!
+                        return device.makeBuffer(
+                            bytes: baseAddress,
+                            length: bytes.count,
                             options: .storageModeShared
                         )
                     }) else { throw ModelError(detail: "index allocation failed") }

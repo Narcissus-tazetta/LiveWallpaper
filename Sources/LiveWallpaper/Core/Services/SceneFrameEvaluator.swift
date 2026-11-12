@@ -133,7 +133,10 @@ final class SceneFrameEvaluator {
             adjustment.effects[layer.layer.effects[index].id]?
                 .apply(to: &layer.layer.effects[index])
         }
-        if let text = adjustment.text { text.apply(to: &layer.layer.text!) }
+        if let text = adjustment.text, var layerText = layer.layer.text {
+            text.apply(to: &layerText)
+            layer.layer.text = layerText
+        }
         if let world = adjustment.world { layer.world = world }
         if let videoTime = adjustment.videoTime { layer.videoTime = videoTime }
         if let modelValues = adjustment.modelValues { layer.layer.modelValues = modelValues }
@@ -392,6 +395,14 @@ final class SceneFrameEvaluator {
                     output = held
                     heldOutput = true
                 }
+                func skipped(_ detail: String) -> SceneScriptIssue {
+                    SceneScriptIssue(
+                        scriptID: script.id,
+                        name: script.name,
+                        message: "Ignored adjustment: \(detail)",
+                        isPartial: true
+                    )
+                }
                 warnings += output.warnings.map {
                     SceneScriptIssue(
                         scriptID: script.id,
@@ -410,16 +421,29 @@ final class SceneFrameEvaluator {
                 for (id, adjustment) in output.adjustments {
                     if let position = adjustment.order { order[id] = position }
                     for (rigID, changes) in adjustment.rigPlayback {
-                        var playback = rigPlayback[rigID] ?? document.rigs[rigID]!.playback
+                        guard let baseRig = document.rigs[rigID] else {
+                            warnings.append(skipped("unknown rig \(rigID)"))
+                            continue
+                        }
+                        var playback = rigPlayback[rigID] ?? baseRig.playback
                         for (index, change) in changes {
+                            guard playback.indices.contains(index) else {
+                                warnings.append(skipped("rig \(rigID) has no playback layer \(index)"))
+                                continue
+                            }
                             change.apply(to: &playback[index])
                         }
                         rigPlayback[rigID] = playback
                     }
-                    var layer = result[id]!
+                    guard var layer = result[id] else {
+                        warnings.append(skipped("unknown layer \(id)"))
+                        continue
+                    }
                     Self.apply(adjustment, to: &layer)
-                    if let particles = adjustment
-                        .particles { particles.apply(to: &layer.layer.particles!) }
+                    if let particles = adjustment.particles, var layerParticles = layer.layer.particles {
+                        particles.apply(to: &layerParticles)
+                        layer.layer.particles = layerParticles
+                    }
                     if let control = adjustment.particleControl, !heldOutput { particleControls[
                         id,
                         default: .init()
@@ -503,6 +527,7 @@ final class SceneFrameEvaluator {
         cachedRigs = document.rigs
         cachedTemplates.removeAll(keepingCapacity: true)
         cachedScriptTargets.removeAll(keepingCapacity: true)
+        lastOutputs.removeAll(keepingCapacity: true)
 
         for layer in document.layers {
             let effects: [[String: Any]] = layer.effects.map { effect in

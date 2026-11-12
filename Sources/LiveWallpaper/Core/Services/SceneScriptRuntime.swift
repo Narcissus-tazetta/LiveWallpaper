@@ -124,8 +124,9 @@ final class SceneScriptRuntime {
                 resultLength!.pointee = found.count
                 return -1
             case 1:
+                guard let value else { return 0 }
                 return session.store
-                    .set(name, Data(bytes: value!, count: valueLength), in: area) ? 1 : 0
+                    .set(name, Data(bytes: value, count: valueLength), in: area) ? 1 : 0
             case 2:
                 return session.store.delete(name, in: area) ? 1 : 0
             default:
@@ -157,7 +158,10 @@ final class SceneScriptRuntime {
                 }
                 programs[script.id]!.lastTime = elapsedTime
             }
-            let starting = script.modules != nil && !programs[script.id]!.hasStarted
+            guard let program = programs[script.id] else {
+                throw failure("Script not prepared")
+            }
+            let starting = script.modules != nil && !program.hasStarted
             let remaining = deadline - ProcessInfo.processInfo.systemUptime
             guard remaining > 0 || starting
             else { throw failure("Frame execution time limit exceeded") }
@@ -170,30 +174,36 @@ final class SceneScriptRuntime {
             let otherMemory = programs.keys.filter { $0 != script.id }
                 .reduce(0) { $0 + memoryBytes(of: $1) }
             lwjs_set_memory_limit(
-                programs[script.id]!.pointer,
+                program.pointer,
                 min(64 * 1024 * 1024, Self.maximumMemoryBytes - otherMemory)
             )
-            let pointer = programs[script.id]!.pointer
+            let pointer = program.pointer
             lwjs_set_storage(
                 pointer,
                 Self.storageHandler,
                 Unmanaged.passUnretained(storage).toOpaque()
             )
+            guard !input.bytes.isEmpty else {
+                throw failure("Empty script input")
+            }
             var outputLength = 0
-            let result = withExtendedLifetime(storage) {
-                input.bytes.withUnsafeBufferPointer { lwjs_evaluate(
-                    pointer,
-                    $0.baseAddress!,
-                    budget,
-                    &outputLength,
-                    &error
-                ) }
+            let result: UnsafeMutablePointer<CChar>? = withExtendedLifetime(storage) {
+                input.bytes.withUnsafeBufferPointer { buffer -> UnsafeMutablePointer<CChar>? in
+                    guard let baseAddress = buffer.baseAddress, !buffer.isEmpty else { return nil }
+                    return lwjs_evaluate(
+                        pointer,
+                        baseAddress,
+                        budget,
+                        &outputLength,
+                        &error
+                    )
+                }
             }
             lwjs_set_storage(pointer, nil, nil)
             programs[script.id]?.hasStarted = true
             if let error {
                 defer { lwjs_free_string(error) }
-                logs[script.id] = String(cString: lwjs_logs(programs[script.id]!.pointer))
+                logs[script.id] = String(cString: lwjs_logs(program.pointer))
                 let message = String(cString: error)
                 // The interrupt is uncatchable and the bundle keeps its animation clocks in
                 // JavaScript, so a run cut short mid-frame leaves a usable program; throwing
@@ -214,17 +224,26 @@ final class SceneScriptRuntime {
                 )
                 throw failure(message)
             }
+            guard let result else {
+                throw failure("Script evaluation returned no output")
+            }
             defer { lwjs_free_string(result) }
-            logs[script.id] = String(cString: lwjs_logs(programs[script.id]!.pointer))
-            programs[script.id]!.memoryIsStale = true
-            let outputBytes = UnsafeRawBufferPointer(start: result!, count: outputLength)
-            var output = outputBytes.first == SceneScriptOutputReader.magic
-                ? SceneScriptOutputReader.read(outputBytes)
-                : try JSONSerialization.jsonObject(with: Data(
-                    bytesNoCopy: result!,
+            logs[script.id] = String(cString: lwjs_logs(program.pointer))
+            programs[script.id]?.memoryIsStale = true
+            let outputBytes = UnsafeRawBufferPointer(start: result, count: outputLength)
+            var output: Any
+            if outputBytes.first == SceneScriptOutputReader.magic {
+                guard let decoded = SceneScriptOutputReader.read(outputBytes) else {
+                    throw failure("Malformed script output (\(outputLength) bytes)")
+                }
+                output = decoded
+            } else {
+                output = try JSONSerialization.jsonObject(with: Data(
+                    bytesNoCopy: result,
                     count: outputLength,
                     deallocator: .none
                 ))
+            }
             var warnings: [String] = []
             var meshes: [SceneMeshFrame] = []
             var models: [SceneModelLayerFrame] = []

@@ -7,7 +7,7 @@ import worker from "../src/index";
 // 内容を文字列として取り込む(本番のスキーマ管理方法=schema.sqlはそのまま)。
 import schema from "../schema.sql?raw";
 
-const ADMIN_KEY = "test-admin-key";
+const ADMIN_KEY = "test-admin-key-fixture";
 
 beforeAll(async () => {
 	// D1のexec()は1行=1文として扱うため複数行のCREATE TABLEを解釈できない。
@@ -76,9 +76,17 @@ async function closeUploadWindow(id: string) {
 }
 
 async function submitEntry(
-	overrides: { title?: string; author?: string; description?: string; uploadWindowOpen?: boolean } = {},
+	overrides: {
+		id?: string;
+		title?: string;
+		author?: string;
+		description?: string;
+		license?: string;
+		uploadWindowOpen?: boolean;
+		ip?: string;
+	} = {},
 ) {
-	const id = crypto.randomUUID();
+	const id = overrides.id ?? crypto.randomUUID();
 	const objectKey = `packages/${id}.lwpkg`;
 	const bytes = new TextEncoder().encode("fake package bytes");
 	await env.STORE_BUCKET.put(objectKey, bytes);
@@ -86,12 +94,13 @@ async function submitEntry(
 	const res = await callWorker(
 		new Request("https://store.example.com/submit", {
 			method: "POST",
-			headers: { "content-type": "application/json" },
+			headers: { "content-type": "application/json", "cf-connecting-ip": overrides.ip ?? id },
 			body: JSON.stringify({
 				id,
 				title: overrides.title ?? "Test Title",
 				author: overrides.author ?? "Test Author",
 				description: overrides.description,
+				license: overrides.license,
 				sha256: "d".repeat(64),
 				sizeBytes: bytes.byteLength,
 				objectKey,
@@ -878,6 +887,46 @@ describe("store submission review flow", () => {
 	it("rejects an over-long description at submit", async () => {
 		const { res } = await submitEntry({ description: "x".repeat(2001) });
 		expect(res.status).toBe(400);
+	});
+
+	it("rejects newlines in title, author, or license at submit", async () => {
+		expect((await submitEntry({ title: "Bad\nTitle" })).res.status).toBe(400);
+		expect((await submitEntry({ author: "Bad\rAuthor" })).res.status).toBe(400);
+		expect((await submitEntry({ license: "MIT\nLicense" })).res.status).toBe(400);
+	});
+
+	it("rejects duplicate submission with 409 Conflict", async () => {
+		const id = crypto.randomUUID();
+		const first = await submitEntry({ id, ip: "198.51.100.10" });
+		expect(first.res.status).toBe(200);
+		const second = await submitEntry({ id, ip: "198.51.100.11" });
+		expect(second.res.status).toBe(409);
+		const body = (await second.res.json()) as { error: string };
+		expect(body.error).toContain("already exists");
+	});
+
+	it("requires ADMIN_KEY to be configured with at least 16 characters", async () => {
+		const shortKey = "short-key-12345";
+		const originalAdminKey = env.ADMIN_KEY;
+		try {
+			(env as unknown as { ADMIN_KEY: string }).ADMIN_KEY = shortKey;
+			const res = await callWorker(
+				new Request("https://store.example.com/admin/requests", {
+					headers: { "x-admin-key": shortKey, "cf-connecting-ip": "198.51.100.20" },
+				}),
+			);
+			expect(res.status).toBe(500);
+
+			(env as unknown as { ADMIN_KEY: string }).ADMIN_KEY = "";
+			const resEmpty = await callWorker(
+				new Request("https://store.example.com/admin/requests", {
+					headers: { "x-admin-key": "", "cf-connecting-ip": "198.51.100.21" },
+				}),
+			);
+			expect(resEmpty.status).toBe(500);
+		} finally {
+			(env as unknown as { ADMIN_KEY: string }).ADMIN_KEY = originalAdminKey;
+		}
 	});
 
 	it("serves the review page with a CSP whose style hash matches and no referrer", async () => {

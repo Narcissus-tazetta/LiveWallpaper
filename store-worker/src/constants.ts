@@ -17,6 +17,7 @@ export const ORPHAN_UPLOAD_GRACE_SECONDS = 2 * 60 * 60;
 // 残すため、2倍しても128MBを大きく下回るこの値を上限に据える(超える投稿はプレビュー
 // 不可とし、/admin/review/:token/download での生ファイルダウンロードに倒す)。
 export const MAX_VIDEO_PREVIEW_BYTES = 48 * 1024 * 1024;
+export const MAX_REVIEW_VIDEO_EXPANDED_BYTES = MAX_VIDEO_PREVIEW_BYTES;
 // unzipSync は展開先サイズを制限しても、入力ZIP自体は先にメモリへ読むため、
 // インラインプレビューで受け入れるアーカイブサイズにも独立した上限を設ける。
 export const MAX_PREVIEW_ARCHIVE_BYTES = 64 * 1024 * 1024;

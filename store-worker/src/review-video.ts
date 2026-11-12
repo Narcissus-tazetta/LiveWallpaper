@@ -1,5 +1,5 @@
-import { unzipSync } from "fflate";
-import { MAX_PREVIEW_ARCHIVE_BYTES, MAX_VIDEO_PREVIEW_BYTES } from "./constants";
+import { Unzip, UnzipInflate, UnzipPassThrough } from "fflate";
+import { MAX_PREVIEW_ARCHIVE_BYTES, MAX_REVIEW_VIDEO_EXPANDED_BYTES } from "./constants";
 import type { Env } from "./env";
 
 /// Rangeヘッダ("bytes=start-end"等)を解釈する。ブラウザの<video>は再生開始時や
@@ -34,41 +34,83 @@ export function parseRangeHeader(
 	return { start, end: Math.min(end, totalLength - 1) };
 }
 
+const PUSH_SLICE_BYTES = 4 * 1024;
+
 /// .lwpkg(ZIP)の中から動画本体(content/videos/<id>.mp4)だけを取り出して返す。
-/// unzipSyncのfilterで動画エントリ以外(metadata.json/previews/*.png)の展開を
-/// スキップさせ、Worker内メモリ使用量を動画本体分だけに抑える。
-function extractVideoEntry(zipBytes: Uint8Array): Uint8Array | null {
+/// Unzipで動画エントリ以外(metadata.json/previews/*.png)は start() せず展開をスキップし、
+/// Worker内メモリ使用量を動画本体分だけに抑える。
+export function extractVideoEntry(zipBytes: Uint8Array): Uint8Array | null {
 	const videoPathRe = /^content\/videos\/[^/]+$/i;
 	let matchedKey: string | null = null;
 	let rejectedForSize = false;
-	let unzipped: Record<string, Uint8Array>;
+	let hasError = false;
+	const chunks: Uint8Array[] = [];
+	let totalExtractedBytes = 0;
+
 	try {
-		unzipped = unzipSync(zipBytes, {
-			filter(file) {
-				if (matchedKey || rejectedForSize) {
-					return false;
+		const unzipper = new Unzip();
+		unzipper.register(UnzipInflate);
+		// ストア(無圧縮)のエントリも受け付ける。登録しないと start() が例外を投げる。
+		unzipper.register(UnzipPassThrough);
+		unzipper.onfile = (file) => {
+			if (matchedKey || rejectedForSize || hasError) {
+				return;
+			}
+			if (videoPathRe.test(file.name)) {
+				if (
+					file.originalSize !== undefined &&
+					(file.originalSize < 0 || file.originalSize > MAX_REVIEW_VIDEO_EXPANDED_BYTES)
+				) {
+					rejectedForSize = true;
+					return;
 				}
-				if (videoPathRe.test(file.name)) {
-					// 圧縮後のパッケージではなく、ZIPヘッダの展開後サイズで
-					// 展開前に拒否する。unzipSync後の検査ではZIP爆弾を防げない。
-					if ((file.originalSize ?? Number.POSITIVE_INFINITY) > MAX_VIDEO_PREVIEW_BYTES) {
-						rejectedForSize = true;
-						return false;
+				matchedKey = file.name;
+				file.ondata = (err, chunk) => {
+					if (err) {
+						hasError = true;
+						chunks.length = 0;
+						file.terminate?.();
+						return;
 					}
-					matchedKey = file.name;
-					return true;
-				}
-				return false;
-			},
-		});
+					if (rejectedForSize) {
+						return;
+					}
+					if (chunk) {
+						totalExtractedBytes += chunk.byteLength;
+						if (totalExtractedBytes > MAX_REVIEW_VIDEO_EXPANDED_BYTES) {
+							rejectedForSize = true;
+							chunks.length = 0;
+							file.terminate?.();
+							return;
+						}
+						chunks.push(chunk);
+					}
+				};
+				file.start();
+			}
+		};
+		// ローカルヘッダの originalSize は偽装できる(0 や未設定)。UnzipInflate は1回の push の
+		// 出力を1チャンクにまとめるため、ZIP全体を一度に渡すと上限検査の前に数百MBを確保する。
+		// 入力を小さく刻めば、上限超過後の確保は入力1スライス分の展開量で済む。
+		for (let offset = 0; offset < zipBytes.byteLength && !rejectedForSize && !hasError; offset += PUSH_SLICE_BYTES) {
+			const end = Math.min(offset + PUSH_SLICE_BYTES, zipBytes.byteLength);
+			unzipper.push(zipBytes.subarray(offset, end), end === zipBytes.byteLength);
+		}
 	} catch {
 		return null;
 	}
-	if (!matchedKey) {
+
+	if (!matchedKey || rejectedForSize || hasError || totalExtractedBytes === 0) {
 		return null;
 	}
-	const video = unzipped[matchedKey] ?? null;
-	return video && video.byteLength <= MAX_VIDEO_PREVIEW_BYTES ? video : null;
+
+	const result = new Uint8Array(totalExtractedBytes);
+	let offset = 0;
+	for (const chunk of chunks) {
+		result.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return result;
 }
 
 /// R2から取得したZIPをまるごとメモリ展開するのはピークメモリも計算量も大きいため、

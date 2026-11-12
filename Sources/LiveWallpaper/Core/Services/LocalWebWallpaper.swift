@@ -390,7 +390,8 @@ final class LocalWebWallpaperServer {
             length: Int = 0,
             body: Bool = false
         ) {
-            let header = "HTTP/1.1 \(status)\r\nContent-Length: \(length)\r\n\(fields)Cache-Control: no-cache\r\nConnection: close\r\n\r\n"
+            let csp = "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https:; style-src 'self' 'unsafe-inline' https:; frame-src 'self' blob: https:; worker-src 'self' blob:; connect-src * data: blob:; img-src * data: blob:; media-src * data: blob:; font-src * data:; object-src 'none';"
+            let header = "HTTP/1.1 \(status)\r\nContent-Length: \(length)\r\n\(fields)X-Content-Type-Options: nosniff\r\nContent-Security-Policy: \(csp)\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n"
             connection.send(content: Data(header.utf8), completion: .contentProcessed { error in
                 if error == nil, body { self.sendChunk() } else { self.finish() }
             })

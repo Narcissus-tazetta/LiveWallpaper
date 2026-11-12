@@ -816,22 +816,28 @@ final class SceneRenderer {
                 var shape = part.shape
                 shape.material = material
                 shape.vertexBuffer = try shape.vertices.withUnsafeBytes { bytes in
-                    guard let buffer = device.makeBuffer(
-                        bytes: bytes.baseAddress!,
+                    guard let baseAddress = bytes.baseAddress, !bytes.isEmpty,
+                          let buffer = device.makeBuffer(
+                        bytes: baseAddress,
                         length: bytes.count,
                         options: .storageModeShared
                     )
                     else { throw RendererError.textureAllocationFailed }
                     return buffer
                 }
-                shape.indexBuffer = try shape.indices!.withUnsafeBytes { bytes in
-                    guard let buffer = device.makeBuffer(
-                        bytes: bytes.baseAddress!,
-                        length: bytes.count,
-                        options: .storageModeShared
-                    )
-                    else { throw RendererError.textureAllocationFailed }
-                    return buffer
+                if let indices = shape.indices, !indices.isEmpty {
+                    shape.indexBuffer = try indices.withUnsafeBytes { bytes in
+                        guard let baseAddress = bytes.baseAddress,
+                              let buffer = device.makeBuffer(
+                            bytes: baseAddress,
+                            length: bytes.count,
+                            options: .storageModeShared
+                        )
+                        else { throw RendererError.textureAllocationFailed }
+                        return buffer
+                    }
+                } else {
+                    shape.indexBuffer = nil
                 }
                 return shape
             }

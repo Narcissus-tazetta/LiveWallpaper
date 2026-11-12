@@ -160,11 +160,13 @@ extension SceneRenderer {
     /// The number of levels measured for 1280x720, 1600x900 and 512x512 (7, 7, 6) and for 640x360
     /// and 1024x256 (6, 5): halved until the short side is 16 or less, the base included.
     static func mipLevelCount(width: Int, height: Int) -> Int {
-        max(1, Int(ceil(log2(Double(min(width, height)) / 16))) + 1)
+        let shortSide = min(width, height)
+        guard shortSide > 0 else { return 1 }
+        return max(1, Int(ceil(log2(Double(shortSide) / 16))) + 1)
     }
 
     func keepMipHistory(of target: MTLTexture, commandBuffer: MTLCommandBuffer) throws {
-        guard readsMipHistory else { return }
+        guard readsMipHistory, target.width > 0, target.height > 0 else { return }
         if mipHistory?.width != target.width || mipHistory?.height != target.height || mipHistory?
             .pixelFormat != target.pixelFormat
         {

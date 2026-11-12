@@ -48,8 +48,15 @@ struct ZipArchiveReader {
         let header = try read(at: entry.localHeaderOffset, count: 30)
         guard header.u32(0) == 0x0403_4B50
         else { throw ReadError.malformed("local header of \(entry.name)") }
-        let dataOffset = entry
-            .localHeaderOffset + 30 + UInt64(header.u16(26)) + UInt64(header.u16(28))
+        let nameLen = UInt64(header.u16(26))
+        let extraLen = UInt64(header.u16(28))
+        let (o1, of1) = entry.localHeaderOffset.addingReportingOverflow(30)
+        let (o2, of2) = o1.addingReportingOverflow(nameLen)
+        let (dataOffset, of3) = o2.addingReportingOverflow(extraLen)
+        let (endOffset, of4) = dataOffset.addingReportingOverflow(entry.compressedSize)
+        guard !of1, !of2, !of3, !of4, endOffset <= fileSize else {
+            throw ReadError.malformed("data offset out of bounds for \(entry.name)")
+        }
         let compressed = try read(at: dataOffset, count: entry.compressedSize)
 
         switch entry.method {
@@ -96,10 +103,14 @@ struct ZipArchiveReader {
         var output = Data(count: expectedSize + 1)
         let written = output.withUnsafeMutableBytes { (dst: UnsafeMutableRawBufferPointer) -> Int in
             input.withUnsafeBytes { (src: UnsafeRawBufferPointer) -> Int in
+                guard let dstBase = dst.bindMemory(to: UInt8.self).baseAddress,
+                      let srcBase = src.bindMemory(to: UInt8.self).baseAddress else {
+                    return 0
+                }
                 // COMPRESSION_ZLIB is raw deflate (RFC 1951), which is what ZIP stores.
-                compression_decode_buffer(
-                    dst.bindMemory(to: UInt8.self).baseAddress!, dst.count,
-                    src.bindMemory(to: UInt8.self).baseAddress!, src.count,
+                return compression_decode_buffer(
+                    dstBase, dst.count,
+                    srcBase, src.count,
                     nil, COMPRESSION_ZLIB
                 )
             }
@@ -124,7 +135,8 @@ struct ZipArchiveReader {
         var eocd: Int?
         var index = tail.count - 22
         while index >= 0 {
-            if tail.u32(index) == 0x0605_4B50 {
+            if tail.u32(index) == 0x0605_4B50,
+               index + 22 + Int(tail.u16(index + 20)) == tail.count {
                 eocd = index
                 break
             }

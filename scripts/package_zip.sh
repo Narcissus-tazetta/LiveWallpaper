@@ -352,6 +352,3 @@ if [[ -f "$DMG_PATH" ]]; then
   echo "DMG: $DMG_PATH"
   ls -lh "$DMG_PATH"
 fi
-
-
- open dist/LiveWallpaper.app

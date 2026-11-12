@@ -38,6 +38,14 @@ final class LocalWebWallpaperTests: XCTestCase {
         request.setValue("bytes=10-19", forHTTPHeaderField: "Range")
         let (data, response) = try await URLSession.shared.data(for: request)
         XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 206)
+        XCTAssertEqual(
+            (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "X-Content-Type-Options"),
+            "nosniff"
+        )
+        XCTAssertTrue(
+            (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Security-Policy")?
+                .contains("default-src 'self'") == true
+        )
         XCTAssertEqual(data, bytes[10 ..< 20])
         XCTAssertEqual(
             (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Range"),

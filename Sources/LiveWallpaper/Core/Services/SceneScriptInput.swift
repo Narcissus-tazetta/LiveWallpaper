@@ -122,12 +122,15 @@ struct SceneScriptInput {
 enum SceneScriptOutputReader {
     static let magic: UInt8 = 0xFF
 
-    static func read(_ bytes: UnsafeRawBufferPointer) -> Any {
+    /// nil when the bytes are not a well-formed tree (truncated, unknown tag).
+    static func read(_ bytes: UnsafeRawBufferPointer) -> Any? {
+        guard bytes.count > 1, bytes[0] == magic else { return nil }
         var offset = 1
         return value(bytes, &offset)
     }
 
-    private static func value(_ bytes: UnsafeRawBufferPointer, _ offset: inout Int) -> Any {
+    private static func value(_ bytes: UnsafeRawBufferPointer, _ offset: inout Int) -> Any? {
+        guard offset < bytes.count else { return nil }
         let tag = bytes[offset]
         offset += 1
         switch tag {
@@ -136,40 +139,54 @@ enum SceneScriptOutputReader {
         case 1, 2:
             return NSNumber(value: tag == 2)
         case 3:
-            return NSNumber(value: Int64(littleEndian: load(bytes, &offset)))
+            guard let raw: Int64 = load(bytes, &offset) else { return nil }
+            return NSNumber(value: Int64(littleEndian: raw))
         case 4:
-            return NSNumber(value: Double(bitPattern: UInt64(littleEndian: load(bytes, &offset))))
+            guard let raw: UInt64 = load(bytes, &offset) else { return nil }
+            return NSNumber(value: Double(bitPattern: UInt64(littleEndian: raw)))
         case 5:
             return text(bytes, &offset)
         case 6:
-            let count = Int(UInt32(littleEndian: load(bytes, &offset)))
+            guard let countRaw: UInt32 = load(bytes, &offset) else { return nil }
+            let count = Int(UInt32(littleEndian: countRaw))
+            guard count >= 0, count <= bytes.count - offset else { return nil }
             var array: [Any] = []
             array.reserveCapacity(count)
             for _ in 0 ..< count {
-                array.append(value(bytes, &offset))
+                guard let element = value(bytes, &offset) else { return nil }
+                array.append(element)
             }
             return array
-        default:
-            let count = Int(UInt32(littleEndian: load(bytes, &offset)))
+        case 7:
+            guard let countRaw: UInt32 = load(bytes, &offset) else { return nil }
+            let count = Int(UInt32(littleEndian: countRaw))
+            guard count >= 0, count <= bytes.count - offset else { return nil }
             var object: [String: Any] = Dictionary(minimumCapacity: count)
             for _ in 0 ..< count {
-                let key = text(bytes, &offset)
-                object[key] = value(bytes, &offset)
+                guard let key = text(bytes, &offset),
+                      let element = value(bytes, &offset) else { return nil }
+                object[key] = element
             }
             return object
+        default:
+            return nil
         }
     }
 
     private static func load<T: FixedWidthInteger>(
         _ bytes: UnsafeRawBufferPointer,
         _ offset: inout Int
-    ) -> T {
-        defer { offset += MemoryLayout<T>.size }
+    ) -> T? {
+        let size = MemoryLayout<T>.size
+        guard offset + size <= bytes.count else { return nil }
+        defer { offset += size }
         return bytes.loadUnaligned(fromByteOffset: offset, as: T.self)
     }
 
-    private static func text(_ bytes: UnsafeRawBufferPointer, _ offset: inout Int) -> String {
-        let length = Int(UInt32(littleEndian: load(bytes, &offset)))
+    private static func text(_ bytes: UnsafeRawBufferPointer, _ offset: inout Int) -> String? {
+        guard let lengthRaw: UInt32 = load(bytes, &offset) else { return nil }
+        let length = Int(UInt32(littleEndian: lengthRaw))
+        guard length >= 0, offset + length <= bytes.count else { return nil }
         defer { offset += length }
         return String(
             decoding: UnsafeRawBufferPointer(rebasing: bytes[offset ..< offset + length]),

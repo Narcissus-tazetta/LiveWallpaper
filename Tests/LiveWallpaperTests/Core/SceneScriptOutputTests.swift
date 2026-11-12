@@ -30,7 +30,7 @@ final class SceneScriptOutputTests: XCTestCase {
         defer { lwjs_free_string(result) }
         let bytes = UnsafeRawBufferPointer(start: result, count: length)
         if bytes.first == SceneScriptOutputReader.magic {
-            return (SceneScriptOutputReader.read(bytes), true)
+            return try (XCTUnwrap(SceneScriptOutputReader.read(bytes)), true)
         }
         return try (JSONSerialization.jsonObject(with: Data(bytes)), false)
     }
@@ -245,5 +245,39 @@ final class SceneScriptOutputTests: XCTestCase {
                 "clearCursorMask": false
             ]
         )
+    }
+
+    func testReaderBoundsCheckingDoesNotCrashOnCorruptedInput() {
+        let emptyBytes: [UInt8] = []
+        emptyBytes.withUnsafeBytes { buffer in
+            XCTAssertNil(SceneScriptOutputReader.read(buffer))
+        }
+        let magicOnly: [UInt8] = [SceneScriptOutputReader.magic]
+        magicOnly.withUnsafeBytes { buffer in
+            XCTAssertNil(SceneScriptOutputReader.read(buffer))
+        }
+        // Tag 6 (array) with corrupted count 0xFFFF_FFFF and no data following
+        let corruptedArray: [UInt8] = [SceneScriptOutputReader.magic, 6, 0xFF, 0xFF, 0xFF, 0xFF]
+        corruptedArray.withUnsafeBytes { buffer in
+            XCTAssertNil(SceneScriptOutputReader.read(buffer))
+        }
+        // Tag 5 (string) with truncated length
+        let truncatedString: [UInt8] = [SceneScriptOutputReader.magic, 5, 0x10, 0x00, 0x00, 0x00, 0x61]
+        truncatedString.withUnsafeBytes { buffer in
+            XCTAssertNil(SceneScriptOutputReader.read(buffer))
+        }
+        // Unknown tag 99
+        let unknownTag: [UInt8] = [SceneScriptOutputReader.magic, 99, 0x01, 0x02]
+        unknownTag.withUnsafeBytes { buffer in
+            XCTAssertNil(SceneScriptOutputReader.read(buffer))
+        }
+    }
+
+    func testMipLevelCountBoundaryValues() {
+        XCTAssertEqual(SceneRenderer.mipLevelCount(width: 0, height: 0), 1)
+        XCTAssertEqual(SceneRenderer.mipLevelCount(width: -1, height: 100), 1)
+        XCTAssertEqual(SceneRenderer.mipLevelCount(width: 100, height: -1), 1)
+        XCTAssertEqual(SceneRenderer.mipLevelCount(width: 16, height: 16), 1)
+        XCTAssertGreaterThan(SceneRenderer.mipLevelCount(width: 1920, height: 1080), 1)
     }
 }

@@ -164,6 +164,10 @@ async function resolveThumbnailKey(env: Env, objectKey: string, body: SubmitRequ
 }
 
 export async function handleSubmit(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+	if (!(await checkRateLimit(env, "submit", request))) {
+		return errorResponse("too many requests", 429);
+	}
+
 	let body: SubmitRequest;
 	try {
 		body = await request.json();
@@ -180,6 +184,9 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 		!isNonEmptyString(objectKey, 128)
 	) {
 		return errorResponse("missing required fields");
+	}
+	if (/[\r\n]/.test(title) || /[\r\n]/.test(author)) {
+		return errorResponse("newlines are not allowed in title or author");
 	}
 	if (typeof sizeBytes !== "number" || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) {
 		return errorResponse("invalid sizeBytes");
@@ -200,9 +207,9 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 	if (
 		body.license !== undefined &&
 		body.license !== null &&
-		(typeof body.license !== "string" || body.license.length > MAX_LICENSE_LENGTH)
+		(typeof body.license !== "string" || body.license.length > MAX_LICENSE_LENGTH || /[\r\n]/.test(body.license))
 	) {
-		return errorResponse(`license must be a string of at most ${MAX_LICENSE_LENGTH} characters`);
+		return errorResponse(`license must be a single-line string of at most ${MAX_LICENSE_LENGTH} characters`);
 	}
 	if (
 		body.durationSeconds !== undefined &&
@@ -252,32 +259,40 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 
 	// エントリ作成と初回審査トークンの発行を1つのバッチ(D1の暗黙トランザクション)
 	// にまとめ、片方だけ書き込まれる状態を避ける。
-	await env.STORE_DB.batch([
-		env.STORE_DB.prepare(
-			`INSERT INTO store_entries
-				(id, title, author, description, object_key, thumbnail_key, sha256, size_bytes,
-				 duration_seconds, has_audio, license, created_at, status, withdraw_token_hash)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?)`,
-		).bind(
-			id,
-			title,
-			author,
-			body.description ?? null,
-			objectKey,
-			thumbnailKey,
-			sha256,
-			sizeBytes,
-			body.durationSeconds ?? null,
-			body.hasAudio === undefined ? null : body.hasAudio ? 1 : 0,
-			body.license ?? null,
-			createdAt,
-			withdrawTokenHash,
-		),
-		env.STORE_DB.prepare(
-			`INSERT INTO store_review_tokens (id, entry_id, token_hash, created_at, expires_at)
-			 VALUES (?, ?, ?, ?, ?)`,
-		).bind(tokenId, id, tokenHash, createdAt, expiresAt),
-	]);
+	try {
+		await env.STORE_DB.batch([
+			env.STORE_DB.prepare(
+				`INSERT INTO store_entries
+					(id, title, author, description, object_key, thumbnail_key, sha256, size_bytes,
+					 duration_seconds, has_audio, license, created_at, status, withdraw_token_hash)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested', ?)`,
+			).bind(
+				id,
+				title,
+				author,
+				body.description ?? null,
+				objectKey,
+				thumbnailKey,
+				sha256,
+				sizeBytes,
+				body.durationSeconds ?? null,
+				body.hasAudio === undefined ? null : body.hasAudio ? 1 : 0,
+				body.license ?? null,
+				createdAt,
+				withdrawTokenHash,
+			),
+			env.STORE_DB.prepare(
+				`INSERT INTO store_review_tokens (id, entry_id, token_hash, created_at, expires_at)
+				 VALUES (?, ?, ?, ?, ?)`,
+			).bind(tokenId, id, tokenHash, createdAt, expiresAt),
+		]);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (/UNIQUE constraint failed/i.test(message)) {
+			return errorResponse("entry already exists", 409);
+		}
+		throw error;
+	}
 
 	// 審査メール送信はレスポンスをブロックしない(Resendへの往復でアップロード完了の
 	// レスポンスを遅らせないため)。ctx.waitUntilでWorkerの実行を継続させる。

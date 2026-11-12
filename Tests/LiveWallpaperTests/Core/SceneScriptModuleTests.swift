@@ -311,4 +311,28 @@ final class SceneScriptModuleTests: XCTestCase {
         )
         XCTAssertEqual(frame.layers[document.layers[0].id]?.transform.offsetX, 0.065)
     }
+
+    func testEmptyScriptInputThrowsInsteadOfCrashing() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let storage = SceneScriptStorage(directory: tempDir).session(path: "/scene", screen: nil)
+        let runtime = SceneScriptRuntime()
+        let script = SceneScript(source: "function update(c){return []}", layerIDs: [])
+        let emptyInput = SceneScriptInput()
+        XCTAssertThrowsError(
+            try runtime.evaluate(
+                script,
+                input: emptyInput,
+                elapsedTime: 0,
+                layers: [],
+                rigs: [:],
+                storage: storage,
+                perScript: 1.0,
+                deadline: ProcessInfo.processInfo.systemUptime + 1.0,
+                moduleStart: 1.0,
+                moduleStartLimit: 2.0
+            )
+        )
+    }
 }

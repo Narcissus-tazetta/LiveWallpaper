@@ -9,7 +9,7 @@ export default defineWorkersConfig({
 				// there), so we inject dummy values here for the test environment only.
 				miniflare: {
 					bindings: {
-						ADMIN_KEY: "test-admin-key",
+						ADMIN_KEY: "test-admin-key-fixture",
 						RESEND_API_KEY: "test-resend-key",
 						R2_ACCESS_KEY_ID: "test-access-key",
 						R2_SECRET_ACCESS_KEY: "test-secret-key",

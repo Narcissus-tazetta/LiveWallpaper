@@ -263,6 +263,7 @@ final class SceneScriptTests: XCTestCase {
         for source in [
             "async function update(c){return []}",
             "function update(c){return import('std')}",
+            "function update(c){__lwjs_evalModule('m', 'export const x=1');return []}",
             "function update(c){return new Promise(r=>r([]))}",
             "function update(c){return [{id:c.targets[0].id,get values(){(async()=>{await 0})();return {opacity:1}}}]}"
         ] {
