@@ -104,7 +104,8 @@ struct ZipArchiveReader {
         let written = output.withUnsafeMutableBytes { (dst: UnsafeMutableRawBufferPointer) -> Int in
             input.withUnsafeBytes { (src: UnsafeRawBufferPointer) -> Int in
                 guard let dstBase = dst.bindMemory(to: UInt8.self).baseAddress,
-                      let srcBase = src.bindMemory(to: UInt8.self).baseAddress else {
+                      let srcBase = src.bindMemory(to: UInt8.self).baseAddress
+                else {
                     return 0
                 }
                 // COMPRESSION_ZLIB is raw deflate (RFC 1951), which is what ZIP stores.
@@ -136,7 +137,8 @@ struct ZipArchiveReader {
         var index = tail.count - 22
         while index >= 0 {
             if tail.u32(index) == 0x0605_4B50,
-               index + 22 + Int(tail.u16(index + 20)) == tail.count {
+               index + 22 + Int(tail.u16(index + 20)) == tail.count
+            {
                 eocd = index
                 break
             }

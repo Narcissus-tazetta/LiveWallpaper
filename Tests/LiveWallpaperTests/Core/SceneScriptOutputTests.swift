@@ -262,7 +262,15 @@ final class SceneScriptOutputTests: XCTestCase {
             XCTAssertNil(SceneScriptOutputReader.read(buffer))
         }
         // Tag 5 (string) with truncated length
-        let truncatedString: [UInt8] = [SceneScriptOutputReader.magic, 5, 0x10, 0x00, 0x00, 0x00, 0x61]
+        let truncatedString: [UInt8] = [
+            SceneScriptOutputReader.magic,
+            5,
+            0x10,
+            0x00,
+            0x00,
+            0x00,
+            0x61
+        ]
         truncatedString.withUnsafeBytes { buffer in
             XCTAssertNil(SceneScriptOutputReader.read(buffer))
         }

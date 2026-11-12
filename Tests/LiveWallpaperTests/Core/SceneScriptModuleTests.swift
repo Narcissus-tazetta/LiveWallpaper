@@ -313,7 +313,8 @@ final class SceneScriptModuleTests: XCTestCase {
     }
 
     func testEmptyScriptInputThrowsInsteadOfCrashing() throws {
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
         let storage = SceneScriptStorage(directory: tempDir).session(path: "/scene", screen: nil)

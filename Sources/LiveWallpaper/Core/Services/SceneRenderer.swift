@@ -818,10 +818,10 @@ final class SceneRenderer {
                 shape.vertexBuffer = try shape.vertices.withUnsafeBytes { bytes in
                     guard let baseAddress = bytes.baseAddress, !bytes.isEmpty,
                           let buffer = device.makeBuffer(
-                        bytes: baseAddress,
-                        length: bytes.count,
-                        options: .storageModeShared
-                    )
+                              bytes: baseAddress,
+                              length: bytes.count,
+                              options: .storageModeShared
+                          )
                     else { throw RendererError.textureAllocationFailed }
                     return buffer
                 }
@@ -829,10 +829,10 @@ final class SceneRenderer {
                     shape.indexBuffer = try indices.withUnsafeBytes { bytes in
                         guard let baseAddress = bytes.baseAddress,
                               let buffer = device.makeBuffer(
-                            bytes: baseAddress,
-                            length: bytes.count,
-                            options: .storageModeShared
-                        )
+                                  bytes: baseAddress,
+                                  length: bytes.count,
+                                  options: .storageModeShared
+                              )
                         else { throw RendererError.textureAllocationFailed }
                         return buffer
                     }

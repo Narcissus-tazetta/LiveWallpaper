@@ -480,14 +480,16 @@ extension SceneModelRenderer {
                         if let cached = shape.vertexBuffer {
                             vertexBuffer = cached
                         } else {
-                            guard !shape.vertices.isEmpty, let buffer = shape.vertices.withUnsafeBytes({ bytes -> MTLBuffer? in
-                                let baseAddress = bytes.baseAddress!
-                                return device.makeBuffer(
-                                    bytes: baseAddress,
-                                    length: bytes.count,
-                                    options: .storageModeShared
-                                )
-                            }) else { throw ModelError(detail: "vertex allocation failed") }
+                            guard !shape.vertices.isEmpty,
+                                  let buffer = shape.vertices
+                                  .withUnsafeBytes({ bytes -> MTLBuffer? in
+                                      let baseAddress = bytes.baseAddress!
+                                      return device.makeBuffer(
+                                          bytes: baseAddress,
+                                          length: bytes.count,
+                                          options: .storageModeShared
+                                      )
+                                  }) else { throw ModelError(detail: "vertex allocation failed") }
                             vertexBuffer = buffer
                         }
                         encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 1)

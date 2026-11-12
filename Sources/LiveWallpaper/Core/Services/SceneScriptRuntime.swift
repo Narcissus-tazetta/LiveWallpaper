@@ -189,10 +189,9 @@ final class SceneScriptRuntime {
             var outputLength = 0
             let result: UnsafeMutablePointer<CChar>? = withExtendedLifetime(storage) {
                 input.bytes.withUnsafeBufferPointer { buffer -> UnsafeMutablePointer<CChar>? in
-                    guard let baseAddress = buffer.baseAddress, !buffer.isEmpty else { return nil }
-                    return lwjs_evaluate(
+                    lwjs_evaluate(
                         pointer,
-                        baseAddress,
+                        buffer.baseAddress!,
                         budget,
                         &outputLength,
                         &error

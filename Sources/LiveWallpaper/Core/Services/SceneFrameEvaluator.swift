@@ -428,7 +428,8 @@ final class SceneFrameEvaluator {
                         var playback = rigPlayback[rigID] ?? baseRig.playback
                         for (index, change) in changes {
                             guard playback.indices.contains(index) else {
-                                warnings.append(skipped("rig \(rigID) has no playback layer \(index)"))
+                                warnings
+                                    .append(skipped("rig \(rigID) has no playback layer \(index)"))
                                 continue
                             }
                             change.apply(to: &playback[index])
@@ -440,7 +441,9 @@ final class SceneFrameEvaluator {
                         continue
                     }
                     Self.apply(adjustment, to: &layer)
-                    if let particles = adjustment.particles, var layerParticles = layer.layer.particles {
+                    if let particles = adjustment.particles,
+                       var layerParticles = layer.layer.particles
+                    {
                         particles.apply(to: &layerParticles)
                         layer.layer.particles = layerParticles
                     }
