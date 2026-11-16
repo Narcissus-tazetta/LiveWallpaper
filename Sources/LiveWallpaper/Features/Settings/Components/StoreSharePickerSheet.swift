@@ -10,7 +10,7 @@ extension SettingsView {
         isStoreSharePickerPresented = false
         storeShareStatus = .idle
         storeShareTitle = model.registeredVideoDisplayName(for: path)
-        storeShareAuthor = ""
+        storeShareAuthor = UserDefaults.standard.string(forKey: PrefsKey.storeShareAuthor) ?? ""
         storeShareLicense = ""
         storeShareTarget = StoreShareTarget(path: path)
     }

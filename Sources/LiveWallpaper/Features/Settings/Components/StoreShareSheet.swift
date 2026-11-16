@@ -97,6 +97,8 @@ extension SettingsView {
                     license: license.isEmpty ? nil : license,
                     thumbnailCache: thumbnailCache
                 )
+                // Saved only on success so a failed submit doesn't keep a mistyped name.
+                UserDefaults.standard.set(author, forKey: PrefsKey.storeShareAuthor)
                 storeShareStatus = .success(status: result.status)
                 storeMySubmissions.record(
                     id: result.id,

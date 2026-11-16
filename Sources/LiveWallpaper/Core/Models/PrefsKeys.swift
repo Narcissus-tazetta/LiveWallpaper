@@ -55,6 +55,7 @@ enum PrefsKey {
     static let selectedPlaylistID = "selectedPlaylistID"
     static let shufflePlaybackEnabled = "shufflePlaybackEnabled"
     static let spaceWallpaperFeatureEnabled = "spaceWallpaperFeatureEnabled"
+    static let storeShareAuthor = "storeShareAuthor"
     static let suspendDisabledDisplayIDs = "suspendDisabledDisplayIDs"
     static let suspendExclusionBundleIDs = "suspendExclusionBundleIDs"
     static let suspendHighSensitivityEnabled = "suspendHighSensitivityEnabled"
