@@ -576,11 +576,6 @@ private final class LayeredHEVCEncoder: @unchecked Sendable {
                 kVTCompressionPropertyKey_ContentLightLevelInfo
             )
         ]
-        for (source, destination) in colourKeys {
-            if let value = extensions[source] {
-                properties[destination] = value
-            }
-        }
         for (key, value) in properties {
             let result = VTSessionSetProperty(session, key: key, value: value as CFTypeRef)
             guard result == noErr else {
@@ -588,7 +583,57 @@ private final class LayeredHEVCEncoder: @unchecked Sendable {
                 throw LockScreenSyncError.exportFailed("\(key): \(Self.message(result))")
             }
         }
+        for (source, destination) in colourKeys {
+            guard let value = extensions[source] else {
+                continue
+            }
+            do {
+                try setColour(value, for: destination)
+            } catch {
+                VTCompressionSessionInvalidate(session)
+                throw error
+            }
+        }
         VTCompressionSessionPrepareToEncodeFrames(session)
+    }
+
+    /// Some H.264 files tag their colour with H.273 code points Core Video has no name
+    /// for ("YCbCrMatrix#5"), and VideoToolbox rejects those with kVTParameterErr.
+    private func setColour(_ value: Any, for key: CFString) throws {
+        var result = VTSessionSetProperty(session, key: key, value: value as CFTypeRef)
+        if result == kVTParameterErr, let named = Self.namedEquivalent(of: value, for: key) {
+            result = VTSessionSetProperty(session, key: key, value: named)
+        }
+        if result == kVTParameterErr {
+            // The video plays with the player's default for this property instead.
+            AppLog.lockScreenSync.error(
+                "lock screen video drops unsupported \(key as String, privacy: .public) \(String(describing: value), privacy: .public)"
+            )
+            return
+        }
+        guard result == noErr else {
+            throw LockScreenSyncError.exportFailed("\(key): \(Self.message(result))")
+        }
+    }
+
+    /// Code points that mean the same colour as a named one.
+    private static func namedEquivalent(of value: Any, for key: CFString) -> CFString? {
+        guard let name = (value as? String).map({ $0 as CFString }) else {
+            return nil
+        }
+        // BT.470 System B/G and SMPTE 170M use the same matrix coefficients.
+        if key == kVTCompressionPropertyKey_YCbCrMatrix,
+           CVYCbCrMatrixGetIntegerCodePointForString(name) == 5
+        {
+            return kCVImageBufferYCbCrMatrix_ITU_R_601_4
+        }
+        // SMPTE 240M and SMPTE 170M use the same primaries.
+        if key == kVTCompressionPropertyKey_ColorPrimaries,
+           CVColorPrimariesGetIntegerCodePointForString(name) == 7
+        {
+            return kCVImageBufferColorPrimaries_SMPTE_C
+        }
+        return nil
     }
 
     func encode(_ buffer: CVPixelBuffer, at time: CMTime, duration: CMTime) throws {
