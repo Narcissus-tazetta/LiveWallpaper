@@ -4,25 +4,35 @@
     let { label }: { label: string } = $props();
 
     let video: HTMLVideoElement;
-    let reducedMotion = $state(false);
 
     $effect(() => {
+        const preview = video;
         const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-        reducedMotion = query.matches;
-        const onChange = () => (reducedMotion = query.matches);
-        query.addEventListener("change", onChange);
+        let isVisible = false;
+        function updatePlayback() {
+            if (query.matches || !isVisible) {
+                preview.pause();
+                return;
+            }
+            void preview.play().catch((error: unknown) => {
+                // Pausing while playback starts rejects the pending play request.
+                if (error instanceof DOMException && error.name === "AbortError") return;
+                console.warn("Could not play the wallpaper preview:", error);
+            });
+        }
+        query.addEventListener("change", updatePlayback);
 
         // Pausing off-screen keeps the page itself from costing battery.
         const observer = new IntersectionObserver(([entry]) => {
-            if (reducedMotion) return;
-            if (entry.isIntersecting) void video.play();
-            else video.pause();
+            isVisible = entry.isIntersecting;
+            updatePlayback();
         });
-        observer.observe(video);
+        observer.observe(preview);
 
         return () => {
-            query.removeEventListener("change", onChange);
+            query.removeEventListener("change", updatePlayback);
             observer.disconnect();
+            preview.pause();
         };
     });
 </script>

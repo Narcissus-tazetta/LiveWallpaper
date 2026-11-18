@@ -45,7 +45,7 @@ extension SettingsView {
             }
 
             HStack(spacing: 6) {
-                if let duration = entry.durationSeconds {
+                if let duration = entry.roundedDurationSeconds {
                     Text(storeEntryDurationText(duration))
                 }
                 Text(storeEntrySizeText(entry.sizeBytes))
@@ -118,9 +118,8 @@ extension SettingsView {
         }
     }
 
-    private func storeEntryDurationText(_ seconds: Double) -> String {
-        let total = max(Int(seconds.rounded()), 0)
-        return String(format: "%d:%02d", total / 60, total % 60)
+    private func storeEntryDurationText(_ seconds: Int) -> String {
+        "\(seconds / 60):" + String(format: "%02d", seconds % 60)
     }
 
     private func storeEntrySizeText(_ bytes: Int) -> String {

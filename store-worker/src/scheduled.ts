@@ -41,6 +41,6 @@ export async function handleScheduled(env: Env): Promise<void> {
 		.bind(nowISO)
 		.all();
 
-	await Promise.all((results as { id: string }[]).map((row) => applyReviewDecision(env, row.id, "reject")));
+	await Promise.all((results as { id: string }[]).map((row) => applyReviewDecision(env, row.id, "reject", nowISO)));
 	await cleanupOrphanUploads(env);
 }

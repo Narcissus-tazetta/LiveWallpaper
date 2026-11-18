@@ -61,9 +61,7 @@ final class WallpaperLoopIntroPlaybackTests: XCTestCase {
 
         let frameCount = seconds * Int(fps)
         for frame in 0 ..< frameCount {
-            while !input.isReadyForMoreMediaData {
-                try await Task.sleep(nanoseconds: 5_000_000)
-            }
+            try await waitForFixtureWriter(writer, input: input)
             let pool = try XCTUnwrap(adaptor.pixelBufferPool)
             var buffer: CVPixelBuffer?
             CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)

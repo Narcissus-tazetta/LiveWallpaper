@@ -12,16 +12,9 @@ import {
 } from "./constants";
 import { sendReviewRequestEmail } from "./email";
 import type { Env } from "./env";
-import { errorResponse, isNonEmptyString, jsonResponse } from "./http";
+import { errorResponse, isNonEmptyString, jsonResponse, readJSONObject } from "./http";
 import { checkRateLimit } from "./rate-limit";
 import { generateRawToken, hashToken } from "./tokens";
-
-interface UploadUrlRequest {
-	contentType?: string;
-	sizeBytes?: number;
-	kind?: string;
-	relatedId?: string;
-}
 
 export async function handleUploadUrl(request: Request, env: Env): Promise<Response> {
 	// bodyのパースより前に汎用バケットでレート制限する。不正なJSONボディを
@@ -31,10 +24,8 @@ export async function handleUploadUrl(request: Request, env: Env): Promise<Respo
 		return errorResponse("too many requests", 429);
 	}
 
-	let body: UploadUrlRequest;
-	try {
-		body = await request.json();
-	} catch {
+	const body = await readJSONObject(request);
+	if (!body) {
 		return errorResponse("invalid JSON body");
 	}
 
@@ -54,10 +45,10 @@ export async function handleUploadUrl(request: Request, env: Env): Promise<Respo
 	const maxBytes = isThumbnail ? MAX_THUMBNAIL_BYTES : MAX_UPLOAD_BYTES;
 	const allowedContentTypes = isThumbnail ? ALLOWED_THUMBNAIL_CONTENT_TYPES : ALLOWED_CONTENT_TYPES;
 
-	if (!contentType || !allowedContentTypes.has(contentType)) {
+	if (typeof contentType !== "string" || !allowedContentTypes.has(contentType)) {
 		return errorResponse("unsupported contentType");
 	}
-	if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+	if (typeof sizeBytes !== "number" || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) {
 		return errorResponse("invalid sizeBytes");
 	}
 	if (sizeBytes > maxBytes) {
@@ -71,7 +62,7 @@ export async function handleUploadUrl(request: Request, env: Env): Promise<Respo
 		// 再利用させる。ここで新規に乱数idを発行してしまうと、/submit 側で
 		// thumbnailKeyがどのパッケージ用に発行されたものか検証できず、任意の
 		// thumbnails/<id>.jpg を他エントリに流用されてしまう(resolveThumbnailKey参照)。
-		if (!relatedId || !UUID_RE.test(relatedId)) {
+		if (typeof relatedId !== "string" || !UUID_RE.test(relatedId)) {
 			return errorResponse("missing or invalid relatedId for thumbnail upload");
 		}
 		// relatedIdは/submit未実行の新規パッケージのidであるはずで、その時点では
@@ -121,22 +112,6 @@ export async function handleUploadUrl(request: Request, env: Env): Promise<Respo
 	});
 }
 
-interface SubmitRequest {
-	id?: string;
-	title?: string;
-	author?: string;
-	sha256?: string;
-	sizeBytes?: number;
-	objectKey?: string;
-	durationSeconds?: number;
-	hasAudio?: boolean;
-	license?: string;
-	description?: string;
-	thumbnailKey?: string;
-	thumbnailSha256?: string;
-	thumbnailSizeBytes?: number;
-}
-
 /// サムネイルはベストエフォート: 動画本体と違い、検証に失敗しても投稿全体は
 /// 失敗させず、単に thumbnail_key を NULL のまま進める。
 ///
@@ -144,7 +119,7 @@ interface SubmitRequest {
 /// 発行されたもの(thumbnails/<packageId>.jpg)であることを必須で検証する。
 /// これが無いと、他エントリ用に発行された(あるいは自分が過去に取得した無関係な)
 /// thumbnails/<id>.jpg をそのまま流用されてしまう。
-async function resolveThumbnailKey(env: Env, objectKey: string, body: SubmitRequest): Promise<string | null> {
+async function resolveThumbnailKey(env: Env, objectKey: string, body: Record<string, unknown>): Promise<string | null> {
 	const { thumbnailKey, thumbnailSizeBytes } = body;
 	if (!thumbnailKey) {
 		return null;
@@ -153,7 +128,7 @@ async function resolveThumbnailKey(env: Env, objectKey: string, body: SubmitRequ
 	if (!packageMatch || thumbnailKey !== `thumbnails/${packageMatch[1]}.jpg`) {
 		return null;
 	}
-	if (typeof thumbnailSizeBytes !== "number" || !Number.isFinite(thumbnailSizeBytes) || thumbnailSizeBytes <= 0) {
+	if (typeof thumbnailSizeBytes !== "number" || !Number.isSafeInteger(thumbnailSizeBytes) || thumbnailSizeBytes <= 0) {
 		return null;
 	}
 	const head = await env.STORE_BUCKET.head(thumbnailKey);
@@ -168,10 +143,8 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 		return errorResponse("too many requests", 429);
 	}
 
-	let body: SubmitRequest;
-	try {
-		body = await request.json();
-	} catch {
+	const body = await readJSONObject(request);
+	if (!body) {
 		return errorResponse("invalid JSON body");
 	}
 
@@ -213,7 +186,9 @@ export async function handleSubmit(request: Request, env: Env, ctx: ExecutionCon
 	}
 	if (
 		body.durationSeconds !== undefined &&
-		(typeof body.durationSeconds !== "number" || !Number.isFinite(body.durationSeconds) || body.durationSeconds <= 0)
+		(typeof body.durationSeconds !== "number" ||
+			body.durationSeconds <= 0 ||
+			!Number.isSafeInteger(Math.round(body.durationSeconds)))
 	) {
 		return errorResponse("invalid durationSeconds");
 	}

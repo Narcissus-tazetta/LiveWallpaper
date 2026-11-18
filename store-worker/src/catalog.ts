@@ -36,7 +36,10 @@ function toPublicEntry(r: PublicEntryRow, origin: string) {
 		description: r.description,
 		sha256: r.sha256,
 		sizeBytes: r.size_bytes,
-		durationSeconds: r.duration_seconds,
+		durationSeconds:
+			r.duration_seconds !== null && r.duration_seconds > 0 && Number.isSafeInteger(Math.round(r.duration_seconds))
+				? r.duration_seconds
+				: null,
 		hasAudio: r.has_audio === null ? null : r.has_audio === 1,
 		license: r.license,
 		createdAt: r.created_at,
@@ -158,15 +161,6 @@ export async function handleDownload(request: Request, env: Env, id: string): Pr
 }
 
 export async function handleThumbnail(request: Request, env: Env, id: string): Promise<Response> {
-	// サムネイルは投稿後不変(content-addressed)なので、エッジにキャッシュして
-	// 人気エントリでも Worker 実行/R2 読み取りを繰り返さないようにする。
-	const cache = caches.default;
-	const cacheKey = new Request(request.url, request);
-	const cached = await cache.match(cacheKey);
-	if (cached) {
-		return cached;
-	}
-
 	const row = await env.STORE_DB.prepare(
 		"SELECT thumbnail_key FROM store_entries WHERE id = ? AND status = 'published'",
 	)
@@ -176,19 +170,27 @@ export async function handleThumbnail(request: Request, env: Env, id: string): P
 		return errorResponse("thumbnail not found", 404);
 	}
 
-	const object = await env.STORE_BUCKET.get(row.thumbnail_key);
-	if (!object) {
-		return errorResponse("thumbnail missing from storage", 404);
-	}
+	// The bytes can stay at the edge, but a cached response must still pass the publication check.
+	const cache = caches.default;
+	const cacheKey = new Request(request.url);
+	let cached = await cache.match(cacheKey);
+	if (!cached) {
+		const object = await env.STORE_BUCKET.get(row.thumbnail_key);
+		if (!object) {
+			return errorResponse("thumbnail missing from storage", 404);
+		}
 
-	const response = new Response(object.body, {
-		headers: {
-			"content-type": "image/jpeg",
-			"content-length": object.size.toString(),
-			"cache-control": "public, max-age=604800, immutable",
-		},
-	});
-	await cache.put(cacheKey, response.clone());
+		cached = new Response(object.body, {
+			headers: {
+				"content-type": "image/jpeg",
+				"content-length": object.size.toString(),
+				"cache-control": "public, max-age=604800, immutable",
+			},
+		});
+		await cache.put(cacheKey, cached.clone());
+	}
+	const response = new Response(cached.body, cached);
+	response.headers.set("cache-control", "no-cache");
 	return response;
 }
 

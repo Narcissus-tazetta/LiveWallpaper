@@ -201,23 +201,24 @@ export async function handleAdminResendReview(
 	}
 
 	const nowISO = new Date().toISOString();
-	await env.STORE_DB.prepare(
-		`UPDATE store_review_tokens SET expires_at = ?
-		 WHERE entry_id = ? AND consumed_at IS NULL AND expires_at > ?`,
-	)
-		.bind(nowISO, id, nowISO)
-		.run();
-
 	const tokenId = crypto.randomUUID();
 	const rawToken = generateRawToken();
 	const tokenHash = await hashToken(rawToken);
 	const expiresAt = new Date(Date.now() + REVIEW_TOKEN_TTL_MS).toISOString();
-	await env.STORE_DB.prepare(
-		`INSERT INTO store_review_tokens (id, entry_id, token_hash, created_at, expires_at)
-		 VALUES (?, ?, ?, ?, ?)`,
-	)
-		.bind(tokenId, id, tokenHash, nowISO, expiresAt)
-		.run();
+	// Keep the current link usable if recording its replacement fails.
+	const [inserted] = await env.STORE_DB.batch([
+		env.STORE_DB.prepare(
+			`INSERT INTO store_review_tokens (id, entry_id, token_hash, created_at, expires_at)
+			 SELECT ?, id, ?, ?, ? FROM store_entries WHERE id = ? AND status = 'requested'`,
+		).bind(tokenId, tokenHash, nowISO, expiresAt, id),
+		env.STORE_DB.prepare(
+			`UPDATE store_review_tokens SET expires_at = ?
+			 WHERE entry_id = ? AND id != ? AND consumed_at IS NULL AND expires_at > ? AND changes() = 1`,
+		).bind(nowISO, id, tokenId, nowISO),
+	]);
+	if (inserted.meta.changes === 0) {
+		return errorResponse("entry is no longer in 'requested' state", 409);
+	}
 
 	const origin = new URL(request.url).origin;
 	ctx.waitUntil(

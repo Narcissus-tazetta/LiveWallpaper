@@ -1,12 +1,13 @@
 import { MAX_REPORT_REASON_LENGTH, REPORT_THRESHOLD } from "./constants";
 import { notifyReport } from "./email";
 import type { Env } from "./env";
-import { clientIP, errorResponse, jsonResponse } from "./http";
+import { clientIP, errorResponse, isNonEmptyString, jsonResponse, readJSONObject } from "./http";
 import { checkRateLimit } from "./rate-limit";
 
-interface ReportRequest {
-	entryId?: string;
-	reason?: string;
+interface ReportedEntry {
+	title: string;
+	report_count: number;
+	status: string;
 }
 
 export async function handleReport(request: Request, env: Env): Promise<Response> {
@@ -14,14 +15,12 @@ export async function handleReport(request: Request, env: Env): Promise<Response
 		return errorResponse("too many requests", 429);
 	}
 
-	let body: ReportRequest;
-	try {
-		body = await request.json();
-	} catch {
+	const body = await readJSONObject(request);
+	if (!body) {
 		return errorResponse("invalid JSON body");
 	}
 	const { entryId, reason } = body;
-	if (!entryId) {
+	if (!isNonEmptyString(entryId, 64)) {
 		return errorResponse("missing entryId");
 	}
 	if (
@@ -32,43 +31,28 @@ export async function handleReport(request: Request, env: Env): Promise<Response
 		return errorResponse(`reason must be a string of at most ${MAX_REPORT_REASON_LENGTH} characters`);
 	}
 
-	const entry = await env.STORE_DB.prepare(
-		"SELECT title, report_count FROM store_entries WHERE id = ? AND status = 'published'",
-	)
-		.bind(entryId)
-		.first<{ title: string; report_count: number }>();
-	if (!entry) {
+	// Counting in the same transaction keeps a failed update retryable. changes()
+	// refers to the preceding INSERT and is zero for a duplicate report.
+	const [inserted, , selected] = await env.STORE_DB.batch<ReportedEntry>([
+		env.STORE_DB.prepare(
+			`INSERT INTO store_reports (entry_id, reason, reporter_ip, reported_at)
+			 SELECT id, ?, ?, ? FROM store_entries WHERE id = ? AND status = 'published'
+			 ON CONFLICT(entry_id, reporter_ip) DO NOTHING`,
+		).bind(reason ?? null, clientIP(request), new Date().toISOString(), entryId),
+		env.STORE_DB.prepare(
+			`UPDATE store_entries
+			 SET report_count = report_count + 1,
+			     status = CASE WHEN report_count + 1 >= ? THEN 'pending' ELSE status END
+			 WHERE id = ? AND changes() = 1`,
+		).bind(REPORT_THRESHOLD, entryId),
+		env.STORE_DB.prepare("SELECT title, report_count, status FROM store_entries WHERE id = ?").bind(entryId),
+	]);
+	const entry = selected.results[0];
+	if (!entry || (inserted.meta.changes === 0 && entry.status !== "published")) {
 		return errorResponse("entry not found", 404);
 	}
-
-	const reporterIP = clientIP(request);
-	const insertResult = await env.STORE_DB.prepare(
-		`INSERT INTO store_reports (entry_id, reason, reporter_ip, reported_at)
-		 VALUES (?, ?, ?, ?) ON CONFLICT(entry_id, reporter_ip) DO NOTHING`,
-	)
-		.bind(entryId, reason ?? null, reporterIP, new Date().toISOString())
-		.run();
-	if (insertResult.meta.changes !== 1) {
-		// 同じ通報者からの重複通報は黙って現在の件数を返す(多重投票で閾値を
-		// 越えさせられないようにする)。
-		return jsonResponse({ ok: true, reportCount: entry.report_count });
+	if (inserted.meta.changes === 1) {
+		await notifyReport(env, entryId, entry.title, reason ?? null, entry.report_count, entry.status === "pending");
 	}
-
-	await env.STORE_DB.prepare(
-		`UPDATE store_entries
-		 SET report_count = report_count + 1,
-		     status = CASE WHEN report_count + 1 >= ? THEN 'pending' ELSE status END
-		 WHERE id = ? AND status IN ('published', 'pending')`,
-	)
-		.bind(REPORT_THRESHOLD, entryId)
-		.run();
-	const updated = await env.STORE_DB.prepare("SELECT report_count, status FROM store_entries WHERE id = ?")
-		.bind(entryId)
-		.first<{ report_count: number; status: string }>();
-	const newCount = updated?.report_count ?? entry.report_count;
-	const hidden = updated?.status === "pending";
-
-	await notifyReport(env, entryId, entry.title, reason ?? null, newCount, hidden);
-
-	return jsonResponse({ ok: true, reportCount: newCount });
+	return jsonResponse({ ok: true, reportCount: entry.report_count });
 }

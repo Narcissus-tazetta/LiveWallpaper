@@ -14,6 +14,11 @@ struct StoreEntry: Decodable, Identifiable, Equatable {
     let downloadCount: Int
     let downloadURL: String
     let thumbnailURL: String?
+
+    var roundedDurationSeconds: Int? {
+        guard let durationSeconds, durationSeconds > 0 else { return nil }
+        return Int(exactly: durationSeconds.rounded())
+    }
 }
 
 struct StoreCatalogResponse: Decodable {

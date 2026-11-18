@@ -1,12 +1,8 @@
 import type { Env } from "./env";
-import { errorResponse, jsonResponse } from "./http";
+import { errorResponse, isNonEmptyString, jsonResponse, readJSONObject } from "./http";
 import { checkRateLimit } from "./rate-limit";
 import { deleteEntryObjects, deleteEntryRecords } from "./storage";
 import { hashToken } from "./tokens";
-
-interface WithdrawRequest {
-	token?: string;
-}
 
 /// 投稿者本人による自己サービスの取り下げ。/submitのレスポンスで一度だけ渡した
 /// 秘密トークンをこの端末がローカルに持っている前提で、ハッシュが一致した場合のみ
@@ -18,13 +14,11 @@ export async function handleWithdraw(request: Request, env: Env, id: string): Pr
 		return errorResponse("too many requests", 429);
 	}
 
-	let body: WithdrawRequest;
-	try {
-		body = await request.json();
-	} catch {
+	const body = await readJSONObject(request);
+	if (!body) {
 		return errorResponse("invalid JSON body");
 	}
-	if (!body.token) {
+	if (!isNonEmptyString(body.token, 128)) {
 		return errorResponse("missing token");
 	}
 

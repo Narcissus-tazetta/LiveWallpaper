@@ -37,9 +37,7 @@ final class SceneVideoFramesTests: XCTestCase {
         XCTAssertTrue(writer.startWriting())
         writer.startSession(atSourceTime: .zero)
         for frame in 0 ..< 20 {
-            while !input.isReadyForMoreMediaData {
-                try await Task.sleep(nanoseconds: 5_000_000)
-            }
+            try await waitForFixtureWriter(writer, input: input)
             var buffer: CVPixelBuffer?
             try CVPixelBufferPoolCreatePixelBuffer(nil, XCTUnwrap(adaptor.pixelBufferPool), &buffer)
             let pixels = try XCTUnwrap(buffer)

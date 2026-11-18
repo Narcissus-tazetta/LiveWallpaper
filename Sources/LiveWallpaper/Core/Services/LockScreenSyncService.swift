@@ -187,30 +187,29 @@ final class LockScreenSyncService {
         let temporaryVideoURL = paths.videosDirectory
             .appendingPathComponent(".\(borrowedAsset.id).\(UUID().uuidString)")
             .appendingPathExtension("mov")
+        defer { removeStagedVideo(at: temporaryVideoURL) }
         try await videoExporter.prepareVideo(
             from: videoURL, to: temporaryVideoURL, start: start, progress: progress
         )
         try Task.checkCancellation()
 
+        try commitSyncOperation(
+            operationID,
+            asset: borrowedAsset,
+            temporaryVideoURL: temporaryVideoURL
+        )
+        return borrowedAsset
+    }
+
+    private func removeStagedVideo(at url: URL) {
         do {
-            try commitSyncOperation(
-                operationID,
-                asset: borrowedAsset,
-                temporaryVideoURL: temporaryVideoURL
-            )
-            return borrowedAsset
-        } catch is CancellationError {
-            try? fileManager.removeItem(at: temporaryVideoURL)
-            throw CancellationError()
+            try fileManager.removeItem(at: url)
+        } catch let error as CocoaError where error.code == .fileNoSuchFile {
+            return
         } catch {
-            do {
-                try restoreOriginalAerial(assetID: borrowedAsset.id)
-            } catch let rollbackError {
-                AppLog.lockScreenSync.error(
-                    "rollback of aerial \(borrowedAsset.id, privacy: .public) failed error=\(rollbackError.localizedDescription, privacy: .public)"
-                )
-            }
-            throw error
+            AppLog.lockScreenSync.error(
+                "could not remove staged video \(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
         }
     }
 
@@ -243,26 +242,41 @@ final class LockScreenSyncService {
         asset: BorrowedAerialAsset,
         temporaryVideoURL: URL
     ) throws {
-        operationLock.lock()
-        guard currentSyncOperationID == id else {
-            operationLock.unlock()
-            try? fileManager.removeItem(at: temporaryVideoURL)
-            throw CancellationError()
-        }
-        do {
+        try operationLock.withLock {
+            guard currentSyncOperationID == id else {
+                throw CancellationError()
+            }
             // A sync within the same borrow (a new video) backs up a store this app
             // already patched; restoring must go to the one from before the borrow.
             let existingBackup = activeLease?.storeBackupFileName
-            try replaceItem(at: asset.videoURL, with: temporaryVideoURL)
-            let backupURL = try applyWallpaperSelection(assetID: asset.id)
-            let kept = existingBackup ?? backupURL?.lastPathComponent
-            saveLease(for: asset, storeBackupFileName: kept)
-            pruneWallpaperStoreBackups(keeping: kept)
-        } catch {
-            operationLock.unlock()
-            throw error
+            let rollbackVideo = asset.videoURL.deletingLastPathComponent()
+                .appendingPathComponent(".rollback-\(id).mov")
+            do {
+                _ = try fileManager.replaceItemAt(
+                    asset.videoURL,
+                    withItemAt: temporaryVideoURL,
+                    backupItemName: rollbackVideo.lastPathComponent,
+                    options: .withoutDeletingBackupItem
+                )
+                let backupURL = try applyWallpaperSelection(assetID: asset.id)
+                let kept = existingBackup ?? backupURL?.lastPathComponent
+                saveLease(for: asset, storeBackupFileName: kept)
+                pruneWallpaperStoreBackups(keeping: kept)
+            } catch {
+                // The file immediately before the swap may be the active borrowed video.
+                if fileManager.fileExists(atPath: rollbackVideo.path) {
+                    do {
+                        try replaceItem(at: asset.videoURL, with: rollbackVideo)
+                    } catch let rollbackError {
+                        AppLog.lockScreenSync.error(
+                            "rollback of aerial \(asset.id, privacy: .public) from \(rollbackVideo.lastPathComponent, privacy: .public) failed: \(rollbackError.localizedDescription, privacy: .public)"
+                        )
+                    }
+                }
+                throw error
+            }
+            removeStagedVideo(at: rollbackVideo)
         }
-        operationLock.unlock()
 
         // ロック解放後に呼ぶ。リースは永続化済みなので、プロセス kill を含む
         // この処理中に cancelPendingSync()(メインスレッド)がロック待ちしない。
@@ -443,10 +457,6 @@ final class LockScreenSyncService {
         try fileManager.copyItem(at: asset.videoURL, to: backupURL)
     }
 
-    private func restoreOriginalAerial(assetID: String) throws {
-        try restoreOriginalAerialIfPossible(assetID: assetID)
-    }
-
     private func restoreOriginalAerialIfPossible(assetID: String) throws {
         let paths = try manifestResolver.resolvePaths()
         let backupURL = try backupURLForBorrowedAerial(assetID: assetID)
@@ -503,7 +513,7 @@ final class LockScreenSyncService {
                 format: nil
             ) as? [String: Any]
         else {
-            return nil
+            throw LockScreenSyncError.wallpaperStoreVerificationFailed
         }
 
         let transactionBackupURL = try backupWallpaperStore(indexURL)

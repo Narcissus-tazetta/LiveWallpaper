@@ -28,6 +28,7 @@ final class StoreCatalogController: ObservableObject {
     private var hasLoadedOnce: Bool = false
     private var searchDebounceTask: Task<Void, Never>?
     private var requestGeneration: UInt64 = 0
+    private var linkedEntryGeneration: UUID?
     private var downloadGeneration: UUID?
     private let session: URLSession
     private let fileManager: FileManager
@@ -61,6 +62,9 @@ final class StoreCatalogController: ObservableObject {
         }
         searchQuery = query
         searchDebounceTask?.cancel()
+        // The previous cursor belongs to the old query even during the debounce.
+        requestGeneration &+= 1
+        nextCursor = nil
         searchDebounceTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 350_000_000)
             guard let self, !Task.isCancelled else {
@@ -68,7 +72,7 @@ final class StoreCatalogController: ObservableObject {
             }
             isSearching = true
             await reload()
-            isSearching = false
+            if !Task.isCancelled { isSearching = false }
         }
     }
 
@@ -78,8 +82,10 @@ final class StoreCatalogController: ObservableObject {
         }
         sortOption = option
         searchDebounceTask?.cancel()
+        isSearching = false
         // Taskの実行開始前に旧レスポンスが返る隙をなくす。
         requestGeneration &+= 1
+        nextCursor = nil
         Task { [weak self] in await self?.reload() }
     }
 
@@ -211,10 +217,14 @@ final class StoreCatalogController: ObservableObject {
     }
 
     func openLinkedEntry(id: String) async {
+        let generation = UUID()
+        linkedEntryGeneration = generation
+        linkedEntry = nil
         downloadResultMessage = nil
         let url = endpointURL.appendingPathComponent("entries").appendingPathComponent(id)
         do {
             let (data, response) = try await session.data(from: url)
+            guard linkedEntryGeneration == generation else { return }
             guard let http = response as? HTTPURLResponse else {
                 throw StoreClientError.invalidResponse
             }
@@ -229,6 +239,7 @@ final class StoreCatalogController: ObservableObject {
             }
             linkedEntry = try JSONDecoder().decode(StoreEntry.self, from: data)
         } catch {
+            guard linkedEntryGeneration == generation else { return }
             AppLog.store.error(
                 "linked entry failed id=\(id, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
             )

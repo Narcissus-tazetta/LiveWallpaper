@@ -97,6 +97,59 @@ final class StoreConcurrencyTests: XCTestCase {
         XCTAssertNil(controller.downloadingEntryID)
     }
 
+    func testOlderStoreLinkDoesNotReplaceTheMostRecentlyOpenedEntry() async throws {
+        let controller = StoreCatalogController(session: session)
+        let started = expectation(description: "first link request started")
+        var firstRequest: ControlledStoreProtocol?
+        ControlledStoreProtocol.onRequest = { request in
+            if request.request.url?.lastPathComponent == "a" {
+                firstRequest = request
+                started.fulfill()
+            } else {
+                do { try request.respond(self.entryResponse("b")) }
+                catch { XCTFail("Could not encode linked entry: \(error)") }
+            }
+        }
+        let first = Task { await controller.openLinkedEntry(id: "a") }
+        await fulfillment(of: [started], timeout: 2)
+        await controller.openLinkedEntry(id: "b")
+        try XCTUnwrap(firstRequest).respond(entryResponse("a"))
+        await first.value
+        XCTAssertEqual(controller.linkedEntry?.id, "b")
+    }
+
+    func testNewSearchDoesNotReuseThePreviousSearchPaginationCursor() async {
+        let controller = StoreCatalogController(session: session)
+        var requestedCursors: [String] = []
+        ControlledStoreProtocol.onRequest = { request in
+            let queryItems = request.request.url.flatMap {
+                URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems
+            }
+            if let cursor = queryItems?.first(where: { $0.name == "cursor" })?.value {
+                requestedCursors.append(cursor)
+            }
+            do {
+                try request.respond([
+                    "entries": [self.entryResponse("old")],
+                    "nextCursor": "old-cursor"
+                ])
+            } catch { XCTFail("Could not encode catalog page: \(error)") }
+        }
+        await controller.reload()
+        controller.setSearchQuery("new search")
+        await controller.loadMoreIfNeeded(currentEntry: entry("old"))
+        XCTAssertTrue(requestedCursors.isEmpty)
+    }
+
+    func testStoreDurationOutsideTheIntegerRangeIsOmitted() throws {
+        for (seconds, expected): (Double, Int?) in [(Double(Int.max), nil), (59.9, 60)] {
+            let payload = entryResponse("a").merging(["durationSeconds": seconds]) { _, new in new }
+            let data = try JSONSerialization.data(withJSONObject: payload)
+            let entry = try JSONDecoder().decode(StoreEntry.self, from: data)
+            XCTAssertEqual(entry.roundedDurationSeconds, expected)
+        }
+    }
+
     func testRefreshUpdatesOriginalSubmissionAfterAnotherIsInserted() async throws {
         let controller = StoreMySubmissionsController(defaults: defaults, session: session)
         record("a", in: controller)
@@ -272,5 +325,13 @@ final class StoreConcurrencyTests: XCTestCase {
             createdAt: "2026-11-07T00:00:00Z", downloadCount: 0,
             downloadURL: "https://store-test.invalid/\(id)", thumbnailURL: nil
         )
+    }
+
+    private func entryResponse(_ id: String) -> [String: Any] {
+        [
+            "id": id, "title": id, "author": "test", "sha256": String(repeating: "0", count: 64),
+            "sizeBytes": 1, "createdAt": "2026-11-07T00:00:00Z", "downloadCount": 0,
+            "downloadURL": "https://store-test.invalid/\(id)"
+        ]
     }
 }

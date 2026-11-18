@@ -41,9 +41,7 @@ final class StoreSceneVideoCompressorTests: XCTestCase {
         }
         CVPixelBufferUnlockBaseAddress(buffer, [])
         for frame in 0 ..< 60 {
-            while !input.isReadyForMoreMediaData {
-                try await Task.sleep(nanoseconds: 1_000_000)
-            }
+            try await waitForFixtureWriter(writer, input: input)
             XCTAssertTrue(adaptor.append(
                 buffer,
                 withPresentationTime: CMTime(value: Int64(frame), timescale: 30)

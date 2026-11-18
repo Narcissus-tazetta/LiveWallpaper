@@ -9,6 +9,17 @@ export function errorResponse(message: string, status = 400): Response {
 	return jsonResponse({ error: message }, status);
 }
 
+export async function readJSONObject(request: Request): Promise<Record<string, unknown> | null> {
+	let body: unknown;
+	try {
+		body = await request.json();
+	} catch (error) {
+		if (error instanceof SyntaxError) return null;
+		throw error;
+	}
+	return body !== null && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
+}
+
 export function isNonEmptyString(value: unknown, maxLength: number): value is string {
 	return typeof value === "string" && value.trim().length > 0 && value.length <= maxLength;
 }

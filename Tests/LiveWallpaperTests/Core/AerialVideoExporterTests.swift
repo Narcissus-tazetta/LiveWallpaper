@@ -1,5 +1,6 @@
 import AVFoundation
 @testable import LiveWallpaper
+import VideoToolbox
 import XCTest
 
 final class AerialVideoExporterTests: XCTestCase {
@@ -104,6 +105,15 @@ final class AerialVideoExporterTests: XCTestCase {
             try Data(contentsOf: directory.appendingPathComponent("first.mov")),
             try Data(contentsOf: directory.appendingPathComponent("second.mov"))
         )
+
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: source.path)
+        let third = directory.appendingPathComponent("source-unavailable.mov")
+        try await exporter.prepareVideo(from: source, to: third) { reports.add($0) }
+        XCTAssertEqual(reports.values.count, first.count)
+        XCTAssertEqual(
+            try Data(contentsOf: third),
+            try Data(contentsOf: directory.appendingPathComponent("first.mov"))
+        )
     }
 
     /// Without the app, the desktop shows the lock screen video's first frame: a video
@@ -185,6 +195,28 @@ final class AerialVideoExporterTests: XCTestCase {
         }
     }
 
+    func testExportPreservesTheSourceVideoOrientation() async throws {
+        let upright = CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: 96, ty: 0)
+        let source = try await writeH264Video(seconds: 2, framesPerSecond: 30, transform: upright)
+        let destination = directory.appendingPathComponent("aerial.mov")
+        try await AerialVideoExporter(
+            fileManager: .default,
+            encodesVideo: true,
+            cacheDirectory: nil
+        )
+        .prepareVideo(from: source, to: destination, start: 0)
+
+        let asset = AVURLAsset(url: destination)
+        let track = try await asset.loadTracks(withMediaType: .video).first
+        let transform = try await XCTUnwrap(track).load(.preferredTransform)
+        XCTAssertEqual(transform, upright)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        let frame = try await generator.image(at: .zero).image
+        XCTAssertEqual(frame.width, 96)
+        XCTAssertEqual(frame.height, 160)
+    }
+
     private func brightness(of image: CGImage) throws -> Double {
         var pixel = [UInt8](repeating: 0, count: 4)
         let context = try XCTUnwrap(CGContext(
@@ -200,14 +232,20 @@ final class AerialVideoExporterTests: XCTestCase {
     private func writeH264Video(
         seconds: Int,
         framesPerSecond: Int32,
+        transform: CGAffineTransform = .identity,
         // A brightness that changes every frame, so no two frames are identical.
         brightness: (Int) -> Int32 = { Int32($0 * 4 % 256) }
     ) async throws -> URL {
         let url = directory.appendingPathComponent("source.mp4")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 160, AVVideoHeightKey: 96
+            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 160, AVVideoHeightKey: 96,
+            // Generating the source clip should not contend with the lock-screen encoder.
+            AVVideoEncoderSpecificationKey: [
+                kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder as String: false
+            ]
         ])
+        input.transform = transform
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(
             assetWriterInput: input,
             sourcePixelBufferAttributes: [
@@ -219,9 +257,7 @@ final class AerialVideoExporterTests: XCTestCase {
         XCTAssertTrue(writer.startWriting())
         writer.startSession(atSourceTime: .zero)
         for frame in 0 ..< Int(framesPerSecond) * seconds {
-            while !input.isReadyForMoreMediaData {
-                try await Task.sleep(nanoseconds: 1_000_000)
-            }
+            try await waitForFixtureWriter(writer, input: input)
             let pool = try XCTUnwrap(adaptor.pixelBufferPool)
             var buffer: CVPixelBuffer?
             CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
@@ -259,5 +295,31 @@ private final class Reports: @unchecked Sendable {
         lock.lock()
         stored.append(value)
         lock.unlock()
+    }
+}
+
+private enum FixtureWriterError: LocalizedError {
+    case stopped
+    case timedOut
+
+    var errorDescription: String? {
+        switch self {
+        case .stopped: "Fixture writer stopped before accepting the next frame"
+        case .timedOut: "Fixture writer did not accept a frame within 15 seconds"
+        }
+    }
+}
+
+func waitForFixtureWriter(_ writer: AVAssetWriter, input: AVAssetWriterInput) async throws {
+    let deadline = ProcessInfo.processInfo.systemUptime + 15
+    while !input.isReadyForMoreMediaData {
+        guard writer.status == .writing else {
+            throw writer.error ?? FixtureWriterError.stopped
+        }
+        guard ProcessInfo.processInfo.systemUptime < deadline else {
+            writer.cancelWriting()
+            throw FixtureWriterError.timedOut
+        }
+        try await Task.sleep(nanoseconds: 2_000_000)
     }
 }

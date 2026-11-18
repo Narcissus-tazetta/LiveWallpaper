@@ -2,6 +2,15 @@ import Foundation
 @testable import LiveWallpaper
 import XCTest
 
+private final class CancelAfterStagingVideoFileManager: FileManager {
+    override func copyItem(at sourceURL: URL, to destinationURL: URL) throws {
+        try super.copyItem(at: sourceURL, to: destinationURL)
+        if destinationURL.lastPathComponent.hasPrefix(".") {
+            withUnsafeCurrentTask { $0?.cancel() }
+        }
+    }
+}
+
 final class LockScreenSyncServiceTests: XCTestCase {
     private let tahoeID = "4C108785-A7BA-422E-9C79-B0129F1D5550"
     private let sequoiaID = "6D6834A4-2F0F-479A-B053-7D4DC5CB8EB7"
@@ -57,6 +66,25 @@ final class LockScreenSyncServiceTests: XCTestCase {
         let store = try wallpaperStore(at: fixture.storeURL)
         XCTAssertEqual((store["SystemDefault"] as? [String: Any])?["Type"] as? String, "linked")
         try assertAllWallpaperStatesShowTheAerial(in: store, assetID: tahoeID)
+    }
+
+    func testCancellingAfterStagingTheVideoRemovesIt() async throws {
+        let fixture = try makeFixture(downloadedIDs: [tahoeID])
+        let source = try writeFakeVideo(named: "source.mov", contents: "live-video")
+        let service = makeService(fixture, fileManager: CancelAfterStagingVideoFileManager())
+        let sync = Task { try await service.sync(videoURL: source) }
+        do {
+            _ = try await sync.value
+            XCTFail("Expected cancellation")
+        } catch is CancellationError {}
+
+        let videos = fixture.videoURL(tahoeID).deletingLastPathComponent()
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(atPath: videos.path),
+            ["\(tahoeID).mov"]
+        )
+        XCTAssertEqual(try String(contentsOf: fixture.videoURL(tahoeID)), "original-\(tahoeID)")
+        XCTAssertNil(service.activeLease)
     }
 
     func testSyncCreatesLeaseAndRestoreClearsIt() async throws {
@@ -134,6 +162,47 @@ final class LockScreenSyncServiceTests: XCTestCase {
             XCTAssertEqual(try String(contentsOf: fixture.videoURL(tahoeID)), "original-\(tahoeID)")
             XCTAssertEqual(try Data(contentsOf: fixture.storeURL), originalStoreData)
         }
+    }
+
+    func testSyncFailsWithoutBorrowingWhenWallpaperStoreHasUnexpectedShape() async throws {
+        let fixture = try makeFixture(downloadedIDs: [tahoeID])
+        let original = try PropertyListSerialization.data(
+            fromPropertyList: ["unexpected"],
+            format: .binary,
+            options: 0
+        )
+        try original.write(to: fixture.storeURL)
+        let service = makeService(fixture)
+        let source = try writeFakeVideo(named: "source.mov", contents: "live-video")
+
+        do {
+            _ = try await service.sync(videoURL: source)
+            XCTFail("Expected wallpaperStoreVerificationFailed")
+        } catch LockScreenSyncError.wallpaperStoreVerificationFailed {}
+        XCTAssertNil(service.activeLease)
+        XCTAssertEqual(try String(contentsOf: fixture.videoURL(tahoeID)), "original-\(tahoeID)")
+        XCTAssertEqual(try Data(contentsOf: fixture.storeURL), original)
+    }
+
+    func testFailedUpdateKeepsThePreviouslySyncedVideoAndLease() async throws {
+        let fixture = try makeFixture(downloadedIDs: [tahoeID])
+        let service = makeService(fixture)
+        let active = try writeFakeVideo(named: "first.mov", contents: "first-video")
+        _ = try await service.sync(videoURL: active)
+        let lease = try XCTUnwrap(service.activeLease)
+        let invalidStore = try PropertyListSerialization.data(
+            fromPropertyList: [String: String](), format: .binary, options: 0
+        )
+        try invalidStore.write(to: fixture.storeURL)
+        let update = try writeFakeVideo(named: "second.mov", contents: "second-video")
+        do {
+            _ = try await service.sync(videoURL: update)
+            XCTFail("Expected wallpaperStoreVerificationFailed")
+        } catch LockScreenSyncError.wallpaperStoreVerificationFailed {}
+
+        XCTAssertEqual(service.activeLease, lease)
+        XCTAssertEqual(try String(contentsOf: fixture.videoURL(tahoeID)), "first-video")
+        XCTAssertEqual(try Data(contentsOf: fixture.storeURL), invalidStore)
     }
 
     func testReloadProcessNamesDoNotKillWallpaperSettingsExtension() throws {
@@ -344,11 +413,13 @@ final class LockScreenSyncServiceTests: XCTestCase {
 
     private func makeService(
         _ fixture: Fixture,
+        fileManager: FileManager = .default,
         shouldRestartWallpaperServices: Bool = false,
         encodesVideo: Bool = false,
         processKiller: @escaping (String) -> Void = { _ in }
     ) -> LockScreenSyncService {
         LockScreenSyncService(
+            fileManager: fileManager,
             aerialsBaseURL: fixture.rootURL,
             wallpaperStoreURL: fixture.storeURL,
             aerialBackupDirectoryURL: fixture.backupDirectoryURL,

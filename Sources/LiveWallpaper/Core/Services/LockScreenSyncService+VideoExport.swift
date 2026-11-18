@@ -78,13 +78,14 @@ struct AerialVideoExporter {
             try fileManager.copyItem(at: sourceURL, to: destinationURL)
             return
         }
+        let source = AVURLAsset(url: sourceURL)
         let cachedURL = try cacheDirectory.map { directory in
             try directory.appendingPathComponent(cacheKey(for: sourceURL, start: start))
                 .appendingPathExtension("mov")
         }
         if let cachedURL, fileManager.fileExists(atPath: cachedURL.path) {
             do {
-                try await validatePreparedVideo(at: cachedURL)
+                try await validatePreparedVideo(at: cachedURL, matchingOrientationOf: source)
                 // A clone on APFS, so even a large video is ready at once.
                 try fileManager.copyItem(at: cachedURL, to: destinationURL)
                 return
@@ -108,7 +109,7 @@ struct AerialVideoExporter {
                 )
             }
             try await encode(
-                AVURLAsset(url: sourceURL),
+                source,
                 to: encodedURL,
                 start: start,
                 progress: progress
@@ -161,6 +162,7 @@ struct AerialVideoExporter {
         let formatDescription: CMFormatDescription?
         let dataRate: Float
         let size: CGSize
+        let transform: CGAffineTransform
         do {
             guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else {
                 throw LockScreenSyncError.invalidVideo(NSLocalizedString(
@@ -173,7 +175,7 @@ struct AerialVideoExporter {
             isHDR = try await HDRVideo.containsHDR(asset)
             formatDescription = try await track.load(.formatDescriptions).first
             dataRate = try await track.load(.estimatedDataRate)
-            size = try await track.load(.naturalSize)
+            (size, transform) = try await track.load(.naturalSize, .preferredTransform)
         } catch let error as LockScreenSyncError {
             throw error
         } catch {
@@ -229,7 +231,7 @@ struct AerialVideoExporter {
             .map(makeSource)
         let encoder = try LayeredHEVCEncoder(
             width: Int32(size.width.rounded()), height: Int32(size.height.rounded()),
-            isHDR: isHDR, sourceFormat: formatDescription,
+            isHDR: isHDR, sourceFormat: formatDescription, transform: transform,
             // Repeated frames cost little, so the source's rate is enough; the floor
             // keeps a heavily compressed source from losing more detail.
             bitRate: Int(min(max(dataRate, 8_000_000), 80_000_000))
@@ -339,7 +341,10 @@ struct AerialVideoExporter {
 
     // MARK: - Validation
 
-    private func validatePreparedVideo(at url: URL) async throws {
+    private func validatePreparedVideo(
+        at url: URL,
+        matchingOrientationOf source: AVAsset? = nil
+    ) async throws {
         let asset = AVURLAsset(url: url)
         let duration: CMTime
         let isPlayable: Bool
@@ -370,6 +375,13 @@ struct AerialVideoExporter {
                 comment: ""
             ))
         }
+        // Older conversions can still be reused if they retained the original orientation.
+        if let source, let sourceTransform = try await Self.sourceTransformForCacheCheck(source) {
+            guard try await track.load(.preferredTransform) == sourceTransform else {
+                throw LockScreenSyncError
+                    .exportFailed("Cached video has a different track transform")
+            }
+        }
         // An encoder that supports layers can still leave them out silently, and the
         // lock screen then freezes after the first unlock: fail here instead.
         guard try !Self.supportsTemporalLayers || Self
@@ -378,6 +390,23 @@ struct AerialVideoExporter {
             throw LockScreenSyncError.exportFailed(
                 NSLocalizedString("ロック画面用の動画に時間階層の情報を付けられませんでした。", comment: "")
             )
+        }
+    }
+
+    private static func sourceTransformForCacheCheck(_ asset: AVAsset) async throws
+        -> CGAffineTransform?
+    {
+        do {
+            return try await asset.loadTracks(withMediaType: .video).first?
+                .load(.preferredTransform)
+        } catch {
+            try Task.checkCancellation()
+            // An unavailable source does not invalidate an otherwise usable cached video.
+            let error = error as NSError
+            AppLog.lockScreenSync.warning(
+                "cannot check cached video orientation: \(error.domain, privacy: .public) \(error.code, privacy: .public)"
+            )
+            return nil
         }
     }
 
@@ -521,6 +550,7 @@ private final class EncodeJob: @unchecked Sendable {
 /// for (it rejects the base layer properties for hvc1).
 private final class LayeredHEVCEncoder: @unchecked Sendable {
     private let session: VTCompressionSession
+    private let transform: CGAffineTransform
     private let lock = NSLock()
     private var pending: [CMSampleBuffer] = []
     private var failure: OSStatus = noErr
@@ -531,6 +561,7 @@ private final class LayeredHEVCEncoder: @unchecked Sendable {
         height: Int32,
         isHDR: Bool,
         sourceFormat: CMFormatDescription?,
+        transform: CGAffineTransform,
         bitRate: Int
     ) throws {
         var created: VTCompressionSession?
@@ -543,6 +574,7 @@ private final class LayeredHEVCEncoder: @unchecked Sendable {
             throw LockScreenSyncError.exportFailed(Self.message(status))
         }
         session = created
+        self.transform = transform
         var properties: [CFString: Any] = [
             kVTCompressionPropertyKey_RealTime: false,
             kVTCompressionPropertyKey_ExpectedFrameRate: AerialVideoExporter.frameRate,
@@ -716,6 +748,7 @@ private final class LayeredHEVCEncoder: @unchecked Sendable {
             sourceFormatHint: CMSampleBufferGetFormatDescription(sample)
         )
         input.expectsMediaDataInRealTime = false
+        input.transform = transform
         writer.add(input)
         guard writer.startWriting() else {
             throw LockScreenSyncError.exportFailed(writer.error?.localizedDescription ?? "")

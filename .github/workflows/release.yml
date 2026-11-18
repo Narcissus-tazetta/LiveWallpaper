@@ -8,7 +8,11 @@ on:
                 type: string
 
 permissions:
+    actions: write
     contents: write
+
+env:
+    RELEASE_VERSION: ${{ inputs.version }}
 
 jobs:
     build-and-publish:
@@ -45,7 +49,13 @@ jobs:
                   CREATE_DMG: true
               run: |
                   chmod +x scripts/package_zip.sh
-                  ./scripts/package_zip.sh "${{ inputs.version }}"
+                  ./scripts/derive_build_number.sh "$RELEASE_VERSION" > /dev/null
+                  if git show-ref --verify --quiet "refs/tags/v$RELEASE_VERSION" &&
+                     [[ "$(git rev-list -n 1 "refs/tags/v$RELEASE_VERSION")" != "$GITHUB_SHA" ]]; then
+                    echo "Release tag v$RELEASE_VERSION already points to another commit" >&2
+                    exit 1
+                  fi
+                  ./scripts/package_zip.sh "$RELEASE_VERSION"
 
             - name: Generate appcast
               env:
@@ -81,35 +91,37 @@ jobs:
                   python -m pip install -q cryptography
                   chmod +x scripts/sign_zip.py
                   chmod +x scripts/generate_appcast.sh
-                  ZIP_PATH="dist/LiveWallpaper-macos-v${{ inputs.version }}.zip"
-                  DOWNLOAD_URL="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v${{ inputs.version }}/LiveWallpaper-macos-v${{ inputs.version }}.zip"
+                  ZIP_PATH="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.zip"
+                  DOWNLOAD_URL="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v${RELEASE_VERSION}/LiveWallpaper-macos-v${RELEASE_VERSION}.zip"
                   SPARKLE_ED_SIGNATURE="$(python scripts/sign_zip.py "$KEY_FILE" "$ZIP_PATH")"
-                  ./scripts/generate_appcast.sh "${{ inputs.version }}" "" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${{ inputs.version }}"
+                  ./scripts/generate_appcast.sh "${RELEASE_VERSION}" "" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${RELEASE_VERSION}"
 
             - name: Generate release notes from commits
               run: |
                   chmod +x scripts/generate_release_notes.sh
-                  ./scripts/generate_release_notes.sh "${{ inputs.version }}" "dist/release-notes.md"
+                  ./scripts/generate_release_notes.sh "${RELEASE_VERSION}" "dist/release-notes.md"
 
             - name: Generate Homebrew cask
               run: |
                   chmod +x scripts/generate_homebrew_cask.sh
-                  ZIP_PATH="dist/LiveWallpaper-macos-v${{ inputs.version }}.zip"
-                  ./scripts/generate_homebrew_cask.sh "${{ inputs.version }}" "$ZIP_PATH"
+                  ZIP_PATH="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.zip"
+                  ./scripts/generate_homebrew_cask.sh "${RELEASE_VERSION}" "$ZIP_PATH"
 
             - name: Create release
+              id: release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  ZIP="dist/LiveWallpaper-macos-v${{ inputs.version }}.zip"
-                  DMG="dist/LiveWallpaper-macos-v${{ inputs.version }}.dmg"
-                  ASSETS="$ZIP"
+                  ZIP="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.zip"
+                  DMG="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.dmg"
+                  ASSETS=("$ZIP")
                   if [[ -f "$DMG" ]]; then
-                    ASSETS="$ASSETS $DMG"
+                    ASSETS+=("$DMG")
                   fi
                   gh release create \
-                    "v${{ inputs.version }}" $ASSETS \
-                    --title "v${{ inputs.version }}" \
+                    "v${RELEASE_VERSION}" "${ASSETS[@]}" \
+                    --target "$GITHUB_SHA" \
+                    --title "v${RELEASE_VERSION}" \
                     --notes-file "dist/release-notes.md"
 
             - name: Publish Homebrew tap
@@ -121,9 +133,19 @@ jobs:
                   ./scripts/publish_homebrew_tap.sh
 
             - name: Commit appcast
+              id: appcast
+              if: ${{ !cancelled() && steps.release.outcome == 'success' }}
               run: |
                   git config user.name github-actions
                   git config user.email github-actions@github.com
                   git add docs/appcast.xml
-                  git commit -m "chore: update appcast v${{ inputs.version }}" || true
-                  git push
+                  if ! git diff --cached --quiet; then
+                    git commit -m "chore: update appcast v${RELEASE_VERSION}"
+                    git push
+                  fi
+
+            - name: Deploy updated website
+              if: ${{ !cancelled() && steps.appcast.outcome == 'success' && github.ref == 'refs/heads/main' }}
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: gh workflow run pages.yml --ref main

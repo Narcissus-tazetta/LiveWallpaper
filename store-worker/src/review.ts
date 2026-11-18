@@ -63,12 +63,12 @@ function renderReviewPage(opts: {
 		const preview =
 			entry.sizeBytes > MAX_VIDEO_PREVIEW_BYTES
 				? `<img src="/admin/review/${token}/thumbnail" alt="thumbnail">
-<p class="notice">動画が大きいためプレビューできません(サイズ上限${Math.round(MAX_VIDEO_PREVIEW_BYTES / (1024 * 1024))}MB)。
-<a href="/admin/review/${token}/download">元ファイルをダウンロードして確認</a>してください。</p>`
+<p class="notice">動画が大きいためプレビューできません(サイズ上限${Math.round(MAX_VIDEO_PREVIEW_BYTES / (1024 * 1024))}MB)。</p>`
 				: `<video controls preload="metadata" poster="/admin/review/${token}/thumbnail">
 	<source src="/admin/review/${token}/video" type="video/mp4">
 </video>`;
 		body = `${preview}
+<p><a href="/admin/review/${token}/download" download="${escapeHtml(entry.id)}.lwpkg">元ファイルをダウンロードして確認</a></p>
 <form method="post" action="/admin/review/${token}/decide">
 	<button class="approve" name="action" value="approve">承認する</button>
 	<button class="reject" name="action" value="reject">却下する</button>

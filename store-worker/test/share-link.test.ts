@@ -110,6 +110,12 @@ describe("GET /entries/:id", () => {
 		});
 	});
 
+	it("omits a legacy duration that clients cannot represent safely", async () => {
+		const id = await insertEntry({ durationSeconds: 1e20 });
+		const response = await callWorker(new Request(`${ORIGIN}/entries/${id}`));
+		expect(await response.json()).toMatchObject({ durationSeconds: null });
+	});
+
 	it("404s for unpublished and missing entries", async () => {
 		for (const status of ["requested", "rejected"]) {
 			const id = await insertEntry({ status });
@@ -126,6 +132,23 @@ describe("GET /entries/:id", () => {
 		const res = await callWorker(new Request(`${ORIGIN}/entries/${id}/status`));
 		expect(res.status).toBe(200);
 		expect(await res.json()).toMatchObject({ id, status: "requested" });
+	});
+});
+
+describe("GET /thumbnail/:id", () => {
+	it("stops serving an already cached thumbnail when its entry becomes private", async () => {
+		const id = await insertEntry();
+		const key = `thumbnails/${id}.jpg`;
+		await env.STORE_BUCKET.put(key, "thumbnail");
+		const url = `${ORIGIN}/thumbnail/${id}`;
+
+		const first = await callWorker(new Request(url));
+		expect(first.status).toBe(200);
+		expect(first.headers.get("cache-control")).toBe("no-cache");
+		expect(new Uint8Array(await first.arrayBuffer())).toEqual(new TextEncoder().encode("thumbnail"));
+
+		await env.STORE_DB.prepare("UPDATE store_entries SET status = 'pending' WHERE id = ?").bind(id).run();
+		expect((await callWorker(new Request(url))).status).toBe(404);
 	});
 });
 

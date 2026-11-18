@@ -3,6 +3,7 @@ import { zipSync } from "fflate";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { UPLOAD_WINDOW_MS } from "../src/constants";
 import worker from "../src/index";
+import { applyReviewDecision } from "../src/review-decision";
 // Workers環境にはnode:fsが無いため、Viteの?raw importでビルド時にschema.sqlの
 // 内容を文字列として取り込む(本番のスキーマ管理方法=schema.sqlはそのまま)。
 import schema from "../schema.sql?raw";
@@ -189,6 +190,92 @@ async function entryStatus(id: string): Promise<string | undefined> {
 }
 
 describe("store submission review flow", () => {
+	it.each([
+		["/upload-url", "POST"],
+		["/submit", "POST"],
+		["/report", "POST"],
+		["/entries/test/withdraw", "DELETE"],
+	])("rejects a null JSON body at %s", async (path, method) => {
+		const response = await callWorker(
+			new Request(`https://store.example.com${path}`, {
+				method,
+				headers: { "content-type": "application/json", "cf-connecting-ip": crypto.randomUUID() },
+				body: "null",
+			}),
+		);
+		expect(response.status).toBe(400);
+	});
+
+	it("can retry a report when updating the count fails", async () => {
+		const mock = mockResendEmail();
+		const { id } = await submitEntry();
+		const approved = await callWorker(
+			new Request(`https://store.example.com/admin/entries/${id}/approve`, {
+				method: "POST",
+				headers: { "x-admin-key": ADMIN_KEY, "cf-connecting-ip": id },
+			}),
+		);
+		expect(approved.status).toBe(200);
+		const report = (reporterIP = id) =>
+			callWorker(
+				new Request("https://store.example.com/report", {
+					method: "POST",
+					headers: { "content-type": "application/json", "cf-connecting-ip": reporterIP },
+					body: JSON.stringify({ entryId: id }),
+				}),
+			);
+		await env.STORE_DB.prepare(
+			`CREATE TRIGGER fail_report_count BEFORE UPDATE OF report_count ON store_entries
+			 BEGIN SELECT RAISE(ABORT, 'test report write failure'); END`,
+		).run();
+		try {
+			await expect(report()).rejects.toThrow("test report write failure");
+		} finally {
+			await env.STORE_DB.prepare("DROP TRIGGER fail_report_count").run();
+		}
+		mock.queueAnother();
+		const retry = await report();
+		expect(retry.status).toBe(200);
+		expect(await retry.json()).toEqual({ ok: true, reportCount: 1 });
+		const duplicate = await report();
+		expect(duplicate.status).toBe(200);
+		expect(await duplicate.json()).toEqual({ ok: true, reportCount: 1 });
+		for (const count of [2, 3]) {
+			mock.queueAnother();
+			const additional = await report(crypto.randomUUID());
+			expect(additional.status).toBe(200);
+			expect(await additional.json()).toEqual({ ok: true, reportCount: count });
+		}
+		expect(await entryStatus(id)).toBe("pending");
+	});
+
+	it("keeps the current review link valid when creating a replacement fails", async () => {
+		const mock = mockResendEmail();
+		const { id } = await submitEntry();
+		await env.STORE_DB.prepare(
+			`CREATE TRIGGER fail_replacement BEFORE INSERT ON store_review_tokens
+			 BEGIN SELECT RAISE(ABORT, 'test review token write failure'); END`,
+		).run();
+		try {
+			await expect(
+				callWorker(
+					new Request(`https://store.example.com/admin/entries/${id}/resend-review`, {
+						method: "POST",
+						headers: { "x-admin-key": ADMIN_KEY, "cf-connecting-ip": id },
+					}),
+				),
+			).rejects.toThrow("test review token write failure");
+		} finally {
+			await env.STORE_DB.prepare("DROP TRIGGER fail_replacement").run();
+		}
+		const approved = await callWorker(
+			new Request(`https://store.example.com/admin/review/${mock.getToken()}/decide`, {
+				method: "POST",
+				body: new URLSearchParams({ action: "approve" }),
+			}),
+		);
+		expect(approved.status).toBe(303);
+	});
 	it("refuses a repeated submission without deleting the published package", async () => {
 		const id = crypto.randomUUID();
 		const objectKey = `packages/${id}.lwpkg`;
@@ -571,6 +658,12 @@ describe("store submission review flow", () => {
 		const oldDecide = await callWorker(decideRequest(oldToken, "approve"));
 		expect(oldDecide.status).toBe(410);
 
+		// A cron run may have selected the entry just before the replacement link was stored.
+		expect(await applyReviewDecision(env, id, "reject", new Date().toISOString())).toEqual({
+			changed: false,
+			status: "requested",
+		});
+
 		const newDecide = await callWorker(decideRequest(newToken, "approve"));
 		expect(newDecide.status).toBe(303);
 		expect(await entryStatus(id)).toBe("published");
@@ -618,6 +711,20 @@ describe("store submission review flow", () => {
 		const pageRes = await callWorker(new Request(`https://store.example.com/admin/review/${token}`));
 		const pageHtml = await pageRes.text();
 		expect(pageHtml).toContain(`/admin/review/${token}/video`);
+	});
+
+	it("offers the original package when an inline preview cannot be played", async () => {
+		const mock = mockResendEmail();
+		await submitEntry();
+		const review = `https://store.example.com/admin/review/${mock.getToken()}`;
+		const page = await callWorker(new Request(review));
+		expect(page.status).toBe(200);
+		expect((await callWorker(new Request(`${review}/video`))).status).toBe(404);
+
+		expect(await page.text()).toContain(`href="/admin/review/${mock.getToken()}/download"`);
+		const original = await callWorker(new Request(`${review}/download`));
+		expect(original.status).toBe(200);
+		expect(new Uint8Array(await original.arrayBuffer())).toEqual(new TextEncoder().encode("fake package bytes"));
 	});
 
 	it("/admin/review/:token/video honors Range requests for scrubbing", async () => {
