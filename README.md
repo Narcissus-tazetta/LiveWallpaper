@@ -80,6 +80,19 @@ Add layers, particles, and effects to turn a photo into a live wallpaper.
 - [3D models](docs/SCENE_3D_MODELS.md): glTF / GLB import and supported features (Japanese)
 - [Web wallpaper API](docs/WEB_WALLPAPER_API.md): HTML folder import, audio, and media integration (Japanese)
 
+## Network use
+
+LiveWallpaper connects to the internet only for the features below. Nothing is sent for analytics.
+
+| Feature | Destination | What is sent |
+| --- | --- | --- |
+| Update check | GitHub (`raw.githubusercontent.com`, Releases) | A request for the appcast; Sparkle's standard request headers |
+| Store (browse, download, submit, report) | `store.livewallpaper.prason.dev` | The data of the action you take, such as the wallpaper and its settings when you submit |
+| Weather rules in the weekly schedule | MET Norway (`api.met.no`) | The coordinates of the schedule city, only while a weather rule is enabled |
+| City search for the schedule location | Apple's geocoding service | The city name you type |
+| Depth estimation for scenes | Hugging Face (`huggingface.co`) | A one-time download of the model; no wallpaper data is sent |
+| URL web wallpapers (YouTube / Vimeo) | The site you register | Requests the page and its thumbnail make |
+
 ## Requirements
 
 | Item | Requirement |

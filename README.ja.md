@@ -80,6 +80,19 @@ Appleの公証を受けずに配布しているため、macOSのセキュリテ�
 - [シーンの3Dモデル](docs/SCENE_3D_MODELS.md)：glTF / GLBの読み込みと対応範囲
 - [Web壁紙API](docs/WEB_WALLPAPER_API.md)：HTMLフォルダからの登録と、音・曲情報との連携
 
+## 外部通信
+
+LiveWallpaperが通信するのは次の機能を使うときだけです。分析のための送信はありません。
+
+| 機能 | 通信先 | 送る内容 |
+| --- | --- | --- |
+| アップデートの確認 | GitHub（`raw.githubusercontent.com`、Releases） | appcast の取得。Sparkle 標準のリクエストヘッダ |
+| ストア（閲覧・ダウンロード・投稿・報告） | `store.livewallpaper.prason.dev` | 操作に必要なデータ（投稿時は壁紙とその設定など） |
+| 曜日スケジュールの天気ルール | MET Norway（`api.met.no`） | スケジュールの都市の座標。天気ルールが有効な間だけ |
+| スケジュールの場所の都市検索 | Apple のジオコーディング | 入力した都市名 |
+| シーンの深度推定 | Hugging Face（`huggingface.co`） | モデルの初回ダウンロードのみ。壁紙のデータは送らない |
+| URL の Web 壁紙（YouTube / Vimeo） | 登録したサイト | ページとサムネイルの取得リクエスト |
+
 ## 動作環境
 
 | 項目 | 要件 |
