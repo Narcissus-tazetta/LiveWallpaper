@@ -1771,3 +1771,15 @@
 "書き出し中…" = "Exporting…";
 "書き出せる壁紙がありません" = "There’s nothing to export.";
 "自分のプリセットを共有" = "Share My Preset";
+
+"天気" = "Weather";
+"晴れ" = "Clear";
+"曇り" = "Cloudy";
+"霧" = "Fog";
+"雷" = "Thunder";
+"場所を設定すると、場所に基づくルールを適用できます。" = "Set a location to use location-based rules.";
+"現在の天気予報 %@" = "Current forecast %@";
+"天気予報を取得できないため、天気ルールを適用できません。" = "Weather rules are unavailable until a forecast can be loaded.";
+"天気予報を取得中…" = "Loading forecast…";
+"モデル内のカメラを使う" = "Use the model’s camera";
+"シーンを全画面プレビュー" = "Preview Scene Full Screen";

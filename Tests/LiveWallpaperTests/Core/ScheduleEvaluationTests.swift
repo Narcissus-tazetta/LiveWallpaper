@@ -64,6 +64,61 @@ final class ScheduleEvaluationTests: XCTestCase {
         )
     }
 
+    func testWeatherRuleTakesPriorityOnlyWhenMatchingAndSurvivesPersistence() throws {
+        let forecast = Data("""
+        {"properties":{"timeseries":[
+          {"time":"2026-07-13T12:00:00Z","data":{"next_1_hours":{"summary":{"symbol_code":"heavyrain"}}}},
+          {"time":"2026-07-13T13:00:00Z","data":{"next_1_hours":{"summary":{"symbol_code":"fair_day"}}}}
+        ]}}
+        """.utf8)
+        let now = date(2026, 7, 13, 12, 15)
+        let weather = try ScheduleWeatherForecast.decode(forecast, now: now, expires: nil)
+        let rainVideo = try makeVideoFile()
+        let fallbackVideo = try makeVideoFile()
+        defer {
+            try? FileManager.default.removeItem(at: rainVideo)
+            try? FileManager.default.removeItem(at: fallbackVideo)
+        }
+        var rainyRule = videoRule(path: rainVideo.path)
+        rainyRule.weather = .rain
+        let fallback = videoRule(path: fallbackVideo.path)
+        let decoded = try JSONDecoder().decode(
+            [ScheduleRule].self, from: JSONEncoder().encode([rainyRule, fallback])
+        )
+        XCTAssertEqual(decoded, [rainyRule, fallback])
+        let model = WallpaperModel()
+        let location = SolarLocation(name: "Test city", latitude: 0, longitude: 0)
+        model.scheduleLocationOverride = location
+        model.scheduleWeatherLocation = location
+        model.scheduleWeatherForecast = weather
+        model.scheduleWeatherRefreshAfter = .distantFuture
+        model.scheduleAppearanceProvider = { .light }
+        model.scheduleRules = decoded
+
+        for (hour, expected) in [(12, rainyRule), (13, fallback), (14, fallback)] {
+            let time = date(2026, 7, 13, hour, 15)
+            model.scheduleNowProvider = { time }
+            model.evaluateSchedule(trigger: .timerTick)
+            XCTAssertEqual(model.currentVideoPath, expected.target.videoPath)
+        }
+        XCTAssertNil(weather.weather(at: date(2026, 7, 13, 14, 0)))
+    }
+
+    func testForecastCoversHoursBeforeADeferredRefresh() throws {
+        let data = Data("""
+        {"properties":{"timeseries":[
+          {"time":"2026-07-13T12:00:00Z","data":{"next_1_hours":{"summary":{"symbol_code":"heavyrain"}}}},
+          {"time":"2026-07-13T14:00:00Z","data":{"next_1_hours":{"summary":{"symbol_code":"fair_day"}}}}
+        ]}}
+        """.utf8)
+        let refresh = date(2026, 7, 13, 14, 30)
+        let forecast = try ScheduleWeatherForecast.decode(
+            data, now: date(2026, 7, 13, 12, 15), expires: refresh
+        )
+        XCTAssertEqual(forecast.refreshAfter, refresh)
+        XCTAssertEqual(forecast.weather(at: date(2026, 7, 13, 14, 15)), .clear)
+    }
+
     func testDisplayScopedRuleCanPinAWebWallpaperAndReleasesIt() throws {
         let model = WallpaperModel()
         let source = try WebWallpaperSource(url: XCTUnwrap(URL(string: "https://example.com/a")))

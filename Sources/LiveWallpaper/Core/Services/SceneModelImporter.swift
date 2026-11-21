@@ -7,6 +7,7 @@ import simd
 enum SceneModelImporter {
     struct Result {
         var layer: SceneLayer
+        var stage: SceneModelStage?
         var rig: (id: UUID, skeleton: SceneSkeleton)?
         /// File names in the scene folder and their contents.
         var files: [(name: String, data: Data)]
@@ -41,6 +42,7 @@ enum SceneModelImporter {
         var hasTangents = false
         var hasUVs = false
         var hasColors = false
+        var morphs: [SceneMorphPatch] = []
     }
 
     static func importModel(at url: URL, canvasWidth: Int, canvasHeight: Int) throws -> Result {
@@ -62,9 +64,12 @@ enum SceneModelImporter {
             try visit(root, parent: nil)
         }
         var global: [Int: simd_float4x4] = [:]
+        var rotations: [Int: simd_quatf] = [:]
         for node in order {
             global[node] = parents[node].map { global[$0]! * asset.nodes[node].local } ?? asset
                 .nodes[node].local
+            let localRotation = asset.nodes[node].rotation
+            rotations[node] = parents[node].map { rotations[$0]! * localRotation } ?? localRotation
         }
 
         let meshNodes = order.filter { asset.nodes[$0].mesh != nil }
@@ -74,6 +79,8 @@ enum SceneModelImporter {
             .contains { $0.channels.contains { visited.contains($0.node) } }
         let skinned = meshNodes.contains { asset.nodes[$0].skin != nil }
         let rigged = animated || skinned
+        let animatedMorphNodes = Set(asset.animations.flatMap(\.channels)
+            .filter { $0.path == .weights }.map(\.node))
 
         var boneIndex: [Int: Int] = [:]
         var inverseBind: [simd_float4x4] = []
@@ -104,6 +111,7 @@ enum SceneModelImporter {
 
         var groups: [Int?: Group] = [:]
         var vertexTotal = 0
+        var remainingMorphBytes = 128 * 1024 * 1024
         for node in meshNodes {
             let info = asset.nodes[node]
             let skin = info.skin.map { asset.skins[$0] }
@@ -128,7 +136,11 @@ enum SceneModelImporter {
                 SIMD3(transform.columns.2.x, transform.columns.2.y, transform.columns.2.z)
             )))
             let mirrored = simd_determinant(transform) < 0
-            for primitive in asset.meshes[info.mesh!] {
+            for source in asset.meshes[info.mesh!] {
+                let morphBone = animatedMorphNodes.contains(node) ? boneIndex[node] : nil
+                let primitive = try morphBone == nil ? source
+                    .morphed(weights: info.morphWeights) : source
+
                 let material = primitive.material.map { asset.materials[$0] }
                 var vertices: [Vertex] = []
                 vertices.reserveCapacity(primitive.positions.count)
@@ -178,6 +190,8 @@ enum SceneModelImporter {
                         )
                     }
                 }
+                let cornersToSource = morphBone != nil && primitive.normals == nil ? indices
+                    .map(Int.init) : nil
                 if primitive.normals == nil {
                     // glTF asks for flat normals when a mesh has none: every triangle gets its own
                     // corners.
@@ -195,7 +209,7 @@ enum SceneModelImporter {
                     }
                 }
                 let wantsTangents = material?.normalTexture != nil && primitive.uvs != nil
-                if wantsTangents, primitive.tangents == nil {
+                if wantsTangents, primitive.tangents == nil || primitive.normals == nil {
                     generateTangents(&vertices, indices: indices)
                 }
                 vertexTotal += vertices.count
@@ -206,6 +220,12 @@ enum SceneModelImporter {
                 }
                 var group = groups[primitive.material] ?? Group()
                 let offset = UInt32(group.vertices.count)
+                group.morphs += try Self.morphPatches(
+                    source: source, bone: morphBone, start: Int(offset), count: vertices.count,
+                    sourceIndices: cornersToSource, transform: transform,
+                    normalMatrix: normalMatrix,
+                    remainingBytes: &remainingMorphBytes
+                )
                 group.vertices += vertices
                 group.indices += indices.map { $0 + offset }
                 group.hasTangents = group.hasTangents || wantsTangents
@@ -289,8 +309,13 @@ enum SceneModelImporter {
 
         var low = SIMD3<Float>(repeating: .infinity), high = SIMD3<Float>(repeating: -.infinity)
         for group in groups.values {
-            for vertex in group.vertices {
-                var p = SIMD4(vertex.position, 1)
+            let restPositions = Self.morphedRestPositions(group, skeleton: rig?.1)
+            for (index, vertex) in group.vertices.enumerated() {
+                let position = restPositions.map {
+                    let i = index * 3
+                    return SIMD3($0[i], $0[i + 1], $0[i + 2])
+                } ?? vertex.position
+                var p = SIMD4(position, 1)
                 if let restMatrices {
                     var skinned = SIMD4<Float>(repeating: 0)
                     for slot in 0 ..< 4 where vertex.weights[slot] > 0 {
@@ -316,7 +341,20 @@ enum SceneModelImporter {
         layer.model = first
         layer.modelParts = ordered.count > 1 ? Array(ordered.dropFirst()) : nil
         layer.modelPlacement = placement
-        return Result(layer: layer, rig: rig, files: files)
+        let stage = try asset.modelStage(
+            order: order, global: global, rotations: rotations, placement: placement,
+            canvasSize: SIMD2(width, height), skeleton: rigID, boneIndex: boneIndex
+        )
+        return Result(layer: layer, stage: stage, rig: rig, files: files)
+    }
+
+    private static func morphedRestPositions(_ group: Group, skeleton: SceneSkeleton?) -> [Float]? {
+        guard let skeleton, !group.morphs.isEmpty else { return nil }
+        var positions = group.vertices.flatMap { [$0.position.x, $0.position.y, $0.position.z] }
+        for patch in group.morphs {
+            patch.applyPositions(weights: skeleton.bones[patch.bone].morphWeights!, to: &positions)
+        }
+        return positions
     }
 
     private static func pack(
@@ -380,7 +418,71 @@ enum SceneModelImporter {
             vertices: vertices,
             indices: indices,
             skeleton: skeleton,
-            surface: surface
+            surface: surface,
+            morphs: group.morphs.isEmpty ? nil : group.morphs
+        )
+    }
+
+    private static func morphPatches(
+        source: GLTFAsset.Primitive, bone: Int?, start: Int, count: Int, sourceIndices: [Int]?,
+        transform: simd_float4x4, normalMatrix: simd_float3x3, remainingBytes: inout Int
+    ) throws -> [SceneMorphPatch] {
+        guard let bone, !source.targets.isEmpty, count >= 1 else { return [] }
+        let channels = source.targets.reduce(0) { total, target in
+            total + [target.position, target.normal, target.tangent].compactMap { $0 }.count
+        }
+        guard channels <= remainingBytes / (count * 12) else {
+            throw ImportError(detail: "glTF: animated morph geometry exceeds 128 MiB")
+        }
+        remainingBytes -= channels * count * 12
+        let normalLengths = source.normals?.map { simd_length(normalMatrix * $0) }
+        return [SceneMorphPatch(
+            bone: bone, start: start, count: count,
+            targets: source.targets.map {
+                morphTarget(
+                    $0,
+                    sourceIndices: sourceIndices,
+                    transform: transform,
+                    normalMatrix: normalMatrix,
+                    normalLengths: normalLengths
+                )
+            }, flatNormals: sourceIndices != nil
+        )]
+    }
+
+    private static func morphTarget(
+        _ target: GLTFAsset.MorphTarget, sourceIndices: [Int]?,
+        transform: simd_float4x4, normalMatrix: simd_float3x3, normalLengths: [Float]?
+    ) -> SceneMorphPatch.Target {
+        func packed(
+            _ values: [SIMD3<Float>]?,
+            convert: (SIMD3<Float>, Int) -> SIMD3<Float>
+        ) -> Data? {
+            guard let values else { return nil }
+            let count = sourceIndices?.count ?? values.count
+            var data = Data(capacity: count * 12)
+            for i in 0 ..< count {
+                let index = sourceIndices?[i] ?? i
+                let value = convert(values[index], index)
+                for axis in 0 ..< 3 {
+                    withUnsafeBytes(of: value[axis].bitPattern.littleEndian) {
+                        data.append(contentsOf: $0)
+                    }
+                }
+            }
+            return data
+        }
+        func direction(_ direction: SIMD3<Float>, _: Int) -> SIMD3<Float> {
+            let v = transform * SIMD4(direction, 0)
+            return SIMD3(v.x, v.y, v.z)
+        }
+        return SceneMorphPatch.Target(
+            positions: packed(target.position, convert: direction),
+            normals: packed(target.normal) { value, index in
+                let length = normalLengths?[index] ?? 0
+                return normalMatrix * value / (length > 0 ? length : 1)
+            },
+            tangents: packed(target.tangent, convert: direction)
         )
     }
 
@@ -432,6 +534,8 @@ enum SceneModelImporter {
                 scale: scale
             )
         }
+        let morphNodes = Set(asset.animations.flatMap(\.channels).filter { $0.path == .weights }
+            .map(\.node))
         let bones = order.enumerated().map { index, node -> SceneSkeleton.Bone in
             let info = asset.nodes[node]
             let m = inverseBind[index]
@@ -443,7 +547,8 @@ enum SceneModelImporter {
                     $0.y,
                     $0.z,
                     $0.w
-                ] }
+                ] },
+                morphWeights: morphNodes.contains(node) ? info.morphWeights : nil
             )
         }
         var clips: [SceneSkeleton.Clip] = []
@@ -458,7 +563,16 @@ enum SceneModelImporter {
             }
             let frameCount = max(1, Int((Double(duration) * framesPerSecond).rounded(.up)))
             var byNode: [Int: [GLTFAsset.Channel.Path: GLTFAsset.Channel]] = [:]
+            var morphTracks: [Int: SceneMorphCurve] = [:]
             for channel in channels {
+                if channel.path == .weights {
+                    morphTracks[boneIndex[channel.node]!] = SceneMorphCurve(
+                        times: channel.times, values: channel.values,
+                        interpolation: channel.interpolation,
+                        width: asset.nodes[channel.node].morphWeights.count
+                    )
+                    continue
+                }
                 byNode[channel.node, default: [:]][channel.path] = channel
             }
             let tracks = byNode.keys.sorted().map { node -> SceneSkeleton.Track in
@@ -482,7 +596,7 @@ enum SceneModelImporter {
                 name: animation.name,
                 framesPerSecond: framesPerSecond,
                 frameCount: frameCount,
-                tracks: tracks
+                tracks: tracks, morphTracks: morphTracks.isEmpty ? nil : morphTracks
             ))
         }
         let skeleton = SceneSkeleton(

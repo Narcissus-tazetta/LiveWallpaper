@@ -1771,3 +1771,15 @@
 "書き出し中…" = "Wird exportiert …";
 "書き出せる壁紙がありません" = "Es gibt nichts zu exportieren.";
 "自分のプリセットを共有" = "Eigene Voreinstellung teilen";
+
+"天気" = "Wetter";
+"晴れ" = "Klar";
+"曇り" = "Bewölkt";
+"霧" = "Nebel";
+"雷" = "Gewitter";
+"場所を設定すると、場所に基づくルールを適用できます。" = "Lege einen Ort fest, um ortsabhängige Regeln zu verwenden.";
+"現在の天気予報 %@" = "Aktuelle Wettervorhersage: %@";
+"天気予報を取得できないため、天気ルールを適用できません。" = "Wetterregeln sind erst verfügbar, wenn eine Vorhersage geladen wurde.";
+"天気予報を取得中…" = "Wettervorhersage wird geladen …";
+"モデル内のカメラを使う" = "Kamera des Modells verwenden";
+"シーンを全画面プレビュー" = "Szene im Vollbild ansehen";

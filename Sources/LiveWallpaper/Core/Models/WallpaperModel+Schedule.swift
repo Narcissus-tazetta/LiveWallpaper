@@ -5,6 +5,7 @@ import Foundation
 /// 集約され、トリガーごとの部分最適化はしない(ルール数は小さいため全件評価で十分軽い)。
 enum ScheduleEvaluationTrigger {
     case timerTick
+    case weatherChanged
     case appearanceChanged
     case wake
     case unlock
@@ -58,7 +59,8 @@ extension WallpaperModel {
         appearance: ScheduleAppearanceCondition,
         calendar: Calendar = .current,
         focusFilterEnabled: Bool = true,
-        location: SolarLocation? = nil
+        location: SolarLocation? = nil,
+        weather: ScheduleWeather? = nil
     ) -> ScheduleRule? {
         let weekday = calendar.component(.weekday, from: now)
         let components = calendar.dateComponents([.hour, .minute], from: now)
@@ -87,7 +89,7 @@ extension WallpaperModel {
             guard rule.appearance == .any || rule.appearance == appearance else {
                 return false
             }
-            return true
+            return rule.weather == nil || rule.weather == weather
         }
         // 集中モードのFocus Filterは「今まさに切り替えた」明示的なユーザー操作の
         // 結果なので、曜日/外観スケジュールより常に優先する。アプリ内トグルで連携を
@@ -112,6 +114,7 @@ extension WallpaperModel {
         isEvaluatingSchedule = true
         defer { isEvaluatingSchedule = false }
         let now = scheduleNowProvider()
+        updateScheduleWeather(now: now)
         let appearance = scheduleAppearanceProvider()
         // ルールに実際に登場するスコープに加えて、過去に適用実績のあるスコープも
         // 評価する。後者を含めないと、あるスコープを使うルールを全て削除/無効化
@@ -123,13 +126,56 @@ extension WallpaperModel {
         }
     }
 
+    private func updateScheduleWeather(now: Date) {
+        let location = scheduleRules.contains { $0.isEnabled && $0.weather != nil }
+            ? scheduleLocation : nil
+        if location != scheduleWeatherLocation {
+            scheduleWeatherTask?.cancel()
+            scheduleWeatherTask = nil
+            scheduleWeatherLocation = location
+            scheduleWeatherForecast = nil
+            scheduleWeatherRefreshAfter = .distantPast
+            scheduleWeatherRequestFailed = false
+        }
+        let weather = scheduleWeatherForecast?.weather(at: now)
+        if scheduleCurrentWeather != weather {
+            scheduleCurrentWeather = weather
+        }
+        guard let location, scheduleWeatherTask == nil, now >= scheduleWeatherRefreshAfter else {
+            return
+        }
+        let previous = scheduleWeatherForecast
+        scheduleWeatherTask = Task { [weak self] in
+            do {
+                let forecast = try await ScheduleWeatherForecast.fetch(
+                    for: location,
+                    previous: previous
+                )
+                guard !Task.isCancelled, let self else { return }
+                scheduleWeatherForecast = forecast
+                scheduleWeatherRefreshAfter = forecast.refreshAfter
+                scheduleWeatherRequestFailed = false
+            } catch {
+                guard !Task.isCancelled, let self else { return }
+                AppLog.schedule
+                    .error(
+                        "Weather forecast request failed: \(error.localizedDescription, privacy: .private)"
+                    )
+                scheduleWeatherRefreshAfter = Date().addingTimeInterval(900)
+                scheduleWeatherRequestFailed = true
+            }
+            self?.scheduleWeatherTask = nil
+            self?.evaluateSchedule(trigger: .weatherChanged)
+        }
+    }
+
     private func evaluateScope(
         _ scope: ScheduleScope, now: Date, appearance: ScheduleAppearanceCondition
     ) {
         let matched = Self.matchingScheduleRule(
             in: scheduleRules, scope: scope, now: now, appearance: appearance,
             focusFilterEnabled: focusFilterIntegrationEnabled,
-            location: scheduleLocation
+            location: scheduleLocation, weather: scheduleCurrentWeather
         )
         let newState: ScheduleApplicationState = matched.map { .rule($0.id) } ?? .none
         // ルール境界を跨いでいなくても、適用中ルールのターゲット自体が編集された
@@ -285,7 +331,7 @@ extension WallpaperModel {
             in: scheduleRules, scope: rule.scope,
             now: scheduleNowProvider(), appearance: scheduleAppearanceProvider(),
             focusFilterEnabled: focusFilterIntegrationEnabled,
-            location: scheduleLocation
+            location: scheduleLocation, weather: scheduleCurrentWeather
         )?.id == id
     }
 

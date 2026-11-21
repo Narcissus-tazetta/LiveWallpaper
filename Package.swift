@@ -66,7 +66,8 @@ let package = Package(
         .macOS(.v13)
     ],
     dependencies: [
-        .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.10.0")
+        .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.10.0"),
+        .package(url: "https://github.com/warrenm/DracoSwift.git", exact: "1.5.7")
     ],
     targets: [
         .target(
@@ -94,10 +95,20 @@ let package = Package(
                 .unsafeFlags(["-O2"])
             ]
         ),
+        .target(
+            name: "MeshOptimizer",
+            sources: ["vendor/indexcodec.cpp", "vendor/vertexcodec.cpp", "vendor/vertexfilter.cpp"]
+        ),
+        .target(
+            name: "DracoBridge",
+            dependencies: [.product(name: "DracoSwift", package: "DracoSwift")]
+        ),
         .executableTarget(
             name: "LiveWallpaper",
             dependencies: [
                 "QuickJS",
+                "MeshOptimizer",
+                "DracoBridge",
                 .product(name: "Sparkle", package: "Sparkle")
             ],
             path: "Sources/LiveWallpaper",

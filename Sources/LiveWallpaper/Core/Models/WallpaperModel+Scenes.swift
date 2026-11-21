@@ -611,7 +611,7 @@ extension WallpaperModel {
     }
 
     /// Imports a glTF or GLB file as a model layer above the existing layers; the scene
-    /// gets a stage with one light the first time.
+    /// gets its stage from the first model, with the default light when it has no lights.
     func addSceneModelLayer(from modelURL: URL, path: String) async -> UUID? {
         guard let current = sceneDocumentsByPath[path] else {
             return nil
@@ -648,7 +648,7 @@ extension WallpaperModel {
                 document.rigs[rig.id] = rig.skeleton
             }
             if document.modelStage == nil {
-                document.modelStage = SceneModelStage()
+                document.modelStage = result.stage ?? SceneModelStage()
             }
             document.layers.append(result.layer)
             updateScene(document, path: path, coalescing: false)

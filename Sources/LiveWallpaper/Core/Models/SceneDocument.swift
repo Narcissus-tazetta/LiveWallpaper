@@ -835,6 +835,7 @@ struct SceneStaticModel: Codable, Equatable {
     var skeleton: UUID?
     /// Shaded by the app's own material instead of the scene's mesh material at `material`.
     var surface: SceneModelSurface?
+    var morphs: [SceneMorphPatch]?
     /// Shared by every copy, so hashing the geometry happens once however often the scene is saved.
     private let files: FileNames
 
@@ -858,7 +859,8 @@ struct SceneStaticModel: Codable, Equatable {
         vertices: Data,
         indices: Data,
         skeleton: UUID? = nil,
-        surface: SceneModelSurface? = nil
+        surface: SceneModelSurface? = nil,
+        morphs: [SceneMorphPatch]? = nil
     ) {
         self.material = material
         self.components = components
@@ -866,6 +868,7 @@ struct SceneStaticModel: Codable, Equatable {
         self.indices = indices
         self.skeleton = skeleton
         self.surface = surface
+        self.morphs = morphs
         files = FileNames(stored: nil)
     }
 
@@ -901,7 +904,7 @@ struct SceneStaticModel: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case material, components, vertices, indices, geometryFiles, skeleton, surface
+        case material, components, vertices, indices, geometryFiles, skeleton, surface, morphs
     }
 
     init(from decoder: Decoder) throws {
@@ -910,6 +913,7 @@ struct SceneStaticModel: Codable, Equatable {
         components = try container.decode(UInt32.self, forKey: .components)
         skeleton = try container.decodeIfPresent(UUID.self, forKey: .skeleton)
         surface = try container.decodeIfPresent(SceneModelSurface.self, forKey: .surface)
+        morphs = try container.decodeIfPresent([SceneMorphPatch].self, forKey: .morphs)
         guard let names = try container.decodeIfPresent(
             SceneModelGeometryFiles.self,
             forKey: .geometryFiles
@@ -952,6 +956,7 @@ struct SceneStaticModel: Codable, Equatable {
         try container.encode(components, forKey: .components)
         try container.encodeIfPresent(skeleton, forKey: .skeleton)
         try container.encodeIfPresent(surface, forKey: .surface)
+        try container.encodeIfPresent(morphs, forKey: .morphs)
         if let folder = encoder.userInfo[.sceneFolder] as? URL, let names = geometryFiles {
             try Self.writeIfMissing(vertices, named: names.vertices, in: folder)
             try Self.writeIfMissing(indices, named: names.indices, in: folder)
@@ -990,7 +995,8 @@ struct SceneStaticModel: Codable, Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.material == rhs.material && lhs.components == rhs.components && lhs.skeleton == rhs
             .skeleton
-            && lhs.surface == rhs.surface && lhs.vertices == rhs.vertices && lhs.indices == rhs
+            && lhs.morphs == rhs.morphs && lhs.surface == rhs.surface && lhs.vertices == rhs
+            .vertices && lhs.indices == rhs
             .indices
     }
 
@@ -1004,6 +1010,10 @@ struct SceneStaticModel: Codable, Equatable {
         guard stride > 0, vertices.count % (stride * 4) == 0, indices.count % 12 == 0,
               surface?.isValid ?? true else { return false }
         let count = UInt32(vertices.count / (stride * 4))
+        if let morphs {
+            guard skeleton != nil, components & 0b11 == 0b11,
+                  morphs.allSatisfy({ $0.isValid(vertexCount: Int(count)) }) else { return false }
+        }
         return indices.withUnsafeBytes { bytes in
             (0 ..< indices.count / 4).allSatisfy { bytes.loadUnaligned(
                 fromByteOffset: $0 * 4,
@@ -1833,6 +1843,7 @@ struct SceneDocument: Codable, Equatable {
     var isAnimated: Bool {
         layers.contains(where: \.isAnimated) || scripts
             .contains { $0.canRun && $0.usesTime } || cameraShake != nil
+            || modelStage?.animationRigs.contains { rigs[$0]?.playback.isEmpty == false } == true
             || layers.contains { layer in
                 layer.isVisible && layer.modelPlacement != nil
                     && layer.model?.skeleton.flatMap { rigs[$0] }

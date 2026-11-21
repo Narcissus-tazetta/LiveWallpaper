@@ -190,6 +190,12 @@ final class SceneRenderer {
         var materials: [Int]
         /// `parts` in order, each with its material and buffers.
         var shapes: [SceneModelLayerFrame.Shape]
+        var morphed: [Int: CachedMorphShape] = [:]
+    }
+
+    struct CachedMorphShape {
+        let weights: [[Float]]
+        let shape: SceneModelLayerFrame.Shape
     }
 
     /// The shapes of each model the editor imported, `model` then `modelParts`.
@@ -804,7 +810,8 @@ final class SceneRenderer {
             }
             if let skeleton = layer.model!.skeleton {
                 guard let rig = document.rigs[skeleton],
-                      parts.allSatisfy({ $0.maxJoint < rig.bones.count })
+                      parts
+                      .allSatisfy({ $0.maxJoint < rig.bones.count && $0.hasValidMorphs(in: rig) })
                 else {
                     throw SceneSkeletonEvaluator
                         .InvalidSkeleton(

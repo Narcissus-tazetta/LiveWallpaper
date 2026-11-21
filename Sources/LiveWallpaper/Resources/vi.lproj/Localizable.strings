@@ -1771,3 +1771,15 @@
 "書き出し中…" = "Đang xuất…";
 "書き出せる壁紙がありません" = "Không có gì để xuất.";
 "自分のプリセットを共有" = "Chia sẻ cài đặt sẵn của tôi";
+
+"天気" = "Thời tiết";
+"晴れ" = "Trời quang";
+"曇り" = "Nhiều mây";
+"霧" = "Sương mù";
+"雷" = "Dông";
+"場所を設定すると、場所に基づくルールを適用できます。" = "Đặt vị trí để sử dụng các quy tắc theo vị trí.";
+"現在の天気予報 %@" = "Dự báo hiện tại: %@";
+"天気予報を取得できないため、天気ルールを適用できません。" = "Không thể áp dụng quy tắc thời tiết cho đến khi tải được dự báo.";
+"天気予報を取得中…" = "Đang tải dự báo thời tiết…";
+"モデル内のカメラを使う" = "Dùng camera của mô hình";
+"シーンを全画面プレビュー" = "Xem trước cảnh toàn màn hình";

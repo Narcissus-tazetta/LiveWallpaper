@@ -16,7 +16,8 @@ enum SceneModelShading {
     private static let lightStride = 64
     private static let shadowMatricesOffset = 368
     private static let floorOffset = 624
-    private static let fragmentSize = 640
+    private static let photometryOffset = 640
+    private static let fragmentSize = 704
     private static let bonesOffset = 192
 
     static func material(surface: SceneModelSurface, boneCount: Int?) -> SceneMeshMaterial {
@@ -155,6 +156,10 @@ enum SceneModelShading {
                 .init(offset: base + 32, value: .lightColor, key: "\(light)"),
                 .init(offset: base + 48, value: .effectValue, key: "light\(light)", components: 4),
                 .init(
+                    offset: photometryOffset + light * 16,
+                    value: .effectValue, key: "photometry\(light)", components: 4
+                ),
+                .init(
                     offset: shadowMatricesOffset + light * 64,
                     value: .shadowMatrix,
                     key: "\(light)"
@@ -242,6 +247,7 @@ enum SceneModelShading {
         float4x4 shadows[4];
         /// x: the floor's shadow opacity
         float4 floor;
+        float4 photometry[4];
     };
 
     constant float PI = 3.14159265;
@@ -310,7 +316,7 @@ enum SceneModelShading {
     }
 
     /// The light's colour at `world` and the direction toward it.
-    static float3 incoming(constant Light& light, float3 world, thread float3& toLight) {
+    static float3 incoming(constant Light& light, float4 photometry, float3 world, thread float3& toLight) {
         if (light.params.x < 0.5) {
             toLight = -light.axis;
             return light.color;
@@ -320,6 +326,19 @@ enum SceneModelShading {
         toLight = offset / distance;
         float r = distance / max(light.params.z, 1.0);
         float strength = 1.0 / (1.0 + 3.0 * r * r);
+        if (photometry.x > 0) {
+            float meters = distance / photometry.x;
+            float normalizedDistance = distance / light.params.z;
+            float fourth = normalizedDistance * normalizedDistance;
+            float cutoff = photometry.z > 0 ? saturate(1.0 - fourth * fourth) : 1.0;
+            strength = cutoff / max(meters * meters, 1e-6);
+            if (light.params.x > 1.5) {
+                float cone = saturate((dot(-toLight, light.axis) - light.params.y)
+                                      / max(photometry.y - light.params.y, 1e-6));
+                strength *= cone * cone;
+            }
+            return light.color * strength;
+        }
         if (light.params.x > 1.5) {
             float c = dot(-toLight, light.axis);
             float edge = light.params.y;
@@ -395,7 +414,7 @@ enum SceneModelShading {
             constant Light& light = u.lights[i];
             if (all(light.color == 0)) continue;
             float3 l;
-            float3 radiance = incoming(light, in.world, l);
+            float3 radiance = incoming(light, u.photometry[i], in.world, l);
             float nl = dot(n, l);
             if (nl <= 0) continue;
             radiance *= visibility(u, light, in.world, normalize(in.normal), shadow0, shadow1, shadow2, shadow3, shadowSampler);
@@ -455,7 +474,7 @@ enum SceneModelShading {
             constant Light& light = u.lights[i];
             if (light.params.w < 0 || all(light.color == 0)) continue;
             float3 l;
-            float3 radiance = incoming(light, in.world, l);
+            float3 radiance = incoming(light, u.photometry[i], in.world, l);
             if (dot(n, l) <= 0) continue;
             float share = max(radiance.r, max(radiance.g, radiance.b)) / max(strongest, 1e-5);
             float lit = visibility(u, light, in.world, n, shadow0, shadow1, shadow2, shadow3, shadowSampler);

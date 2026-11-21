@@ -14,7 +14,8 @@ extension SettingsView {
         "適用中",
         "複製",
         "日の出",
-        "日の入り"
+        "日の入り",
+        "天気"
     ]
 
     /// 壁紙タブの一覧ペインの下に置く折りたたみカード。スケジュールはルール自身が
@@ -171,8 +172,10 @@ extension SettingsView {
                 )
             )
 
-            if model.scheduleRules.contains(where: { $0.timeRange?.followsSun == true }) {
-                scheduleSunLocationRow
+            let followsSun = model.scheduleRules.contains { $0.timeRange?.followsSun == true }
+            let usesWeather = model.scheduleRules.contains { $0.isEnabled && $0.weather != nil }
+            if followsSun || usesWeather {
+                scheduleLocationRow(followsSun: followsSun, usesWeather: usesWeather)
                     .transition(Motion.reveal)
             }
 
@@ -330,6 +333,16 @@ extension SettingsView {
             .controlSize(.small)
             .fixedSize()
 
+            Picker(model.localizedString("天気"), selection: ruleBinding.weather) {
+                Text(model.localizedString("常に")).tag(nil as ScheduleWeather?)
+                ForEach(ScheduleWeather.allCases, id: \.self) { weather in
+                    Text(model.localizedString(weather.title)).tag(Optional(weather))
+                }
+            }
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
+
             HStack(spacing: 8) {
                 scheduleRuleScopePicker(ruleBinding: ruleBinding)
                 scheduleTargetPickerButton(ruleID: id, target: rule.target)
@@ -423,6 +436,9 @@ extension SettingsView {
             parts.append(timeRangeSummary(range))
         } else {
             parts.append(model.localizedString("終日"))
+        }
+        if let weather = rule.weather {
+            parts.append(model.localizedString(weather.title))
         }
         if rule.appearance != .any {
             parts.append(model.localizedString(rule.appearance == .dark ? "ダーク" : "ライト"))
@@ -552,31 +568,50 @@ extension SettingsView {
         )
     }
 
-    private var scheduleSunLocationRow: some View {
+    @ViewBuilder
+    private var scheduleWeatherStatus: some View {
+        if let weather = model.scheduleCurrentWeather {
+            Text(String(
+                format: model.localizedString("現在の天気予報 %@"),
+                model.localizedString(weather.title)
+            ))
+        } else if model.scheduleWeatherRequestFailed {
+            Text(model.localizedString("天気予報を取得できないため、天気ルールを適用できません。"))
+                .foregroundColor(.orange)
+        } else {
+            Text(model.localizedString("天気予報を取得中…"))
+        }
+        Link("MET Norway", destination: URL(string: "https://www.met.no/")!)
+            .foregroundColor(.secondary)
+    }
+
+    private func scheduleLocationRow(followsSun: Bool, usesWeather: Bool) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "sun.horizon")
+            Image(systemName: followsSun ? "sun.horizon" : "cloud.sun")
                 .foregroundColor(.secondary)
                 .accessibilityHidden(true)
-            if let location = model.scheduleLocation, let sun = model.todaySunTimes() {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(String(
-                        format: model.localizedString("今日の日の出 %@ · 日の入り %@"),
-                        sunTimeLabel(sun.sunrise, sun: sun), sunTimeLabel(sun.sunset, sun: sun)
-                    ))
-                    .font(.caption)
+            if let location = model.scheduleLocation {
+                VStack(alignment: .leading, spacing: 2) {
+                    if followsSun, let sun = model.todaySunTimes() {
+                        Text(String(
+                            format: model.localizedString("今日の日の出 %@ · 日の入り %@"),
+                            sunTimeLabel(sun.sunrise, sun: sun), sunTimeLabel(sun.sunset, sun: sun)
+                        ))
+                    }
+                    if usesWeather {
+                        scheduleWeatherStatus
+                    }
                     Text(model.isScheduleLocationFromTimeZone
                         ? String(format: model.localizedString("%@(タイムゾーンから推定)"), location.name)
                         : location.name)
-                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
-            } else {
-                Text(model.localizedString(
-                    "場所が分からないため、日の出・日の入りを使うルールは適用されません。場所を設定してください。"
-                ))
                 .font(.caption)
-                .foregroundColor(.orange)
-                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(model.localizedString("場所を設定すると、場所に基づくルールを適用できます。"))
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
             Button(model.localizedString("場所を変更…")) {

@@ -105,6 +105,12 @@ struct SceneModelStage: Codable, Equatable {
 
     struct Light: Codable, Equatable, Identifiable {
         enum Kind: String, Codable, CaseIterable { case directional, point, spot }
+        struct Photometry: Codable, Equatable {
+            var canvasUnitsPerMeter: Double
+            var innerConeAngle: Double
+            var hasRange: Bool
+        }
+
         var id = UUID()
         var kind: Kind = .directional
         /// Linear RGB.
@@ -122,6 +128,8 @@ struct SceneModelStage: Codable, Equatable {
         var coneAngle: Double = 30
         /// Point lights cast none.
         var castsShadow = true
+        var photometry: Photometry?
+        var binding: Binding?
 
         var casts: Bool {
             castsShadow && kind != .point
@@ -131,7 +139,15 @@ struct SceneModelStage: Codable, Equatable {
             color.count == 3 && position.count == 3
                 && (color + position + [intensity, azimuth, elevation, range, coneAngle])
                 .allSatisfy(\.isFinite)
-                && range > 0 && (1 ... 89).contains(coneAngle)
+                && (binding?.isValid ?? true) && range > 0 &&
+                (photometry == nil ? (1 ... 89).contains(coneAngle) : importedConeIsValid)
+        }
+
+        private var importedConeIsValid: Bool {
+            guard let photometry else { return false }
+            return coneAngle > 0 && coneAngle <= 90 && photometry.innerConeAngle >= 0
+                && photometry.innerConeAngle < coneAngle && photometry.canvasUnitsPerMeter.isFinite
+                && photometry.canvasUnitsPerMeter > 0
         }
 
         /// Unit vector toward where the light comes from.
@@ -152,6 +168,9 @@ struct SceneModelStage: Codable, Equatable {
         }
     }
 
+    var importedCamera: Camera?
+    var importedCameraEnabled: Bool?
+
     /// 0 shows the models without perspective; otherwise the vertical field of view in degrees.
     var fieldOfView: Double = 30
     /// The view turns about the canvas centre: degrees around the vertical axis and above it.
@@ -168,7 +187,7 @@ struct SceneModelStage: Codable, Equatable {
             && (skyColor + groundColor + [fieldOfView, orbitAzimuth, orbitElevation])
             .allSatisfy(\.isFinite)
             && (0 ..< 120).contains(fieldOfView) && lights
-            .allSatisfy(\.isValid) && (floor?.isValid ?? true)
+            .allSatisfy(\.isValid) && (floor?.isValid ?? true) && (importedCamera?.isValid ?? true)
     }
 
     /// The scene camera the renderer lights models with: the lights as script-movable
@@ -246,6 +265,11 @@ struct SceneModelStage: Codable, Equatable {
             values["light\(index).1"] = cos(light.coneAngle * .pi / 180)
             values["light\(index).2"] = light.range * canvasHeight
             values["light\(index).3"] = light.casts ? Double(slot) : -1
+            if let photometry = light.photometry {
+                values["photometry\(index).0"] = photometry.canvasUnitsPerMeter
+                values["photometry\(index).1"] = cos(photometry.innerConeAngle * .pi / 180)
+                values["photometry\(index).2"] = photometry.hasRange ? 1 : 0
+            }
             if light.casts { slot += 1 }
         }
         values["floor.0"] = floor?.opacity ?? 0
@@ -261,6 +285,17 @@ struct SceneModelStage: Codable, Equatable {
         viewport: SIMD4<Float>
     ) -> (simd_float4x4, SIMD3<Float>) {
         let w = Float(canvasWidth), h = Float(canvasHeight)
+        if importedCameraEnabled != false, let camera = importedCamera {
+            let eye = SIMD3<Float>(camera.eye.map(Float.init))
+            let direction = SIMD3<Float>(camera.direction.map(Float.init))
+            let up = SIMD3<Float>(camera.up.map(Float.init))
+            let view = Self.lookAt(eye: eye, backward: -direction, up: up)
+            return (
+                Self.viewportAdjust(viewport) * camera.projection
+                    .matrix(canvasAspect: w / h) * view,
+                eye
+            )
+        }
         let center = SIMD3(w / 2, h / 2, 0)
         let turn = simd_quatf(angle: Float(orbitAzimuth * .pi / 180), axis: SIMD3(0, 1, 0))
             * simd_quatf(angle: Float(-orbitElevation * .pi / 180), axis: SIMD3(1, 0, 0))
@@ -310,7 +345,13 @@ struct SceneModelStage: Codable, Equatable {
         center: SIMD3<Float>,
         up: SIMD3<Float>
     ) -> simd_float4x4 {
-        let z = simd_normalize(eye - center)
+        lookAt(eye: eye, backward: eye - center, up: up)
+    }
+
+    private static func lookAt(
+        eye: SIMD3<Float>, backward: SIMD3<Float>, up: SIMD3<Float>
+    ) -> simd_float4x4 {
+        let z = simd_normalize(backward)
         let x = simd_normalize(simd_cross(up, z))
         let y = simd_cross(z, x)
         return simd_float4x4(columns: (

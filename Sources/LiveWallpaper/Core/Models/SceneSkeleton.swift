@@ -13,6 +13,7 @@ struct SceneSkeleton: Codable, Equatable {
         var parent: Int?
         var rest: Transform
         var inverseBind: [Float]
+        var morphWeights: [Float]?
     }
 
     struct Track: Codable, Equatable {
@@ -26,6 +27,7 @@ struct SceneSkeleton: Codable, Equatable {
         var framesPerSecond: Double
         var frameCount: Int
         var tracks: [Track]
+        var morphTracks: [Int: SceneMorphCurve]?
     }
 
     struct Playback: Codable, Equatable {
@@ -60,11 +62,15 @@ final class SceneSkeletonEvaluator {
 
     struct Pose {
         var matrices: [simd_float4x4]
+        var world: [simd_float4x4]
+        var rotations: [simd_quatf]
+        var morphWeights: [Int: [Float]]
         var opacity: [Float]
         var attachments: [String: simd_float4x4]
     }
 
     private let skeleton: SceneSkeleton
+    private let restMorphWeights: [Int: [Float]]
     private var order: [Int] = []
     private var inverseBind: [simd_float4x4] = []
     private var playbackOverride: [SceneSkeleton.Playback]?
@@ -74,6 +80,10 @@ final class SceneSkeletonEvaluator {
 
     init(_ skeleton: SceneSkeleton) throws {
         self.skeleton = skeleton
+        restMorphWeights = Dictionary(uniqueKeysWithValues: skeleton.bones.enumerated()
+            .compactMap { index, bone in
+                bone.morphWeights.map { (index, $0) }
+            })
         try validate()
         inverseBind = skeleton.bones.map { Self.matrix($0.inverseBind) }
         var visited = Set<Int>()
@@ -104,6 +114,7 @@ final class SceneSkeletonEvaluator {
     func evaluate(time: Double) -> Pose {
         if let cachedPose, cachedPose.time == time { return cachedPose.pose }
         var transforms = skeleton.bones.map(\.rest)
+        var morphs = restMorphWeights
         var opacity = Array(repeating: Float(1), count: transforms.count)
         for playback in playbackOverride ?? skeleton.playback where playback.weight > 0 {
             let clip = skeleton.clips[playback.clip]
@@ -132,6 +143,15 @@ final class SceneSkeletonEvaluator {
             }
             let first = Int(frame), next = min(first + 1, clip.frameCount)
             let fraction = Float(frame - Double(first))
+            for (bone, curve) in clip.morphTracks ?? [:] {
+                let rest = restMorphWeights[bone]!
+                let sample = curve.sample(at: Float(frame / clip.framesPerSecond))
+                let base = morphs[bone] ?? rest
+                morphs[bone] = base.indices.map { i in
+                    let reference = playback.additive ? rest[i] : base[i]
+                    return base[i] + (sample[i] - reference) * playback.weight
+                }
+            }
             for track in clip.tracks {
                 let sampled = Self.mix(track.transforms[first], track.transforms[next], fraction)
                 let bone = track.bone
@@ -159,12 +179,19 @@ final class SceneSkeletonEvaluator {
             }
         }
         var world = Array(repeating: matrix_identity_float4x4, count: transforms.count)
+        let identity = simd_quatf(ix: 0, iy: 0, iz: 0, r: 1)
+        var rotations = Array(repeating: identity, count: transforms.count)
         for index in order {
             let local = Self.matrix(transforms[index])
             world[index] = skeleton.bones[index].parent.map { world[$0] * local } ?? local
+            let rotation = Self.quaternion(transforms[index].rotation)
+            rotations[index] = skeleton.bones[index].parent
+                .map { rotations[$0] * rotation } ?? rotation
         }
         let pose = Pose(
             matrices: world.indices.map { world[$0] * inverseBind[$0] },
+            world: world, rotations: rotations,
+            morphWeights: morphs,
             opacity: opacity.map { min(1, max(0, $0)) },
             attachments: Dictionary(uniqueKeysWithValues: skeleton.attachments.map {
                 ($0.name, world[$0.bone] * Self.matrix($0.transform))
@@ -283,6 +310,14 @@ final class SceneSkeletonEvaluator {
                 Set(clip.tracks.map(\.bone)).count == clip.tracks.count,
                 "duplicate bone track"
             )
+            for (bone, curve) in clip.morphTracks ?? [:] {
+                try require(
+                    skeleton.bones.indices.contains(bone) && curve.isValid
+                        && skeleton.bones[bone].morphWeights?.count == curve.width
+                        && skeleton.bones[bone].morphWeights?.allSatisfy(\.isFinite) == true,
+                    "invalid morph track"
+                )
+            }
             for track in clip.tracks {
                 try require(skeleton.bones.indices.contains(track.bone), "unknown track bone")
                 try require(

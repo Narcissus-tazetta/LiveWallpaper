@@ -91,9 +91,10 @@ extension SceneRenderer {
                     || (layer.kind == .particles ? layer.hasParticles : picture(for: layer) != nil))
         }
         // On the canvas a solid model stands in the layer order, like the ones a script makes.
-        let placed = visibleLayers.map { layer -> Drawn in
-            layer.model != nil && document.camera?.perspective != true
-                ? .model(staticModelFrame(layer, evaluated: evaluated)) : .layer(layer)
+        let placed = try visibleLayers.map { layer -> Drawn in
+            try layer.model != nil && document.camera?.perspective != true
+                ? .model(staticModelFrame(layer, evaluated: evaluated, time: input.time)) :
+                .layer(layer)
         }
         if modelRenderer == nil &&
             (!evaluated.models.isEmpty || visibleLayers.contains { $0.model != nil })
@@ -110,9 +111,14 @@ extension SceneRenderer {
                     evaluated.order[id] ?? document.layers.firstIndex { $0.id == id } ?? 0
                 }
             )
-        let lights = currentLights(evaluated.lights)
+        let stage = try document.modelStage?.posed(
+            rigs: rigs!, time: input.time,
+            canvasSize: SIMD2(Double(document.canvasWidth), Double(document.canvasHeight))
+        )
+        let stageCamera = modelCamera(stage: stage)
+        let lights = currentLights(evaluated.lights, camera: stageCamera)
         var views = modelViews(
-            camera: evaluated.camera,
+            camera: evaluated.camera, stage: stage,
             input: input,
             target: target,
             lights: lights
@@ -124,7 +130,7 @@ extension SceneRenderer {
             {
                 visible.insert(.model(floor), at: first)
             }
-            if let shadowLights = modelCamera?.shadowLights, !shadowLights.isEmpty {
+            if let shadowLights = stageCamera?.shadowLights, !shadowLights.isEmpty {
                 let casters = visible.compactMap { item -> SceneModelLayerFrame? in
                     if case let .model(model) = item { return model }
                     return nil
@@ -553,7 +559,11 @@ extension SceneRenderer {
             case let .model(model): prepared.append(.model(model))
             case let .layer(layer):
                 if layer.model != nil {
-                    prepared.append(.model(staticModelFrame(layer, evaluated: evaluated)))
+                    try prepared.append(.model(staticModelFrame(
+                        layer,
+                        evaluated: evaluated,
+                        time: input.time
+                    )))
                     continue
                 }
                 if layer.capturesCanvas {
@@ -619,7 +629,7 @@ extension SceneRenderer {
             prepared = keyed.map(\.item) + captures
         }
         var views = views
-        if var lights = modelCamera?.shadowLights, !lights.isEmpty {
+        if var lights = modelCamera(stage: document.modelStage)?.shadowLights, !lights.isEmpty {
             for index in lights.indices {
                 guard let moving = lights[index].dynamicLight,
                       views.flat.lights.indices.contains(moving) else { continue }

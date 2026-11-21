@@ -188,17 +188,25 @@ struct SceneModelStagePanel: View {
         if let document = model.sceneDocumentsByPath[path], let stage = document.modelStage {
             DisclosureGroup {
                 VStack(alignment: .leading, spacing: 10) {
-                    slider("画角", stage.fieldOfView, 0 ... 90, unit: "°") { value in
-                        update { $0.fieldOfView = value }
+                    if stage.importedCamera != nil {
+                        Toggle(model.localizedString("モデル内のカメラを使う"), isOn: Binding(
+                            get: { stage.importedCameraEnabled != false },
+                            set: { enabled in update { $0.importedCameraEnabled = enabled } }
+                        ))
                     }
-                    note(stage.fieldOfView < 0.5
-                        ? "0° では遠近なし(平行投影)で表示します。"
-                        : "大きいほど遠近が強くなります。画像レイヤーの見え方は変わりません。")
-                    slider("視点の左右", stage.orbitAzimuth, -90 ... 90, unit: "°") { value in
-                        update { $0.orbitAzimuth = value }
-                    }
-                    slider("視点の上下", stage.orbitElevation, -60 ... 60, unit: "°") { value in
-                        update { $0.orbitElevation = value }
+                    if stage.importedCamera == nil || stage.importedCameraEnabled == false {
+                        slider("画角", stage.fieldOfView, 0 ... 90, unit: "°") { value in
+                            update { $0.fieldOfView = value }
+                        }
+                        note(stage.fieldOfView < 0.5
+                            ? "0° では遠近なし(平行投影)で表示します。"
+                            : "大きいほど遠近が強くなります。画像レイヤーの見え方は変わりません。")
+                        slider("視点の左右", stage.orbitAzimuth, -90 ... 90, unit: "°") { value in
+                            update { $0.orbitAzimuth = value }
+                        }
+                        slider("視点の上下", stage.orbitElevation, -60 ... 60, unit: "°") { value in
+                            update { $0.orbitElevation = value }
+                        }
                     }
                     colorRow("空からの光", stage.skyColor) { color in update { $0.skyColor = color } }
                     colorRow("地面からの照り返し", stage.groundColor) { color in
@@ -280,12 +288,20 @@ struct SceneModelStagePanel: View {
                     setLight(index) { $0.position[2] = value }
                 }
                 slider("届く距離", light.range, 0.1 ... 5, unit: "", digits: 2) { value in
-                    setLight(index) { $0.range = value }
+                    setLight(index) {
+                        $0.range = value
+                        $0.photometry?.hasRange = true
+                    }
                 }
             }
             if light.kind == .spot {
                 slider("広がり", light.coneAngle, 1 ... 89, unit: "°") { value in
-                    setLight(index) { $0.coneAngle = value }
+                    setLight(index) {
+                        $0.coneAngle = value
+                        if let inner = $0.photometry?.innerConeAngle, inner >= value {
+                            $0.photometry?.innerConeAngle = value.nextDown
+                        }
+                    }
                 }
             }
             if light.kind == .point {

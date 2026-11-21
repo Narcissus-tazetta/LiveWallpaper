@@ -1771,3 +1771,15 @@
 "書き出し中…" = "Dışa aktarılıyor…";
 "書き出せる壁紙がありません" = "Dışa aktarılacak bir şey yok.";
 "自分のプリセットを共有" = "Hazır Ayarımı Paylaş";
+
+"天気" = "Hava durumu";
+"晴れ" = "Açık";
+"曇り" = "Bulutlu";
+"霧" = "Sisli";
+"雷" = "Gök gürültülü fırtına";
+"場所を設定すると、場所に基づくルールを適用できます。" = "Konuma dayalı kuralları kullanmak için konum belirleyin.";
+"現在の天気予報 %@" = "Güncel hava tahmini: %@";
+"天気予報を取得できないため、天気ルールを適用できません。" = "Hava tahmini yüklenene kadar hava durumu kuralları uygulanamaz.";
+"天気予報を取得中…" = "Hava tahmini yükleniyor…";
+"モデル内のカメラを使う" = "Modelin kamerasını kullan";
+"シーンを全画面プレビュー" = "Sahneyi tam ekranda önizle";

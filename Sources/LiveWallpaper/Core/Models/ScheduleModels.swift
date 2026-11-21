@@ -169,11 +169,12 @@ struct ScheduleRule: Codable, Identifiable, Equatable {
     /// nil は「終日(時間帯条件なし)」。
     var timeRange: ScheduleTimeRange?
     var appearance: ScheduleAppearanceCondition
+    var weather: ScheduleWeather?
     var scope: ScheduleScope
     var target: ScheduleTarget
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isEnabled, origin, weekdays, timeRange, appearance, scope, target
+        case id, name, isEnabled, origin, weekdays, timeRange, appearance, weather, scope, target
     }
 
     init(
@@ -184,6 +185,7 @@ struct ScheduleRule: Codable, Identifiable, Equatable {
         weekdays: Set<Int> = Set(1 ... 7),
         timeRange: ScheduleTimeRange? = nil,
         appearance: ScheduleAppearanceCondition = .any,
+        weather: ScheduleWeather? = nil,
         scope: ScheduleScope = .shared,
         target: ScheduleTarget
     ) {
@@ -194,6 +196,7 @@ struct ScheduleRule: Codable, Identifiable, Equatable {
         self.weekdays = weekdays
         self.timeRange = timeRange
         self.appearance = appearance
+        self.weather = weather
         self.scope = scope
         self.target = target
     }
@@ -214,6 +217,7 @@ struct ScheduleRule: Codable, Identifiable, Equatable {
             ScheduleAppearanceCondition.self,
             forKey: .appearance
         ) ?? .any
+        weather = try container.decodeIfPresent(ScheduleWeather.self, forKey: .weather)
         scope = try container.decodeIfPresent(ScheduleScope.self, forKey: .scope) ?? .shared
     }
 }

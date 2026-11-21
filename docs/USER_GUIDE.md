@@ -29,6 +29,8 @@ For HTML folder wallpapers, see the [web wallpaper API](WEB_WALLPAPER_API.md) (J
 
 ## Displays and playlists
 
+Choose “Preview Scene Full Screen” from the menu bar to view the current scene wallpaper live, including pointer interaction and enabled audio reactions. Press Esc or click Close to exit. The preview closes when macOS locks the screen.
+
 - **Separate desktop and lock screen videos**: Assign different videos for desktop live wallpaper and lock screen sync (lock screen sync requires macOS 26 or later).
 - **Multi-display support**: Main display only or all connected displays, with per-display assignments.
 - **Per-desktop (Space) wallpapers**: Assign a different wallpaper to each Mission Control desktop, and optionally show the desktop number in the menu bar.
@@ -79,7 +81,8 @@ For HTML folder wallpapers, see the [web wallpaper API](WEB_WALLPAPER_API.md) (J
 Three independent rules can pick the wallpaper for you. All of them are configured in the **Wallpaper** tab.
 
 - **Appearance**: Choose a light-mode wallpaper and a dark-mode wallpaper, and the shared wallpaper follows macOS Dark Mode.
-- **Weekly schedule**: Build rules from weekday + time range + appearance. Rules higher in the list win, and the first match applies. Overnight ranges such as 22:00–06:00 are supported. A range can also start or end at sunrise or sunset (for example, sunset–sunrise for nights only). The location defaults to your time zone's representative city (Tokyo for all of Japan); use "Change Location…" to search for a city instead. Location Services permission is not needed. If you pick a wallpaper manually while a rule is active, your choice stays until the next time boundary.
+- **Weekly schedule**: Build rules from weekday, time range, appearance, and weather. Rules higher in the list win, and the first match applies. Overnight ranges such as 22:00–06:00 are supported. A range can also start or end at sunrise or sunset (for example, sunset–sunrise for nights only). The location defaults to your time zone's representative city (Tokyo for all of Japan); use "Change Location…" to search for a city instead. Location Services permission is not needed. If you pick a wallpaper manually while a rule is active, your choice stays until the matching rule changes.
+    - Weather rules can match clear skies, clouds, fog, rain, snow, or thunder. Enabling a weather rule sends the schedule city's coordinates (or the time zone's representative city) to MET Norway. Rules with a weather condition are skipped while no valid forecast is available. LiveWallpaper groups the MET Norway forecast into six conditions. [MET Norway data policy](https://docs.api.met.no/doc/License) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 - **Focus modes**: Assign a wallpaper per Focus mode. macOS does not expose Focus state to apps, so this reads the notification-center database directly and therefore needs **Full Disk Access**; the app walks you through granting it.
 
 ## Automation

@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var settingsWindowController: NSWindowController?
     var sceneEditorWindowController: NSWindowController?
+    var liveScenePreview: LiveScenePreviewWindow?
     let wallpaperModel = WallpaperModel()
     var launchAtLoginEnabled: Bool = false
     var autoUpdateEnabled: Bool = true
@@ -47,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let assignToCurrentSpace = 1014
         static let pauseToggle = 1015
         static let powerPolicyStatus = 1016
+        static let liveScenePreview = 1017
     }
 
     func applicationWillFinishLaunching(_: Notification) {

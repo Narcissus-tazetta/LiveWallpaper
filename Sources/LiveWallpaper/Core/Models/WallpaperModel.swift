@@ -434,6 +434,12 @@ final class WallpaperModel: ObservableObject {
     // MARK: - スケジュール(時間帯/ダークモード連動切替・曜日スケジュール)
 
     var scheduleEvaluationTimer: Timer?
+    var scheduleWeatherTask: Task<Void, Never>?
+    var scheduleWeatherLocation: SolarLocation?
+    var scheduleWeatherForecast: ScheduleWeatherForecast?
+    var scheduleWeatherRefreshAfter = Date.distantPast
+    @Published var scheduleCurrentWeather: ScheduleWeather?
+    @Published var scheduleWeatherRequestFailed = false
     /// evaluateSchedule の再入ガード。適用処理が間接的に評価を呼び戻しても多重実行しない。
     var isEvaluatingSchedule: Bool = false
     /// スコープ単位で「今どのルールが適用中か」を追跡する。ルール境界を跨いだ瞬間
@@ -603,6 +609,7 @@ final class WallpaperModel: ObservableObject {
         }
         autoFrameRateTimer?.invalidate()
         autoFrameRateTimer = nil
+        scheduleWeatherTask?.cancel()
         scheduleEvaluationTimer?.invalidate()
         scheduleEvaluationTimer = nil
         if let observer = autoFrameRateThermalObserver {

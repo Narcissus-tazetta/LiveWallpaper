@@ -58,6 +58,16 @@ extension AppDelegate {
         openSettingsItem.tag = MenuTag.openSettings
         menu.addItem(openSettingsItem)
 
+        let liveItem = NSMenuItem(
+            title: localized("シーンを全画面プレビュー"), action: #selector(openLiveScenePreview),
+            keyEquivalent: ""
+        )
+        liveItem.image = menuIcon(systemSymbolName: "eye", accessibilityDescription: liveItem.title)
+        preserveConceptMenuIconVisibility(liveItem)
+        liveItem.target = self
+        liveItem.tag = MenuTag.liveScenePreview
+        menu.addItem(liveItem)
+
         let toggleItem = NSMenuItem(
             title: audioMenuTitle(wallpaperModel.audioEnabled),
             action: #selector(toggleAudioEnabled),
@@ -262,6 +272,14 @@ extension AppDelegate {
             }
             .store(in: &cancellables)
 
+        wallpaperModel.$currentVideoPath
+            .combineLatest(wallpaperModel.$sceneDocumentsByPath, wallpaperModel.$wallpaperKind)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshLiveScenePreviewMenu()
+            }
+            .store(in: &cancellables)
+
         wallpaperModel.$spaceWallpaperFeatureEnabled
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -439,6 +457,7 @@ extension AppDelegate {
             return
         }
         refreshPowerPolicyStatusItem()
+        menu.item(withTag: MenuTag.liveScenePreview)?.title = localized("シーンを全画面プレビュー")
 
         if let item = menu.item(withTag: MenuTag.openWallpaper) {
             item.title = localized("壁紙を開く")

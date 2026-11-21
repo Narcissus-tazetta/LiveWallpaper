@@ -29,12 +29,19 @@ extension SceneRenderer {
 
     func staticModelFrame(
         _ layer: SceneLayer,
-        evaluated: SceneEvaluatedFrame
-    ) -> SceneModelLayerFrame {
+        evaluated: SceneEvaluatedFrame,
+        time: Double
+    ) throws -> SceneModelLayerFrame {
         let drawn = evaluated.layers[layer.id]!
+        let sourceID = evaluated.instances[layer.id] ?? layer.id
         if let placement = drawn.layer.modelPlacement,
-           let shapes = importedShapes[layer.id]?.shapes
+           importedShapes[sourceID] != nil
         {
+            let shapes = try importedShapesForFrame(
+                sourceID,
+                rig: layer.model?.skeleton,
+                time: time
+            )
             let tint = drawn.layer.tint
             return SceneModelLayerFrame(
                 serial: 0, order: 0, alpha: Float(drawn.layer.opacity * drawn.opacity),
@@ -67,6 +74,51 @@ extension SceneRenderer {
             castsShadow: layer.model?.skeleton == nil && (drawn.layer.castsShadow ?? true),
             rig: layer.model?.skeleton
         )
+    }
+
+    private func importedShapesForFrame(
+        _ sourceID: UUID,
+        rig: UUID?,
+        time: Double
+    ) throws -> [SceneModelLayerFrame.Shape] {
+        let cache = importedShapes[sourceID]!
+        guard cache.parts.contains(where: { $0.morphs?.isEmpty == false })
+        else { return cache.shapes }
+        let pose = try rigs!.evaluator(rig!).evaluate(time: time)
+        var shapes = cache.shapes
+        for (index, part) in cache.parts.enumerated() {
+            guard let patches = part.morphs, !patches.isEmpty else { continue }
+            let weights = patches.map { pose.morphWeights[$0.bone]! }
+            if let existing = cache.morphed[index], existing.weights == weights {
+                shapes[index] = existing.shape
+                continue
+            }
+            var shape = shapes[index]
+            if weights.contains(where: { $0.contains { $0 != 0 } }) {
+                let stride = shape.stride
+                let tangentOffset: Int? = shape.components & 0b100 != 0 ? 6 : nil
+                for (patch, weight) in zip(patches, weights) {
+                    patch.apply(
+                        weights: weight,
+                        to: &shape.vertices,
+                        stride: stride,
+                        tangentOffset: tangentOffset
+                    )
+                }
+                shape.vertexBuffer = try shape.vertices.withUnsafeBytes { bytes in
+                    guard let buffer = device.makeBuffer(
+                        bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared
+                    ) else { throw RendererError.textureAllocationFailed }
+                    return buffer
+                }
+            }
+            importedShapes[sourceID]!.morphed[index] = CachedMorphShape(
+                weights: weights,
+                shape: shape
+            )
+            shapes[index] = shape
+        }
+        return shapes
     }
 
     /// The stage's floor: a wide level square at its height, centred under the canvas.
@@ -193,8 +245,8 @@ extension SceneRenderer {
 
     /// Where model layers are seen from and lit by: the editor's stage for imported models
     /// when the scene has one, else the scene's camera.
-    var modelCamera: SceneCamera? {
-        document.modelStage.map { $0.camera(
+    func modelCamera(stage: SceneModelStage?) -> SceneCamera? {
+        stage.map { $0.camera(
             canvasWidth: Double(document.canvasWidth),
             canvasHeight: Double(document.canvasHeight)
         ) }
@@ -202,8 +254,11 @@ extension SceneRenderer {
     }
 
     /// The scripted lights as scripts left them, the scene file's values where they left none.
-    func currentLights(_ scripted: [Int: SceneLightState]) -> [SceneModelRenderer.DynamicLight] {
-        (modelCamera?.dynamicLights ?? []).map { base in
+    func currentLights(
+        _ scripted: [Int: SceneLightState],
+        camera: SceneCamera?
+    ) -> [SceneModelRenderer.DynamicLight] {
+        (camera?.dynamicLights ?? []).map { base in
             if let state = scripted[base.objectID] { return .init(
                 origin: state.origin,
                 axis: state.axis,
@@ -219,13 +274,14 @@ extension SceneRenderer {
 
     func modelViews(
         camera: SceneCameraState?,
+        stage: SceneModelStage?,
         input: SceneFrameInput,
         target: MTLTexture,
         lights: [SceneModelRenderer.DynamicLight]
     )
         -> (flat: SceneModelRenderer.View, perspective: SceneModelRenderer.View)
     {
-        let scene = modelCamera
+        let scene = modelCamera(stage: stage)
         let ambient = SIMD3((scene?.ambientColor ?? [0, 0, 0]).map(Float.init))
         let skylight = SIMD3((scene?.skylightColor ?? [0, 0, 0]).map(Float.init))
         var state = camera ?? scene.map { scene in
@@ -266,7 +322,7 @@ extension SceneRenderer {
                 Float(target.width) / Float(target.height)
             )
         )
-        if let stage = document.modelStage, document.camera?.perspective != true {
+        if let stage, document.camera?.perspective != true {
             (canvas.viewProjection, canvas.eye) = stage.viewProjection(
                 canvasWidth: Double(document.canvasWidth),
                 canvasHeight: Double(document.canvasHeight), viewport: input.viewport
