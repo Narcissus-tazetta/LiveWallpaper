@@ -40,19 +40,17 @@ extension WallpaperModel {
         guard frameRateLimit != limit else {
             return
         }
+        let previousProxyCache = activePlaybackProxyCache
         frameRateLimit = limit
         UserDefaults.standard.set(limit.rawValue, forKey: PrefsKey.frameRateLimit)
         refreshLocalWebEnvironment()
         applyDynamicPlaybackProfile()
-    }
-
-    func setDecodeMode(_ mode: DecodeMode) {
-        guard decodeMode != mode else {
-            return
+        if previousProxyCache !== activePlaybackProxyCache {
+            resetLightweightProxyRequests()
+            requestPlaybackReconfiguration()
         }
-        decodeMode = mode
-        UserDefaults.standard.set(mode.rawValue, forKey: PrefsKey.decodeMode)
-        requestPlaybackReconfiguration()
+        // Live scenes take their frame-rate cap from here too.
+        refreshSceneHosts()
     }
 
     func setWorkProfile(_ profile: WorkProfile) {
@@ -61,15 +59,6 @@ extension WallpaperModel {
         }
         workProfile = profile
         UserDefaults.standard.set(profile.rawValue, forKey: PrefsKey.workProfile)
-        applyDynamicPlaybackProfile()
-    }
-
-    func setQualityPreset(_ preset: QualityPreset) {
-        guard qualityPreset != preset else {
-            return
-        }
-        qualityPreset = preset
-        UserDefaults.standard.set(preset.rawValue, forKey: PrefsKey.qualityPreset)
         applyDynamicPlaybackProfile()
     }
 
@@ -261,7 +250,8 @@ extension WallpaperModel {
     }
 
     func applyLightweightSettings() {
-        if !effectiveLightweightMode { resetLightweightProxyRequests() }
+        // The proxy in use may have changed (lightweight's or the 30 fps limit's).
+        resetLightweightProxyRequests()
         sharedPlayer?.automaticallyWaitsToMinimizeStalling = effectiveLightweightMode
         for entry in allDedicatedSlotEntries() {
             entry.slot.player.automaticallyWaitsToMinimizeStalling = effectiveLightweightMode
@@ -306,8 +296,6 @@ extension WallpaperModel {
             workProfile: workProfile,
             lightweightMode: effectiveLightweightMode,
             targetMaxPixelWidth: targetMaxPixelWidth(),
-            qualityPreset: qualityPreset,
-            decodeMode: decodeMode,
             chipClass: playbackEnvironment.chipClass,
             logicalCores: playbackEnvironment.logicalCores,
             frameRateLimit: frameRateLimit,
@@ -434,7 +422,9 @@ extension WallpaperModel {
             for entry in allDedicatedSlotEntries() where entry.isActive {
                 let url = resolvedPlaybackURL(for: entry.path)
                 replaceDedicatedPlaybackURL(url, screenID: entry.screenID, path: entry.path)
-                if effectiveLightweightMode { ensureLightweightProxyIfNeeded(for: entry.path) }
+                if activePlaybackProxyCache != nil {
+                    ensureLightweightProxyIfNeeded(for: entry.path)
+                }
             }
             refreshLightweightProxyState()
         }

@@ -116,6 +116,8 @@ final class WallpaperModel: ObservableObject {
     let lockScreenSyncService: LockScreenSyncService = .init()
     let desktopIconsService: DesktopIconsService = .init()
     let lightweightProxyCache: LightweightProxyCache
+    /// Full-size 30 fps copies, for the 30 fps limit.
+    let frameRateProxyCache: LightweightProxyCache
     var lockScreenSyncTask: Task<Void, Never>?
     /// Identifies the running sync, so progress from a replaced one is ignored.
     var lockScreenSyncID = UUID()
@@ -178,6 +180,9 @@ final class WallpaperModel: ObservableObject {
 
     /// Scenes whose baked video does not show the latest edit yet (pending or failed).
     var sceneStaleVideoPaths: Set<String> = []
+    /// Scenes baked because they were shown, by path and scene.json date: each version
+    /// is tried once, so a bake whose result still counts as incomplete is not repeated.
+    var shownSceneBakeAttempts: Set<String> = []
     @Published var sceneErrorMessage: String?
     @Published var sceneScriptIssues: [String: [SceneScriptIssue]] = [:]
     /// Downloaded scenes whose JavaScript waits for the user's yes; asked one at a time.
@@ -234,8 +239,6 @@ final class WallpaperModel: ObservableObject {
     var sceneBakingTimesOfDay: [String: SceneTimeOfDay] = [:]
     var sceneTimeOfDayObservers: [NSObjectProtocol] = []
     @Published var frameRateLimit: FrameRateLimit = .off
-    @Published var decodeMode: DecodeMode = .automatic
-    @Published var qualityPreset: QualityPreset = .auto
     @Published var bakeQuality: BakeQuality = .high
     @Published var workProfile: WorkProfile = .normal
     @Published var autoFrameRateEnabled: Bool = true
@@ -522,8 +525,15 @@ final class WallpaperModel: ObservableObject {
         )
     }
 
-    init(lightweightProxyCache: LightweightProxyCache? = nil) {
+    init(
+        lightweightProxyCache: LightweightProxyCache? = nil,
+        frameRateProxyCache: LightweightProxyCache? = nil
+    ) {
         self.lightweightProxyCache = lightweightProxyCache ?? LightweightProxyCache()
+        self.frameRateProxyCache = frameRateProxyCache ?? LightweightProxyCache(
+            rootDirectory: LightweightProxyCache.frameRateRootDirectoryURL(),
+            profile: .frameRate
+        )
         playbackEnvironment = Self.detectPlaybackEnvironment()
         configurePlayer()
         restoreState()

@@ -59,12 +59,30 @@ final class LightweightProxyCache {
     // regenerated, instead of serving proxies made under the old scheme.
     nonisolated static let metadataVersion = 4
     nonisolated static let metadataFileName = "metadata.json"
-    /// Target long edge, in pixels, for the transcoded proxy. Sources at or below this
-    /// (and at or below the frame-rate cap) are treated as passthrough — see +Generation.swift.
-    nonisolated static let targetLongEdge: CGFloat = 1280
     nonisolated static let targetFrameRate: Float = 30
 
+    /// What a proxy trades. Sources already within it (at most the long edge, if any,
+    /// and the frame-rate cap) are treated as passthrough — see +Generation.swift.
+    struct Profile {
+        /// Longest edge, in pixels; nil keeps the source's size.
+        var targetLongEdge: CGFloat?
+        /// The export preset for SDR sources; HDR ones keep HDR (HDRVideo).
+        var sdrPreset: String
+
+        /// Lightweight mode: small and 30 fps, for the least decoding.
+        static let lightweight = Profile(
+            targetLongEdge: 1280,
+            sdrPreset: AVAssetExportPresetMediumQuality
+        )
+        /// The 30 fps limit: every frame at full size and quality, only half of them.
+        static let frameRate = Profile(
+            targetLongEdge: nil,
+            sdrPreset: AVAssetExportPresetHEVCHighestQuality
+        )
+    }
+
     let rootDirectory: URL?
+    let profile: Profile
     var dataDirectory: URL? {
         rootDirectory?.appendingPathComponent("data", isDirectory: true)
     }
@@ -73,8 +91,12 @@ final class LightweightProxyCache {
         rootDirectory?.appendingPathComponent(Self.metadataFileName)
     }
 
-    init(rootDirectory: URL? = LightweightProxyCache.rootDirectoryURL()) {
+    init(
+        rootDirectory: URL? = LightweightProxyCache.rootDirectoryURL(),
+        profile: Profile = .lightweight
+    ) {
         self.rootDirectory = rootDirectory
+        self.profile = profile
     }
 
     let maxDiskBytes: UInt64 = 2 * 1024 * 1024 * 1024

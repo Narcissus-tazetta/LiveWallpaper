@@ -27,9 +27,9 @@ enum FrameRateLimit: String {
     case fps60
 }
 
+/// How playback items load, chosen from the hardware: an Intel Mac with few cores
+/// skips the precise duration and timing that the others ask for.
 enum DecodeMode: String {
-    case automatic
-    case gpuAdaptive
     case balanced
     case efficiency
 }
@@ -38,12 +38,6 @@ enum WorkProfile: String {
     case normal
     case lowPower
     case ultraLight
-}
-
-enum QualityPreset: String {
-    case auto
-    case efficiency
-    case quality
 }
 
 enum BakeQuality: String, CaseIterable, Identifiable {

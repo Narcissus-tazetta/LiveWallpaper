@@ -32,8 +32,6 @@
 "一致するアプリがありません" = "Không có ứng dụng phù hợp";
 "Finderから他のアプリを選択…" = "Chọn ứng dụng khác trong Finder…";
 "詳細設定" = "Cài đặt nâng cao";
-"省電力" = "Tiết kiệm điện";
-"高画質" = "Chất lượng cao";
 "通常" = "Bình thường";
 "低負荷" = "Tải thấp";
 "最小" = "Tối thiểu";
@@ -193,14 +191,11 @@
 "メニューバーの自動的に表示/非表示がONのため、この設定は使用できません。" = "Không thể dùng cài đặt này vì “Tự động ẩn và hiển thị thanh menu” đang bật.";
 "macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "Khi chuyển Space trên macOS (Mission Control), đôi khi hình nền có thể chuyển sang Space bên cạnh. Điều này dễ xảy ra khi chuyển từ một Space có ứng dụng đang mở sang một Space trống. Quay lại cùng Space đó thường sẽ ổn định lại.";
 "画質" = "Chất lượng";
-"画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。" = "Chọn mức cân bằng giữa chất lượng và mức tiêu thụ điện. Tự động sẽ tối ưu theo môi trường, Tiết kiệm điện giảm hao pin và nhiệt, Chất lượng cao ưu tiên hình ảnh.";
 "動作プロファイル" = "Cấu hình hoạt động";
 "全体の再生負荷を切り替えます。通常は品質優先、低負荷は安定と省電力を重視、最小は負荷を最小限にして作業優先にします。" = "Điều chỉnh tải phát lại tổng thể. Bình thường ưu tiên chất lượng, Tải thấp chú trọng sự ổn định và tiết kiệm điện, Tối thiểu giảm tải xuống mức thấp nhất để ưu tiên công việc của bạn.";
 "フレームレート" = "Tốc độ khung hình";
 "動画の再生上限を選べます。制限なしは滑らかさ優先、30/60 はCPUと電力を抑えやすくなります。" = "Chọn giới hạn khi phát video. Không giới hạn ưu tiên độ mượt; 30/60 giúp giảm mức sử dụng CPU và điện năng.";
-"デコード" = "Giải mã";
 "標準" = "Tiêu chuẩn";
-"省電" = "Tiết kiệm";
 "動画データのデコード方法を切り替えます。自動はハードウェア/ソフトウェアを状況に応じて選び、標準はGPUハードウェア優先で滑らかさを保ちます。省電力はソフトウェア再生を多用し、CPU負荷と消費電力を低く抑えますが再生品質が落ちる場合があります。" = "Thay đổi cách giải mã video. Tự động sẽ chọn phần cứng hoặc phần mềm tùy tình huống, Tiêu chuẩn ưu tiên phần cứng GPU để giữ độ mượt. Tiết kiệm điện dùng giải mã phần mềm nhiều hơn để giảm tải CPU và điện năng, nhưng chất lượng phát lại có thể giảm.";
 "デスクトップレベル" = "Lớp màn hình nền";
 "壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。" = "Chọn lớp của màn hình nền mà cửa sổ hình nền được đặt vào. -1 đặt cửa sổ phía sau cửa sổ của các ứng dụng khác, 0 là lớp màn hình nền thông thường và +1 hiển thị phía trước các cửa sổ khác. Ở phía trước dễ che các biểu tượng hơn; ở phía sau ít cản trở thao tác với các cửa sổ khác hơn.";
@@ -230,10 +225,9 @@
 "バッテリー残量に応じて画質を自動調整" = "Tự động điều chỉnh chất lượng theo mức pin";
 "バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "Khi máy đang dùng pin và mức pin giảm xuống 10% hoặc thấp hơn, tải phát lại sẽ tự động giảm để tiết kiệm điện.";
 "再生負荷" = "Tải phát lại";
-"再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。" = "Chọn mức tải phát lại tham khảo. Giá trị này chỉ điều chỉnh tốc độ bit bên trong; độ phân giải hiển thị không thay đổi.";
+"動画とシーンのフレームレートの上限です。軽量では60fpsの動画を30fpsに変換したもので再生し（初回は変換に時間がかかります）、シーンは30fpsまでで描きます。高負荷ではシーンを60fpsまで描きます。" = "Giới hạn tốc độ khung hình của video và cảnh. Nhẹ phát video 60 fps từ bản chuyển đổi 30 fps (lần chuyển đổi đầu tiên mất một lúc) và vẽ cảnh tối đa 30 fps. Cao vẽ cảnh tối đa 60 fps.";
 "軽量" = "Nhẹ";
 "高負荷" = "Cao";
-"動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Thay đổi cách giải mã video. Tự động chọn theo môi trường, Tiêu chuẩn ưu tiên độ mượt, Tiết kiệm giảm tải CPU và điện năng.";
 "高度な共有を有効にする" = "Bật chia sẻ nâng cao";
 "オフのときは動画ファイルだけを書き出します。オンにすると配置情報を含む .lwpkg も一緒に書き出します。" = "Khi tắt, chỉ xuất tệp video. Khi bật, gói .lwpkg chứa thông tin bố cục cũng được xuất kèm.";
 "選ぶと保存先フォルダを指定して、動画ファイルを書き出します" = "Sau khi chọn, hãy chỉ định thư mục đích để xuất tệp video";
@@ -691,6 +685,8 @@
 "この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です" = "Cách hiển thị mặc định, được dùng trừ khi video được đặt riêng trong tab Bố cục.";
 "軽量版を生成中..." = "Đang tạo phiên bản nhẹ…";
 "軽量版の生成に失敗しました。元の画質で再生しています。" = "Không thể tạo phiên bản nhẹ. Đang phát với chất lượng gốc.";
+"30fps版を生成中..." = "Đang tạo phiên bản 30 fps…";
+"30fps版の生成に失敗しました。元の動画で再生しています。" = "Không thể tạo phiên bản 30 fps. Đang phát video gốc.";
 "オンにすると壁紙タブの一覧にWeb壁紙を追加できるようになります。実験的な機能です。" = "Khi bật, bạn có thể thêm hình nền web vào danh sách trong tab Hình nền. Đây là tính năng thử nghiệm.";
 "アニメ画像" = "Ảnh động";
 "バックアップ" = "Bản sao lưu";

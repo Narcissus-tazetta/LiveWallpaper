@@ -110,6 +110,8 @@ extension SceneRenderer {
         guard drew else {
             throw RendererError.imageDecodeFailed(url.lastPathComponent)
         }
+        let isOpaque = mode == .premultiplied
+            && !stride(from: 3, to: bytes.count, by: 4).contains { bytes[$0] != 255 }
         if mode == .straightKept {
             for pixel in stride(from: 0, to: bytes.count, by: 4)
                 where bytes[pixel + 3] != 0 && bytes[pixel + 3] != 255
@@ -123,13 +125,26 @@ extension SceneRenderer {
                 }
             }
         }
-        return try makeTexture(
+        let texture = try makeTexture(
             device: device,
             pixelFormat: .rgba8Unorm,
             width: width,
             height: height,
             bytes: bytes
         )
+        if isOpaque {
+            opaqueTexturesLock.withLock { opaqueTextures.add(texture) }
+        }
+        return texture
+    }
+
+    private static let opaqueTexturesLock = NSLock()
+    /// Decoded pictures with no transparent pixel. Weak, so a freed texture's address
+    /// reused by another one is never taken for it.
+    private nonisolated(unsafe) static let opaqueTextures = NSHashTable<AnyObject>.weakObjects()
+
+    static func isOpaque(_ texture: MTLTexture) -> Bool {
+        opaqueTexturesLock.withLock { opaqueTextures.contains(texture) }
     }
 
     static func decodeMask(url: URL, device: MTLDevice) throws -> MTLTexture {

@@ -1138,6 +1138,7 @@ extension WallpaperModel {
         lockScreenVideoPath == path || screenSaverVideoPath == path
             || currentVideoPath == path
             || videoOverrideByScreenID.values.contains(path)
+            || shownVideoPaths.contains(path)
     }
 
     func hasPlayableBakedVideo(forPath path: String) -> Bool {
@@ -1507,6 +1508,68 @@ extension WallpaperModel {
 
     // MARK: - Desktop
 
+    /// The paths the screens show (a Space's or an external wallpaper's included).
+    var shownVideoPaths: [String] {
+        playerViews.compactMap { view in
+            guard let window = view.window,
+                  let displayID = displayIDByWindow[ObjectIdentifier(window)]
+            else { return nil }
+            return resolvedOverridePath(forScreenID: displayID)
+                ?? (isWebWallpaperActive ? nil : currentVideoPath)
+        }
+    }
+
+    /// The scenes the screens show, whether drawn live or played as their videos.
+    var shownSceneDocuments: [SceneDocument] {
+        shownVideoPaths.compactMap { sceneDocumentsByPath[$0] }
+    }
+
+    static func drawsSceneLive(
+        _ document: SceneDocument,
+        listensToAudio: Bool,
+        cursorReacts: Bool,
+        isStale: Bool,
+        scriptsDriveSound: Bool
+    ) -> Bool {
+        isStale || scriptsDriveSound
+            || document.hasLiveInteraction(
+                listensToAudio: listensToAudio,
+                cursorReacts: cursorReacts
+            )
+    }
+
+    /// A shown scene with no full baked loop is drawn live for as long as it is up. Baked
+    /// once, it plays as a video whenever nothing on it reacts. Bakes wait for mains power:
+    /// one takes about a minute of the GPU and the encoder.
+    static func shouldBakeShownScene(
+        isAnimated: Bool,
+        isOnBattery: Bool,
+        isBaking: Bool,
+        hasFailed: Bool,
+        alreadyTried: Bool
+    ) -> Bool {
+        isAnimated && !isOnBattery && !isBaking && !hasFailed && !alreadyTried
+    }
+
+    private func bakeShownSceneIfNeeded(path: String, document: SceneDocument) {
+        let sceneFile = SceneStore.folderURL(forVideoPath: path)
+            .appendingPathComponent(SceneStore.documentFileName)
+        let modified = (try? FileManager.default.attributesOfItem(atPath: sceneFile.path))?[
+            .modificationDate
+        ] as? Date
+        let attempt = "\(path)|\(modified?.timeIntervalSinceReferenceDate ?? 0)"
+        guard Self.shouldBakeShownScene(
+            isAnimated: document.isAnimated,
+            isOnBattery: isOnBatteryPower,
+            isBaking: sceneBakeWorkItems[path] != nil || scenesBakeRunning.contains(path),
+            hasFailed: sceneBakeFailures[path] != nil,
+            alreadyTried: shownSceneBakeAttempts.contains(attempt)
+        ) else { return }
+        shownSceneBakeAttempts.insert(attempt)
+        AppLog.windowRefresh.info("scene bake for the desktop path=\(path, privacy: .public)")
+        scheduleSceneBake(path: path)
+    }
+
     /// Shows or hides the live scene on each screen to match what it plays. Called
     /// from refreshCursorEffects, which runs on every change of what screens show.
     ///
@@ -1537,6 +1600,14 @@ extension WallpaperModel {
         if lightweight {
             maximumFramesPerSecond = min(maximumFramesPerSecond ?? 30, 30)
         }
+        // Saving power, the cursor no longer moves scenes, so one that reacts to nothing
+        // else looks like its baked video, which costs a fraction of drawing it.
+        // Read here rather than from isLowPowerModeOn/isThermallyConstrained, which are only
+        // kept current while cursor effects are watched and are read after this runs.
+        let processInfo = ProcessInfo.processInfo
+        let cursorReacts = !(processInfo.isLowPowerModeEnabled
+            || processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue
+            || batteryReduceLoadActive)
         for view in playerViews {
             guard let window = view.window,
                   let displayID = displayIDByWindow[ObjectIdentifier(window)],
@@ -1553,13 +1624,15 @@ extension WallpaperModel {
                 view.hideScene()
                 continue
             }
+            if isStale { bakeShownSceneIfNeeded(path: path, document: document) }
             // Scripts decide when some sounds start and how loud they are, and only a live scene
             // runs them.
             let scriptsDriveSound = audioEnabled && document.soundsNeedScripts
             let listens = SceneSoundReaction.isEnabled(videoPath: path)
-            guard document
-                .hasLiveInteraction(listensToAudio: listens) || isStale || scriptsDriveSound
-            else {
+            guard Self.drawsSceneLive(
+                document, listensToAudio: listens, cursorReacts: cursorReacts,
+                isStale: isStale, scriptsDriveSound: scriptsDriveSound
+            ) else {
                 if view.isShowingScene {
                     AppLog.windowRefresh.info(
                         "scene video display=\(displayID, privacy: .public) path=\(URL(fileURLWithPath: path).pathComponents.suffix(2).joined(separator: "/"), privacy: .public)"

@@ -3,14 +3,22 @@ import Foundation
 
 @MainActor
 extension WallpaperModel {
+    /// The transcoded copies playback uses instead of the originals: lightweight mode's
+    /// small ones, else the 30 fps limit's full-size ones (AVPlayer shows every frame of
+    /// a file, and a composition that drops them costs as much CPU as decoding them).
+    var activePlaybackProxyCache: LightweightProxyCache? {
+        if effectiveLightweightMode { return lightweightProxyCache }
+        if frameRateLimit == .fps30 { return frameRateProxyCache }
+        return nil
+    }
+
     /// Resolves the URL that should actually be decoded for `path` right now: the
-    /// lightweight proxy if one is already cached and lightweight mode is on,
-    /// otherwise the original file. This check is synchronous and never triggers
-    /// generation itself — see `ensureLightweightProxyIfNeeded(for:)` for that.
+    /// active proxy if one is already cached, otherwise the original file. This check
+    /// is synchronous and never triggers generation itself — see
+    /// `ensureLightweightProxyIfNeeded(for:)` for that.
     func resolvedPlaybackURL(for path: String) -> URL {
         let originalURL = URL(fileURLWithPath: path)
-        guard effectiveLightweightMode,
-              let proxyURL = lightweightProxyCache.cachedProxyURL(for: path)
+        guard let proxyURL = activePlaybackProxyCache?.cachedProxyURL(for: path)
         else {
             return originalURL
         }
@@ -26,12 +34,12 @@ extension WallpaperModel {
     }
 
     func ensureLightweightProxyIfNeeded(for path: String) {
-        guard effectiveLightweightMode else {
+        guard let cache = activePlaybackProxyCache else {
             resetLightweightProxyRequests()
             return
         }
         guard lightweightProxyRequests[path] == nil else { return }
-        if lightweightProxyCache.cachedProxyURL(for: path) != nil {
+        if cache.cachedProxyURL(for: path) != nil {
             lightweightProxyStatesByPath[path] = .ready
             refreshLightweightProxyState()
             return
@@ -40,10 +48,10 @@ extension WallpaperModel {
         lightweightProxyRequests[path] = requestID
         lightweightProxyStatesByPath[path] = .generating
         refreshLightweightProxyState()
-        lightweightProxyCache.generateProxyIfNeeded(for: path) { [weak self] result in
+        cache.generateProxyIfNeeded(for: path) { [weak self] result in
             guard let self, lightweightProxyRequests[path] == requestID else { return }
             lightweightProxyRequests[path] = nil
-            guard effectiveLightweightMode else { return }
+            guard activePlaybackProxyCache === cache else { return }
             switch result {
             case let .ready(proxyURL):
                 lightweightProxyStatesByPath[path] = .ready
@@ -72,17 +80,20 @@ extension WallpaperModel {
         lightweightProxyRequests = [:]
         lightweightProxyStatesByPath = [:]
         lightweightProxyCache.cancelActiveGeneration()
+        frameRateProxyCache.cancelActiveGeneration()
         lightweightProxyState = .idle
     }
 
     func refreshLightweightProxyState() {
         let paths = Set(activeDedicatedPathByScreenID.values)
             .union(currentVideoPath.map { [$0] } ?? [])
-        lightweightProxyCache.retainGenerationRequests(for: paths)
+        for cache in [lightweightProxyCache, frameRateProxyCache] {
+            cache.retainGenerationRequests(for: cache === activePlaybackProxyCache ? paths : [])
+        }
         lightweightProxyStatesByPath = lightweightProxyStatesByPath
             .filter { paths.contains($0.key) }
         let states = lightweightProxyStatesByPath.values
-        lightweightProxyState = !effectiveLightweightMode ? .idle
+        lightweightProxyState = activePlaybackProxyCache == nil ? .idle
             : states.contains(.failed) ? .failed
             : states.contains(.generating) ? .generating
             : states.contains(.ready) ? .ready : .idle

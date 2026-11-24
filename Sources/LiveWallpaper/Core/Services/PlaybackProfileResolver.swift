@@ -8,8 +8,6 @@ enum PlaybackProfileResolver {
         var workProfile: WorkProfile
         var lightweightMode: Bool
         var targetMaxPixelWidth: Double
-        var qualityPreset: QualityPreset
-        var decodeMode: DecodeMode
         var chipClass: WallpaperModel.ChipClass
         var logicalCores: Int
         var frameRateLimit: FrameRateLimit
@@ -41,11 +39,11 @@ enum PlaybackProfileResolver {
             break
         }
 
-        let baseRate = baseBitRate(for: inputs.targetMaxPixelWidth, preset: inputs.qualityPreset)
+        let baseRate = baseBitRate(for: inputs.targetMaxPixelWidth)
         var bitRate =
             baseRate * decodeBitRateFactor(inputs) * frameRateBitRateFactor(inputs.frameRateLimit)
                 * inputs.autoFrameRateBitRateFactor
-        var buffer = qualityAdjustedBuffer(baseBufferDuration(inputs), preset: inputs.qualityPreset)
+        var buffer = baseBufferDuration(inputs)
         buffer += inputs.autoFrameRateBufferAdjustment
 
         if inputs.lightweightMode {
@@ -63,59 +61,29 @@ enum PlaybackProfileResolver {
         if inputs.workProfile != .normal {
             return inputs.workProfile
         }
-        if inputs.targetMaxPixelWidth <= 1920, inputs.qualityPreset != .quality,
-           inputs.frameRateLimit != .fps60
-        {
+        if inputs.targetMaxPixelWidth <= 1920, inputs.frameRateLimit != .fps60 {
             return .lowPower
         }
         return .normal
     }
 
     static func resolvedDecodeMode(_ inputs: Inputs) -> DecodeMode {
-        switch inputs.decodeMode {
-        case .automatic, .gpuAdaptive:
-            switch inputs.chipClass {
-            case .appleSilicon:
-                return .balanced
-            case .intel:
-                return inputs.logicalCores >= 8 ? .balanced : .efficiency
-            }
-        default:
-            return inputs.decodeMode
+        switch inputs.chipClass {
+        case .appleSilicon:
+            return .balanced
+        case .intel:
+            return inputs.logicalCores >= 8 ? .balanced : .efficiency
         }
     }
 
-    private static func baseBitRate(for width: Double, preset: QualityPreset) -> Double {
+    private static func baseBitRate(for width: Double) -> Double {
         if width < 2560 {
-            switch preset {
-            case .auto:
-                return 2_200_000
-            case .efficiency:
-                return 1_500_000
-            case .quality:
-                return 3_000_000
-            }
+            return 2_200_000
         }
-
         if width < 3840 {
-            switch preset {
-            case .auto:
-                return 6_000_000
-            case .efficiency:
-                return 4_000_000
-            case .quality:
-                return 8_000_000
-            }
+            return 6_000_000
         }
-
-        switch preset {
-        case .auto:
-            return 12_000_000
-        case .efficiency:
-            return 8_000_000
-        case .quality:
-            return 16_000_000
-        }
+        return 12_000_000
     }
 
     private static func frameRateBitRateFactor(_ frameRateLimit: FrameRateLimit) -> Double {
@@ -131,8 +99,6 @@ enum PlaybackProfileResolver {
 
     private static func decodeBitRateFactor(_ inputs: Inputs) -> Double {
         switch resolvedDecodeMode(inputs) {
-        case .automatic, .gpuAdaptive:
-            return 1.0
         case .balanced:
             return 1.05
         case .efficiency:
@@ -142,26 +108,10 @@ enum PlaybackProfileResolver {
 
     private static func baseBufferDuration(_ inputs: Inputs) -> TimeInterval {
         switch resolvedDecodeMode(inputs) {
-        case .automatic, .gpuAdaptive:
-            return 1.0
         case .balanced:
             return 1.5
         case .efficiency:
             return 0.25
-        }
-    }
-
-    private static func qualityAdjustedBuffer(
-        _ base: TimeInterval,
-        preset: QualityPreset
-    ) -> TimeInterval {
-        switch preset {
-        case .auto:
-            return base
-        case .efficiency:
-            return max(0, base - 0.5)
-        case .quality:
-            return base + 0.5
         }
     }
 }

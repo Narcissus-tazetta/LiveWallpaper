@@ -30,7 +30,7 @@ extension LightweightProxyCache {
         let asset = AVURLAsset(url: URL(fileURLWithPath: path))
         let eligibility: TranscodeEligibility
         do {
-            eligibility = try await evaluateEligibility(asset: asset)
+            eligibility = try await evaluateEligibility(asset: asset, profile: profile)
         } catch {
             return .failed
         }
@@ -129,7 +129,10 @@ extension LightweightProxyCache {
         }
     }
 
-    private func evaluateEligibility(asset: AVURLAsset) async throws -> TranscodeEligibility {
+    private func evaluateEligibility(
+        asset: AVURLAsset,
+        profile: Profile
+    ) async throws -> TranscodeEligibility {
         let duration = try await asset.load(.duration)
         guard duration.seconds.isFinite, duration.seconds >= 1.0 else {
             return .passthrough
@@ -148,7 +151,7 @@ extension LightweightProxyCache {
         let height = abs(transformed.height)
         let longEdge = max(width, height)
 
-        let targetLongEdge = Self.targetLongEdge
+        let targetLongEdge = profile.targetLongEdge ?? longEdge
         let targetFrameRate = Self.targetFrameRate
         if longEdge <= targetLongEdge * 1.1, nominalFrameRate <= targetFrameRate * 1.1 {
             return .passthrough
@@ -202,7 +205,7 @@ extension LightweightProxyCache {
             composition.frameDuration = minFrameDuration
         }
         let presetName = try await HDRVideo.reEncodePreset(
-            for: asset, sdrPreset: AVAssetExportPresetMediumQuality
+            for: asset, sdrPreset: profile.sdrPreset
         )
         return .needsTranscode(composition, presetName: presetName)
     }

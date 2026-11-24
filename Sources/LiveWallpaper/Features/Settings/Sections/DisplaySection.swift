@@ -28,7 +28,6 @@ extension SettingsView {
         "Mission Control",
         "メニューバーを不透明にする",
         "詳細設定",
-        "画質",
         "動作プロファイル",
         "再生負荷",
         "切り替えエフェクト",
@@ -39,7 +38,6 @@ extension SettingsView {
         "バッテリー駆動中",
         "負荷を下げる",
         "静止画にする",
-        "デコード",
         "デスクトップレベル",
         "環境に応じて再生負荷を自動調整",
         "バッテリー残量に応じて画質を自動調整",
@@ -187,11 +185,17 @@ extension SettingsView {
                 hdrDisplayRow
             }
             if model.lightweightProxyState == .generating {
-                settingsFootnote(model.localizedString("軽量版を生成中..."))
+                settingsFootnote(model.localizedString(
+                    model.effectiveLightweightMode ? "軽量版を生成中..." : "30fps版を生成中..."
+                ))
             }
             if model.lightweightProxyState == .failed {
                 settingsFootnote(
-                    model.localizedString("軽量版の生成に失敗しました。元の画質で再生しています。"),
+                    model.localizedString(
+                        model.effectiveLightweightMode
+                            ? "軽量版の生成に失敗しました。元の画質で再生しています。"
+                            : "30fps版の生成に失敗しました。元の動画で再生しています。"
+                    ),
                     color: .orange
                 )
             }
@@ -639,10 +643,8 @@ extension SettingsView {
 
     static let advancedSettingsSearchKeywords: [String] = [
         "詳細設定",
-        "画質",
         "動作プロファイル",
         "再生負荷",
-        "デコード",
         "デスクトップレベル",
         "環境に応じて再生負荷を自動調整",
         "バッテリー残量に応じて画質を自動調整",
@@ -708,16 +710,6 @@ extension SettingsView {
     }
 
     func advancedSettingsSummaryText() -> String {
-        let qualityText =
-            switch model.qualityPreset {
-            case .auto:
-                model.localizedString("自動")
-            case .efficiency:
-                model.localizedString("省電力")
-            case .quality:
-                model.localizedString("高画質")
-            }
-
         let workProfileText =
             switch model.workProfile {
             case .normal:
@@ -738,26 +730,12 @@ extension SettingsView {
                 model.localizedString("高負荷")
             }
 
-        return [qualityText, workProfileText, frameRateText]
+        return [workProfileText, frameRateText]
             .joined(separator: model.localizedString("・"))
     }
 
     var advancedSettingsContent: some View {
         Group {
-            settingsMenuRow(
-                title: model.localizedString("画質"),
-                options: [
-                    (model.localizedString("自動"), QualityPreset.auto),
-                    (model.localizedString("省電力"), QualityPreset.efficiency),
-                    (model.localizedString("高画質"), QualityPreset.quality)
-                ],
-                selection: qualityPresetBinding,
-                helpTopic: .qualityPreset,
-                helpText: model.localizedString(
-                    "画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。"
-                )
-            )
-
             settingsMenuRow(
                 title: model.localizedString("動作プロファイル"),
                 options: [
@@ -782,21 +760,7 @@ extension SettingsView {
                 selection: frameRateLimitBinding,
                 helpTopic: .frameRate,
                 helpText: model.localizedString(
-                    "再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。"
-                )
-            )
-
-            settingsMenuRow(
-                title: model.localizedString("デコード"),
-                options: [
-                    (model.localizedString("自動"), DecodeMode.automatic),
-                    (model.localizedString("標準"), DecodeMode.balanced),
-                    (model.localizedString("省電"), DecodeMode.efficiency)
-                ],
-                selection: decodeModeBinding,
-                helpTopic: .decode,
-                helpText: model.localizedString(
-                    "動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。"
+                    "動画とシーンのフレームレートの上限です。軽量では60fpsの動画を30fpsに変換したもので再生し（初回は変換に時間がかかります）、シーンは30fpsまでで描きます。高負荷ではシーンを60fpsまで描きます。"
                 )
             )
 

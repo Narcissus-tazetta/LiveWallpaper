@@ -1869,13 +1869,14 @@ struct SceneDocument: Codable, Equatable {
     }
 
     /// A scene not allowed to listen gets no audio, as in its baked video, so its audio
-    /// effects alone do not call for drawing it live.
-    func hasLiveInteraction(listensToAudio: Bool) -> Bool {
-        layers.contains(where: \.usesCursor)
-            || links.contains { $0.input.usesCursor && $0.hasEffect }
+    /// effects alone do not call for drawing it live. Likewise, while the cursor may not
+    /// move it (`cursorReacts` false), it rests where the baked video has it.
+    func hasLiveInteraction(listensToAudio: Bool, cursorReacts: Bool = true) -> Bool {
+        (cursorReacts && layers.contains(where: \.usesCursor))
+            || (cursorReacts && links.contains { $0.input.usesCursor && $0.hasEffect })
             || (listensToAudio && usesAudio)
             || layers.contains { $0.isVisible && $0.usesMediaArtwork }
-            || scripts.contains { $0.requiresLiveInteraction }
+            || scripts.contains { $0.requiresLiveInteraction(cursorReacts: cursorReacts) }
     }
 
     var requiresRealTimePlayback: Bool {

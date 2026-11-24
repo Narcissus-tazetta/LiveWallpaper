@@ -71,10 +71,6 @@ extension SettingsView {
         }
     }
 
-    var qualityPresetBinding: Binding<QualityPreset> {
-        modelBinding(model.qualityPreset) { model.setQualityPreset($0) }
-    }
-
     var bakeQualityBinding: Binding<BakeQuality> {
         modelBinding(model.bakeQuality) { model.setBakeQuality($0) }
     }
@@ -121,10 +117,6 @@ extension SettingsView {
 
     var frameRateLimitBinding: Binding<FrameRateLimit> {
         modelBinding(model.frameRateLimit) { model.setFrameRateLimit($0) }
-    }
-
-    var decodeModeBinding: Binding<DecodeMode> {
-        modelBinding(model.decodeMode) { model.setDecodeMode($0) }
     }
 
     var desktopLevelOffsetBinding: Binding<DesktopLevelOffset> {

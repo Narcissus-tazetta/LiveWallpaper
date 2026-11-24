@@ -32,8 +32,6 @@
 "一致するアプリがありません" = "No matching apps";
 "Finderから他のアプリを選択…" = "Choose another app in Finder…";
 "詳細設定" = "Advanced settings";
-"省電力" = "Power saving";
-"高画質" = "High quality";
 "通常" = "Normal";
 "低負荷" = "Low load";
 "最小" = "Minimal";
@@ -193,14 +191,11 @@
 "メニューバーの自動的に表示/非表示がONのため、この設定は使用できません。" = "This setting is unavailable while “Automatically hide and show the menu bar” is on.";
 "macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "When switching macOS Spaces (Mission Control), the wallpaper may occasionally move to an adjacent Space. This is more likely when moving from a Space with an open app to an empty one. Returning to the same Space usually stabilizes it.";
 "画質" = "Quality";
-"画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。" = "Choose the balance between quality and power. Automatic adapts to your environment, Power saving reduces battery use and heat, High quality favors visuals.";
 "動作プロファイル" = "Performance Profile";
 "全体の再生負荷を切り替えます。通常は品質優先、低負荷は安定と省電力を重視、最小は負荷を最小限にして作業優先にします。" = "Adjust overall playback load. Normal favors quality, Low load prioritizes stability and power saving, Minimal minimizes load for work.";
 "フレームレート" = "Frame Rate";
 "動画の再生上限を選べます。制限なしは滑らかさ優先、30/60 はCPUと電力を抑えやすくなります。" = "Choose a playback cap. Unlimited favors smoothness; 30/60 reduce CPU use and power.";
-"デコード" = "Decoding";
 "標準" = "Balanced";
-"省電" = "Power saving";
 "動画データのデコード方法を切り替えます。自動はハードウェア/ソフトウェアを状況に応じて選び、標準はGPUハードウェア優先で滑らかさを保ちます。省電力はソフトウェア再生を多用し、CPU負荷と消費電力を低く抑えますが再生品質が落ちる場合があります。" = "Switch video decoding. Automatic chooses hardware/software as needed, Balanced prefers GPU hardware for smoothness. Power saving uses software decoding more, reducing CPU/power but may lower quality.";
 "デスクトップレベル" = "Desktop Level";
 "壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。" = "Choose the wallpaper window layer. -1 puts it behind other windows, 0 is the standard desktop level, and +1 puts it in front. The front layer can cover your desktop icons, while the back layer is less likely to interfere with other windows.";
@@ -230,10 +225,9 @@
 "バッテリー残量に応じて画質を自動調整" = "Automatically adjust quality based on battery level";
 "バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "When running on battery and charge drops to 10% or below, playback load is automatically reduced to save power.";
 "再生負荷" = "Playback load";
-"再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。" = "Choose a playback load preset. This adjusts internal bitrate only; display resolution does not change.";
+"動画とシーンのフレームレートの上限です。軽量では60fpsの動画を30fpsに変換したもので再生し（初回は変換に時間がかかります）、シーンは30fpsまでで描きます。高負荷ではシーンを60fpsまで描きます。" = "Caps the frame rate of videos and scenes. Light plays 60 fps videos from a 30 fps conversion (the first conversion takes a while) and draws scenes at up to 30 fps. Heavy draws scenes at up to 60 fps.";
 "軽量" = "Light";
 "高負荷" = "Heavy";
-"動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Choose how video is decoded. Automatic adapts to your Mac, Balanced favors smooth playback, and Power saving reduces CPU use and power draw.";
 "高度な共有を有効にする" = "Enable advanced sharing";
 "オフのときは動画ファイルだけを書き出します。オンにすると配置情報を含む .lwpkg も一緒に書き出します。" = "When off, sharing exports only the video file. When on, it also exports a .lwpkg package with layout information.";
 "選ぶと保存先フォルダを指定して、動画ファイルを書き出します" = "Choose a destination folder to export the video file.";
@@ -691,6 +685,8 @@
 "この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です" = "The default display method, used unless a video overrides it in the Layout tab.";
 "軽量版を生成中..." = "Creating the lightweight version…";
 "軽量版の生成に失敗しました。元の画質で再生しています。" = "Couldn’t create the lightweight version. Playing at the original quality.";
+"30fps版を生成中..." = "Creating the 30 fps version…";
+"30fps版の生成に失敗しました。元の動画で再生しています。" = "Couldn’t create the 30 fps version. Playing the original video.";
 "オンにすると壁紙タブの一覧にWeb壁紙を追加できるようになります。実験的な機能です。" = "When on, you can add web wallpapers to the list in the Wallpaper tab. This is an experimental feature.";
 "アニメ画像" = "Animated images";
 "バックアップ" = "Backup";

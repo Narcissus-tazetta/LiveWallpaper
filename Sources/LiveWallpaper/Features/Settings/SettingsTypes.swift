@@ -142,10 +142,8 @@ extension SettingsView {
     }
 
     enum HelpTopic: Hashable {
-        case qualityPreset
         case workProfile
         case frameRate
-        case decode
         case desktopLevel
         case desktopIcons
         case reduceMotion

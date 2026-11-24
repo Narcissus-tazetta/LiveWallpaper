@@ -224,8 +224,10 @@ extension WallpaperModel {
     /// Frontmost app, Low Power Mode and thermal state, watched only while some
     /// effect is enabled.
     private func updateCursorEffectsObservers() {
+        // A cursor scene shown as its video while saving power must hear the saving end.
         guard cursorEffects.anyEnabled || cursorEffectsByPath.values.contains(where: \.anyEnabled)
             || playerViews.contains(where: \.sceneUsesCursor)
+            || shownSceneDocuments.contains(where: \.usesCursor)
         else {
             for observer in cursorEffectsObservers {
                 NSWorkspace.shared.notificationCenter.removeObserver(observer)

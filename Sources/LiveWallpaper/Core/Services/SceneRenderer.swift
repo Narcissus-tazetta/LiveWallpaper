@@ -604,6 +604,8 @@ final class SceneRenderer {
     /// Measured: it holds what lies before and behind the model, and the model itself comes back
     /// into it; one frame of delay is the reading that fits, its length was not measured.
     var mipHistory: MTLTexture?
+    /// Bottom layers the last frame left out under an opaque layer covering the target.
+    var layersHiddenByCover = 0
 
     lazy var readsMipHistory: Bool = (document.meshMaterials ?? []).contains {
         $0?.draw.textures.contains { $0.source == SceneModelRenderer.mipHistorySource } ?? false

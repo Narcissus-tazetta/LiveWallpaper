@@ -36,15 +36,18 @@ final class LocalWebIntegration: ObservableObject {
     private var sentSilence = true
     private var mediaTask: Task<Void, Never>?
     private var lastMedia = WebNowPlaying()
+    /// lastMedia is what the running poll last read, not the empty value it starts from.
+    private var hasMediaReading = false
     private let reader = WebNowPlayingReader()
 
     func update(id: UUID, subscription: Subscription?) {
         let isNew = subscriptions[id] == nil
         subscriptions[id] = subscription
-        if isNew, let subscription { subscription.receiveMedia(
-            lastMedia,
-            subscription.media && mediaError == nil
-        ) }
+        // Before the first reading, lastMedia is empty: a scene resuming would show its
+        // media fields blank until the poll, which starts at once, reads them.
+        if isNew, let subscription, hasMediaReading || mediaError != nil {
+            subscription.receiveMedia(lastMedia, subscription.media && mediaError == nil)
+        }
         reconcile()
     }
 
@@ -127,6 +130,7 @@ final class LocalWebIntegration: ObservableObject {
                         let snapshot = try await reader.read(runningIDs: running)
                         try Task.checkCancellation()
                         lastMedia = snapshot
+                        hasMediaReading = true
                         for item in subscriptions.values where item.media {
                             item.receiveMedia(
                                 snapshot,
@@ -157,6 +161,7 @@ final class LocalWebIntegration: ObservableObject {
             mediaTask?.cancel()
             mediaTask = nil
             lastMedia = WebNowPlaying()
+            hasMediaReading = false
         }
     }
 

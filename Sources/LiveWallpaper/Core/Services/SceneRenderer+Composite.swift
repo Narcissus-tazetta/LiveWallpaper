@@ -200,6 +200,10 @@ extension SceneRenderer {
             try keepMipHistory(of: target, commandBuffer: commandBuffer)
             return
         }
+        layersHiddenByCover = hiddenBelowCover(
+            visible, evaluated: evaluated, input: input, targetSize: targetSize
+        )
+        visible.removeFirst(layersHiddenByCover)
         if allowsSinglePassComposite, let fetch = pipeline.compositeFetch(for: target.pixelFormat) {
             enum Segment {
                 case batch([SceneLayer])
@@ -782,6 +786,56 @@ extension SceneRenderer {
     private enum Drawn {
         case layer(SceneLayer)
         case model(SceneModelLayerFrame)
+    }
+
+    /// How many of the bottom items an opaque layer covering the whole target hides.
+    /// Their pixels never reach the target: the composite of a normal, fully opaque
+    /// layer is its own colour. Only layers whose drawing keeps no state between frames
+    /// are left out, so skipping them now changes nothing about later frames.
+    private func hiddenBelowCover(
+        _ visible: [Drawn],
+        evaluated: SceneEvaluatedFrame,
+        input: SceneFrameInput,
+        targetSize: SIMD2<Float>
+    ) -> Int {
+        // Scripts turn effects on and change how a layer blends, so the frame's own
+        // layers decide, as they are the ones composited.
+        let layers = visible.compactMap { item -> SceneLayer? in
+            if case let .layer(layer) = item { return evaluated.layers[layer.id]?.layer }
+            return nil
+        }
+        guard layers.count == visible.count else { return 0 }
+        func isStateless(_ layer: SceneLayer) -> Bool {
+            layer.kind != .particles && !layer.capturesCanvas && layer.renderGraph == nil
+                && graphRenderers[layer.id] == nil
+                && layer.activeEffects.allSatisfy { $0.renderGraph == nil }
+        }
+        guard let cover = layers.lastIndex(where: { layer in
+            guard isStateless(layer), layer.activeEffects.isEmpty, layer.depthFile == nil,
+                  !readsBackground(layer), let picture = picture(for: layer),
+                  Self.isOpaque(picture), let drawn = evaluated.layers[layer.id]
+            else { return false }
+            let u = compositeUniforms(
+                for: drawn.layer, drawn: drawn, input: input, targetSize: targetSize
+            )
+            return u.blendMode == 0 && u.opacity >= 1 && u.maskMode < 0 && u.hasDepth == 0
+                && Self.coversTarget(u, targetSize: targetSize)
+        }), cover > 0, layers[..<cover].allSatisfy(isStateless) else { return 0 }
+        return cover
+    }
+
+    /// Every target pixel samples inside the layer's picture: the shader's mapping, at the
+    /// centres of the corner pixels (the mapping is affine, so the inside is convex). A layer
+    /// fitted exactly to the canvas reaches its edges at the target's corners, so its corner
+    /// pixels sample half a pixel inside.
+    static func coversTarget(_ u: LayerUniforms, targetSize: SIMD2<Float>) -> Bool {
+        let low = 0.5 / targetSize, high = 1 - low
+        return [low, SIMD2(high.x, low.y), SIMD2(low.x, high.y), high].allSatisfy { corner in
+            let relative = u.viewOrigin + corner * u.viewSize - 0.5 - u.placementOffset
+            let placed = u.placementColumn0 * relative.x + u.placementColumn1 * relative.y
+            let layerUV = placed * u.uvScale + 0.5 + u.uvOffset
+            return all(layerUV .>= SIMD2(repeating: 0)) && all(layerUV .<= SIMD2(repeating: 1))
+        }
     }
 
     /// The scene's layers, bottom to top, with the model layers scripts made, by their

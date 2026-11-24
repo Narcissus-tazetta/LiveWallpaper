@@ -19,7 +19,7 @@ enum SceneStore {
         }
     }
 
-    private static let documentFileName = "scene.json"
+    static let documentFileName = "scene.json"
 
     static func folderURL(forVideoPath path: String) -> URL {
         URL(fileURLWithPath: path).deletingPathExtension().appendingPathExtension("scene")

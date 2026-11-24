@@ -13,9 +13,7 @@ struct SettingsSnapshot: Codable {
     var audioEnabled: Bool?
     var audioVolume: Float?
     var frameRateLimit: String?
-    var decodeMode: String?
     var workProfile: String?
-    var qualityPreset: String?
     var videoLoopEnabled: Bool?
     var autoSwitchIntervalMinutes: Int?
     var playlistPlaybackEnabled: Bool?
@@ -75,9 +73,7 @@ enum SettingsTransfer {
             audioEnabled: model.audioEnabled,
             audioVolume: model.audioVolume,
             frameRateLimit: model.frameRateLimit.rawValue,
-            decodeMode: model.decodeMode.rawValue,
             workProfile: model.workProfile.rawValue,
-            qualityPreset: model.qualityPreset.rawValue,
             videoLoopEnabled: model.videoLoopEnabled,
             autoSwitchIntervalMinutes: model.autoSwitchIntervalMinutes,
             playlistPlaybackEnabled: model.playlistPlaybackEnabled,
@@ -130,14 +126,8 @@ enum SettingsTransfer {
         if let raw = snapshot.frameRateLimit, let value = FrameRateLimit(rawValue: raw) {
             model.setFrameRateLimit(value)
         }
-        if let raw = snapshot.decodeMode, let value = DecodeMode(rawValue: raw) {
-            model.setDecodeMode(value)
-        }
         if let raw = snapshot.workProfile, let value = WorkProfile(rawValue: raw) {
             model.setWorkProfile(value)
-        }
-        if let raw = snapshot.qualityPreset, let value = QualityPreset(rawValue: raw) {
-            model.setQualityPreset(value)
         }
         if let value = snapshot.videoLoopEnabled {
             model.setVideoLoopEnabled(value)

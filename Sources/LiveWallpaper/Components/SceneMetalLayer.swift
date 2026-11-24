@@ -302,17 +302,43 @@ final class SceneMetalLayer: CAMetalLayer {
         }
     }
 
+    struct MediaNeeds: Equatable {
+        var media = false
+        var spectrum = false
+    }
+
+    /// What the scene reads. Subscribed only while it draws: a suspended scene would
+    /// otherwise keep the system audio capture and the once-a-second now-playing
+    /// queries running behind a covered or locked screen.
+    static func mediaNeeds(
+        document: SceneDocument?,
+        listensToSound: Bool,
+        isSuspended: Bool
+    ) -> (wanted: MediaNeeds, subscribed: MediaNeeds) {
+        var wanted = MediaNeeds()
+        wanted.media = document?.scripts.contains { $0.canRun && $0.usesMedia } == true
+            || document?.layers.contains { $0.isVisible && $0.usesMediaArtwork } == true
+        wanted.spectrum = document?.usesAudio == true && listensToSound
+        return (wanted, isSuspended ? MediaNeeds() : wanted)
+    }
+
     fileprivate func updateMediaSubscription() {
-        let wantsMedia = renderer?.document.scripts.contains { $0.canRun && $0.usesMedia } == true
-            || renderer?.document.layers.contains { $0.isVisible && $0.usesMediaArtwork } == true
-        let wantsSpectrum = renderer?.document.usesAudio == true
-            && videoPath.map { SceneSoundReaction.isEnabled(videoPath: $0) } == true
+        let (wanted, subscribed) = Self.mediaNeeds(
+            document: renderer?.document,
+            listensToSound: videoPath.map { SceneSoundReaction.isEnabled(videoPath: $0) } == true,
+            isSuspended: isSuspended
+        )
+        // A suspended scene keeps what it last read, so it does not resume blank; one that
+        // no longer reads it (cleared, or another scene) drops it even when already
+        // unsubscribed by its suspension.
+        if !wanted.media { media = nil }
+        if !wanted.spectrum { setAudio(nil) }
+        let wantsMedia = subscribed.media
+        let wantsSpectrum = subscribed.spectrum
         guard wantsMedia != isSubscribedToMedia || wantsSpectrum != isSubscribedToSpectrum
         else { return }
         isSubscribedToMedia = wantsMedia
         isSubscribedToSpectrum = wantsSpectrum
-        if !wantsMedia { media = nil }
-        if !wantsSpectrum { setAudio(nil) }
         MainActor.assumeIsolated {
             LocalWebIntegration.shared.update(
                 id: mediaSubscriptionID,
@@ -389,11 +415,13 @@ final class SceneMetalLayer: CAMetalLayer {
         needsScriptEvaluation = false
         stopTicking()
         stopPolling()
+        updateMediaSubscription()
     }
 
     func resume() {
         guard isSuspended else { return }
         isSuspended = false
+        updateMediaSubscription()
         clockDidChange()
     }
 

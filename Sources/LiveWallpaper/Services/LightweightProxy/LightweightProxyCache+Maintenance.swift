@@ -180,6 +180,10 @@ extension LightweightProxyCache {
         DiskCacheLayout.rootDirectoryURL(subfolder: "LightweightProxyCache")
     }
 
+    nonisolated static func frameRateRootDirectoryURL() -> URL? {
+        DiskCacheLayout.rootDirectoryURL(subfolder: "FrameRateProxyCache")
+    }
+
     nonisolated static func dataDirectoryURL() -> URL? {
         DiskCacheLayout.dataDirectoryURL(subfolder: "LightweightProxyCache")
     }

@@ -32,8 +32,6 @@
 "一致するアプリがありません" = "Nenhum app correspondente";
 "Finderから他のアプリを選択…" = "Escolher Outro App no Finder…";
 "詳細設定" = "Ajustes Avançados";
-"省電力" = "Economia de Energia";
-"高画質" = "Alta Qualidade";
 "通常" = "Normal";
 "低負荷" = "Carga Baixa";
 "最小" = "Mínimo";
@@ -193,14 +191,11 @@
 "メニューバーの自動的に表示/非表示がONのため、この設定は使用できません。" = "Este ajuste não está disponível enquanto “Ocultar e mostrar a barra de menus automaticamente” estiver ativado.";
 "macOS の Space（Mission Control）切り替え時、まれに隣接する Space に移動することがあります。アプリを開いている Space から何もない Space へ移る操作で発生しやすいです。同じ Space へ戻ると安定することがあります。" = "Ao trocar de Espaço no macOS (Mission Control), a imagem de fundo pode ocasionalmente passar para um Espaço vizinho. Isso é mais comum ao ir de um Espaço com um app aberto para um vazio. Voltar ao mesmo Espaço costuma estabilizá-la.";
 "画質" = "Qualidade";
-"画質と消費電力のバランスを選択します。自動は環境に応じて最適化、省電力はバッテリーと発熱を抑え、高画質は見た目を優先します。" = "Escolha o equilíbrio entre qualidade e consumo de energia. Automático se adapta ao ambiente, Economia de Energia reduz o uso da bateria e o aquecimento, e Alta Qualidade prioriza o visual.";
 "動作プロファイル" = "Perfil de Funcionamento";
 "全体の再生負荷を切り替えます。通常は品質優先、低負荷は安定と省電力を重視、最小は負荷を最小限にして作業優先にします。" = "Ajusta a carga geral de reprodução. Normal prioriza a qualidade, Carga Baixa favorece a estabilidade e a economia de energia, e Mínimo reduz a carga ao mínimo para priorizar o seu trabalho.";
 "フレームレート" = "Taxa de Quadros";
 "動画の再生上限を選べます。制限なしは滑らかさ優先、30/60 はCPUと電力を抑えやすくなります。" = "Escolha um limite para a reprodução. Sem Limite prioriza a fluidez; 30/60 ajudam a reduzir o uso da CPU e o consumo de energia.";
-"デコード" = "Decodificação";
 "標準" = "Padrão";
-"省電" = "Econômico";
 "動画データのデコード方法を切り替えます。自動はハードウェア/ソフトウェアを状況に応じて選び、標準はGPUハードウェア優先で滑らかさを保ちます。省電力はソフトウェア再生を多用し、CPU負荷と消費電力を低く抑えますが再生品質が落ちる場合があります。" = "Altera o método de decodificação de vídeo. Automático escolhe hardware ou software conforme a situação, e Padrão prioriza o hardware da GPU para manter a fluidez. Economia de Energia usa mais a decodificação por software, o que reduz a carga da CPU e o consumo, mas pode diminuir a qualidade da reprodução.";
 "デスクトップレベル" = "Nível da Mesa";
 "壁紙用のウィンドウがデスクトップのどの層に置かれるかを切り替えます。-1だとほかのアプリのウィンドウより後ろ、0は一般的なデスクトップレベル、+1だとほかのウィンドウより前面に表示されます。前面にするとアイコンを隠しやすいですが、背面にするとほかのウィンドウ操作が妨げられにくくなります。" = "Escolhe em qual camada da mesa fica a janela da imagem de fundo. Com -1 ela fica atrás das janelas de outros apps, 0 é o nível de mesa comum e +1 a exibe na frente das outras janelas. Na frente, ela pode cobrir os ícones com mais facilidade; atrás, atrapalha menos o uso das outras janelas.";
@@ -230,10 +225,9 @@
 "バッテリー残量に応じて画質を自動調整" = "Ajustar automaticamente a qualidade conforme o nível da bateria";
 "バッテリー駆動中に残量が10%以下になると、再生の負荷を自動的に下げて消費電力を抑えます。" = "Quando o Mac está usando a bateria e a carga cai para 10% ou menos, a carga de reprodução é reduzida automaticamente para economizar energia.";
 "再生負荷" = "Carga de Reprodução";
-"再生負荷の目安を選びます。数値は内部のビットレート調整に使われ、表示解像度は変わりません。" = "Escolha um nível de referência para a carga de reprodução. O valor ajusta apenas a taxa de bits interna; a resolução de exibição não muda.";
+"動画とシーンのフレームレートの上限です。軽量では60fpsの動画を30fpsに変換したもので再生し（初回は変換に時間がかかります）、シーンは30fpsまでで描きます。高負荷ではシーンを60fpsまで描きます。" = "Limita a taxa de quadros de vídeos e cenas. “Leve” reproduz vídeos de 60 fps a partir de uma conversão para 30 fps (a primeira conversão leva algum tempo) e desenha as cenas a até 30 fps. “Alta” desenha as cenas a até 60 fps.";
 "軽量" = "Leve";
 "高負荷" = "Alta";
-"動画データのデコード方法を切り替えます。自動は環境に応じて選び、標準は滑らかさ優先、省電はCPU負荷と消費電力を抑えます。" = "Altera o método de decodificação de vídeo. Automático escolhe conforme o ambiente, Padrão prioriza a fluidez e Econômico reduz a carga da CPU e o consumo de energia.";
 "高度な共有を有効にする" = "Ativar Compartilhamento Avançado";
 "オフのときは動画ファイルだけを書き出します。オンにすると配置情報を含む .lwpkg も一緒に書き出します。" = "Quando desativado, apenas o arquivo de vídeo é exportado. Quando ativado, um .lwpkg com as informações de disposição também é exportado.";
 "選ぶと保存先フォルダを指定して、動画ファイルを書き出します" = "Escolha uma pasta de destino para exportar o arquivo de vídeo";
@@ -691,6 +685,8 @@
 "この動画ごとに配置タブで上書きしていない場合に使われる既定の表示方法です" = "O modo de exibição padrão, usado a menos que um vídeo o substitua na aba Disposição.";
 "軽量版を生成中..." = "Criando a versão leve…";
 "軽量版の生成に失敗しました。元の画質で再生しています。" = "Não foi possível criar a versão leve. Reproduzindo na qualidade original.";
+"30fps版を生成中..." = "Criando a versão de 30 fps…";
+"30fps版の生成に失敗しました。元の動画で再生しています。" = "Não foi possível criar a versão de 30 fps. Reproduzindo o vídeo original.";
 "オンにすると壁紙タブの一覧にWeb壁紙を追加できるようになります。実験的な機能です。" = "Quando ativado, você pode adicionar imagens de fundo web à lista da aba Imagem de Fundo. Este é um recurso experimental.";
 "アニメ画像" = "Imagens animadas";
 "バックアップ" = "Backup";

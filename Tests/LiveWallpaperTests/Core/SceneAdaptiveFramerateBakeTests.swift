@@ -55,6 +55,8 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         let tracks = try await asset.loadTracks(withMediaType: .video)
         let track = try XCTUnwrap(tracks.first)
         let frameRate = try await track.load(.nominalFrameRate)
+        let duration = try await asset.load(.duration)
+        XCTAssertEqual(duration.seconds, 10, accuracy: 0.05)
         XCTAssertEqual(
             round(Double(frameRate)),
             30.0,
@@ -73,6 +75,8 @@ final class SceneAdaptiveFramerateBakeTests: XCTestCase {
         let tracks = try await asset.loadTracks(withMediaType: .video)
         let track = try XCTUnwrap(tracks.first)
         let frameRate = try await track.load(.nominalFrameRate)
+        let duration = try await asset.load(.duration)
+        XCTAssertEqual(duration.seconds, 10, accuracy: 0.05)
         XCTAssertEqual(
             round(Double(frameRate)),
             60.0,

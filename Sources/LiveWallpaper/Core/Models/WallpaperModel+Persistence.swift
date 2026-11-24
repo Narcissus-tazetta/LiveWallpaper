@@ -96,11 +96,6 @@ extension WallpaperModel {
     }
 
     private func restoreQualityAndPerformancePrefs() {
-        if let qualityValue = UserDefaults.standard.string(forKey: PrefsKey.qualityPreset),
-           let restoredQuality = QualityPreset(rawValue: qualityValue)
-        {
-            qualityPreset = restoredQuality
-        }
         if let bakeQualityValue = UserDefaults.standard.string(forKey: PrefsKey.bakeQuality),
            let restoredBakeQuality = BakeQuality(rawValue: bakeQualityValue)
         {
@@ -306,19 +301,6 @@ extension WallpaperModel {
            let restoredFrameRate = FrameRateLimit(rawValue: frameRateValue)
         {
             frameRateLimit = restoredFrameRate
-        }
-        if let decodeValue = UserDefaults.standard.string(forKey: PrefsKey.decodeMode),
-           let restoredDecodeMode = DecodeMode(rawValue: decodeValue)
-        {
-            if restoredDecodeMode == .gpuAdaptive {
-                decodeMode = .automatic
-                UserDefaults.standard.set(
-                    DecodeMode.automatic.rawValue,
-                    forKey: PrefsKey.decodeMode
-                )
-            } else {
-                decodeMode = restoredDecodeMode
-            }
         }
         if let workProfileValue = UserDefaults.standard.string(forKey: PrefsKey.workProfile),
            let restoredWorkProfile = WorkProfile(rawValue: workProfileValue)
@@ -655,9 +637,7 @@ extension WallpaperModel {
         setAudioVolume(1.0)
         setDesktopReadabilityDimOpacity(0)
         setFrameRateLimit(.off)
-        setDecodeMode(.automatic)
         setWorkProfile(.normal)
-        setQualityPreset(.auto)
         setBakeQuality(.high)
         setPlaylistPlaybackEnabled(false)
         setShufflePlaybackEnabled(false)

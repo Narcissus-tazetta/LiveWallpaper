@@ -136,22 +136,7 @@ enum SceneVideoBaker {
         outputURL: URL,
         progress: @Sendable (Double) -> Void
     ) async throws -> Statistics {
-        let renderer = try SceneRenderer(document: document, videoPath: videoPath)
-        renderer.timeOfDay = timeOfDay
-        try await renderer.prepareVideos()
-        // Its own queue: on the shared one, every live preview frame waited behind a
-        // full-resolution bake frame and stalled the main thread in nextDrawable.
-        guard let commandQueue = renderer.device.makeCommandQueue() else {
-            throw BakeError.writerFailed("Cannot create a command queue")
-        }
-        let (width, height) = SceneRenderer.outputSize(for: document, maxEdge: maxEdge)
-        let fps = framesPerSecond
-        let frameCount = max(document.loopSeconds, 1) * fps
-        let totalOddFrames = frameCount / 2
-        // Simulated particles cannot loop; starting with them already spread out
-        // keeps the video from opening on an empty sky.
-        renderer.warmUpParticles(seconds: renderer.particleWarmUpSeconds, fps: fps)
-
+        let frameCount = max(document.loopSeconds, 1) * framesPerSecond
         let tmpURL = outputURL.deletingLastPathComponent()
             .appendingPathComponent(".\(outputURL.lastPathComponent).\(UUID().uuidString).tmp.mp4")
         let tmp30URL = outputURL.deletingLastPathComponent()
@@ -162,39 +147,90 @@ enum SceneVideoBaker {
             removeIfPresent(tmpURL)
             removeIfPresent(tmp30URL)
         }
-        // Both candidates are encoded from the same rendered frames, so whichever wins
-        // is encoded exactly once and no frame is rendered twice.
-        let full = try makeSink(
-            url: tmpURL,
-            width: width,
-            height: height,
-            fps: fps,
-            quality: quality
+        // The encoder, not the rendering, sets the pace (measured on M5: 3.3 ms of a
+        // 20.8 ms frame when both rates were encoded at once). Most scenes pass at 30 fps,
+        // so that video is encoded first, alone; every frame is still rendered to judge
+        // it. A scene that needs 60 fps fails on its first fast motion and is rendered
+        // again, from the start, into a 60 fps video.
+        let reducedPass = try await encodePass(
+            document: document, videoPath: videoPath, timeOfDay: timeOfDay,
+            userProperties: userProperties, quality: quality, url: tmp30URL,
+            fps: reducedFramesPerSecond
+        ) { progress($0) }
+        let stats = reducedPass.stats
+        var chosen = reducedPass.sink
+        if let failedAt = reducedPass.disqualifiedAtFrame {
+            let done = Double(failedAt) / Double(frameCount)
+            chosen = try await encodePass(
+                document: document, videoPath: videoPath, timeOfDay: timeOfDay,
+                userProperties: userProperties, quality: quality, url: tmpURL,
+                fps: framesPerSecond
+            ) { progress(done + (1 - done) * $0) }.sink
+        }
+        try Task.checkCancellation()
+        try installVideo(chosen.url, at: outputURL)
+        AppLog.windowRefresh
+            .notice(
+                "[bake] Selected \(chosen.fps, privacy: .public)fps, quality=\(quality, privacy: .public) for \(outputURL.lastPathComponent, privacy: .public) (hold PSNR avg: \(stats.averagePSNR, privacy: .public) dB, min: \(stats.minimumPSNR, privacy: .public) dB, changed max: \(stats.maximumChangedFraction * 100, privacy: .public)%)"
+            )
+        return Statistics(
+            holdStats: stats,
+            reducedDisqualifiedAtFrame: reducedPass.disqualifiedAtFrame
         )
-        var reduced: Sink? = try makeSink(
-            url: tmp30URL,
-            width: width,
-            height: height,
-            fps: reducedFramesPerSecond,
-            quality: quality
-        )
+    }
+
+    private struct Pass {
+        let sink: Sink
+        let stats: HoldStats
+        /// The 60 fps frame at which 30 fps was found not to be enough; nil when it was,
+        /// or when the pass encoded at 60 fps.
+        let disqualifiedAtFrame: Int?
+    }
+
+    /// Renders the loop at 60 fps from a fresh renderer and encodes every frame (60 fps)
+    /// or every even one (30 fps). A 30 fps pass compares each odd frame with the even
+    /// frame shown in its place and stops, its video discarded, as soon as the
+    /// difference rules 30 fps out.
+    private static func encodePass(
+        document: SceneDocument,
+        videoPath: String,
+        timeOfDay: SceneTimeOfDay,
+        userProperties: [String: WebPropertyValue]?,
+        quality: Double,
+        url: URL,
+        fps: Int,
+        progress: (Double) -> Void
+    ) async throws -> Pass {
+        let frameCount = max(document.loopSeconds, 1) * framesPerSecond
+        let renderer = try SceneRenderer(document: document, videoPath: videoPath)
+        renderer.timeOfDay = timeOfDay
+        try await renderer.prepareVideos()
+        // Its own queue: on the shared one, every live preview frame waited behind a
+        // full-resolution bake frame and stalled the main thread in nextDrawable.
+        guard let commandQueue = renderer.device.makeCommandQueue() else {
+            throw BakeError.writerFailed("Cannot create a command queue")
+        }
+        let (width, height) = SceneRenderer.outputSize(for: document, maxEdge: maxEdge)
+        let renderFPS = framesPerSecond
+        let judges = fps < renderFPS
+        let totalOddFrames = frameCount / 2
+        // Simulated particles cannot loop; starting with them already spread out
+        // keeps the video from opening on an empty sky.
+        renderer.warmUpParticles(seconds: renderer.particleWarmUpSeconds, fps: renderFPS)
+        let sink = try makeSink(url: url, width: width, height: height, fps: fps, quality: quality)
 
         var textureCache: CVMetalTextureCache?
         CVMetalTextureCacheCreate(nil, nil, renderer.device, nil, &textureCache)
         var stats = HoldStats()
-        var reducedDisqualifiedAtFrame: Int?
         do {
-            guard let textureCache, let pool = full.adaptor.pixelBufferPool else {
+            guard let textureCache, let pool = sink.adaptor.pixelBufferPool else {
                 throw BakeError.writerFailed("No pixel buffer pool")
             }
             var previousEven: CVPixelBuffer?
             for frame in 0 ..< frameCount {
                 try Task.checkCancellation()
-                let isEven = frame % 2 == 0
-                while !full.input
-                    .isReadyForMoreMediaData ||
-                    (isEven && (reduced?.input.isReadyForMoreMediaData == false))
-                {
+                let isEncoded = !judges || frame % 2 == 0
+                while isEncoded, !sink.input.isReadyForMoreMediaData {
                     try await Task.sleep(nanoseconds: 2_000_000)
                 }
                 var pixelBuffer: CVPixelBuffer?
@@ -212,7 +248,7 @@ enum SceneVideoBaker {
                 else {
                     throw BakeError.writerFailed("Cannot allocate frame \(frame)")
                 }
-                let time = Double(frame) / Double(fps)
+                let time = Double(frame) / Double(renderFPS)
                 try renderer.encode(
                     into: texture,
                     commandBuffer: commandBuffer,
@@ -227,81 +263,51 @@ enum SceneVideoBaker {
                 if let error = commandBuffer.error {
                     throw error
                 }
-                guard full.adaptor.append(
-                    pixelBuffer,
-                    withPresentationTime: CMTime(
-                        value: CMTimeValue(frame),
-                        timescale: CMTimeScale(fps)
-                    )
-                ) else {
-                    throw BakeError
-                        .writerFailed(full.writer.error?
-                            .localizedDescription ?? "Cannot append frame \(frame)")
-                }
-                if let currentReduced = reduced {
-                    if isEven {
-                        guard currentReduced.adaptor.append(
-                            pixelBuffer,
-                            withPresentationTime: CMTime(
-                                value: CMTimeValue(frame / 2),
-                                timescale: CMTimeScale(reducedFramesPerSecond)
-                            )
-                        ) else {
-                            throw BakeError
-                                .writerFailed(currentReduced.writer.error?
-                                    .localizedDescription ?? "Cannot append reduced frame \(frame)")
-                        }
-                        previousEven = pixelBuffer
-                    } else if let even = previousEven {
-                        stats.add(even: even, odd: pixelBuffer)
-                        if stats.isDisqualified(totalOddFrames: totalOddFrames) {
-                            currentReduced.input.markAsFinished()
-                            currentReduced.writer.cancelWriting()
-                            reduced = nil
-                            previousEven = nil
-                            reducedDisqualifiedAtFrame = frame
-                        }
+                if isEncoded {
+                    guard sink.adaptor.append(
+                        pixelBuffer,
+                        withPresentationTime: CMTime(
+                            value: CMTimeValue(judges ? frame / 2 : frame),
+                            timescale: CMTimeScale(fps)
+                        )
+                    ) else {
+                        throw BakeError
+                            .writerFailed(sink.writer.error?
+                                .localizedDescription ?? "Cannot append frame \(frame)")
+                    }
+                    previousEven = pixelBuffer
+                } else if let even = previousEven {
+                    stats.add(even: even, odd: pixelBuffer)
+                    if stats.isDisqualified(totalOddFrames: totalOddFrames) {
+                        sink.input.markAsFinished()
+                        sink.writer.cancelWriting()
+                        return Pass(sink: sink, stats: stats, disqualifiedAtFrame: frame)
                     }
                 }
                 progress(Double(frame + 1) / Double(frameCount))
             }
         } catch {
-            full.writer.cancelWriting()
-            reduced?.writer.cancelWriting()
+            sink.writer.cancelWriting()
             throw error
         }
-
         try Task.checkCancellation()
-        let chosen: Sink
-        if let reduced, stats.usesReducedRate {
-            chosen = reduced
-            full.input.markAsFinished()
-            full.writer.cancelWriting()
-        } else {
-            chosen = full
-            if let reduced {
-                reduced.input.markAsFinished()
-                reduced.writer.cancelWriting()
-            }
+        if judges, !stats.usesReducedRate {
+            sink.input.markAsFinished()
+            sink.writer.cancelWriting()
+            return Pass(sink: sink, stats: stats, disqualifiedAtFrame: frameCount)
         }
-        chosen.input.markAsFinished()
-        chosen.writer.endSession(atSourceTime: CMTime(
-            value: CMTimeValue(frameCount * chosen.fps / fps),
-            timescale: CMTimeScale(chosen.fps)
+        sink.input.markAsFinished()
+        sink.writer.endSession(atSourceTime: CMTime(
+            value: CMTimeValue(judges ? frameCount / 2 : frameCount),
+            timescale: CMTimeScale(fps)
         ))
-        await chosen.writer.finishWriting()
-        guard chosen.writer.status == .completed else {
+        await sink.writer.finishWriting()
+        guard sink.writer.status == .completed else {
             throw BakeError
-                .writerFailed(chosen.writer.error?
+                .writerFailed(sink.writer.error?
                     .localizedDescription ?? "Writing did not complete")
         }
-        try Task.checkCancellation()
-        try installVideo(chosen.url, at: outputURL)
-        AppLog.windowRefresh
-            .notice(
-                "[bake] Selected \(chosen.fps, privacy: .public)fps, quality=\(quality, privacy: .public) for \(outputURL.lastPathComponent, privacy: .public) (hold PSNR avg: \(stats.averagePSNR, privacy: .public) dB, min: \(stats.minimumPSNR, privacy: .public) dB, changed max: \(stats.maximumChangedFraction * 100, privacy: .public)%)"
-            )
-        return Statistics(holdStats: stats, reducedDisqualifiedAtFrame: reducedDisqualifiedAtFrame)
+        return Pass(sink: sink, stats: stats, disqualifiedAtFrame: nil)
     }
 
     private struct Sink {

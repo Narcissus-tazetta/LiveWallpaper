@@ -75,6 +75,11 @@ struct SceneScript: Codable, Equatable, Identifiable {
     }
 
     var requiresLiveInteraction: Bool {
+        requiresLiveInteraction(cursorReacts: true)
+    }
+
+    func requiresLiveInteraction(cursorReacts: Bool) -> Bool {
+        let usesCursor = usesCursor && cursorReacts
         guard canRun else { return false }
         guard usesCursor || usesMedia || usesTimeOfDay else { return false }
         guard let modules, !modules.isEmpty else { return true }

@@ -25,9 +25,7 @@ extension WallpaperModel {
         isActive: Bool
     ) -> AVQueuePlayer {
         if dedicatedSlotsByScreenID[screenID]?[path] != nil {
-            if isActive, effectiveLightweightMode,
-               let proxy = lightweightProxyCache.cachedProxyURL(for: path)
-            {
+            if isActive, let proxy = activePlaybackProxyCache?.cachedProxyURL(for: path) {
                 replaceDedicatedPlaybackURL(proxy, screenID: screenID, path: path)
             }
             guard isActive, activeDedicatedPathByScreenID[screenID] != path else {
