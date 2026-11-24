@@ -62,6 +62,7 @@ extension WallpaperModel {
             guard FileManager.default.fileExists(atPath: path) else {
                 return
             }
+            relinquishScheduleOverrideForManualAssignment(.display(screenID))
             removeWebOverrideForVideoAssignment(forScreenID: screenID)
             guard videoOverrideByScreenID[screenID] != path else {
                 return
@@ -71,6 +72,7 @@ extension WallpaperModel {
             guard videoOverrideByScreenID[screenID] != nil else {
                 return
             }
+            relinquishScheduleOverrideForManualAssignment(.display(screenID))
             videoOverrideByScreenID.removeValue(forKey: screenID)
             evictAllDedicatedSlots(forScreenID: screenID)
             if suspendDisabledDisplayIDs.remove(screenID) != nil {

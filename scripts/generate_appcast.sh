@@ -41,7 +41,12 @@ if [[ ${#ED_SIGNATURE} -lt 80 ]]; then
 fi
 
 LENGTH=$(stat -f%z "$ZIP_PATH")
-PUB_DATE=$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S %z")
+DATE_FORMAT="+%a, %d %b %Y %H:%M:%S %z"
+if [[ -n "${APPCAST_PUBLISHED_AT:-}" ]]; then
+  PUB_DATE=$(LC_ALL=C date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$APPCAST_PUBLISHED_AT" "$DATE_FORMAT")
+else
+  PUB_DATE=$(LC_ALL=C date -u "$DATE_FORMAT")
+fi
 
 mkdir -p "$(dirname "$OUTPUT_PATH")"
 

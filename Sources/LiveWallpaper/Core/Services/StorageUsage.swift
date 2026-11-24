@@ -1,14 +1,60 @@
 import Foundation
 
 enum StorageUsage {
+    private static let sharedVideoPreferenceDomains = ["com.sakana.livewallpaper", "LiveWallpaper"]
+
     static func preferencesProtectedText(
         defaults: UserDefaults = .standard,
-        domainNames: [String] = ["com.sakana.livewallpaper", "LiveWallpaper"]
+        domainNames: [String]? = nil
     ) -> String {
         // Installed and source builds share the video folder but have separate preferences.
-        let domains = domainNames.compactMap { defaults.persistentDomain(forName: $0) }
+        let domains = (domainNames ?? sharedVideoPreferenceDomains)
+            .compactMap { defaults.persistentDomain(forName: $0) }
             + [defaults.dictionaryRepresentation()]
-        return domains.map(\.description).joined(separator: "\n")
+        return protectedText(from: domains)
+    }
+
+    static func otherBuildsProtectedText(
+        currentDomain: String,
+        defaults: UserDefaults = .standard,
+        domainNames: [String]? = nil
+    ) -> String {
+        let names = (domainNames ?? sharedVideoPreferenceDomains).filter { $0 != currentDomain }
+        return protectedText(from: names.compactMap { defaults.persistentDomain(forName: $0) })
+    }
+
+    private static func protectedText(from domains: [[String: Any]]) -> String {
+        // Preferences such as playlists and local Web sources are stored as JSON blobs.
+        domains.flatMap { domain in
+            [domain.description] + domain.values.compactMap { value in
+                (value as? Data).flatMap { String(data: $0, encoding: .utf8) }
+            }
+        }.joined(separator: "\n")
+    }
+
+    static func clearCachedVideos(
+        in directory: URL, referencedPaths: Set<String>, protectedText: String
+    ) throws {
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let directoryPath = directory.resolvingSymlinksInPath().path
+        let stems = Set(referencedPaths.compactMap { path -> String? in
+            let url = URL(fileURLWithPath: path)
+            guard url.deletingLastPathComponent().resolvingSymlinksInPath().path == directoryPath
+            else { return nil }
+            return extractVideoStem(from: url.lastPathComponent)
+        })
+        let entries = try fileManager.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+        )
+        for entry in entries {
+            let stem = extractVideoStem(from: entry.lastPathComponent)
+            if stems.contains(stem),
+               protectedText.range(of: stem, options: .caseInsensitive) == nil
+            {
+                try fileManager.removeItem(at: entry)
+            }
+        }
     }
 
     /// 2 GiB headroom required in addition to estimated export size.

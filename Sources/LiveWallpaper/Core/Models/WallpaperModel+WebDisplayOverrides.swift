@@ -66,17 +66,19 @@ extension WallpaperModel {
     func setWebOverride(id: UUID?, forScreenID screenID: String) {
         if let id {
             guard webWallpaperFeatureEnabled,
-                  webWallpaperSources.contains(where: { $0.id == id }),
-                  webOverrideByScreenID[screenID] != id
+                  webWallpaperSources.contains(where: { $0.id == id })
             else {
                 return
             }
+            relinquishScheduleOverrideForManualAssignment(.display(screenID))
+            guard webOverrideByScreenID[screenID] != id else { return }
             setVideoOverride(path: nil, forScreenID: screenID)
             webOverrideByScreenID[screenID] = id
         } else {
             guard webOverrideByScreenID.removeValue(forKey: screenID) != nil else {
                 return
             }
+            relinquishScheduleOverrideForManualAssignment(.display(screenID))
         }
         AppLog.events.notice(
             "screen \(screenID, privacy: .public) fixed web -> \(id?.uuidString ?? "none", privacy: .public)"
@@ -99,6 +101,7 @@ extension WallpaperModel {
         let screenIDs = webOverrideByScreenID.filter { $0.value == id }.map(\.key)
         for screenID in screenIDs {
             webOverrideByScreenID.removeValue(forKey: screenID)
+            relinquishScheduleOverrideForManualAssignment(.display(screenID))
         }
         guard !screenIDs.isEmpty else {
             return

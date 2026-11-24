@@ -23,6 +23,9 @@ extension WallpaperModel {
         }
 
         let thumbnailDirectory = thumbnailCacheDirectoryURL()
+        let protectedText = StorageUsage.otherBuildsProtectedText(
+            currentDomain: Bundle.main.bundleIdentifier ?? ProcessInfo.processInfo.processName
+        )
 
         for path in sceneDocumentsByPath.keys {
             cancelSceneBake(path: path)
@@ -30,23 +33,22 @@ extension WallpaperModel {
         }
 
         do {
-            if FileManager.default.fileExists(atPath: directory.path) {
-                try FileManager.default.removeItem(at: directory)
-            }
             if let thumbnailDirectory,
                FileManager.default.fileExists(atPath: thumbnailDirectory.path)
             {
                 try FileManager.default.removeItem(at: thumbnailDirectory)
             }
-            try FileManager.default.createDirectory(
-                at: directory, withIntermediateDirectories: true
-            )
             if let thumbnailDirectory {
                 try FileManager.default.createDirectory(
                     at: thumbnailDirectory,
                     withIntermediateDirectories: true
                 )
             }
+            try StorageUsage.clearCachedVideos(
+                in: directory,
+                referencedPaths: allReferencedVideoPaths(),
+                protectedText: protectedText
+            )
             playlists.removeAll()
             selectedPlaylistID = nil
             libraryVideoPaths.removeAll()
@@ -64,16 +66,21 @@ extension WallpaperModel {
             )
             wallpaperPresentationByPath.removeAll()
             UserDefaults.standard.removeObject(forKey: wallpaperPresentationStorageKey)
-            clearWebWallpaperState()
+            clearWebWallpaperState(protectedText: protectedText)
             stopAllPlayers()
             currentVideoPath = nil
             currentVideoIndex = nil
             UserDefaults.standard.removeObject(forKey: PrefsKey.videoPath)
             persistPlaylistStateImmediately()
+            verifyRestoredVideoPaths()
             evaluateForegroundCoverageState()
             NotificationCenter.default.post(name: .thumbnailCacheDidClear, object: nil)
             return true
         } catch {
+            verifyRestoredVideoPaths()
+            AppLog.persistence.error(
+                "cache cleanup failed: \(error.localizedDescription, privacy: .private)"
+            )
             return false
         }
     }

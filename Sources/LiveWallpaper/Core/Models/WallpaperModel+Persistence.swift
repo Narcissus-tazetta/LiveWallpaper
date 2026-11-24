@@ -404,6 +404,7 @@ extension WallpaperModel {
                 selectRegisteredVideo(path: fallback)
             }
         }
+        evaluateSchedule(trigger: .playbackConstraintChanged)
     }
 
     func setLockScreenSyncEnabled(_ enabled: Bool) {

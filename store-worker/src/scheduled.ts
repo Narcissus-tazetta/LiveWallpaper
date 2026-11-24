@@ -1,9 +1,9 @@
 import type { Env } from "./env";
 import { ORPHAN_UPLOAD_GRACE_SECONDS } from "./constants";
 import { applyReviewDecision } from "./review-decision";
+import { expirePopularSnapshots } from "./catalog";
 
-/// upload-url取得後にsubmitされなかったR2実体を定期回収する。DBに参照がある実体は
-/// statusにかかわらず保持し、署名URLの有効期限+十分な猶予を過ぎた孤児だけを消す。
+/// The grace period lets active upload URLs expire even if an entry is rejected before they do.
 async function cleanupOrphanUploads(env: Env): Promise<void> {
 	const cutoff = Date.now() - ORPHAN_UPLOAD_GRACE_SECONDS * 1000;
 	for (const prefix of ["packages/", "thumbnails/"]) {
@@ -13,7 +13,9 @@ async function cleanupOrphanUploads(env: Env): Promise<void> {
 			for (const object of listed.objects) {
 				if (object.uploaded.getTime() > cutoff) continue;
 				const column = prefix === "packages/" ? "object_key" : "thumbnail_key";
-				const referenced = await env.STORE_DB.prepare(`SELECT 1 FROM store_entries WHERE ${column} = ? LIMIT 1`)
+				const referenced = await env.STORE_DB.prepare(
+					`SELECT 1 FROM store_entries WHERE ${column} = ? AND status <> 'rejected' LIMIT 1`,
+				)
 					.bind(object.key)
 					.first();
 				if (!referenced) await env.STORE_BUCKET.delete(object.key);
@@ -42,5 +44,6 @@ export async function handleScheduled(env: Env): Promise<void> {
 		.all();
 
 	await Promise.all((results as { id: string }[]).map((row) => applyReviewDecision(env, row.id, "reject", nowISO)));
+	await expirePopularSnapshots(env);
 	await cleanupOrphanUploads(env);
 }

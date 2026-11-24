@@ -29,10 +29,10 @@ private final class ControlledStoreProtocol: URLProtocol {
         client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
     }
 
-    func respond(_ object: [String: Any]) throws {
+    func respond(_ object: [String: Any], statusCode: Int = 200) throws {
         let data = try JSONSerialization.data(withJSONObject: object)
         let response = HTTPURLResponse(
-            url: request.url!, statusCode: 200, httpVersion: nil,
+            url: request.url!, statusCode: statusCode, httpVersion: nil,
             headerFields: ["Content-Type": "application/json"]
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
@@ -139,6 +139,37 @@ final class StoreConcurrencyTests: XCTestCase {
         controller.setSearchQuery("new search")
         await controller.loadMoreIfNeeded(currentEntry: entry("old"))
         XCTAssertTrue(requestedCursors.isEmpty)
+    }
+
+    func testExpiredCatalogCursorReloadsFromFirstPage() async {
+        let controller = StoreCatalogController(session: session)
+        var firstPageRequests = 0
+        var paginationRequests = 0
+        ControlledStoreProtocol.onRequest = { request in
+            let items = request.request.url.flatMap {
+                URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems
+            }
+            do {
+                if items?.contains(where: { $0.name == "cursor" }) == true {
+                    paginationRequests += 1
+                    try request.respond(["error": "expired"], statusCode: 410)
+                } else {
+                    firstPageRequests += 1
+                    let id = firstPageRequests == 1 ? "old" : "refreshed"
+                    try request.respond([
+                        "entries": [self.entryResponse(id)],
+                        "nextCursor": "catalog-cursor"
+                    ])
+                }
+            } catch { XCTFail("Could not encode catalog response: \(error)") }
+        }
+        await controller.reload()
+        await controller.loadMoreIfNeeded(currentEntry: entry("old"))
+
+        XCTAssertEqual(firstPageRequests, 2)
+        XCTAssertEqual(paginationRequests, 1)
+        XCTAssertEqual(controller.entries.map(\.id), ["refreshed"])
+        XCTAssertNil(controller.errorMessage)
     }
 
     func testStoreDurationOutsideTheIntegerRangeIsOmitted() throws {

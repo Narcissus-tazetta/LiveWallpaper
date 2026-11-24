@@ -1,7 +1,7 @@
 import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from "cloudflare:test";
 import { zipSync } from "fflate";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { UPLOAD_WINDOW_MS } from "../src/constants";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { ORPHAN_UPLOAD_GRACE_SECONDS, UPLOAD_WINDOW_MS } from "../src/constants";
 import worker from "../src/index";
 import { applyReviewDecision } from "../src/review-decision";
 // Workers環境にはnode:fsが無いため、Viteの?raw importでビルド時にschema.sqlの
@@ -467,7 +467,7 @@ describe("store submission review flow", () => {
 		expect(wildcardJson.entries).toHaveLength(0);
 	});
 
-	it("/catalog?sort=popular orders by download_count and paginates with a composite cursor", async () => {
+	it("/catalog?sort=popular preserves page order when downloads change", async () => {
 		const { id: lowId } = await submitEntry({ title: "Low Downloads" });
 		const { id: highId } = await submitEntry({ title: "High Downloads" });
 		for (const id of [lowId, highId]) {
@@ -493,13 +493,26 @@ describe("store submission review flow", () => {
 		expect(page1Json.entries.map((e) => e.id)).toEqual([highId]);
 		expect(page1Json.nextCursor).toBeTruthy();
 
-		const page2 = await callWorker(
-			new Request(
-				`https://store.example.com/catalog?sort=popular&limit=1&cursor=${encodeURIComponent(page1Json.nextCursor!)}`,
-			),
+		for (let count = 0; count < 2; count++) {
+			await (await callWorker(new Request(`https://store.example.com/download/${lowId}`))).arrayBuffer();
+		}
+		const nextPage = new Request(
+			`https://store.example.com/catalog?sort=popular&limit=1&cursor=${encodeURIComponent(page1Json.nextCursor!)}`,
 		);
-		const page2Json = (await page2.json()) as { entries: { id: string }[] };
+		const page2 = await callWorker(nextPage);
+		const page2Json = (await page2.json()) as { entries: { id: string; downloadCount: number }[] };
 		expect(page2Json.entries.map((e) => e.id)).toEqual([lowId]);
+		expect(page2Json.entries[0].downloadCount).toBe(1);
+
+		await env.STORE_DB.prepare("UPDATE store_entries SET status = 'pending' WHERE id = ?").bind(lowId).run();
+		expect((await (await callWorker(nextPage)).json<{ entries: unknown[] }>()).entries).toEqual([]);
+
+		const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 2 * 60 * 60 * 1000);
+		try {
+			expect((await callWorker(nextPage)).status).toBe(410);
+		} finally {
+			clock.mockRestore();
+		}
 	});
 
 	it("/submit issues a one-time withdraw token that lets the submitter self-delete without ADMIN_KEY", async () => {
@@ -954,6 +967,25 @@ describe("store submission review flow", () => {
 		expect(await entryStatus(staleId)).toBe("rejected");
 		expect(await entryStatus(freshId)).toBe("requested");
 	});
+
+	it("scheduled cleanup removes a leftover rejected upload and keeps its status", async () => {
+		mockResendEmail();
+		const { id } = await submitEntry();
+		const key = `packages/${id}.lwpkg`;
+		await applyReviewDecision(env, id, "reject");
+		await env.STORE_BUCKET.put(key, "leftover package");
+		const uploaded = await env.STORE_BUCKET.head(key);
+		const now = uploaded!.uploaded.getTime() + (ORPHAN_UPLOAD_GRACE_SECONDS + 1) * 1000;
+		const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+		try {
+			await worker.scheduled({ cron: "0 * * * *", scheduledTime: now, noRetry: () => {} } as never, env);
+		} finally {
+			clock.mockRestore();
+		}
+		expect(await env.STORE_BUCKET.head(key)).toBeNull();
+		expect(await entryStatus(id)).toBe("rejected");
+	});
+
 	it("holds review previews and approval until the submitter's upload URLs have expired", async () => {
 		const mock = mockResendEmail();
 		const { id } = await submitEntry({ uploadWindowOpen: true });

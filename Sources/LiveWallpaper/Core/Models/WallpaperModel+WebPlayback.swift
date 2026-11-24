@@ -85,14 +85,14 @@ extension WallpaperModel {
                 return
             }
         }
-        let wasActive = currentWebWallpaperID == id
         clearWebOverrides(forSourceID: id)
         webWallpaperSources.remove(at: index)
         pruneWebWallpaperIDsFromPlaylists()
         pruneScheduleRules(referencingWebWallpaperID: id)
         syncActivePlaylistPaths()
 
-        if wasActive {
+        // Pruning the schedule may already have switched the shared wallpaper.
+        if currentWebWallpaperID == id {
             if let next = webWallpaperSources.first {
                 selectWebWallpaper(id: next.id)
             } else {
@@ -273,7 +273,7 @@ extension WallpaperModel {
         }
     }
 
-    func clearWebWallpaperState() {
+    func clearWebWallpaperState(protectedText: String) {
         stopWebWallpaper()
         webOverrideByScreenID.removeAll()
         persistWebOverrides()
@@ -283,7 +283,9 @@ extension WallpaperModel {
         for folder in folders {
             localWebWallpaperServer.remove(folder: folder)
         }
-        removeLeftovers(of: folders)
+        removeLeftovers(of: folders.filter {
+            protectedText.range(of: $0.lastPathComponent, options: .caseInsensitive) == nil
+        })
         webWallpaperSources.removeAll()
         pruneWebWallpaperIDsFromPlaylists()
         currentWebWallpaperID = nil

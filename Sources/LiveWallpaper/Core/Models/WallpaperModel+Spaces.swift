@@ -78,6 +78,7 @@ extension WallpaperModel {
             guard FileManager.default.fileExists(atPath: path) else {
                 return
             }
+            relinquishScheduleOverrideForManualAssignment(.space(uuid))
             guard videoBySpaceUUID[uuid] != path else {
                 return
             }
@@ -86,6 +87,7 @@ extension WallpaperModel {
             guard videoBySpaceUUID[uuid] != nil else {
                 return
             }
+            relinquishScheduleOverrideForManualAssignment(.space(uuid))
             videoBySpaceUUID.removeValue(forKey: uuid)
         }
         persistSpaceVideos()
@@ -103,6 +105,7 @@ extension WallpaperModel {
         }
         for uuid in matching {
             videoBySpaceUUID.removeValue(forKey: uuid)
+            relinquishScheduleOverrideForManualAssignment(.space(uuid))
         }
         persistSpaceVideos()
         applySpaceWallpaperSwap()

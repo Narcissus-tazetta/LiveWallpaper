@@ -59,6 +59,7 @@ extension WallpaperModel {
         appearance: ScheduleAppearanceCondition,
         calendar: Calendar = .current,
         focusFilterEnabled: Bool = true,
+        webWallpaperEnabled: Bool = true,
         location: SolarLocation? = nil,
         weather: ScheduleWeather? = nil
     ) -> ScheduleRule? {
@@ -77,7 +78,9 @@ extension WallpaperModel {
             )
         }
         func matches(_ rule: ScheduleRule) -> Bool {
-            guard rule.isEnabled, rule.scope == scope else {
+            guard rule.isEnabled, rule.scope == scope,
+                  webWallpaperEnabled || rule.target.kind != .web
+            else {
                 return false
             }
             guard rule.weekdays.isEmpty || rule.weekdays.contains(weekday) else {
@@ -120,7 +123,8 @@ extension WallpaperModel {
         // 評価する。後者を含めないと、あるスコープを使うルールを全て削除/無効化
         // した際にそのスコープの解放処理(releaseScheduleAuthority)が二度と
         // 呼ばれず、オーバーライドが張り付いたままになる。
-        let scopes = Set(scheduleRules.map(\.scope)).union(lastScheduleApplicationState.keys)
+        let scopes = Set(scheduleRules.map(\.scope))
+            .union(lastScheduleApplicationState.keys).union(scheduleOwnedOverrides.keys)
         for scope in scopes {
             evaluateScope(scope, now: now, appearance: appearance)
         }
@@ -175,6 +179,7 @@ extension WallpaperModel {
         let matched = Self.matchingScheduleRule(
             in: scheduleRules, scope: scope, now: now, appearance: appearance,
             focusFilterEnabled: focusFilterIntegrationEnabled,
+            webWallpaperEnabled: webWallpaperFeatureEnabled,
             location: scheduleLocation, weather: scheduleCurrentWeather
         )
         let newState: ScheduleApplicationState = matched.map { .rule($0.id) } ?? .none
@@ -183,7 +188,10 @@ extension WallpaperModel {
         // 反映されない)。手動でのタブ操作等ではルールのtargetは変わらないため、
         // この比較が手動選択の維持と衝突することはない。
         let targetChanged = matched.map { $0.target != lastScheduleAppliedTarget[scope] } ?? false
-        guard newState != (lastScheduleApplicationState[scope] ?? .none) || targetChanged else {
+        let hasExpiredOverride = matched == nil && scheduleOwnedOverrides[scope] != nil
+        guard newState != (lastScheduleApplicationState[scope] ?? .none) || targetChanged
+            || hasExpiredOverride
+        else {
             return
         }
         if let rule = matched {
@@ -246,14 +254,20 @@ extension WallpaperModel {
                 else {
                     return false
                 }
-                setVideoOverride(path: path, forScreenID: screenID)
+                if videoOverrideByScreenID[screenID] != path {
+                    setScheduleOverrideOwnership(target, for: scope)
+                    setVideoOverride(path: path, forScreenID: screenID)
+                }
             case .web:
                 guard let id = target.webWallpaperID,
                       webWallpaperSources.contains(where: { $0.id == id })
                 else {
                     return false
                 }
-                setWebOverride(id: id, forScreenID: screenID)
+                if webOverrideByScreenID[screenID] != id {
+                    setScheduleOverrideOwnership(target, for: scope)
+                    setWebOverride(id: id, forScreenID: screenID)
+                }
             }
             return true
         case .space:
@@ -263,7 +277,10 @@ extension WallpaperModel {
             else {
                 return false
             }
-            setSpaceVideo(path: path, forSpaceUUID: spaceUUID)
+            if videoBySpaceUUID[spaceUUID] != path {
+                setScheduleOverrideOwnership(target, for: scope)
+                setSpaceVideo(path: path, forSpaceUUID: spaceUUID)
+            }
             return true
         }
     }
@@ -272,6 +289,8 @@ extension WallpaperModel {
     /// スケジュールの関与を手放す。共有スコープには「解除」の概念がない
     /// (常に何らかの壁紙が表示され続けるため何もしない)。
     private func releaseScheduleAuthority(scope: ScheduleScope) {
+        guard let target = scheduleOwnedOverrides[scope] else { return }
+        defer { setScheduleOverrideOwnership(nil, for: scope) }
         switch scope.kind {
         case .shared:
             break
@@ -279,17 +298,40 @@ extension WallpaperModel {
             guard let screenID = scope.identifier else {
                 return
             }
-            // 適用したのが Web 壁紙なら、その画面の Web の固定を外す。
-            if lastScheduleAppliedTarget[scope]?.kind == .web {
-                setWebOverride(id: nil, forScreenID: screenID)
-            } else {
-                setVideoOverride(path: nil, forScreenID: screenID)
+            // A manual assignment can replace the scheduled wallpaper before the rule expires.
+            switch target.kind {
+            case .web:
+                if webOverrideByScreenID[screenID] == target.webWallpaperID {
+                    setWebOverride(id: nil, forScreenID: screenID)
+                }
+            case .video:
+                if videoOverrideByScreenID[screenID] == target.videoPath {
+                    setVideoOverride(path: nil, forScreenID: screenID)
+                }
             }
         case .space:
-            guard let spaceUUID = scope.identifier else {
+            guard let spaceUUID = scope.identifier,
+                  videoBySpaceUUID[spaceUUID] == target.videoPath
+            else {
                 return
             }
             setSpaceVideo(path: nil, forSpaceUUID: spaceUUID)
+        }
+    }
+
+    func relinquishScheduleOverrideForManualAssignment(_ scope: ScheduleScope) {
+        guard !isEvaluatingSchedule else { return }
+        setScheduleOverrideOwnership(nil, for: scope)
+    }
+
+    private func setScheduleOverrideOwnership(_ target: ScheduleTarget?, for scope: ScheduleScope) {
+        guard scheduleOwnedOverrides[scope] != target else { return }
+        scheduleOwnedOverrides[scope] = target
+        do {
+            let data = try JSONEncoder().encode(scheduleOwnedOverrides)
+            UserDefaults.standard.set(data, forKey: PrefsKey.scheduleOwnedOverrides)
+        } catch {
+            recordPersistenceFailure(key: PrefsKey.scheduleOwnedOverrides, error: error)
         }
     }
 
@@ -490,7 +532,9 @@ extension WallpaperModel {
     /// 設定リセット用。全ルールを消してタイマー停止と各スコープの権限解放
     /// (オーバーライド解除)まで一括で行う。
     func resetScheduleState() {
-        guard !scheduleRules.isEmpty || !lastScheduleApplicationState.isEmpty else {
+        guard !scheduleRules.isEmpty || !lastScheduleApplicationState.isEmpty
+            || !scheduleOwnedOverrides.isEmpty
+        else {
             return
         }
         scheduleRules = []
@@ -656,6 +700,9 @@ extension WallpaperModel {
     // MARK: - 永続化
 
     func restoreScheduleState() {
+        scheduleOwnedOverrides = UserDefaults.standard.decodedJSON(
+            [ScheduleScope: ScheduleTarget].self, forKey: PrefsKey.scheduleOwnedOverrides
+        ) ?? [:]
         if var decoded = UserDefaults.standard.decodedJSON(
             [ScheduleRule].self, forKey: PrefsKey.scheduleRulesData
         ) {

@@ -35,6 +35,10 @@ final class StoreCatalogController: ObservableObject {
     private let endpointURL: URL
     private let packageImporter: PackageImporter
 
+    private enum CatalogError: Error {
+        case expiredCursor
+    }
+
     init(
         session: URLSession = .shared,
         fileManager: FileManager = .default,
@@ -128,6 +132,9 @@ final class StoreCatalogController: ObservableObject {
             guard requestGeneration == generation else { return }
             entries.append(contentsOf: page.entries)
             nextCursor = page.nextCursor
+        } catch CatalogError.expiredCursor {
+            guard requestGeneration == generation else { return }
+            await reload()
         } catch {
             guard requestGeneration == generation else { return }
             errorMessage = error.localizedDescription
@@ -153,9 +160,11 @@ final class StoreCatalogController: ObservableObject {
         components.queryItems = queryItems
 
         let (data, response) = try await session.data(from: components.url!)
-        guard let http = response as? HTTPURLResponse,
-              (200 ..< 300).contains(http.statusCode)
-        else {
+        guard let http = response as? HTTPURLResponse else {
+            throw StoreClientError.invalidResponse
+        }
+        if cursor != nil, http.statusCode == 410 { throw CatalogError.expiredCursor }
+        guard (200 ..< 300).contains(http.statusCode) else {
             throw StoreClientError.invalidResponse
         }
         return try JSONDecoder().decode(StoreCatalogResponse.self, from: data)

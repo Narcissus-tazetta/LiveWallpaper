@@ -447,6 +447,7 @@ final class WallpaperModel: ObservableObject {
     /// のため永続化しない(再起動後は空から再評価する)。
     var lastScheduleApplicationState: [ScheduleScope: ScheduleApplicationState] = [:]
     var lastScheduleAppliedTarget: [ScheduleScope: ScheduleTarget] = [:]
+    var scheduleOwnedOverrides: [ScheduleScope: ScheduleTarget] = [:]
     /// テスト用フック。本番では常に Date()/実際の外観を返す。
     var scheduleNowProvider: () -> Date = { Date() }
     var scheduleAppearanceProvider: () -> ScheduleAppearanceCondition = {

@@ -47,6 +47,7 @@ enum PrefsKey {
     static let cursorEffectsData = "cursorEffectsData"
     static let scheduleLocationData = "scheduleLocationData"
     static let scheduleRulesData = "scheduleRulesData"
+    static let scheduleOwnedOverrides = "scheduleOwnedOverrides"
     static let screenSaverEnabled = "screenSaverEnabled"
     static let screenSaverVideoPath = "screenSaverVideoPath"
     static let keepLockScreenAndScreenSaverAfterQuit = "keepLockScreenAndScreenSaverAfterQuit"

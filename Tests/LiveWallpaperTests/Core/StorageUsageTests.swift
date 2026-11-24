@@ -5,6 +5,43 @@ import XCTest
 final class StorageUsageTests: XCTestCase {
     private let fileManager = FileManager.default
 
+    func testClearCachedVideosProtectsOtherBuildAndItsSceneFiles() throws {
+        let directory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: directory) }
+        let current = UUID().uuidString
+        let other = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: current))
+        defer {
+            defaults.removePersistentDomain(forName: current)
+            defaults.removePersistentDomain(forName: other)
+        }
+        let keep = directory.appendingPathComponent("foreign.mp4")
+        let remove = directory.appendingPathComponent("local.mp4")
+        let scene = directory.appendingPathComponent("foreign.scene")
+        let preview = directory.appendingPathComponent("foreign.preview.jpg")
+        let unclaimed = directory.appendingPathComponent("unclaimed.mp4")
+        for url in [keep, remove, preview, unclaimed] {
+            try Data("data".utf8).write(to: url)
+        }
+        try fileManager.createDirectory(at: scene, withIntermediateDirectories: false)
+        defaults.setPersistentDomain(["paths": [remove.path]], forName: current)
+        let encoded = try JSONEncoder().encode([keep.path])
+        defaults.setPersistentDomain(["paths": encoded], forName: other)
+
+        let protected = StorageUsage.otherBuildsProtectedText(
+            currentDomain: current, defaults: defaults, domainNames: [current, other]
+        )
+        try StorageUsage.clearCachedVideos(
+            in: directory, referencedPaths: [keep.path, remove.path], protectedText: protected
+        )
+
+        XCTAssertEqual(
+            try Set(fileManager.contentsOfDirectory(atPath: directory.path)),
+            Set([keep, scene, preview, unclaimed].map(\.lastPathComponent))
+        )
+    }
+
     func testEstimatedBakeBytesAccuracy() {
         // Rainlink 4K 60fps 60s test
         let w = 3840

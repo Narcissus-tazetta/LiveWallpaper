@@ -424,6 +424,69 @@ final class ScheduleEvaluationTests: XCTestCase {
         return url
     }
 
+    func testWebScheduleRespectsFeatureToggleInBothScopes() throws {
+        let video = try makeVideoFile()
+        defer { try? FileManager.default.removeItem(at: video) }
+        let model = WallpaperModel()
+        let source = try WebWallpaperSource(url: XCTUnwrap(URL(string: "about:blank")))
+        model.webWallpaperSources = [source]
+        let screenID = "screen-web-schedule"
+        for scope in [ScheduleScope.shared, .display(screenID)] {
+            var web = videoRule(scope: scope)
+            web.target = .web(source.id)
+            model.scheduleRules += [web, videoRule(scope: scope, path: video.path)]
+        }
+
+        model.evaluateSchedule(trigger: .launch)
+        XCTAssertEqual(model.currentPlaybackEntry, .video(video.path))
+        XCTAssertEqual(model.videoOverrideByScreenID[screenID], video.path)
+
+        model.setWebWallpaperFeatureEnabled(true)
+        XCTAssertEqual(model.currentPlaybackEntry, .web(source.id))
+        XCTAssertEqual(model.webOverrideByScreenID[screenID], source.id)
+
+        model.setWebWallpaperFeatureEnabled(false)
+        model.evaluateSchedule(trigger: .timerTick)
+        XCTAssertEqual(model.currentPlaybackEntry, .video(video.path))
+        XCTAssertEqual(model.videoOverrideByScreenID[screenID], video.path)
+    }
+
+    func testRemovingActiveVideoKeepsNextMatchingRuleApplied() throws {
+        let videos = try (0 ..< 3).map { _ in try makeVideoFile() }
+        defer { for video in videos {
+            try? FileManager.default.removeItem(at: video)
+        } }
+        let model = WallpaperModel()
+        for video in videos {
+            XCTAssertTrue(model.addVideoPathToLibrary(video.path))
+        }
+        model.scheduleRules = [videoRule(path: videos[0].path), videoRule(path: videos[2].path)]
+        model.evaluateSchedule(trigger: .ruleListChanged)
+
+        model.removeRegisteredVideo(path: videos[0].path)
+        model.evaluateSchedule(trigger: .timerTick)
+
+        XCTAssertEqual(model.currentPlaybackEntry, .video(videos[2].path))
+    }
+
+    func testRemovingActiveWebWallpaperKeepsNextMatchingRuleApplied() throws {
+        let video = try makeVideoFile()
+        defer { try? FileManager.default.removeItem(at: video) }
+        let model = WallpaperModel()
+        model.webWallpaperFeatureEnabled = true
+        let source = try WebWallpaperSource(url: XCTUnwrap(URL(string: "about:blank")))
+        model.webWallpaperSources = [source, WebWallpaperSource(url: source.url)]
+        var first = videoRule()
+        first.target = .web(source.id)
+        model.scheduleRules = [first, videoRule(path: video.path)]
+        model.evaluateSchedule(trigger: .ruleListChanged)
+
+        model.removeWebWallpaper(id: source.id)
+        model.evaluateSchedule(trigger: .timerTick)
+
+        XCTAssertEqual(model.currentPlaybackEntry, .video(video.path))
+    }
+
     /// ディスプレイ別スコープを使うルールを全て削除すると、そのスコープに張られた
     /// setVideoOverride が解放されること(バグ修正: 未使用スコープを評価対象から
     /// 落としていたため、以前は永久にオーバーライドが残っていた)。
@@ -444,6 +507,76 @@ final class ScheduleEvaluationTests: XCTestCase {
         model.scheduleRules = []
         model.evaluateSchedule(trigger: .ruleListChanged)
         XCTAssertNil(model.videoOverrideByScreenID[screenID])
+    }
+
+    func testEndingSchedulesPreservesDifferentManualAssignments() throws {
+        let scheduled = try makeVideoFile()
+        let manual = try makeVideoFile()
+        defer {
+            try? FileManager.default.removeItem(at: scheduled)
+            try? FileManager.default.removeItem(at: manual)
+        }
+        let model = WallpaperModel()
+        model.webWallpaperFeatureEnabled = true
+        let url = try XCTUnwrap(URL(string: "about:blank"))
+        let scheduledWeb = WebWallpaperSource(url: url)
+        let manualWeb = WebWallpaperSource(url: url)
+        model.webWallpaperSources = [scheduledWeb, manualWeb]
+        var webRule = videoRule(appearance: .light, scope: .display("web"))
+        webRule.target = .web(scheduledWeb.id)
+        model.scheduleAppearanceProvider = { .light }
+        model.scheduleRules = [
+            videoRule(appearance: .light, scope: .display("video"), path: scheduled.path), webRule,
+            videoRule(appearance: .light, scope: .space("space"), path: scheduled.path)
+        ]
+        model.evaluateSchedule(trigger: .ruleListChanged)
+        XCTAssertEqual(model.videoOverrideByScreenID["video"], scheduled.path)
+        XCTAssertEqual(model.webOverrideByScreenID["web"], scheduledWeb.id)
+        XCTAssertEqual(model.videoBySpaceUUID["space"], scheduled.path)
+
+        model.setVideoOverride(path: manual.path, forScreenID: "video")
+        model.setWebOverride(id: manualWeb.id, forScreenID: "web")
+        model.setSpaceVideo(path: manual.path, forSpaceUUID: "space")
+        model.scheduleAppearanceProvider = { .dark }
+        model.evaluateSchedule(trigger: .appearanceChanged)
+
+        XCTAssertEqual(model.videoOverrideByScreenID["video"], manual.path)
+        XCTAssertEqual(model.webOverrideByScreenID["web"], manualWeb.id)
+        XCTAssertEqual(model.videoBySpaceUUID["space"], manual.path)
+    }
+
+    func testExpiredFixedAssignmentsAreReleasedAfterRestore() throws {
+        let video = try makeVideoFile()
+        defer { try? FileManager.default.removeItem(at: video) }
+        let model = WallpaperModel()
+        model.webWallpaperFeatureEnabled = true
+        let source = try WebWallpaperSource(url: XCTUnwrap(URL(string: "about:blank")))
+        model.webWallpaperSources = [source]
+        let active: ScheduleAppearanceCondition = model.scheduleAppearanceProvider() == .light
+            ? .dark : .light
+        var web = videoRule(appearance: active, scope: .display("web"))
+        web.target = .web(source.id)
+        model.scheduleRules = [
+            videoRule(appearance: active, scope: .display("video"), path: video.path), web,
+            videoRule(appearance: active, scope: .space("space"), path: video.path),
+            videoRule(appearance: active, scope: .display("manual"), path: video.path),
+            videoRule(appearance: active, scope: .space("repinned"), path: video.path)
+        ]
+        model.setVideoOverride(path: video.path, forScreenID: "manual")
+        model.scheduleAppearanceProvider = { active }
+        model.evaluateSchedule(trigger: .launch)
+        model.setSpaceVideo(path: video.path, forSpaceUUID: "repinned")
+        model.persistPlaylistStateImmediately()
+        XCTAssertEqual(model.videoOverrideByScreenID["video"], video.path)
+        XCTAssertEqual(model.webOverrideByScreenID["web"], source.id)
+        XCTAssertEqual(model.videoBySpaceUUID["space"], video.path)
+
+        let restored = WallpaperModel()
+        XCTAssertNil(restored.videoOverrideByScreenID["video"])
+        XCTAssertNil(restored.webOverrideByScreenID["web"])
+        XCTAssertNil(restored.videoBySpaceUUID["space"])
+        XCTAssertEqual(restored.videoOverrideByScreenID["manual"], video.path)
+        XCTAssertEqual(restored.videoBySpaceUUID["repinned"], video.path)
     }
 
     /// ルール境界を跨いでいなくても、適用中ルールのターゲット自体を編集したら

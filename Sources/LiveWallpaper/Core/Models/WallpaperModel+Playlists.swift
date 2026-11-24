@@ -544,7 +544,6 @@ extension WallpaperModel {
             return
         }
         let queueIndexBeforeRemoval = registeredVideoPaths.firstIndex(of: trimmed)
-        let wasCurrentVideoPath = currentVideoPath == trimmed
         let wasLockScreen = lockScreenVideoPath == trimmed
 
         libraryVideoPaths.remove(at: libraryIndex)
@@ -578,12 +577,13 @@ extension WallpaperModel {
         // Web壁紙が実際に表示中のときの currentVideoPath は「動画に戻すときの
         // フォールバック参照」でしかなく、再生には使われていない。削除しても
         // 表示中のWeb壁紙を中断せず、参照だけ片付ける。
-        if wasCurrentVideoPath, isWebWallpaperActive {
+        if currentVideoPath == trimmed, isWebWallpaperActive {
             clearCurrentVideoReference()
             return
         }
 
-        if wasCurrentVideoPath {
+        // Pruning the schedule may already have switched the shared wallpaper.
+        if currentVideoPath == trimmed {
             if !registeredVideoPaths.isEmpty {
                 let nextIndex = min(
                     queueIndexBeforeRemoval ?? 0,

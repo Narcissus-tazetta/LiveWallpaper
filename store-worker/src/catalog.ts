@@ -1,6 +1,19 @@
 import type { Env } from "./env";
 import { errorResponse, jsonResponse } from "./http";
 
+const POPULAR_SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
+const POPULAR_SNAPSHOT_MAX_AGE = 12;
+
+function popularSnapshot() {
+	return Math.floor(Date.now() / POPULAR_SNAPSHOT_INTERVAL_MS);
+}
+
+export async function expirePopularSnapshots(env: Env): Promise<void> {
+	await env.STORE_DB.prepare("DELETE FROM store_popular_order WHERE snapshot < ?")
+		.bind(popularSnapshot() - POPULAR_SNAPSHOT_MAX_AGE)
+		.run();
+}
+
 /// LIKEのワイルドカード(%, _)とエスケープ文字自体をリテラル扱いさせる。
 /// これが無いと検索語に含まれる%/_がユーザーの意図しないマッチ範囲を作ってしまう
 /// (SQLインジェクションではなく、あくまでLIKEの意味論上の問題)。
@@ -74,7 +87,9 @@ export async function handleCatalog(request: Request, env: Env): Promise<Respons
 	const limit = Math.min(Math.max(Number.parseInt(url.searchParams.get("limit") ?? "20", 10) || 20, 1), 50);
 	const cursor = url.searchParams.get("cursor");
 	const q = url.searchParams.get("q")?.trim() || null;
-	const sort = url.searchParams.get("sort") === "popular" ? "popular" : "newest";
+	if (url.searchParams.get("sort") === "popular") {
+		return handlePopularCatalog(env, url.origin, limit, cursor, q);
+	}
 
 	const conditions = ["status = 'published'"];
 	const bindings: unknown[] = [];
@@ -83,34 +98,18 @@ export async function handleCatalog(request: Request, env: Env): Promise<Respons
 		bindings.push(`%${escapeLikePattern(q)}%`);
 	}
 
-	// created_atは同一ミリ秒に複数行ができるため、idを最終タイブレーカーにする。
-	let orderClause: string;
-	if (sort === "popular") {
-		orderClause = "download_count DESC, created_at DESC, id DESC";
-		if (cursor) {
-			const [rawCount, createdAt, cursorID] = cursor.split("|");
-			const count = Number.parseInt(rawCount, 10);
-			if (Number.isFinite(count) && createdAt && cursorID) {
-				conditions.push(`(download_count < ? OR
-					(download_count = ? AND created_at < ?) OR
-					(download_count = ? AND created_at = ? AND id < ?))`);
-				bindings.push(count, count, createdAt, count, createdAt, cursorID);
-			}
-		}
-	} else {
-		orderClause = "created_at DESC, id DESC";
-		if (cursor) {
-			const [createdAt, cursorID] = cursor.split("|");
-			if (createdAt && cursorID) {
-				conditions.push("(created_at < ? OR (created_at = ? AND id < ?))");
-				bindings.push(createdAt, createdAt, cursorID);
-			}
+	// Multiple entries can share a timestamp.
+	if (cursor) {
+		const [createdAt, cursorID] = cursor.split("|");
+		if (createdAt && cursorID) {
+			conditions.push("(created_at < ? OR (created_at = ? AND id < ?))");
+			bindings.push(createdAt, createdAt, cursorID);
 		}
 	}
 
 	const query = `SELECT ${PUBLIC_ENTRY_COLUMNS}
 		FROM store_entries WHERE ${conditions.join(" AND ")}
-		ORDER BY ${orderClause} LIMIT ?`;
+		ORDER BY created_at DESC, id DESC LIMIT ?`;
 	bindings.push(limit + 1);
 
 	const { results } = await env.STORE_DB.prepare(query)
@@ -119,19 +118,60 @@ export async function handleCatalog(request: Request, env: Env): Promise<Respons
 
 	const hasMore = results.length > limit;
 	const page = hasMore ? results.slice(0, limit) : results;
-	const nextCursor = hasMore
-		? sort === "popular"
-			? `${(page[page.length - 1] as { download_count: number }).download_count}|${
-					(page[page.length - 1] as { created_at: string }).created_at
-				}|${(page[page.length - 1] as { id: string }).id}`
-			: `${(page[page.length - 1] as { created_at: string }).created_at}|${
-					(page[page.length - 1] as { id: string }).id
-				}`
-		: null;
+	const last = page.at(-1);
+	const nextCursor = hasMore && last ? `${last.created_at}|${last.id}` : null;
 
 	const origin = new URL(request.url).origin;
 	const entries = page.map((row) => toPublicEntry(row, origin));
 
+	return jsonResponse({ entries, nextCursor });
+}
+
+async function handlePopularCatalog(
+	env: Env,
+	origin: string,
+	limit: number,
+	cursor: string | null,
+	query: string | null,
+): Promise<Response> {
+	const current = popularSnapshot();
+	let snapshot = current;
+	let position = 0;
+	if (cursor) {
+		const match = /^p\|(\d+)\|(\d+)$/.exec(cursor);
+		if (!match) return errorResponse("popular catalog cursor expired", 410);
+		snapshot = Number(match[1]);
+		position = Number(match[2]);
+		if (!Number.isSafeInteger(position) || snapshot > current || snapshot < current - POPULAR_SNAPSHOT_MAX_AGE) {
+			return errorResponse("popular catalog cursor expired", 410);
+		}
+	} else {
+		// Every page uses the same ordering even while downloads update the live counters.
+		await env.STORE_DB.prepare(
+			`INSERT INTO store_popular_order (snapshot, position, entry_id, ranked_downloads)
+			 SELECT ?, ROW_NUMBER() OVER (ORDER BY download_count DESC, created_at DESC, id DESC),
+			     id, download_count
+			 FROM store_entries WHERE status = 'published'
+			     AND NOT EXISTS (SELECT 1 FROM store_popular_order WHERE snapshot = ?)`,
+		)
+			.bind(snapshot, snapshot)
+			.run();
+	}
+
+	// Check publication live so a withdrawn entry disappears even from an older ranking.
+	const filter = query ? " AND title LIKE ? ESCAPE '\\'" : "";
+	const { results } = await env.STORE_DB.prepare(
+		`SELECT ${PUBLIC_ENTRY_COLUMNS}, position, ranked_downloads
+		 FROM store_popular_order JOIN store_entries ON id = entry_id
+		 WHERE snapshot = ? AND position > ? AND status = 'published'${filter}
+		 ORDER BY position LIMIT ?`,
+	)
+		.bind(snapshot, position, ...(query ? [`%${escapeLikePattern(query)}%`] : []), limit + 1)
+		.all<PublicEntryRow & { position: number; ranked_downloads: number }>();
+	const page = results.slice(0, limit);
+	const last = page.at(-1);
+	const nextCursor = results.length > limit && last ? `p|${snapshot}|${last.position}` : null;
+	const entries = page.map((row) => toPublicEntry({ ...row, download_count: row.ranked_downloads }, origin));
 	return jsonResponse({ entries, nextCursor });
 }
 

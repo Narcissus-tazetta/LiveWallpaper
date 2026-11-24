@@ -14,21 +14,53 @@ permissions:
 env:
     RELEASE_VERSION: ${{ inputs.version }}
 
+concurrency:
+    group: release
+    cancel-in-progress: false
+
 jobs:
     build-and-publish:
+        if: github.ref == 'refs/heads/main'
         runs-on: macos-26
         steps:
             - uses: actions/checkout@v4.4.0
               with:
                   fetch-depth: 0
 
+            - name: Check release state
+              id: release_state
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  bash scripts/derive_build_number.sh "$RELEASE_VERSION" > /dev/null
+                  tag="v$RELEASE_VERSION"
+                  if release=$(gh api --include "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq .draft); then
+                    if [[ "$(tail -n 1 <<< "$release")" != "false" ]]; then
+                      echo "Release $tag is still a draft" >&2
+                      exit 1
+                    fi
+                    if ! git merge-base --is-ancestor "refs/tags/$tag" "$GITHUB_SHA"; then
+                      echo "Published release $tag is outside this main history" >&2
+                      exit 1
+                    fi
+                    echo "published=true" >> "$GITHUB_OUTPUT"
+                  elif [[ ! "$release" =~ ^HTTP/[^[:space:]]+[[:space:]]404([[:space:]]|$) ]]; then
+                    exit 1
+                  elif git show-ref --verify --quiet "refs/tags/$tag" &&
+                       [[ "$(git rev-list -n 1 "refs/tags/$tag")" != "$GITHUB_SHA" ]]; then
+                    echo "Release tag $tag already points to another commit" >&2
+                    exit 1
+                  fi
+
             - name: Select Xcode 26.5
+              if: steps.release_state.outputs.published != 'true'
               run: |
                   sudo xcode-select -s /Applications/Xcode_26.5.app
                   xcodebuild -version
                   swift --version
 
             - name: Cache SwiftPM
+              if: steps.release_state.outputs.published != 'true'
               uses: actions/cache@v4.3.0
               with:
                   path: |
@@ -39,9 +71,11 @@ jobs:
                       ${{ runner.os }}-swiftpm-
 
             - name: Install create-dmg
+              if: steps.release_state.outputs.published != 'true'
               run: brew install create-dmg
 
             - name: Build zip
+              if: steps.release_state.outputs.published != 'true'
               env:
                   SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
                   SPARKLE_APPCAST_URL: https://raw.githubusercontent.com/Narcissus-tazetta/LiveWallpaper/main/docs/appcast.xml
@@ -49,15 +83,79 @@ jobs:
                   CREATE_DMG: true
               run: |
                   chmod +x scripts/package_zip.sh
-                  ./scripts/derive_build_number.sh "$RELEASE_VERSION" > /dev/null
-                  if git show-ref --verify --quiet "refs/tags/v$RELEASE_VERSION" &&
-                     [[ "$(git rev-list -n 1 "refs/tags/v$RELEASE_VERSION")" != "$GITHUB_SHA" ]]; then
-                    echo "Release tag v$RELEASE_VERSION already points to another commit" >&2
-                    exit 1
-                  fi
                   ./scripts/package_zip.sh "$RELEASE_VERSION"
 
+            - name: Generate release notes from commits
+              if: steps.release_state.outputs.published != 'true'
+              run: |
+                  chmod +x scripts/generate_release_notes.sh
+                  ./scripts/generate_release_notes.sh "${RELEASE_VERSION}" "dist/release-notes.md"
+
+            - name: Create release
+              if: steps.release_state.outputs.published != 'true'
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  ZIP="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.zip"
+                  DMG="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.dmg"
+                  ASSETS=("$ZIP")
+                  if [[ -f "$DMG" ]]; then
+                    ASSETS+=("$DMG")
+                  fi
+                  gh release create \
+                    "v${RELEASE_VERSION}" "${ASSETS[@]}" \
+                    --target "$GITHUB_SHA" \
+                    --title "v${RELEASE_VERSION}" \
+                    --notes-file "dist/release-notes.md"
+
+    publish-download-links:
+        needs: build-and-publish
+        runs-on: macos-26
+        steps:
+            - uses: actions/checkout@v4.4.0
+              with:
+                  fetch-depth: 0
+
+            - name: Download published archive
+              id: archive
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  mkdir -p dist
+                  gh release download "v$RELEASE_VERSION" \
+                    --pattern "LiveWallpaper-macos-v$RELEASE_VERSION.zip" --dir dist
+                  released=$(gh release view "v$RELEASE_VERSION" --json publishedAt --jq .publishedAt)
+                  echo "APPCAST_PUBLISHED_AT=$released" >> "$GITHUB_ENV"
+
+            - name: Check Homebrew release
+              id: homebrew
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  latest=$(gh release view --json tagName --jq .tagName)
+                  if [[ "$latest" == "v$RELEASE_VERSION" ]]; then
+                    echo "latest=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Generate Homebrew cask
+              if: steps.homebrew.outputs.latest == 'true'
+              run: |
+                  chmod +x scripts/generate_homebrew_cask.sh
+                  ZIP_PATH="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.zip"
+                  ./scripts/generate_homebrew_cask.sh "${RELEASE_VERSION}" "$ZIP_PATH"
+
+            - name: Publish Homebrew tap
+              if: steps.homebrew.outputs.latest == 'true'
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+              run: |
+                  chmod +x scripts/publish_homebrew_tap.sh
+                  ./scripts/publish_homebrew_tap.sh
+
             - name: Generate appcast
+              id: appcast
+              if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
               env:
                   SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
               run: |
@@ -89,63 +187,21 @@ jobs:
                   source "$RUNNER_TEMP/pyenv/bin/activate"
                   python -m pip install -q --upgrade pip
                   python -m pip install -q cryptography
-                  chmod +x scripts/sign_zip.py
-                  chmod +x scripts/generate_appcast.sh
                   ZIP_PATH="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.zip"
                   DOWNLOAD_URL="https://github.com/Narcissus-tazetta/LiveWallpaper/releases/download/v${RELEASE_VERSION}/LiveWallpaper-macos-v${RELEASE_VERSION}.zip"
                   SPARKLE_ED_SIGNATURE="$(python scripts/sign_zip.py "$KEY_FILE" "$ZIP_PATH")"
-                  ./scripts/generate_appcast.sh "${RELEASE_VERSION}" "" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "docs/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${RELEASE_VERSION}"
+                  ./scripts/generate_appcast.sh "${RELEASE_VERSION}" "" "$ZIP_PATH" "$DOWNLOAD_URL" "$SPARKLE_ED_SIGNATURE" "$RUNNER_TEMP/appcast.xml" "https://github.com/Narcissus-tazetta/LiveWallpaper/releases/tag/v${RELEASE_VERSION}"
 
-            - name: Generate release notes from commits
-              run: |
-                  chmod +x scripts/generate_release_notes.sh
-                  ./scripts/generate_release_notes.sh "${RELEASE_VERSION}" "dist/release-notes.md"
-
-            - name: Generate Homebrew cask
-              run: |
-                  chmod +x scripts/generate_homebrew_cask.sh
-                  ZIP_PATH="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.zip"
-                  ./scripts/generate_homebrew_cask.sh "${RELEASE_VERSION}" "$ZIP_PATH"
-
-            - name: Create release
-              id: release
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  ZIP="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.zip"
-                  DMG="dist/LiveWallpaper-macos-v${RELEASE_VERSION}.dmg"
-                  ASSETS=("$ZIP")
-                  if [[ -f "$DMG" ]]; then
-                    ASSETS+=("$DMG")
-                  fi
-                  gh release create \
-                    "v${RELEASE_VERSION}" "${ASSETS[@]}" \
-                    --target "$GITHUB_SHA" \
-                    --title "v${RELEASE_VERSION}" \
-                    --notes-file "dist/release-notes.md"
-
-            - name: Publish Homebrew tap
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-              run: |
-                  chmod +x scripts/publish_homebrew_tap.sh
-                  ./scripts/publish_homebrew_tap.sh
-
-            - name: Commit appcast
-              id: appcast
-              if: ${{ !cancelled() && steps.release.outcome == 'success' }}
+            - name: Publish appcast on main
+              id: publish_appcast
+              if: ${{ !cancelled() && steps.appcast.outcome == 'success' }}
               run: |
                   git config user.name github-actions
                   git config user.email github-actions@github.com
-                  git add docs/appcast.xml
-                  if ! git diff --cached --quiet; then
-                    git commit -m "chore: update appcast v${RELEASE_VERSION}"
-                    git push
-                  fi
+                  bash scripts/publish_appcast.sh "$RELEASE_VERSION" "$RUNNER_TEMP/appcast.xml"
 
             - name: Deploy updated website
-              if: ${{ !cancelled() && steps.appcast.outcome == 'success' && github.ref == 'refs/heads/main' }}
+              if: ${{ !cancelled() && steps.publish_appcast.outcome == 'success' }}
               env:
                   GH_TOKEN: ${{ github.token }}
               run: gh workflow run pages.yml --ref main
